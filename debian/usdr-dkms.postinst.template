@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+dkms add -m usdr-dkms -v #MODULE_VERSION#
+dkms build -m usdr-dkms -v #MODULE_VERSION#
+dkms install -m usdr-dkms -v #MODULE_VERSION#
+exit 0

@@ -1,0 +1,12 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+set(USDR_CAL_LIB_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/opt_func.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cal_lo_iqimb.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cal_filt.c
+
+)
+
+list(APPEND USDR_LIBRARY_FILES ${USDR_CAL_LIB_FILES})
+set(USDR_LIBRARY_FILES ${USDR_LIBRARY_FILES} PARENT_SCOPE)

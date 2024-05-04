@@ -1,0 +1,118 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         PCIEFECMD
+desc:         FrontEndCmd
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: VIRTUAL
+    usdr_path: /debug/hw/pciefe_cmd/0/reg
+addr_width:   8
+data_width:   16
+page_prefix:  True
+# field_prefix: [ Page, RegName ]
+# field_macros: True
+
+pages:
+  - name: FECMD
+    regs:
+      - addr: 0x00
+        name: DAC
+        fields:
+          - bits: "15:0"
+            name: VOUT
+            desc: DAC value
+      - addr: 0x01
+        name: TXSEL
+        fields:
+          - bits: "1:0"
+            name: TXSEL
+            desc: TX selector
+            opts:
+                0: TX_LPF400
+                1: TX_LPF1200
+                2: TX_LPF2100
+                3: TX_BYPASS
+      - addr: 0x02
+        name: RXSEL
+        fields:
+          - bits: "1:0"
+            name: RXSEL
+            desc: RX selector
+            opts:
+                0: RX_LPF1200
+                1: RX_LPF2100
+                2: RX_BPF2100_3000
+                3: RX_BPF3000_4200
+      - addr: 0x03
+        name: DUPLSEL
+        fields:
+          - bits: "2:0"
+            name: DUPLSEL
+            desc: Dumplexer path
+            opts:
+                0: TRX_BYPASS
+                1: TRX_BAND2
+                2: TRX_BAND3
+                3: TRX_BAND5
+                4: TRX_BAND7
+                5: TRX_BAND8
+      - addr: 0x04
+        name: LOOPBACK
+        fields:
+          - bits: "0"
+            name: TRX
+            desc: Enable TX-RX loopback 
+      - addr: 0x05
+        name: LED
+        fields:
+          - bits: "3"
+            name: LED4
+            desc: Inverted control LED4
+          - bits: "2"
+            name: LED3
+            desc: Inverted control LED3
+          - bits: "1"
+            name: LED2
+            desc: Inverted control LED2
+          - bits: "0"
+            name: LED1
+            desc: Inverted control LED1
+      - addr: 0x06
+        name: ATTN
+        fields:
+          - bits: "1:0"
+            name: VAL
+            desc: RX attenuator, LSB=6dB
+            opts:
+                0: IL
+                1: 6DB
+                2: 12DB
+                3: 18DB
+      - addr: 0x07
+        name: CTRL_LNA
+        fields:
+          - bits: "0"
+            name: LNA
+            desc: Enable RX LNA
+      - addr: 0x08
+        name: CTRL_PA
+        fields:
+          - bits: "0"
+            name: PA
+            desc: Enable TX PA            
+      - addr: 0x09
+        name: GPS
+        fields:
+          - bits: "0"
+            name: EN_GPS
+            desc: Enable GPS
+      - addr: 0x0A
+        name: OSC
+        fields:
+          - bits: "0"
+            name: EN_OSC
+            desc: Enable OSC            
+            

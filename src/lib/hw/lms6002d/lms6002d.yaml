@@ -1,0 +1,1357 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         LMS6002D
+desc:         RFIC
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: SPI
+    wr_mask: 0x8000
+    usdr_path: /debug/hw/lms6002d/0/reg
+addr_width:   8
+data_width:   8
+page_prefix:  True
+field_prefix: [ Page, RegName ]
+field_macros: True
+
+x-lpf-codes: &lpf-codes
+    0b0000: 14000KHZ
+    0b0001: 10000KHZ
+    0b0010: 7000KHZ
+    0b0011: 6000KHZ
+    0b0100: 5000KHZ
+    0b0101: 4375KHZ
+    0b0110: 3500KHZ
+    0b0111: 3000KHZ
+    0b1000: 2750KHZ
+    0b1001: 2500KHZ
+    0b1010: 1920KHZ
+    0b1011: 1500KHZ
+    0b1100: 1375KHZ
+    0b1101: 1250KHZ
+    0b1110: 875KHZ
+    0b1111: 750KHZ
+
+pages:
+  - name: Top
+    regs:
+      - addr: 0x00
+        name: DC_REG
+        fields:
+          - bits: "5:0"
+            name: VAL
+            desc: Value from DC calibration module selected by DC_ADDR
+
+      - addr: 0x01
+        name: DC_CAL
+        fields:
+          - bits: "7:5"
+            name: RC_LPF
+            desc: Value of the cal_core block in the LPF which calibrates the RC time constant. It should be read by software to set the value of the TIA feedbackcap (CFB_RXFE_TIA)
+          - bits: "4:2"
+            name: LOCK
+            desc: Lock pattern register. Locked, when register value is not 000 nor 111
+          - bits: "1"
+            name: CLBR_DONE
+            desc: Indicates calibration status. 1 - calibration in progress; 0 - calibration is done
+          - bits: "0"
+            name: UD
+            desc: Value from DC module comparator, selected by DC_ADDR. 1 - Count Up; 0 - Count Down
+
+      - addr: 0x02
+        name: DC_CNTVAL
+        fields:
+          - bits: "5:0"
+            name: VAL
+            desc: Value to load into selected (by DC_ADDR) DC calibration module
+
+      - addr: 0x03
+        name: DC_OP
+        fields:
+          - name: DC_START_CLBR
+            bits: "5"
+            desc: Start calibration command of themodule, selected by DC_ADDR 1 - Start Calibration; 0 - Deactivate Start Calibration command. (default)
+          - name: DC_LOAD
+            bits: "4"
+            desc: Loadvalue from DC_CNTVAL to module, selected by DC_ADDR 1 - Load Value; 0 - Deactivate Load Value command. (default)
+          - name: DC_SRESET
+            bits: "3"
+            desc: Resets all DC Calibration modules 1 - Reset inactive (default); 0 - Reset active
+          - name: DC_ADDR
+            bits: "2:0"
+            desc: Active calibration module address 000 - LPF tuning module; 001-111 - Not used
+
+      - addr: 0x04
+        name: CHIPID
+        fields:
+          - name: REV
+            bits: '3:0'
+            desc: Chip revision
+          - name: VER
+            bits: '7:4'
+            desc: Chip version
+            
+      - addr: 0x05
+        name: ENCFG
+        fields:
+          - name: DECODE
+            bits: '7'
+            desc: 0 - decode control signals (default); 1 - use control signals from
+                testmode registers.
+          - name: EN
+            bits: '4'
+            desc: 'Top modules enable: EN = 0 - Top modules powered down; EN = 1
+                - Top modules enabled (default)'
+          - name: SRESET
+            bits: '5'
+            desc: DSM soft reset; 0 - reset state; 1 - inactive (default)
+          - name: SRXEN
+            bits: '2'
+            desc: 'Soft receive enable SRX: EN=0 - Receiver powered down(default);
+                SRXEN=1 - Receiver enabled'
+          - name: STXEN
+            bits: '3'
+            desc: 'Soft transmit enable STX: EN=0 - Transmitter powered down(default);
+                STXEN=1 - Transmitter enabled'
+          - name: TFWMODE
+            bits: '1'
+            desc: 'Serial port mode: TFWMODE=0 - three wire mode; TFWMODE=1 - four
+                wire mode (default)'
+                
+      - addr: 0x06
+        name: LPF_CTRL
+        fields:
+          - name: CLKSEL
+            bits: '3'
+            desc: 'Select the clock for LPF tuning module: 0 - 40 MHz clock generated
+                from TX PLL output; 1 - use PLL reference clock (default)'
+          - name: ENF_EN
+            bits: '1'
+            desc: 'Enables the enforce mode. Passes FORCE_CODE_CAL_LPFCAL to RCCAL_LPFCAL:
+                0 - enforce mode disabled (default); 1 - enforce mode enabled'
+          - name: PD_CLK
+            bits: '2'
+            desc: 'Power down on chip LPF tuning clock generation block: 0 - powered
+                up; 1 - powered down (default)'
+          - name: RST_CAL
+            bits: '0'
+            desc: 'Reset signal  used  atthe  beginning  of  calibration  cycle.  Reset
+                signal needs to be longer than 100ns: 0 - normalstate; 1 - resetstate (default)'
+                
+      - addr: 0x07
+        name: LPF_CAL
+        fields:
+          - name: BWC
+            bits: '3:0'
+            desc: LPF bandwidth control (Set this code to RXLPF BWC if RXLPF and
+                TXLPF have different cut-off frequencies)
+          - name: EN_CAL
+            bits: '7'
+            desc: 'nable signal. If =1--> the block is enabled. Should be enabled
+                only during the RC calibration algorithm running: 0 - Block disabled (default);
+                1 - Block enabled'
+          - name: FORCE_CODE_CAL
+            bits: '6:4'
+            desc: 'put code coming from software. Will be passed to the output if
+                ENF_EN_CAL_LPFCAL=1: 000  (default)'
+                
+      - addr: 0x08
+        name: LOOPBACK
+        fields:
+          - name: LBEN_LPFIN
+            bits: '6'
+            desc: BB loopback enable. If =1, TX BB loopback signalis connected to
+                RXLPF input. If enabled, RXTIA should be disabled (powered down)0 - defaultvalue.
+          - name: LBEN_OPIN
+            bits: '4'
+            desc: BB loopback enable. If =1, TX BB loopback signalis connected to
+                the RX output pins. If enabled, RXLPF and RXVGA2 should be disabled (powered
+                down)0 - defaultvalue.
+          - name: LBEN_VGA2IN
+            bits: '5'
+            desc: BB loopback enable. If =1, TX BB loopback signalis connected to
+                RXVGA2 input. If enabled, LPFshould be disabled (powered down).0 - defaultvalue.
+          - name: LBRFEN
+            bits: '3:0'
+            desc: 'RF loop back control. When activated, LNAs should be disabled
+                (powered down): 0 - RF loopback disabled (default); 1 - TXMIX output connected
+                to LNA1 path; 2 - TXMIX output connected to LNA2 path; 3 - TXMIX output connected
+                to LNA3 path; 4-15 Reserved. Not valid for settings.'
+                
+      - addr: 0x09
+        name: ENREG
+        fields:
+          - name: CLK_LPF_CAL
+            bits: '5'
+            desc: LPF CAL clock enable
+          - name: CLK_PLLCLKOUT
+            bits: '6'
+            desc: PLLCLKOUT enable
+          - name: CLK_RX_DSM_SPI
+            bits: '2'
+            desc: Rx DSM SPI clock enable
+          - name: CLK_RX_RPL_DCCAL
+            bits: '3'
+            desc: Rx LPF DCCAL clock enable
+          - name: CLK_RX_VGA2_DCCAL
+            bits: '4'
+            desc: Rx VGA2 DCCAL clock enable
+          - name: CLK_TX_DSM_SPI
+            bits: '0'
+            desc: Tx DSM SPI clock enable
+          - name: CLK_TX_RPL_DCCAL
+            bits: '1'
+            desc: Tx LPF SPI DCCAL clock enable
+          - name: RXOUTSW
+            bits: '7'
+            desc: RX out/ADC in high-Z switch control; 0 - switch open (RX output/ADC
+                input chip pins disconnected) (default); 1 - switch closed, RXVGA2 should
+                be powered off first
+                
+      - addr: 0x0A
+        name: DUPLEX
+        fields:
+          - name: FDDTDD
+            bits: '1'
+            desc: Frequency/Time division duplexing selection 0 - FDD mode (default);
+                1 - TDD mode
+          - name: TDDMOD
+            bits: '0'
+            desc: 'TDD mode selectionif FDDTDD=1: 0 - TDD Transmit mode (default);
+                1 - TDD Receive mode'
+                
+      - addr: 0x0B
+        name: POWER
+        fields:
+          - name: PDXCOBUF
+            bits: '4'
+            desc: XCO buffer power down 0 - buffer powered up (default); 1 - buffer
+                powered down
+          - name: SLFBXCOBUF
+            bits: '3'
+            desc: 'XCO buffer self-biasingcontrol: 0 - self biasing disabled: 1 -
+                self biasing enabled (default)'
+          - name: BYPXCOBUF
+            bits: '2'
+            desc: 'XCO buffer bypass: 0 - buffer active (default); 1 - buffer bypassed'
+          - name: PD_DCOREF_LPFCAL
+            bits: '1'
+            desc: 1 - PD_DCOREF_LPFCAL powered down
+          - name: PU_RFLB
+            bits: '0'
+            desc: 1 - RF loop back switch powered up
+
+  - name: TxPLL
+    regs:
+      - addr: "0x10:0x13"
+        name: NINT_NFRAC
+        fields:
+          - name: NINT
+            bits: '31:23'
+            desc: Integer part of the divider
+          - name: NFRAC
+            bits: '22:0'
+            desc: Fractional part of the divider
+            
+      - addr: 0x14
+        name: PLL_CFG
+        fields:
+          - name: AUTOBYP
+            bits: '2'
+            desc: Delta sigma auto bypass when NFRAC = 0
+          - name: DECODE
+            bits: '1'
+            desc: 0 - decode power down/enable signals (default); 1 - use power down/enable signals from test mode registers
+          - name: DITHEN
+            bits: '7'
+            desc: Dithering control
+          - name: DITHN
+            bits: '6:4'
+            desc: How many bits to dither if DITHEN=1
+          - name: PLLEN
+            bits: '3'
+            desc: PLL enable
+            
+      - addr: 0x15
+        name: VCO_DIV
+        fields:
+          - name: FRANGE
+            bits: '4:2'
+            desc: PLL output frequency range selection
+          - name: SELOUT
+            bits: '1:0'
+            desc: "Select output buffer in RX PLL, not used in TX PLL; 00 -\
+                All output buffers powered down; 01 - First buffer enabled for LNA1 path\
+                \ (default); 10 - Second buffer enabledfor LNA2 path; 11 - Third buffer\
+                \ enabledfor LNA3 path"
+          - name: SELVCO
+            bits: '7:5'
+            desc: VCO selection
+            
+      - addr: 0x16
+        name: PFD_UP
+        fields:
+          - name: EN_PFD_UP
+            bits: '7'
+            desc: Enable PFD UP pulses
+          - name: ICHP
+            bits: '4:0'
+            desc: Charge pump current. LSB - 100ua
+          - name: OEN_TSTD_SX
+            bits: '6'
+            desc: 0 - Test signal output buffer disabled
+          - name: PASSEN_TSTOD_SD
+            bits: '5'
+            desc: 0 - Test signal pass disabled
+            
+      - addr: 0x17
+        name: VCO_REG_PFD_U
+        fields:
+          - name: BYPVCOREG
+            bits: '7'
+            desc: Bypass VCO regulator
+          - name: FSTVCOBG
+            bits: '5'
+            desc: VCO regulator band gap settling time control. Shorts the resistor
+                in band gap to speed up charging for faster response. After the initial charge
+                up, it should be disabled
+          - name: OFFUP
+            bits: '4:0'
+            desc: Charge pump UP offset current. Binary coded, LSB = 10uA
+          - name: PDVCOREG
+            bits: '6'
+            desc: VCO regulator power down
+
+      - addr: 0x18
+        name: VCO_REG_PFD_D
+        fields:
+          - name: OFFDOWN
+            bits: '4:0'
+            desc: Charge pump DOWN offset current. Binary coded, LSB = 10uA
+          - name: VOVCOREG_H
+            bits: '7:5'
+            desc: VCO regulator output voltage control, 0 -- 1.4V; 1100 -- 2.6V (MAX)
+            
+      - addr: 0x19
+        name: PLL_CFG2
+        fields:
+          - name: VCOCAP
+            bits: '5:0'
+            desc: Switch capacitance programming. Binary coded
+          - name: VOVCOREG_L
+            bits: '7'
+            desc: VCO regulator output voltage control
+            
+      - addr: 0x1A
+        name: VTUNE
+        fields:
+          - name: VTUNE_H
+            bits: '7'
+            desc: HValue from Vtunecomparator
+          - name: VTUNE_L
+            bits: '6'
+            desc: LValue from Vtunecomparator
+
+      - addr: 0x1B
+        name: VCOCOMO
+        fields:
+          - name: PD_SX
+            bits: '3'
+            desc: VCO Comparator Enable; 0 - enabled (powered up), 1 - disabled (powered down)
+
+  - name: RxPLL
+    regs:
+      - addr: "0x20:0x23"
+        name: NINT_NFRAC
+        fields:
+          - name: NINT
+            bits: '31:23'
+            desc: Integer part of the divider
+          - name: NFRAC
+            bits: '22:0'
+            desc: Fractional part of the divider
+            
+      - addr: 0x24
+        name: PLL_CFG
+        fields:
+          - name: AUTOBYP
+            bits: '2'
+            desc: Delta sigma auto bypass when NFRAC = 0
+          - name: DECODE
+            bits: '1'
+            desc: 0 - decode power down/enable signals (default); 1 - use power down/enable signals from test mode registers
+          - name: DITHEN
+            bits: '7'
+            desc: Dithering control
+          - name: DITHN
+            bits: '6:4'
+            desc: How many bits to dither if DITHEN=1
+          - name: PLLEN
+            bits: '3'
+            desc: PLL enable
+            
+      - addr: 0x25
+        name: VCO_DIV_BUFSEL
+        fields:
+          - name: FRANGE
+            bits: '4:2'
+            desc: PLL output frequency range selection
+          - name: SELOUT
+            bits: '1:0'
+            desc: "Select output buffer in RX PLL, not used in TX PLL; 00 -\
+                All output buffers powered down; 01 - First buffer enabled for LNA1 path\
+                \ (default); 10 - Second buffer enabledfor LNA2 path; 11 - Third buffer\
+                \ enabledfor LNA3 path"
+          - name: SELVCO
+            bits: '7:5'
+            desc: VCO selection
+            
+      - addr: 0x26
+        name: PFD_UP
+        fields:
+          - name: EN_PFD_UP
+            bits: '7'
+            desc: Enable PFD UP pulses
+          - name: ICHP
+            bits: '4:0'
+            desc: Charge pump current. LSB - 100ua
+          - name: OEN_TSTD_SX
+            bits: '6'
+            desc: 0 - Test signal output buffer disabled
+          - name: PASSEN_TSTOD_SD
+            bits: '5'
+            desc: 0 - Test signal pass disabled
+            
+      - addr: 0x27
+        name: VCO_REG_PFD_U
+        fields:
+          - name: BYPVCOREG
+            bits: '7'
+            desc: Bypass VCO regulator
+          - name: FSTVCOBG
+            bits: '5'
+            desc: VCO regulator band gap settling time control. Shorts the resistor
+                in band gap to speed up charging for faster response. After the initial charge
+                up, it should be disabled
+          - name: OFFUP
+            bits: '4:0'
+            desc: Charge pump UP offset current. Binary coded, LSB = 10uA
+          - name: PDVCOREG
+            bits: '6'
+            desc: VCO regulator power down
+
+      - addr: 0x28
+        name: VCO_REG_PFD_D
+        fields:
+          - name: OFFDOWN
+            bits: '4:0'
+            desc: Charge pump DOWN offset current. Binary coded, LSB = 10uA
+          - name: VOVCOREG_H
+            bits: '7:5'
+            desc: VCO regulator output voltage control, 0 -- 1.4V; 1100 -- 2.6V (MAX)
+            
+      - addr: 0x29
+        name: PLL_CFG2
+        fields:
+          - name: VCOCAP
+            bits: '5:0'
+            desc: Switch capacitance programming. Binary coded
+          - name: VOVCOREG_L
+            bits: '7'
+            desc: VCO regulator output voltage control
+            
+      - addr: 0x2A
+        name: VTUNE
+        fields:
+          - name: COMPH
+            bits: '7'
+            desc: HValue from Vtunecomparator
+          - name: COMPL
+            bits: '6'
+            desc: LValue from Vtunecomparator
+
+      - addr: 0x2B
+        name: VCOCOMO
+        fields:
+          - name: PD_SX
+            bits: '3'
+            desc: VCO Comparator Enable; 0 - enabled (powered up), 1 - disabled (powered down)
+            
+  - name: TxLPF
+    regs:
+      - addr: 0x30
+        name: DC_REG_VAL
+        fields:
+          - name: VAL
+            bits: '7:0'
+            desc: Value from DC calibration module selected by DC_ADDR
+            
+      - addr: 0x31
+        name: DC_REG
+        fields:
+          - name: LOCK
+            bits: '4:2'
+            desc: Locked, when register value is not 000 nor 111 
+          - name: CALIBR_DONE
+            bits: '1'
+            desc: Idicates calibration status; 1 - calibration in progress; 0 - calibration is done
+          - name: UD
+            bits: '0'
+            desc: Value from DC module comparator, selected by DC_ADDR; 1 - Count Up; 0 - Count Down
+
+      - addr: 0x32
+        name: DC_CNT
+        fields:
+          - name: VAL
+            bits: '7:0'
+            desc: Value to load into selected (by DC_ADDR) DC calibration module
+
+      - addr: 0x33
+        name: DC_CALIB
+        fields:
+          - name: START
+            bits: '5'
+            desc: Start calibration command of module selected by DC_ADDR; 1 - start calibration; 0 - deactivate start calibration command
+          - name: LOAD
+            bits: '4'
+            desc: Load value from DC_CNTVAL to module, selected by DC_ADDR; 1 - Load Value; 0 - Deactivate Load Value command
+          - name: SRESET
+            bits: '3'
+            desc: Rsets all DC Calibration modules; 1 - Reset inactive; 0 - Reset active
+          - name: ADDR
+            bits: '2:0'
+            desc: Active calibration module address; 000 - I filter; 001 - Q filter; 010 - 111 Not used
+
+      - addr: 0x34
+        name: BW
+        fields:
+          - name: LPF
+            bits: '5:2'
+            desc: LPF bandwidth control;
+                    Code - Bandwidth, MHz;
+                    0000 - 14;
+                    0001 - 10;
+                    0010 - 7;
+                    0011 - 6;
+                    0100 - 5;
+                    0101 - 4.375;
+                    0110 - 3.5;
+                    0111 - 3;
+                    1000 - 2.75;
+                    1001 - 2.5;
+                    1010 - 1.92;
+                    1011 - 1.5;
+                    1100 - 1.375;
+                    1101 - 1.25;
+                    1110 - 0.875;
+                    1111 - 0.75;
+            opts:
+                <<: *lpf-codes
+          - name: EN
+            bits: '1'
+            desc: LPF modules enable; 0 - LPF modules powered down; 1 - LPF modules enabled
+          - name: DECODE
+            bits: '0'
+            desc: 0 - decode control signals (default), 1 - use control signals from test mode registers
+
+      - addr: 0x35
+        name: DACBP
+        fields:
+          - name: BYP
+            bits: '6'
+            desc: PF bypass enable; 1 - bypass switches will bypass the LPF; 0 - normal operation
+          - name: DACCAL
+            bits: '5:0'
+            desc: Resistor calibration control for the DC offset cancellation DAC
+
+      - addr: 0x36
+        name: CTRL
+        fields:
+          - name: TX_DACBUF_PD
+            bits: '7'
+            desc: TX data DAC buffers power down; 0 - enabled (default); 1 - powered Down
+          - name: RCCAL_LPF
+            bits: '6:4'
+            desc: Calibration value, coming from TRX_LPF_CAL module
+          - name: PD_DCODAC_LPF
+            bits: '2'
+            desc: Power down for the DAC in the DC offset cancellation block; 1 -  Powered Down; 0 - Enabled (default)
+          - name: PD_DCOREF_LPF
+            bits: '1'
+            desc: Power down signal for the dc_ref_con3 block; 1 - Powered Down; 0 -  Enabled (default)
+          - name: PD_FIL_LPF
+            bits: '0'
+            desc: Power down for the filter; 1 - Powered Down; 0 - Enabled (default)
+            
+      - addr: 0x3F
+        name: DCOCMP_LPF
+        fields:
+          - name: PD
+            bits: '7'
+            desc: Power down DC offset comparators in DC offset cancellation block. Should be powered up only when DC offset cancellation algorithm is running; 1 -  Powered Down; 0 - Enabled (default)
+
+  - name: TRF
+    regs:
+      - addr: 0x40
+        name: CTRL
+        fields:
+          - name: EN
+            bits: '1'
+            desc: TXRF modules enable; 0 - TXRF modules powered down; 1 - TXRF modules enabled (default)
+          - name: DECODE
+            bits: '0'
+            desc: 0 - decode control signals (default); 1 - use control signals from test mode register     
+            
+      - addr: 0x41
+        name: VGA1GAIN
+        fields:
+          - name: VGA1GAIN
+            bits: '4:0'
+            desc: TXVGA1 gain, log-linear control
+            scale:
+                min: -35
+                max: -4
+                unit: dB
+
+      - addr: 0x42
+        name: VGA1DC_I
+        fields:
+          - name: VGA1DC_I
+            bits: '7:0'
+            desc: TXVGA1 DC shift control, LO leakage cancellation LSB=0.0625mV
+            scale:
+                min: -16
+                max: 15.9375
+                unit: mV
+                
+      - addr: 0x43
+        name: VGA1DC_Q
+        fields:
+          - name: VGA1DC_Q
+            bits: '7:0'
+            desc: TXVGA1 DC shift control, LO leakage cancellation LSB=0.0625mV
+            scale:
+                min: -16
+                max: 15.9375
+                unit: mV                
+                
+      - addr: 0x44
+        name: PA_CTRL
+        fields:
+          - name: EN12
+            bits: '4:3'
+            desc: VGA2 power amplifier (TX output) selection PA1 / PA2; 00 - OFF; 01 - PA1 ON; 10 - PA2 ON; 11 - OFF
+          - name: ENAUX
+            bits: '2'
+            desc: AUXPA, auxiliary (RF loop back) PA power down; 0 - powered up (default); 1 - powered down
+
+      - addr: 0x45
+        name: CTRL2
+        fields:
+          - name: VGA2GAIN
+            bits: '7:3'
+            desc: TXVGA2 gain control, log-linear control LSB=1dB, encoded as shown below; 00000 - 0; 11001 - 25; 11111 - 25
+            scale:
+                min: 0
+                0b11001: 25
+                max: 25
+                unit: dB
+          - name: ENVD2
+            bits: '2'
+            desc: Controls envelop/peak detector analogue MUX; Selects the signal for AC coupling, MUX provides; 0 - reference DC generated inside the selected detector (default); 1 - average of the selected detector output
+          - name: ENVD
+            bits: '1:0'
+            desc: Detector select, MUX provides; 00 - AUXPA envelop detector output (default); 01 - AUXPA peak detector output; 10 - PA1 envelop detector output; 11 - PA2 envelop detector output
+            opts:
+                0b00: AUXPA_ENVELOP
+                0b01: AUXPA_PEAK
+                0b10: PA1_ENVELOP
+                0b11: PA2_PEAK
+
+      - addr: 0x46
+        name: CTRL3
+        fields:
+          - name: PKDBW
+            bits: '7:4'
+            desc: Controls the bandwidth of the envelop and peak detectors; 0000 - Minimum bandwidth, envelop ~1MHz, peak 30kHz (default); 1111 - Maximum bandwidth, envelop ~15MHz, peak ~300KHz
+          - name: LOOPBBEN
+            bits: '3:2'
+            desc: Base band loop back switches control
+            opts:
+                0b00: BBLB_DISABLE
+                0b11: BBLB_ENABLE
+          - name: FST_PKDET
+            bits: '1'
+            desc: Shorts the resistor in the envelop/peak detector to speed up charging for faster response. After the initial charge up, it should be disabled to achieve a LPF function; 0 - switch open, LPF function in effect (default); 1 - resistor shorted (no LPF function)
+          - name: FST_TXHFBIAS
+            bits: '0'
+            desc: Bias stage of high frequency TX part has large resistors to filter the noise. However, they create large settling time. This switch can be used to short those resistors during the initialization and then it may be needed to open it to filter the noise, in case the noise is too high; 0 - switch open (noise filtering functional) (default); 1 - resistors shorted (short settling - no noise filtering) 
+
+      - addr: 0x47
+        name: CTRL4
+        fields:
+          - name: ICT_TXLOBUF
+            bits: '7:4'
+            desc: Controls the bias current of the LO buffer. Higher current will increase the linearity. LSB=5/6mA; 0000 - minimum current; 0110 - TXMIX takes 5mA for buffer (default); 1111 - maximum current
+          - name: VBCAS_TXDRV
+            bits: '3:0'
+            desc: "The linearity of PAs depends on the bias at the base of the cascode npn's in the PA cells. Increasing the VBCAS will lower the base of the cascode npn; 0000 - maximum base voltage (default); 1111 - minimum base voltage"
+
+      - addr: 0x48
+        name: TXMIX
+        fields:
+          - name: TXMIX_ICT
+            bits: '4:0'
+            desc: Controls the bias current of the mixer. Higher current will increase the linearity. LSB=1mA; 00000 - 0 mA; 01100 - TXMIX takes 12mA for each cell (default); 11111 - 31 mA
+            scale:
+                min: 0
+                max: 31
+                unit: mA
+
+      - addr: 0x49
+        name: TXDRV
+        fields:
+          - name: TXDRV_ICT
+            bits: '4:0'
+            desc: Controls the bias current of the PAs. Higher current will increase the linearity. LSB=1mA; 00000 - 0 mA; 01100 - TXMIX takes 12mA for each cell (default); 11111 - 31 mA
+            scale:
+                min: 0
+                max: 31
+                unit: mA
+
+      - addr: 0x4A
+        name: PWR
+        fields:
+          - name: PW_VGA1_I
+            bits: '4'
+            desc: VGA1, I channel power enable control
+          - name: PW_VGA1_Q
+            bits: '3'
+            desc: Calibration value, coming from TRX_LPF_CAL module
+          - name: PD_TXDRV
+            bits: '2'
+            desc: Power down for PAs and AUXPA; 0 - PA1, PA2 and AUXPA can be separately controlled (default); 1 - PA1, PA2 and AUXPA all disabled
+          - name: PD_TXLOBUF
+            bits: '1'
+            desc: Power down for TXLOBUF
+          - name: PD_TXMIX
+            bits: '0'
+            desc: Power down for TXMIX
+
+      - addr: 0x4B
+        name: VGA1GAINT
+        fields:
+          - name: VGA1GAINT
+            bits: '7:0'
+            desc: TXVGA1 gain control, raw access
+            
+      - addr: "0x4C:0x4D"
+        name: G_TXVGA2
+        fields:
+          - name: G_TXVGA2
+            bits: '15:7'
+            desc: 'G_TXVGA2 Controls the gain of PA1, PA2 and AUXPA, raw access For PA1, PA2: Gain=20 * log10(0.038 * G_TXVGA2[8:0])'
+
+      - addr: 0x4E
+        name: PKDET
+        fields:
+          - name: PKDET_PD
+            bits: '7'
+            desc: Power down for envelop/peak detectors; 0 - powered up (default); 1 - powered down
+
+  - name: RxLPF
+    regs:
+      - addr: 0x50
+        name: DC_REG_VAL
+        fields:
+          - name: RXLPF_DC_VAL
+            bits: '7:0'
+            desc: Value from DC calibration module selected by DC_ADDR
+            
+      - addr: 0x51
+        name: DC_REG
+        fields:
+          - name: LOCK
+            bits: '4:2'
+            desc: Locked, when register value is not 000 nor 111 
+          - name: CALIBR_DONE
+            bits: '1'
+            desc: Idicates calibration status; 1 - calibration in progress; 0 - calibration is done
+          - name: UD
+            bits: '0'
+            desc: Value from DC module comparator, selected by DC_ADDR; 1 - Count Up; 0 - Count Down
+
+      - addr: 0x52
+        name: DC_CNT
+        fields:
+          - name: VAL
+            bits: '7:0'
+            desc: Value to load into selected (by DC_ADDR) DC calibration module
+
+      - addr: 0x53
+        name: DC_CALIB
+        fields:
+          - name: START
+            bits: '5'
+            desc: Start calibration command of module selected by DC_ADDR; 1 - start calibration; 0 - deactivate start calibration command
+          - name: LOAD
+            bits: '4'
+            desc: Load value from DC_CNTVAL to module, selected by DC_ADDR; 1 - Load Value; 0 - Deactivate Load Value command
+          - name: SRESET
+            bits: '3'
+            desc: Rsets all DC Calibration modules; 1 - Reset inactive; 0 - Reset active
+          - name: ADDR
+            bits: '2:0'
+            desc: Active calibration module address; 000 - I filter; 001 - Q filter; 010 - 111 Not used
+            opts:
+                0b000: DC_ADDR_I
+                0b001: DC_ADDR_Q
+
+      - addr: 0x54
+        name: BW
+        fields:
+          - name: LPF
+            bits: '5:2'
+            desc: LPF bandwidth control;
+                    Code - Bandwidth, MHz;
+                    0000 - 14;
+                    0001 - 10;
+                    0010 - 7;
+                    0011 - 6;
+                    0100 - 5;
+                    0101 - 4.375;
+                    0110 - 3.5;
+                    0111 - 3;
+                    1000 - 2.75;
+                    1001 - 2.5;
+                    1010 - 1.92;
+                    1011 - 1.5;
+                    1100 - 1.375;
+                    1101 - 1.25;
+                    1110 - 0.875;
+                    1111 - 0.75;
+            opts:
+                <<: *lpf-codes
+          - name: EN
+            bits: '1'
+            desc: LPF modules enable; 0 - LPF modules powered down; 1 - LPF modules enabled
+          - name: DECODE
+            bits: '0'
+            desc: 0 - decode control signals (default), 1 - use control signals from test mode registers
+
+      - addr: 0x55
+        name: DACBP
+        fields:
+          - name: BYP
+            bits: '6'
+            desc: PF bypass enable; 1 - bypass switches will bypass the LPF; 0 - normal operation
+          - name: DACCAL
+            bits: '5:0'
+            desc: Resistor calibration control for the DC offset cancellation DAC
+
+      - addr: 0x56
+        name: CTRL
+        fields:
+          - name: RCCAL_LPF
+            bits: '6:4'
+            desc: Calibration value, coming from TRX_LPF_CAL module
+          - name: PD_DCODAC_LPF
+            bits: '2'
+            desc: Power down for the DAC in the DC offset cancellation block; 1 -  Powered Down; 0 - Enabled (default)
+          - name: PD_DCOREF_LPF
+            bits: '1'
+            desc: Power down signal for the dc_ref_con3 block; 1 - Powered Down; 0 -  Enabled (default)
+          - name: PD_FIL_LPF
+            bits: '0'
+            desc: Power down for the filter; 1 - Powered Down; 0 - Enabled (default)
+            
+  - name: AFE
+    regs:
+      - addr: 0x57
+        name: CTRL
+        fields:
+          - name: EN_ADC_DAC
+            bits: '7'
+            desc: ADC/DAC modules enable; 0 - ADC/DAC modules powered down; 1 - ADC/DAC modules enabled (default)
+          - name: DECODE
+            bits: '6'
+            desc: 0 - decode ADC/DAC enable signals (default); 1 - use ADC/DAC enable signals from MISC_CTRL[4:0] register.
+          - name: DAC_OUT_LOAD
+            bits: '5:3'
+            desc: DAC Internal Output Load Resistor Control Bits
+            opts:
+                0b111: 50OHM
+                0b110: 100OHM
+                0b101: 66OHM
+                0b100: 200OHM
+                0b011: 67OHM
+                0b010: 200OHM_2
+                0b001: 100OHM_2
+                0b000: 0OHM
+          - name: DAC_REF_EXT_RES
+            bits: '2'
+            desc: DAC Reference Current Resistor; 1 - External (default); 0 - Internal
+          - name: DAC_FS_CURRENT
+            bits: '1:0'
+            desc: DAC Full Scale Output Current Control (single-ended)
+            opts:
+                0b11: FS5MA
+                0b10: FS2MA5
+                0b01: FS10MA
+                0b00: FS5MA_2
+                
+      - addr: 0x58
+        name: RX_CTRL1
+        fields:
+          - name: REF_BIAS
+            bits: '7:6'
+            desc: Reference bias resistor adjust
+            opts:
+                0b11: 15UA
+                0b10: 10UA
+                0b01: 40UA
+                0b00: 20UA
+          - name: REF_BIAS_UP
+            bits: '5:4'
+            desc: Reference bias UP
+            opts:
+                0b11: 15UA
+                0b10: 10UA
+                0b01: 40UA
+                0b00: 20UA       
+          - name: REF_BIAS_DOWN
+            bits: '3:0'
+            desc: Reference bias DOWN; 1111 - Min Bias; 0000 - Max Bias (default)
+            
+      - addr: 0x59
+        name: RX_CTRL2
+        fields:
+          - name: GAIN_ADJ
+            bits: '6:5'
+            desc: Reference Gain Adjust
+            opts:
+                0b11: 1V25
+                0b10: 1V00
+                0b01: 1V75
+                0b00: 1V50
+          - name: CM_ADJ
+            bits: '4:3'
+            desc: Common Mode Adjust
+            opts:
+                0b11: 790MV
+                0b10: 700MV
+                0b01: 960MV
+                0b00: 875MV
+          - name: BUF_BOOST
+            bits: '2:1'
+            desc: Reference Buffer Boost
+            opts:
+                0b11: 2X5
+                0b10: 2X0
+                0b01: 1X5
+                0b00: 1X0
+                
+      - addr: 0x5A
+        name: MISC_CTRL
+        fields:
+          - name: RXPOL
+            bits: '7'
+            desc: Rx Fsync Polarity, frame start
+          - name: RXIQ
+            bits: '6'
+            desc: Rx Interleave Mode; 1 - Q,I; 0 - I,Q (default)
+          - name: DAC_EDGE
+            bits: '5'
+            desc:  Dac Clk Edge Polarity; 1 - negative (default); 0 - positive
+          - name: TXPOL
+            bits: '4'
+            desc: Tx Fsync Polarity, frame start
+          - name: TXIQ
+            bits: '3'
+            desc: Tx Interleave Mode; 1 - Q,I; 0 - I,Q (default)
+          - name: ADC_EDGE
+            bits: '2'
+            desc:  Dac Clk Edge Polarity; 1 - negative (default); 0 - positive     
+          - name: CLOCK_ADJ
+            bits: '1:0'
+            desc:  Clock Non-Overlap Adjust; 11 - +300ps; 10 - +150ps; 01 - +450ps; 00 - Nominal 
+
+      - addr: 0x5B
+        name: RX_CTRL4
+        fields:
+          - name: ADC_BAIS
+            bits: '7:6'
+            desc: ADC bias resistor adjust
+          - name: MAIN_BAIS_DOWN
+            bits: '5:4'
+            desc: Main bias DOWN        
+          - name: ADC_AMP1_ST1_UP
+            bits: '3:2'
+            desc: ADC Amp1 stage1 bias UP
+          - name: ADC_AMP24_ST1_UP
+            bits: '1:0'
+            desc: ADC Amp2-4 stage1 bias UP
+
+      - addr: 0x5C
+        name: RX_CTRL5
+        fields:     
+          - name: ADC_AMP1_ST2_UP
+            bits: '7:6'
+            desc: ADC Amp1 stage2 bias UP
+          - name: ADC_AMP24_ST2_UP
+            bits: '5:4'
+            desc: ADC Amp2-4 stage2 bias UP
+          - name: QUA_BAIS_UP
+            bits: '3:2'
+            desc: Quantizer bias UP
+          - name: IN_BUF_BIAS_UP
+            bits: '1:0'
+            desc: Input Buffer bias UP
+           
+      - addr: 0x5D
+        name: RFE_CTRL0
+        fields:     
+          - name: BAND_TEMP
+            bits: '7:4'
+            desc: Bandgap Temperature Coefficient Control; 0111 - Max; 0000 - Nominal (default); 1000 - Min
+          - name: BAND_GAIN
+            bits: '3:0'
+            desc: Bandgap Gain Control; 0111 - Max; 0000 - Nominal (default); 1000 - Min
+            
+      - addr: 0x5E
+        name: RFE_CTRL1
+        fields:
+          - name: AMP_BIAS
+            bits: '7:6'
+            desc: Reference Amps bias adjust
+            opts:
+                0b11: 15UA
+                0b10: 10UA
+                0b01: 40UA
+                0b00: 20UA
+          - name: AMP_BIAS_UP
+            bits: '5:4'
+            desc: Reference Amps bias UP
+            opts:
+                0b11: 15UA
+                0b10: 10UA
+                0b01: 40UA
+                0b00: 20UA       
+          - name: AMP_BIAS_DOWN
+            bits: '3:0'
+            desc: Reference Amps bias DOWN; 1111 - Min Bias; 0000 - Max Bias (default)
+            
+      - addr: 0x5F
+        name: MISC
+        fields:
+          - name: DCOCMP_LPF_PD
+            bits: '7'
+            desc: Power down DC offset comparators in DC offset cancellation block. Should be powered up only when DC offset cancellation algorithm is running; 1 -  Powered Down; 0 - Enabled (default)
+          - name: EN_DAC
+            bits: '4'
+            desc: Enable DAC
+          - name: EN_ADC_I
+            bits: '3'
+            desc: Enable ADC I Channel
+          - name: EN_ADC_Q
+            bits: '2'
+            desc: Enable ADC Q Channel            
+          - name: EN_ADC_REF
+            bits: '1'
+            desc: Enable ADC reference       
+          - name: EN_MASTER_REF
+            bits: '0'
+            desc: Enable master reference       
+
+  - name: RxVGA2
+    regs:
+      - addr: 0x60
+        name: DC_REG_VAL
+        fields:
+          - name: VAL
+            bits: '7:0'
+            desc: Value from DC calibration module selected by DC_ADDR
+            
+      - addr: 0x61
+        name: DC_REG
+        fields:
+          - name: LOCK
+            bits: '4:2'
+            desc: Locked, when register value is not 000 nor 111 
+          - name: CALIBR_DONE
+            bits: '1'
+            desc: Idicates calibration status; 1 - calibration in progress; 0 - calibration is done
+          - name: UD
+            bits: '0'
+            desc: Value from DC module comparator, selected by DC_ADDR; 1 - Count Up; 0 - Count Down
+
+      - addr: 0x62
+        name: DC_CNT
+        fields:
+          - name: VAL
+            bits: '7:0'
+            desc: Value to load into selected (by DC_ADDR) DC calibration module
+
+      - addr: 0x63
+        name: DC_CALIB
+        fields:
+          - name: START
+            bits: '5'
+            desc: Start calibration command of module selected by DC_ADDR; 1 - start calibration; 0 - deactivate start calibration command
+          - name: LOAD
+            bits: '4'
+            desc: Load value from DC_CNTVAL to module, selected by DC_ADDR; 1 - Load Value; 0 - Deactivate Load Value command
+          - name: SRESET
+            bits: '3'
+            desc: Rsets all DC Calibration modules; 1 - Reset inactive; 0 - Reset active
+          - name: ADDR
+            bits: '2:0'
+            desc: Active calibration module address; 000 - I filter; 001 - Q filter; 010 - 111 Not used
+            opts:
+                0b000: DC_ADDR_REF
+                0b001: DC_ADDR_VGA2A_I
+                0b010: DC_ADDR_VGA2A_Q
+                0b011: DC_ADDR_VGA2B_I
+                0b100: DC_ADDR_VGA2B_Q
+
+      - addr: 0x64
+        name: CTRL
+        fields:
+          - name: CMV
+            bits: '5:2'
+            desc: "RXVGA2 output common mode voltage control. VCM[3] – sign, VCM[2:0] - magnitude, LSB=40mV"
+            scale:
+                min: 1180
+                0b0111: 900
+                0b1000: 620
+                max: 860
+                unit: mV
+          - name: EN
+            bits: '1'
+            desc: RXVGA2 modules enable; 0 - RXVGA2 modules powered down; 1 - RXVGA2 modules enabled (default)
+          - name: DECODE
+            bits: '0'
+            desc: 0 - decode control signals (default); 1 - use control signals from test mode registers
+            
+      - addr: 0x65
+        name: GAIN_COMB
+        fields:
+          - name: VAL
+            bits: '4:0'
+            desc: RXVGA2 gain control LSB=3dB. A and B stages single control. Not recommended to be used above 30dB
+            scale:
+                min: 0
+                0b10100: 60
+                unit: dB
+
+      - addr: 0x66
+        name: PD
+        fields:
+          - name: DC_CUR_REG
+            bits: '5'
+            desc: DC current regulator; 1 - powered down; 0 - powered up (default)
+          - name: DC_DAC_VGA2B
+            bits: '4'
+            desc: DC calibration DAC for VGA2B; 1 - powered down; 0 - powered up (default)
+          - name: DC_DAC_VGA2A
+            bits: '2'
+            desc: DC calibration DAC for VGA2B; 1 - powered down; 0 - powered up (default)
+          - name: DC_BAND_GAP
+            bits: '0'
+            desc: Band gap; 1 - powered down; 0 - powered up (default)
+
+      - addr: 0x67
+        name: PD2
+        fields:
+          - name: PD_OUT_BUF
+            bits: '3'
+            desc: Output buffer in both RXVGAs; 1 - powered down; 0 - powered up (default)
+          - name: PD_VGA2B
+            bits: '2'
+            desc: PD_RXVGA2B; 1 - powered down; 0 - powered up (default)
+          - name: VGA2A
+            bits: '1'
+            desc: PD_RXVGA2A; 1 - powered down; 0 - powered up (default)
+          - name: CUR_REF
+            bits: '0'
+            desc: Current reference; 1 - powered down; 0 - powered up (default)
+            
+      - addr: 0x68
+        name: GAIN
+        fields:
+          - name: INB_VAL
+            bits: '7:4'
+            desc: Controls the gain of second VGA2 stage (VGA2B) LSB=3dB
+            scale:
+                min: 0
+                0b1010: 30
+                unit: dB
+          - name: INA_VAL
+            bits: '3:0'
+            desc: Controls the gain of second VGA2 stage (VGA2A) LSB=3dB
+            scale:
+                min: 0
+                0b1010: 30
+                unit: dB
+
+      - addr: 0x6E
+        name: PD_CALIB
+        fields:
+          - name: PD_CAL_VGA2B
+            bits: '7'
+            desc: DC calibration comparator for VGA2B; 1 - powered down; 0 - powered up (default)
+          - name: PD_CAL_VGA2A
+            bits: '6'
+            desc: DC calibration comparator for VGA2A; 1 - powered down; 0 - powered up (default)
+
+  - name: RFE
+    regs:
+      - addr: 0x70
+        name: CTRL
+        fields:
+          - name: RFE_DECODE
+            bits: '1'
+            desc: 0 - decode control signals (default); 1 - use control signals from test mode registers
+          - name: RFE_EN
+            bits: '0'
+            desc: RXFE modules enable; EN=0 - Top modules powered down; EN=1 - Top modules enabled (default)
+            
+      - addr: 0x71
+        name: IN1SEL_DCI
+        fields:
+          - name: IN1SEL_MIX
+            bits: '7'
+            desc: Selects the input to the mixer; 1 - input 1 is selected, shorted on-chip to LNA internal output (default); 0 - input 2 is selected, connected to pads
+          - name: DCOFF_I
+            bits: '6:0'
+            desc: "DC offset cancellation, I channel. Code is Sign(6) - Magnitude(5:0), signed magnitude format"
+
+      - addr: 0x72
+        name: INLOAD_DCQ
+        fields:
+          - name: INLOAD_LNA
+            bits: '7'
+            desc: To select the internal load for the LNA; 1 - internal load is active (default); 0 - internal node is disabled
+          - name: DCOFF_Q
+            bits: '6:0'
+            desc: "DC offset cancellation, I channel. Code is Sign(6) - Magnitude(5:0), signed magnitude format"
+            
+      - addr: 0x73
+        name: XLD_IP2I
+        fields:
+          - name: XLOAD_LNA
+            bits: '7'
+            desc: To select the external load for the LNA; 1 - external load is active; 0 - external node is disabled (default)
+          - name: IP2TRIM_I
+            bits: '6:0'
+            desc: "IP2 cancellation, I channel. Code is Sign(6) - Magnitude(5:0), signed magnitude format"
+
+      - addr: 0x74
+        name: IP2Q
+        fields:
+          - name: IP2TRIM_Q
+            bits: '6:0'
+            desc: "IP2 cancellation, Q channel. Code is Sign(6) - Magnitude(5:0), signed magnitude format"
+
+      - addr: 0x75
+        name: GAIN_LNA_SEL
+        fields:
+          - name: G_LNA
+            bits: '7:6'
+            desc: LNA gain mode control; 11 - max gain (all LNAs) (default); 10 - mid gain (all LNAs); 01 - LNA bypassed (LNA1 and LNA2); 00 - max gain (LNA3)
+            opts:
+                0b11: GAIN_MAX
+                0b10: GAIN_MID
+                0b01: BYPASS_LAN1_LNA2
+                0b00: GAIN_MAX_LNA3
+          - name: LNASEL
+            bits: '5:4'
+            desc: "Selects the active LNA; 00 - all LNA's disabled; 01 - LNA1 active (default); 10 - LNA2 active; 11 - LNA3 active"
+            opts:
+                0b00: LNA_DISABLE
+                0b01: LNA_1
+                0b10: LNA_2
+                0b11: LNA_3
+          - name: CBE_LNA
+            bits: '3:0'
+            desc: Controls the capacitance parallel to the BE of the input NPN transistors. To be used at lower frequencies for easier matching. For LNA1 and LNA2 only   
+            
+      - addr: 0x76
+        name: RFB_TIA
+        fields:
+          - name: RFB_TIA
+            bits: '6:0'
+            desc: Feedback resistor control of the TIA (RXVGA1) to set the mixer gain. If =120 --> mixer gain = 30dB (default); If =102 --> mixer gain = 19dB; If = 2 --> mixer gain = 5dB
+            
+      - addr: 0x77
+        name: CFB_TIA
+        fields:
+          - name: CFB_TIA
+            bits: '6:0'
+            desc: Feedback capacitor for the TIA (RXVGA1) to limit the BW. If =0, min cap --> BW~45MHz for gain of 30dB. (default); If = 19 --> BW=2.5MHz for MixGain=30dB and at TT; This cap is supposed to be set according to the RC time constant to have almost constant BW over the corners for optimum CDMA performance. Software will control it using the information from the LPF calibration circuit
+
+      - addr: 0x78
+        name: RDLEXT_LNA
+        fields:
+          - name: RDLEXT_LNA
+            bits: '5:0'
+            desc: Controls the on-chip LNA load resistor for the external load mode of the LNA. In practice, this will be set to high value, the output will be ac coupled, and the actual load is defined on PCB
+
+      - addr: 0x79
+        name: RDLINT_LNA
+        fields:
+          - name: RDLINT_LNA
+            bits: '5:0'
+            desc: ontrols the on-chip LNA load resistor for the internal load mode of the LNA, LNA1 and LNA2
+
+      - addr: 0x7A
+        name: MIX_LNA
+        fields:
+          - name: MIX_ICT
+            bits: '7:4'
+            desc: Control for tweaking the bias current for mixer; 0000 - 0 bias current; 0111 - nominal bias current (default); 1111 - 2.1 x nominal bias current
+          - name: LNA_ICT
+            bits: '3:0'
+            desc: Control for tweaking the bias current for LNA; 0000 - 0 bias current; 0111 - nominal bias current (default); 1111 - 2.1 x nominal bias current
+
+      - addr: 0x7B
+        name: TIA_MXLOB
+        fields:
+          - name: TIA_ICT
+            bits: '7:4'
+            desc: Control for tweaking the bias current for TIA (RXVGA1); 0000 - 0 bias current; 0111 - nominal bias current (default); 1111 - 2.1 x nominal bias current
+          - name: MXLOB_ICT
+            bits: '3:0'
+            desc: Control for tweaking the bias current for mixer LO buffer; 0000 - 0 bias current; 0111 - nominal bias current (default); 1111 - 2.1 x nominal bias current
+
+      - addr: 0x7C
+        name: LOMIX_GLNA3
+        fields:
+          - name: LOBN_MIX
+            bits: '6:3'
+            desc: Tweak for the LO bias of the mixer for optimum linearity; 0000 - minimum bias voltage; 0011 - (default); 1111 - maximum bias voltage
+          - name: RINEN_MIX
+            bits: '2'
+            desc: Termination resistor on external mixer input enable; 1 - Active; 0 - Inactive (default)
+          - name: G_FINE_LNA3
+            bits: '1:0'
+            desc: LNA3 fine gain adjustmen, LSB=1dB
+
+      - addr: 0x7D
+        name: PD
+        fields:
+          - name: TIA
+            bits: '3'
+            desc: A (RXVGA1) power down; 0 - block active (default); 1 - block inactive
+          - name: MXLOB
+            bits: '2'
+            desc: Mixer LO buffer power down; 0 - block active (default); 1 - block inactive
+          - name: MIX
+            bits: '1'
+            desc: Mixer power down; 0 - block active (default); 1 - block inactive    
+          - name: LNA
+            bits: '0'
+            desc: LNA power down; 0 - block active (default); 1 - block inactive
+

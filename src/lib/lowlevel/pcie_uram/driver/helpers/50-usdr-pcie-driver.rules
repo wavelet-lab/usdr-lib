@@ -1,0 +1,1 @@
+KERNEL=="usdr*", SUBSYSTEM=="usdr", MODE="0666"

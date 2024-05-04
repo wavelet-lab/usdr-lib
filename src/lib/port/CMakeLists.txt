@@ -1,0 +1,11 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+set(USDR_PORT_LIB_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/usdr_logging.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/usdr_port.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/usdr_helpers.c
+)
+
+list(APPEND USDR_LIBRARY_FILES ${USDR_PORT_LIB_FILES})
+set(USDR_LIBRARY_FILES ${USDR_LIBRARY_FILES} PARENT_SCOPE)

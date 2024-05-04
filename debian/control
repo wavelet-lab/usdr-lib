@@ -1,0 +1,67 @@
+Source: usdr
+Section: misc
+Priority: optional
+Maintainer: Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>
+Standards-Version: 0.9.0
+Homepage: https://github.com/wavelet-lab/usdr-lib
+Vcs-Browser: https://github.com/wavelet-lab/usdr-lib
+Vcs-Git: https://github.com/wavelet-lab/usdr-lib.git
+Build-Depends:
+     build-essential,
+     cmake,
+     python3,
+     python3-yaml,
+     dwarves,
+     qtbase5-dev-tools,
+     qtbase5-dev,
+     libqcustomplot-dev,
+     qtmultimedia5-dev,
+     libfftw3-dev,
+     libusb-1.0-0-dev,
+     libsoapysdr-dev,
+     check
+
+Package: libusdr
+Architecture: amd64 arm64
+Section: misc
+Priority: optional
+Homepage: https://github.com/wavelet-lab/usdr-lib
+Depends:
+     ${shlibs:Depends}
+Description: Host software for uSDR devices
+
+Package: soapysdr-module-usdr
+Architecture: amd64 arm64
+Section: libdevel
+Priority: optional
+Depends:
+    libusdr (= ${binary:Version}),
+    ${shlibs:Depends}
+Description: SoapySDR module for uSDR devices
+
+Package: libusdr-dev
+Architecture: amd64 arm64
+Section: libdevel
+Priority: optional
+Depends:
+    libusdr (= ${binary:Version}),
+    ${shlibs:Depends}
+Description: Development files for uSDR devices
+
+Package: usdr-tools
+Architecture: amd64 arm64
+Section: kernel
+Priority: optional
+Depends:
+    libusdr (= ${binary:Version}),
+    ${shlibs:Depends}
+Description: uSDR tools
+
+Package: usdr-dkms
+Architecture: amd64 arm64
+Section: kernel
+Priority: optional
+Depends:
+    dkms,
+    ${shlibs:Depends}
+Description: DKMS source for the uSDR PCIe driver

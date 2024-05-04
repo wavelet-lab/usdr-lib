@@ -1,0 +1,524 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+name:         LMK04832
+desc:         VCO+PLL Clok Generator with SYSREF
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: SPI
+    rd_mask: 0x80000000
+    usdr_path: /debug/hw/lmk04832/0/reg
+addr_width:   16
+data_width:   8
+field_macros: True
+
+pages:
+  - name: Top
+    regs:
+      - addr: '0x0000'
+        name: RESET
+        desc: Reset & SPI 3-ware
+        fields:
+          - name: RESET
+            bits: '7'
+            desc: Reset (automatically cleared)
+          - name: SPI_3WARE_DIS
+            bits: '4'
+            desc: 3 Wire Mode disabled
+      - addr: '0x0003'
+        name: DEVICE_TYPE
+        fields:
+          - name: DEVICE_TYPE
+            bits: '7:0'
+            desc: DEVICE_TYPE
+      - addr: '0x0004'
+        name: PROD_HI
+        fields:
+          - name: PROD_HI
+            bits: '7:0'
+            desc: PROD_HI
+      - addr: '0x0005'
+        name: PROD_LOW
+        fields:
+          - name: PROD_LOW
+            bits: '7:0'
+            desc: PROD_LOW
+      - addr: '0x0006'
+        name: MASKREV
+        fields:
+          - name: MASKREV
+            bits: '7:0'
+            desc: MASKREV
+      - addr: '0x000C'
+        name: VNDR_HI
+        fields:
+          - name: VNDR_HI
+            bits: '7:0'
+            desc: VNDR_HI
+      - addr: '0x000D'
+        name: VNDR_LOW
+        fields:
+          - name: VNDR_LOW
+            bits: '7:0'
+            desc: VNDR_LOW
+      - addr: '0x0100'
+        name: DCLK0_1_DIV_LOW
+        fields:
+          - name: DCLK0_1_DIV_LOW
+            bits: '7:0'
+            desc: DCLK0_1_DIV_LOW
+      - addr: '0x0101'
+        name: DCLK0_1_DDLY_LOW
+        fields:
+          - name: DCLK0_1_DDLY_LOW
+            bits: '7:0'
+            desc: DCLK0_1_DDLY_LOW
+      - addr: '0x0102'
+        name: DCLK0_1_CFG
+        fields:
+          - name: CLKOUT0_1_DDLY_PD
+            bits: '4'
+            desc: Powerdown the device clock digital delay circuitry
+          - name: CLKOUT0_1_IDL
+            bits: '5'
+            desc: Sets input drive level for clocks
+          - name: CLKOUT0_1_ODL
+            bits: '6'
+            desc: Sets output drive level for clocks. This has no impact for the
+                even clock output in bypassmode
+          - name: CLKOUT0_1_PD
+            bits: '7'
+            desc: Power down the clock group defined by X and Y
+          - name: DCLK0_1_DDLY_HI
+            bits: '3:2'
+            desc: DCLK0_1_DDLY_HI
+          - name: DCLK0_1_DIV_HI
+            bits: '1:0'
+            desc: DCLK0_1_DIV_HI
+      - addr: '0x0103'
+        name: DELAY_CTRL
+        desc: These registers control the analog delay properties for the device
+            clocks
+        fields:
+          - name: CLKOUT0_SRC_MUX
+            bits: '5'
+            desc: Select CLKoutX clock source. Source must also be powered up
+            opts:
+                0: DEVICE_CLOCK
+                1: SYSREF
+          - name: DCLK0_1_DCC
+            bits: '2'
+            desc: Duty cycle correction for device clock divider. Required for half
+                step
+          - name: DCLK0_1_HS
+            bits: '0'
+            desc: Sets the device clock half step value. Must be set to zero (0)
+                for a divide of 1. No effect if DCLKX_Y_DCC = 0
+          - name: DCLK0_1_PD
+            bits: '4'
+            desc: Power down the device clock defined by X and Y
+          - name: DCLK0_1_POL
+            bits: '1'
+            desc: Invert polarity of device clock output. This also applies to CLKoutX
+                in high performance bypass mode. Polarity invert is a method to get a half-step
+                phase adjustment in high performance bypass mode or /1 divide value
+          - name: DCLK0_BYP
+            bits: '3'
+            desc: Enable high performance bypass path for even clock outputs
+      - addr: '0x0104'
+        name: SCLK0_1_CFG
+        desc: These registers set the half step for the device clock, the SYSREF
+            output MUX, the SYSREF clock digital delay, and half step
+        fields:
+          - name: CLKOUT1_SRC_MUX
+            bits: '5'
+            desc: Select CLKoutY clock source. Source must also be powered up
+            opts:
+                0: DEVICE_CLOCK
+                1: SYSREF
+          - name: SCLK0_1_DIS_MODE
+            bits: '3:2'
+            desc: Set disable mode for clock outputs controlled by SYSREF. Some cases
+                will assert when SYSREF_GBL_PD = 1
+          - name: SCLK0_1_HS
+            bits: '0'
+            desc: Sets the local SYSREF clock half step value
+          - name: SCLK0_1_PD
+            bits: '4'
+            desc: Power down the SYSREF clock output circuitry
+          - name: SCLK0_1_POL
+            bits: '1'
+            desc: Sets the polarity of clock on SCLKX_Y when SYSREF clock output
+                is selected with CLKoutX_MUX or CLKoutY_MUX
+      - addr: '0x0105'
+        name: SCLK0_1_ADLY
+        desc: These registers set the analog delay parameters for the SYSREF outputs
+        fields:
+          - name: SCLK0_1_ADLY
+            bits: '4:0'
+            desc: SYSREF analog delay in approximately 21 ps steps. Selecting analog
+                delay adds an additional 125 ps in propagation delay. Range is 125 ps to 608
+                ps
+          - name: SCLK0_1_ADLY_EN
+            bits: '5'
+            desc: Enables analog delay for the SYSREF output
+      - addr: '0x0106'
+        name: SCLKX_Y_DDLY
+        fields:
+          - name: SCLKX_Y_DDLY
+            bits: '3:0'
+            desc: Set digital delay value for SYSREF clock (minimum 8)
+      - addr: '0x0107'
+        desc: The difference in the tables is that some of the clock outputs have
+            inverted CMOS polarity settings.
+        name: CLKOUT0_1_FMT
+        fields:
+          - name: CLKOUT0_FMT
+            bits: '3:0'
+            desc: Set CLKoutX clock format
+          - name: CLKOUT1_FMT
+            bits: '7:4'
+            desc: Set CLKoutY clock format
+      - addr: '0x0138'
+        desc: VCO_MUX, OSCout_MUX, OSCout_FMT
+        name: VCO_BUF_CFG
+        fields:
+          - name: OSCOUT_FMT
+            bits: '3:0'
+            desc: Selects the output format of OSCout. When powered down, these pins may be used as CLKin2
+            opts:
+                0: POWER_DOWN
+          - name: OSCOUT_MUX
+            bits: '4'
+            desc: Select the source for OSCout
+            opts:
+                0: BUFF_OSCIN
+                1: FEEDBACK_MUX
+          - name: VCO_MUX
+            bits: '6:5'
+            desc: Selects clock distribution path source from VCO0, VCO1, or CLKin (external VCO)
+            opts:
+                2: CLKIN1
+                0: VCO0
+                1: VCO1
+      - addr: '0x013F'
+        desc: This register controls the feedback feature
+        name: FB_CFG
+        fields:
+          - name: FB_MUX
+            bits: '2:1'
+            desc: When in 0-delay mode, the feedback mux selects the clock output
+                to be fedback into the PLL1 N Divider
+            opts:
+                0: CLKOUT6
+                1: CLKOUT8
+                3: EXTERNAL
+                2: SYSREF_DIVIDER
+          - name: FB_MUX_EN
+            bits: '0'
+            desc: When using 0-delay, FB_MUX_EN must be set to 1 power up the feedback
+                mux
+          - name: PLL1_NCLK_MUX
+            bits: '4:3'
+            desc: Selects the input to the PLL1 N Divider
+            opts:
+                0: FEEDBACK_MUX
+                1: OSCIN
+                2: PLL2_PRESCALER
+          - name: PLL2_NCLK_MUX
+            bits: '5'
+            desc: Selects the input to the PLL2 N Divider
+            opts:
+                1: FEEDBACK_MUX
+                0: PLL2_PRESCALER
+          - name: PLL2_RCLK_MUX
+            bits: '7'
+            desc: Selects the source for PLL2 reference
+            opts:
+                1: CLKIN
+                0: OSCIN
+      - addr: '0x0140'
+        name: OSC_SYSREF_CFG
+        desc: This register contains power down controls for OSCin and SYSREF functions
+        fields:
+          - name: OSCIN_PD
+            bits: '4'
+            desc: Power down the OSCin port
+          - name: PLL1_PD
+            bits: '7'
+            desc: Power down PLL1
+          - name: SYSREF_DDLY_PD
+            bits: '1'
+            desc: Power down the SYSREF digital delay circuitry
+          - name: SYSREF_GBL_PD
+            bits: '3'
+            desc: Power down individual SYSREF outputs depending on the setting of
+                SCLKX_Y_DIS_MODE for each SYSREF output. SYSREF_GBL_PD allows many SYSREF
+                outputs to be controlled through a single bit
+          - name: SYSREF_PD
+            bits: '2'
+            desc: Power down the SYSREF circuitry and divider. If powered down, SYSREF
+                output mode cannot be used. SYNC cannot be provided either
+          - name: SYSREF_PLSR_PD
+            bits: '0'
+            desc: Powerdown the SYSREF pulse generator
+          - name: VCO_LDO_PD
+            bits: '6'
+            desc: Power down VCO_LDO
+          - name: VCO_PD
+            bits: '5'
+            desc: Power down VCO
+      - addr: '0x0145'
+        name: PLL1_2_SYNC
+        desc: These bits are used when synchronizing PLL1 and PLL2 R dividers
+        fields:
+          - name: PLL1R_SYNC_EN
+            bits: '6'
+            desc: Enable synchronization for PLL1 R divider
+          - name: PLL1R_SYNC_SRC
+            bits: '5:4'
+            desc: Select the source for PLL1 R divider synchronization
+            opts:
+                2: CLKIN0
+                1: SYNC_PIN
+          - name: PLL2R_SYNC_EN
+            bits: '3'
+            desc: Enable synchronization for PLL2 R divider. Synchronization for
+                PLL2 R always comes from the SYNC pin
+      - addr: '0x0146'
+        desc: This register has CLKin enable and type controls
+        name: CLKIN_CFG
+        fields:
+          - name: CLKIN0_EN
+            bits: '3'
+            desc: Enable CLKin0 to be used during auto-switching
+          - name: CLKIN0_TYPE
+            bits: '0'
+            desc: Bipolar is recommended for differential inputs like LVDS or LVPECL.
+                CMOS is recommended for DC-coupled single ended inputs
+            opts:
+                0: BIPOLAR
+                1: MOS
+          - name: CLKIN1_EN
+            bits: '4'
+            desc: Enable CLKin1 to be used during auto-switching
+          - name: CLKIN1_TYPE
+            bits: '1'
+            desc: Bipolar is recommended for differential inputs like LVDS or LVPECL.
+                CMOS is recommended for DC-coupled single ended inputs
+            opts:
+                0: BIPOLAR
+                1: MOS
+          - name: CLKIN2_EN
+            bits: '5'
+            desc: Enable CLKin2 to be used during auto-switching
+          - name: CLKIN2_TYPE
+            bits: '2'
+            desc: Bipolar is recommended for differential inputs like LVDS or LVPECL.
+                CMOS is recommended for DC-coupled single ended inputs
+            opts:
+                0: BIPOLAR
+                1: MOS
+          - name: CLKIN_SEL_PIN_EN
+            bits: '7'
+            desc: Enables pin control
+          - name: CLKIN_SEL_PIN_POL
+            bits: '6'
+            desc: Inverts the CLKin polarity for use in pin select mode
+            opts:
+                0: ACTIVE_HIGH
+                1: ACTIVE_LOW
+      - addr: '0x0147'
+        desc: This register has CLKin enable and type controls
+        name: CLKIN_TYPE
+        fields:
+          - name: CLKIN0_DEMUX
+            bits: '1:0'
+            opts:
+                3: PD
+                2: PLL1
+                0: SYSREF_MUX
+          - name: CLKIN1_DEMUX
+            bits: '3:2'
+            opts:
+                1: FEEDBACK_MUX
+                0: FIN
+                3: PD
+                2: PLL1
+          - name: CLKIN_SEL_AUTO_EN
+            bits: '6'
+            desc: Enables pin control
+          - name: CLKIN_SEL_AUTO_REVERT_EN
+            bits: '7'
+            desc: When in auto clock switching mode. If active clock is detected
+                on higher priority clock, the clock input is immediately switched. Highest
+                priority input is lowest numbered active clock input
+          - name: CLKIN_SEL_MANUAL
+            bits: '5:4'
+            opts:
+                0: CLKIN0
+                1: CLKIN1
+                2: CLKIN2
+                3: HOLDOVER
+      - addr: '0x014A'
+        desc: This register contains control of the RESET pin
+        name: RESET_CFG
+        fields:
+          - name: RESET_MUX
+            bits: '5:3'
+            desc: This sets the output value of the RESET pin. This register only
+                applies if RESET_TYPE is set to an output mode
+            opts:
+                6: SPI_READBACK
+          - name: RESET_TYPE
+            bits: '2:0'
+            desc: This sets the IO type of the RESET pin
+            opts:
+                3: OUTPUT_PUSH_PULL
+      - addr: '0x0153'
+        name: CLKIN0_R_HI
+        fields:
+          - name: CLKIN0_R_HI
+            bits: '5:0'
+            desc: CLKIN0_R_HI
+      - addr: '0x0154'
+        name: CLKIN0_R_LOW
+        fields:
+          - name: CLKIN0_R_LOW
+            bits: '7:0'
+            desc: CLKIN0_R_LOW
+      - addr: '0x0155'
+        name: CLKIN1_R_HI
+        fields:
+          - name: CLKIN1_R_HI
+            bits: '5:0'
+            desc: CLKIN1_R_HI
+      - addr: '0x0156'
+        name: CLKIN1_R_LOW
+        fields:
+          - name: CLKIN1_R_LOW
+            bits: '7:0'
+            desc: CLKIN1_R_LOW
+      - addr: '0x0157'
+        name: CLKIN2_R_HI
+        fields:
+          - name: CLKIN2_R_HI
+            bits: '5:0'
+            desc: CLKIN2_R_HI
+      - addr: '0x0158'
+        name: CLKIN2_R_LOW
+        fields:
+          - name: CLKIN2_R_LOW
+            bits: '7:0'
+            desc: CLKIN2_R_LOW
+      - addr: '0x0159'
+        name: PLL1_N_HI
+        fields:
+          - name: PLL1_N_HI
+            bits: '5:0'
+            desc: PLL1_N_HI
+      - addr: '0x015A'
+        name: PLL1_N_LOW
+        fields:
+          - name: PLL1_N_LOW
+            bits: '7:0'
+            desc: PLL1_N_LOW
+      - addr: '0x015C'
+        name: PLL1_DLD_CNT_HI
+        fields:
+          - name: PLL1_DLD_CNT
+            bits: '5:0'
+            desc: PLL1_DLD_CNT
+      - addr: '0x015D'
+        name: PLL1_DLD_CNT_LOW
+        fields:
+          - name: PLL1_DLD_CNT_LOW
+            bits: '7:0'
+            desc: PLL1_DLD_CNT_LOW
+      - addr: '0x0160'
+        name: PLL2_R_HI
+        fields:
+          - name: PLL2_R_HI
+            bits: '3:0'
+            desc: PLL2_R_HI
+      - addr: '0x0161'
+        name: PLL2_R_LOW
+        fields:
+          - name: PLL2_R_LOW
+            bits: '7:0'
+            desc: PLL2_R_LOW
+      - addr: '0x0162'
+        desc: This register sets other PLL2 functions
+        name: PLL2_FUNC
+        fields:
+          - name: OSCIN_FREQ
+            bits: '4:2'
+            desc: The frequency of the PLL2 reference input to the PLL2 Phase Detector
+                (OSCin/OSCin* port) must be programmed in order to support proper operation
+                of the frequency calibration routine which locks the internal VCO to the target
+                frequency
+            opts:
+                0: OSC_FREQ_0_63
+                2: OSC_FREQ_127_255
+                4: OSC_FREQ_255_500
+                1: OSC_FREQ_63_127
+          - name: PLL2_P
+            bits: '7:5'
+            desc: The PLL2 N Prescaler divides the output of the VCO as selected
+                by Mode_MUX1 and is connected to the PLL2 N divider
+          - name: PLL2_REF_2X_EN
+            bits: '0'
+            desc: Enabling the PLL2 reference frequency doubler allows for higher
+                phase detector frequencies on PLL2 than would normally be allowed with the
+                given VCXO frequency. Higher phase detector frequencies reduces the PLL2 N
+                values which makes the design of wider loop bandwidth filters possible
+      - addr: '0x0163'
+        name: PLL2_N_CAL_HI
+        fields:
+          - name: PLL2_N_CAL_HI
+            bits: '1:0'
+            desc: PLL2_N_CAL_HI
+      - addr: '0x0164'
+        name: PLL2_N_CAL_MID
+        fields:
+          - name: PLL2_N_CAL_MID
+            bits: '7:0'
+            desc: PLL2_N_CAL_MID
+      - addr: '0x0165'
+        name: PLL2_N_CAL_LOW
+        fields:
+          - name: PLL2_N_CAL_LOW
+            bits: '7:0'
+            desc: PLL2_N_CAL_LOW
+      - addr: '0x0166'
+        name: PLL2_N_HI
+        fields:
+          - name: PLL2_N_HI
+            bits: '1:0'
+            desc: PLL2_N_HI
+      - addr: '0x0167'
+        name: PLL2_N_MID
+        fields:
+          - name: PLL2_N_MID
+            bits: '7:0'
+            desc: PLL2_N_MID
+      - addr: '0x0168'
+        name: PLL2_N_LOW
+        fields:
+          - name: PLL2_N_LOW
+            bits: '7:0'
+            desc: PLL2_N_LOW
+      - addr: '0x0173'
+        name: PLL2_PD
+        fields:
+          - name: PLL2_PD
+            bits: '5'
+            desc: Powerdown PLL2
+          - name: PLL2_PD_RESERVED
+            bits: '4:0'
+            opts:
+                16: PLL2_PD_RESERVED
+          - name: PLL2_PRE_PD
+            bits: '6'
+            desc: Powerdown PLL2 prescaler

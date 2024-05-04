@@ -1,0 +1,26 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+set(HW_FILES si549 si5332 ads42lbx9 tps6594 tmp108 tmp114 lms6002d lms7002m lp8758 lmk05318 lmk5c33216 tps6381x dac80501 lmk04832)
+# YAML registers generators
+set(HW_FILES_YAML lmk05318 lmk5c33216 lms6002d lms7002m tps6381x dac80501 lmk04832)
+
+foreach(I ${HW_FILES})
+    aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/${I} HW_DIR_FILES)
+    list(APPEND USDR_HW_LIB_FILES ${HW_DIR_FILES})
+endforeach()
+
+foreach(I ${HW_FILES_YAML})
+    message(STATUS "Generating header for ${I}")
+    GENERATE_YAML_H(${CMAKE_CURRENT_SOURCE_DIR}/${I}/${I}.yaml ${CMAKE_CURRENT_BINARY_DIR}/def_${I}.h)
+
+    list(APPEND USDR_DEPEND_TARGETS generate_${I})
+endforeach()
+
+list(APPEND USDR_LIBRARY_FILES ${USDR_HW_LIB_FILES})
+list(APPEND USDR_INCLUDE_FILES ${CMAKE_CURRENT_BINARY_DIR})
+
+set(USDR_LIBRARY_FILES ${USDR_LIBRARY_FILES} PARENT_SCOPE)
+set(USDR_DEPEND_TARGETS ${USDR_DEPEND_TARGETS} PARENT_SCOPE)
+set(USDR_INCLUDE_FILES ${USDR_INCLUDE_FILES} PARENT_SCOPE)
+

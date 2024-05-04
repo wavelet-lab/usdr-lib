@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+%:
+	dh $@ --sourcedirectory=src --buildsystem=cmake --with=dkms
+
+
+override_dh_auto_configure:
+	dh_auto_configure -- -DENABLE_TESTS=OFF
+
+	# Generate the DKMS install files
+	sed 's/#MODULE_VERSION#/$(DEB_VERSION_UPSTREAM)/g' debian/usdr-dkms.install.template > debian/usdr-dkms.install
+	sed 's/#MODULE_VERSION#/$(DEB_VERSION_UPSTREAM)/g' debian/usdr-dkms.dkms.template > debian/usdr-dkms.dkms
+	sed 's/#MODULE_VERSION#/$(DEB_VERSION_UPSTREAM)/g' debian/usdr-dkms.postinst.template > debian/usdr-dkms.postinst
+	sed 's/#MODULE_VERSION#/$(DEB_VERSION_UPSTREAM)/g' debian/usdr-dkms.postrm.template > debian/usdr-dkms.postrm
+
+	# Generate the dev package install file
+	cat debian/libusdr-dev.install.template > debian/libusdr-dev.install
+
+	find src/lib -name "*.yaml" | while read file_path; do \
+		dest=`dirname "$$file_path" | sed 's/src\/lib//g'`; \
+		echo "$$file_path usr/share/usdr$$dest/" >> debian/libusdr-dev.install; \
+	done
+
+
+override_dh_auto_build:
+	cd "obj-$(DEB_TARGET_GNU_TYPE)" && make
+
+override_dh_missing:
+

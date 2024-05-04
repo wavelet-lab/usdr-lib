@@ -1,0 +1,335 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         PCIEFE
+desc:         FrontEnd
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: VIRTUAL
+    usdr_path: /debug/hw/pciefe/0/reg
+addr_width:   8
+data_width:   16
+page_prefix:  True
+field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+  - name: General
+    regs:
+      - addr: 0x04
+        name: DAC
+        fields:
+          - bits: "15:0"
+            name: VOUT
+            desc: DAC value
+  - name: V0
+    regs:
+      - addr: 0x00
+        name: FE0
+        fields:
+          - bits: "1:0"
+            name: TXSEL1
+            desc: TX selector up (U26)
+            opts:
+                0b01: RF1_LPF_2100
+                0b10: RF2_LPF_1200
+                0b11: RF3_BYPASS
+                0b00: RF4_LPF_400
+          - bits: "7:6"
+            name: TXSEL2
+            desc: TX selector down (U28)
+            opts:
+                0b01: RF1_BYPASS
+                0b10: RF2_LPF_400
+                0b11: RF3_LPF_2100
+                0b00: RF4_LPF_1200
+          - bits: "5:4"
+            name: RXSEL2
+            desc: RX selector down (U29)
+            opts:
+                0b01: RF1_LPF_2100
+                0b10: RF2_LPF_1200
+                0b11: RF3_BPF_2100_3000
+                0b00: RF4_BPF_3000_4200
+          - bits: "3:2"
+            name: RXSEL1
+            desc: RX selector up (U27)
+            opts:
+                0b10: RF1_BPF_2100_3000
+                0b01: RF2_BPF_3000_4200
+                0b11: RF3_LPF_2100
+                0b00: RF4_LPF_1200
+      - addr: 0x01
+        name: FE1
+        fields:
+          - bits: "7"
+            name: EN_LNA
+            desc: Enable RX EN_LNA
+          - bits: "6"
+            name: EN_PA
+            desc: Enable TX power amplifier
+          - bits: "5:4"
+            name: ATTN
+            desc: RX attenuator, LSB=6dB
+            opts:
+                0b00: IL
+                0b10: 6DB
+                0b01: 12DB
+                0b11: 18DB
+          - bits: "3"
+            name: NLOOPBACK
+            desc: Activate TX - RX loopback, while TX is still active; Inverted
+          - bits: "2:0"
+            name: DUPL_PATH
+            desc: Dumplexer path
+            opts:
+                0b001: RF1_BAND5
+                0b010: RF2_BAND8
+                0b011: RF3_BAND2
+                0b100: RF4_BYPASS
+                0b101: RF5_BAND3
+                0b110: RF6_BAND7
+      - addr: 0x02
+        name: GPIO0
+        fields:
+          - bits: "7"
+            name: DIR_45
+            desc: Direction of 45
+          - bits: "6"
+            name: DIR_23
+            desc: Direction of 23
+          - bits: "5"
+            name: LS_1
+            desc: Output control of LS_1
+          - bits: "4"
+            name: LS_0
+            desc: Output control of LS_0
+          - bits: "3"
+            name: LS_4
+            desc: Output control of LS_4
+          - bits: "2"
+            name: LS_5
+            desc: Output control of LS_5
+          - bits: "1"
+            name: EN_GPS
+            desc: Enable GPS
+          - bits: "0"
+            name: EN_OSC
+            desc: Enable OSC
+      - addr: 0x03
+        name: GPIO1
+        fields:
+          - bits: "7"
+            name: LED4
+            desc: Inverted control LED4
+          - bits: "6"
+            name: LED3
+            desc: Inverted control LED3
+          - bits: "5"
+            name: LED2
+            desc: Inverted control LED2
+          - bits: "4"
+            name: LED1
+            desc: Inverted control LED1
+          - bits: "3"
+            name: DIR_AB
+            desc: Direction of AB
+          - bits: "2"
+            name: DIR_89
+            desc: Direction of 89
+          - bits: "1"
+            name: DIR_01
+            desc: Direction of 01
+          - bits: "0"
+            name: DIR_67
+            desc: Direction of 67
+      - addr: 0x10
+        name: FE0_ALT
+        bitshuffle:
+            0: 3
+            1: 2
+            2: 4
+            3: 5
+            4: 0
+            5: 1
+        fields:
+          - bits: "1:0"
+            name: ATXSEL1
+            desc: TX selector up (U38)
+            opts:
+                0b00: ARF1_LPF_1200
+                0b10: ARF2_LPF_400
+                0b01: ARF3_LPF_2100
+                0b11: ARF4_BYPASS
+          - bits: "7:6"
+            name: ATXSEL2
+            desc: TX selector down (U40)
+            opts:
+                0b00: ARF1_LPF_400
+                0b10: ARF2_LPF_1200
+                0b01: ARF3_BYPASS
+                0b11: ARF4_LPF_2100
+          - bits: "5:4"
+            name: ARXSEL2
+            desc: RX selector down (U39)
+            opts:
+                0b00: ARF1_LPF_1200
+                0b10: ARF2_BPF_3000_4200
+                0b01: ARF3_LPF_2100
+                0b11: ARF4_BPF_2100_3000
+          - bits: "3:2"
+            name: ARXSEL1
+            desc: RX selector up (U41)
+            opts:
+                0b00: ARF1_BPF_3000_4200
+                0b01: ARF2_LPF_1200
+                0b10: ARF3_BPF_2100_3000
+                0b11: ARF3_LPF_2100
+      - addr: 0x11
+        name: AFE1_ALT
+        fields:
+          - bits: "7"
+            name: AEN_LNA
+            desc: Enable RX EN_LNA
+          - bits: "6"
+            name: AEN_PA
+            desc: Enable TX power amplifier
+          - bits: "5:4"
+            name: AATTN
+            desc: RX attenuator, LSB=6dB
+            opts:
+                0b00: IL
+                0b10: 6DB
+                0b01: 12DB
+                0b11: 18DB
+          - bits: "3"
+            name: ANLOOPBACK
+            desc: Activate TX - RX loopback, while TX is still active; Inverted
+          - bits: "2:0"
+            name: ADUPL_PATH
+            desc: Dumplexer path
+            opts:
+                0b000: ARF1_BAND2
+                0b100: ARF2_BAND7
+                0b010: ARF3_BAND8
+                0b110: ARF4_BAND3
+                0b001: ARF5_BAND5
+                0b101: ARF6_BYPASS
+  - name: V1
+    regs:
+      - addr: 0x20
+        name: FE
+        fields:
+          - bits: "15:14"
+            name: ATTN
+            desc: RX attenuator, 6dB step
+            opts:
+                0b00: IL
+                0b10: 6DB
+                0b01: 12DB
+                0b11: 18DB
+          - bits: "13"
+            name: NLOOPBACK
+            desc: Activate TX - RX loopback, while TX is still active; Inverted
+          - bits: "12"
+            name: EN_PA1
+            desc: Enable TX power amplifier 1
+          - bits: "11"
+            name: EN_LNA2
+            desc: Enable RX LNA 2
+          - bits: "10"
+            name: EN_LNA1
+            desc: Enable RX LNA 1
+          - bits: "9:7"
+            name: DUPL_PATH
+            desc: Dumplexer path
+            opts:
+                0b001: RF1_BAND5
+                0b010: RF2_BAND8
+                0b011: RF3_BAND2
+                0b100: RF4_BYPASS
+                0b101: RF5_BAND3
+                0b110: RF6_BAND7
+          - bits: "6"
+            name: EN_PA2
+            desc: Enable TX power amplifier 2
+          - bits: "5:3"
+            name: RXSEL
+            desc: RX selector combined (U39+U41)
+            opts:
+                0b000: BPF_2100_3000_LPF_1200
+                0b001: BPF_2100_3000_BPF_2100_3000
+                0b010: LPF_2100_BPF_3000_4200
+                0b011: LPF_2100_LPF_2100
+                0b100: LPF_1200_LPF_1200
+                0b101: LPF_1200_BPF_2100_3000
+                0b110: BPF_3000_4200_BPF_3000_4200
+                0b111: BPF_3000_4200_LPF2100
+          - bits: "2:0"
+            name: TXSEL
+            desc: TX selector combined (U38+U40)
+            opts:
+                0b000: LPF_400_LPF_2100
+                0b001: LPF_400_LPF_400
+                0b010: LPF_2100_LPF_4000
+                0b011: LPF_2100_LPF_2100
+                0b100: LPF_1200_LPF_1200
+                0b101: LPF_1200_LPF_400
+                0b110: LPF_4000_LPF_4000
+                0b111: LPF_4000_LPF_2100
+      - addr: 0x22
+        name: GPIO0
+        fields:
+          - bits: "7"
+            name: DIR_CD
+            desc: Direction of CD
+          - bits: "6"
+            name: DIR_67
+            desc: Direction of 67
+          - bits: "5"
+            name: DIR_89
+            desc: Direction of 89
+          - bits: "4"
+            name: DIR_AB
+            desc: Direction of AB
+          - bits: "3"
+            name: LED2
+            desc: Inverted control LED2
+          - bits: "2"
+            name: LED1
+            desc: Inverted control LED1
+          - bits: "1"
+            name: EN_GPS
+            desc: Enable GPS
+          - bits: "0"
+            name: EN_OSC
+            desc: Enable OSC
+      - addr: 0x23
+        name: GPIO1
+        fields:
+          - bits: "7"
+            name: LED4
+            desc: Inverted control LED4
+          - bits: "6"
+            name: LED3
+            desc: Inverted control LED3
+          - bits: "5"
+            name: LS_5
+            desc: Output control of LS_5
+          - bits: "4"
+            name: LS_4
+            desc: Output control of LS_4
+          - bits: "3"
+            name: LS_3
+            desc: Output control of LS_3
+          - bits: "2"
+            name: LS_2
+            desc: Output control of LS_2
+          - bits: "1"
+            name: LS_1
+            desc: Output control of LS_1
+          - bits: "0"
+            name: LS_0
+            desc: Output control of LS_0

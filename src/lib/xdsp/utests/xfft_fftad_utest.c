@@ -1,0 +1,212 @@
+// Copyright (c) 2023-2024 Wavelet Lab
+// SPDX-License-Identifier: MIT
+
+#include <check.h>
+#include <stdio.h>
+#include <string.h>
+#include <inttypes.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <math.h>
+#include "xdsp_utest_common.h"
+#include "../fftad_functions.h"
+
+#undef DEBUG_PRINT
+
+#define STREAM_SIZE 65536
+static_assert( STREAM_SIZE >= 4096, "STREAM_SIZE should be >= 4096!" );
+static const unsigned packet_lens[3] = { 256, 4096, STREAM_SIZE };
+
+#define SPEED_MEASURE_ITERS 1000000
+
+#define EPSILON 5E-6
+
+static const char* last_fn_name = NULL;
+static generic_opts_t max_opt = OPT_GENERIC;
+
+static wvlt_fftwf_complex* in = NULL;
+static float* f_mant = NULL;
+static int32_t* f_pwr = NULL;
+static double* out = NULL;
+static double* out_etalon = NULL;
+static struct fft_accumulate_data acc;
+
+static void setup(void)
+{
+    posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE);
+    posix_memalign((void**)&f_mant,     ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    posix_memalign((void**)&f_pwr,      ALIGN_BYTES, sizeof(int32_t)       * STREAM_SIZE);
+    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(double)        * STREAM_SIZE);
+    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(double)        * STREAM_SIZE);
+
+    //init input data
+    for(unsigned i = 0; i < STREAM_SIZE; ++i)
+    {
+        in[i][0] = (float)(i);
+        in[i][1] = (float)(STREAM_SIZE - i - 1);
+    }
+
+    //init acc
+    acc.f_mant = f_mant;
+    acc.f_pwr  = f_pwr;
+    acc.mine   = 0.001;
+}
+
+static void teardown(void)
+{
+    free(in);
+    free(f_mant);
+    free(f_pwr);
+    free(out);
+    free(out_etalon);
+}
+
+static int32_t is_equal()
+{
+    for(unsigned i = 0; i < STREAM_SIZE; i++)
+    {
+        if(fabs(out[i] - out_etalon[i]) > EPSILON) return i;
+    }
+    return -1;
+}
+
+START_TEST(fftad_check)
+{
+    generic_opts_t opt = max_opt;
+    fprintf(stderr,"\n**** Check SIMD implementations ***\n");
+
+    fftad_init_c(OPT_GENERIC, NULL)(&acc, STREAM_SIZE);
+    fftad_add_c(OPT_GENERIC, NULL)(&acc, in, STREAM_SIZE);
+    fftad_norm_c(OPT_GENERIC, NULL)(&acc, STREAM_SIZE, 1.0, 0.0, out_etalon);
+
+#ifdef DEBUG_PRINT
+    for(unsigned i = 0; i < STREAM_SIZE; ++i)
+    {
+        if(i<10)
+        {
+            unsigned j = i ^ (STREAM_SIZE / 2);
+            fprintf(stderr, "ETALON> i:%u in=(%.6f,%.6f) acc=(%.8f,%d,%.6f) out=%.6f\n",
+                    i, in[j][0], in[j][1], acc.f_mant[j], acc.f_pwr[j], acc.mine, out_etalon[i]);
+        }
+    }
+#endif
+
+    last_fn_name = NULL;
+    const char* fn_name = NULL;
+    fftad_init_function_t fn_init = NULL;
+    fftad_add_function_t fn_add = NULL;
+    fftad_norm_function_t fn_norm = NULL;
+
+    while(opt != OPT_GENERIC)
+    {
+        fn_init = fftad_init_c(opt, &fn_name);
+
+        if(last_fn_name && !strcmp(last_fn_name, fn_name))
+        {
+            --opt;
+            continue;
+        }
+
+        last_fn_name = fn_name;
+        fn_add = fftad_add_c(opt, NULL);
+        fn_norm = fftad_norm_c(opt, NULL);
+
+        fn_init(&acc, STREAM_SIZE);
+        fn_add(&acc, in, STREAM_SIZE);
+        fn_norm(&acc, STREAM_SIZE, 1.0, 0.0, out);
+
+#ifdef DEBUG_PRINT
+        for(unsigned i = 0; i < STREAM_SIZE; ++i)
+        {
+            if(i<10)
+            {
+                unsigned j = i ^ (STREAM_SIZE / 2);
+                fprintf(stderr, "TEST  > i:%u in=(%.6f,%.6f) acc=(%.8f,%d,%.6f) out=%.6f\n",
+                        i, in[j][0], in[j][1], acc.f_mant[j], acc.f_pwr[j], acc.mine, out[i]);
+            }
+        }
+#endif
+
+        int res = is_equal();
+        fprintf(stderr, "%-20s\t", fn_name);
+        (res >= 0) ? fprintf(stderr, "\tFAILED!\n") : fprintf(stderr, "\tOK!\n");
+
+        if(res >= 0)
+        {
+            unsigned i = res;
+            unsigned j = i ^ (STREAM_SIZE / 2);
+            fprintf(stderr, "TEST  > i:%u in=(%.6f,%.6f) acc=(%.8f,%d,%.6f) out=%.6f <---> out_etalon=%.6f\n",
+                    i, in[j][0], in[j][1], acc.f_mant[j], acc.f_pwr[j], acc.mine, out[i], out_etalon[i]);
+        }
+        ck_assert_int_eq( res, -1 );
+        --opt;
+    }
+}
+END_TEST
+
+START_TEST(fftad_speed)
+{
+    fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
+
+    const char* fn_name = NULL;
+    fftad_init_function_t fn_init = NULL;
+    fftad_add_function_t fn_add = NULL;
+    fftad_norm_function_t fn_norm = NULL;
+
+    unsigned size = packet_lens[_i];
+
+    last_fn_name = NULL;
+    generic_opts_t opt = max_opt;
+
+    fprintf(stderr, "**** packet: %u elems, iters: %u ***\n", size, SPEED_MEASURE_ITERS);
+
+    while(opt != OPT_GENERIC)
+    {
+        fn_init = fftad_init_c(opt, &fn_name);
+        if(last_fn_name && !strcmp(last_fn_name, fn_name))
+        {
+            --opt;
+            continue;
+        }
+        last_fn_name = fn_name;
+        fn_add = fftad_add_c(opt, NULL);
+        fn_norm = fftad_norm_c(opt, NULL);
+
+        fprintf(stderr, "%-20s\t", fn_name);
+
+        //warming
+        (*fn_init)(&acc, size);
+        for(unsigned i = 0; i < 100; ++i) (*fn_add)(&acc, in, size);
+        (*fn_norm)(&acc, size, 1.0, 0.0, out);
+
+        //measuring
+        uint64_t tk = clock_get_time();
+        (*fn_init)(&acc, size);
+        for(unsigned i = 0; i < SPEED_MEASURE_ITERS; ++i) (*fn_add)(&acc, in, size);
+        (*fn_norm)(&acc, size, 1.0, 0.0, out);
+        uint64_t tk1 = clock_get_time() - tk;
+
+        fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 cycle, ave speed = %" PRIu64 " cycles/s \n",
+                        tk1, (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS), (uint64_t)(1000000LL*SPEED_MEASURE_ITERS/tk1));
+
+        --opt;
+    }
+}
+END_TEST
+
+Suite * fftad_suite(void)
+{
+    Suite *s;
+    TCase *tc_core;
+
+    max_opt = cpu_vcap_get();
+
+    s = suite_create("xfft_ftad_functions");
+    tc_core = tcase_create("XFFT");
+    tcase_set_timeout(tc_core, 300);
+    tcase_add_unchecked_fixture(tc_core, setup, teardown);
+    tcase_add_test(tc_core, fftad_check);
+    tcase_add_loop_test(tc_core, fftad_speed, 0, 3);
+    suite_add_tcase(s, tc_core);
+    return s;
+}

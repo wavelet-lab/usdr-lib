@@ -1,0 +1,16 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+set(USDR_DM_LIB_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/dm_sdr.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dm_stream.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dm_time.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dm_dev.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dm_dev_impl.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dm_rate.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dm_obj.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dm_debug.c
+)
+
+list(APPEND USDR_LIBRARY_FILES ${USDR_DM_LIB_FILES})
+set(USDR_LIBRARY_FILES ${USDR_LIBRARY_FILES} PARENT_SCOPE)

@@ -1,0 +1,1920 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         LMS7002M
+desc:         RFIC
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: SPI
+    wr_mask: 0x80000000
+    usdr_path: /debug/hw/lms7002m/0/reg
+addr_width:   16
+data_width:   16
+page_prefix:  True
+field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+- name: AFE
+  regs:
+  - addr: '0x0082'
+    name: '0x0082'
+    fields:
+    - bits: '15:13'
+      name: ISEL_DAC_AFE
+    - bits: 12
+      name: MODE_INTERLEAVE_AFE
+      opts:
+        0: 2ADCS
+        1: INTERLEAVED
+    - bits: '11:10'
+      name: MUX_AFE_1
+      opts:
+        0: MUXOFF
+        1: PDET_1
+        2: BIAS_TOP
+        3: RSSI1
+    - bits: '9:8'
+      name: MUX_AFE_2
+      opts:
+        0: MUXOFF
+        1: PDET_2
+        2: RSSI1
+        3: RSSI2
+    - bits: 5
+      name: PD_AFE
+    - bits: 4
+      name: PD_RX_AFE1
+    - bits: 3
+      name: PD_RX_AFE2
+    - bits: 2
+      name: PD_TX_AFE1
+    - bits: 1
+      name: PD_TX_AFE2
+    - bits: 0
+      name: EN_G_AFE
+- name: BIAS
+  regs:
+  - addr: '0x0084'
+    name: '0x0084'
+    fields:
+    - bits: '12:11'
+      name: MUX_BIAS_OUT
+    - bits: '10:6'
+      name: RP_CALIB_BIAS
+    - bits: 4
+      name: PD_FRP_BIAS
+    - bits: 3
+      name: PD_F_BIAS
+    - bits: 2
+      name: PD_PTRP_BIAS
+    - bits: 1
+      name: PD_PT_BIAS
+    - bits: 0
+      name: PD_BIAS_MASTER
+- name: CGEN
+  regs:
+  - addr: '0x0086'
+    name: ENABLE
+    fields:
+    - bits: 15
+      name: SPDUP_VCO
+    - bits: 14
+      name: RESET_N
+    - bits: 11
+      name: EN_ADCCLKH
+    - bits: 10
+      name: EN_COARSE
+    - bits: 9
+      name: EN_INTONLY_SDM
+    - bits: 8
+      name: EN_SDM_CLK
+    - bits: 6
+      name: PD_CP
+    - bits: 5
+      name: PD_FDIV_FB
+    - bits: 4
+      name: PD_FDIV_O
+    - bits: 3
+      name: PD_SDM
+    - bits: 2
+      name: PD_VCO
+    - bits: 1
+      name: PD_VCO_COMP
+    - bits: 0
+      name: EN_G
+  - addr: '0x0087'
+    name: '0x0087'
+    fields:
+    - bits: '15:0'
+      name: FRAC_SDM_LSB
+  - addr: '0x0088'
+    name: '0x0088'
+    fields:
+    - bits: '13:4'
+      name: INT_SDM
+    - bits: '3:0'
+      name: FRAC_SDM_MSB
+  - addr: '0x0089'
+    name: '0x0089'
+    fields:
+    - bits: 15
+      name: REV_SDMCLK
+    - bits: 14
+      name: SEL_SDMCLK
+      opts:
+        0: CLK_DIV
+        1: CLK_REF
+    - bits: 13
+      name: SX_DITHER_EN
+    - bits: '12:11'
+      name: CLKH_OV_CLKL
+    - bits: '10:3'
+      name: DIV_OUTCH
+    - bits: '2:0'
+      name: TST
+      opts:
+        0: disabled
+        1: tstdo
+        2: vco_tune_50_kohm
+        3: vco_tune
+        5: PFD_UP
+  - addr: '0x008A'
+    name: '0x008A'
+    fields:
+    - bits: 14
+      name: REV_CLKDAC
+    - bits: 13
+      name: REV_CLKADC
+    - bits: 12
+      name: REVPH_PFD
+    - bits: '11:6'
+      name: IOFFSET_CP
+    - bits: '5:0'
+      name: IPULSE_CP
+  - addr: '0x008B'
+    name: '0x008B'
+    fields:
+    - bits: '13:9'
+      name: ICT_VCO
+    - bits: '8:1'
+      name: CSW_VCO
+    - bits: 0
+      name: COARSE_START
+  - addr: '0x008C'
+    name: '0x008C'
+    fields:
+    - bits: 15
+      name: COARSE_STEPDONE
+    - bits: 14
+      name: COARSEPLL_COMPO
+    - bits: 13
+      name: VCO_CMPHO
+    - bits: 12
+      name: VCO_CMPLO
+    - bits: '11:8'
+      name: CP2
+    - bits: '7:4'
+      name: CP3
+    - bits: '3:0'
+      name: CZ
+  - addr: '0x008D'
+    name: '0x008D'
+    fields:
+    - bits: '2:0'
+      name: RESRV_CGN
+- name: DC
+  regs:
+  - addr: '0x05C0'
+    name: PD
+    fields:
+    - bits: 15
+      name: MODE
+    - bits: 7
+      name: DCDAC_RXB
+    - bits: 6
+      name: DCDAC_RXA
+    - bits: 5
+      name: DCDAC_TXB
+    - bits: 4
+      name: DCDAC_TXA
+    - bits: 3
+      name: DCCMP_RXB
+    - bits: 2
+      name: DCCMP_RXA
+    - bits: 1
+      name: DCCMP_TXB
+    - bits: 0
+      name: DCCMP_TXA
+  - addr: '0x05C1'
+    name: STATUS
+    fields:
+    - bits: 15
+      name: DCCAL_CAL_RXBQ
+    - bits: 14
+      name: DCCAL_CAL_RXBI
+    - bits: 13
+      name: DCCAL_CAL_RXAQ
+    - bits: 12
+      name: DCCAL_CAL_RXAI
+    - bits: 11
+      name: DCCAL_CAL_TXBQ
+    - bits: 10
+      name: DCCAL_CAL_TXBI
+    - bits: 9
+      name: DCCAL_CAL_TXAQ
+    - bits: 8
+      name: DCCAL_CAL_TXAI
+    - bits: 7
+      name: DCCAL_CMP_RXBQ
+    - bits: 6
+      name: DCCAL_CMP_RXBI
+    - bits: 5
+      name: DCCAL_CMP_RXAQ
+    - bits: 4
+      name: DCCAL_CMP_RXAI
+    - bits: 3
+      name: DCCAL_CMP_TXBQ
+    - bits: 2
+      name: DCCAL_CMP_TXBI
+    - bits: 1
+      name: DCCAL_CMP_TXAQ
+    - bits: 0
+      name: DCCAL_CMP_TXAI
+  - addr: '0x05C2'
+    name: '0x05C2'
+    fields:
+    - bits: 15
+      name: DCCAL_CMPCFG_RXBQ
+    - bits: 14
+      name: DCCAL_CMPCFG_RXBI
+    - bits: 13
+      name: DCCAL_CMPCFG_RXAQ
+    - bits: 12
+      name: DCCAL_CMPCFG_RXAI
+    - bits: 11
+      name: DCCAL_CMPCFG_TXBQ
+    - bits: 10
+      name: DCCAL_CMPCFG_TXBI
+    - bits: 9
+      name: DCCAL_CMPCFG_TXAQ
+    - bits: 8
+      name: DCCAL_CMPCFG_TXAI
+    - bits: 7
+      name: DCCAL_START_RXBQ
+    - bits: 6
+      name: DCCAL_START_RXBI
+    - bits: 5
+      name: DCCAL_START_RXAQ
+    - bits: 4
+      name: DCCAL_START_RXAI
+    - bits: 3
+      name: DCCAL_START_TXBQ
+    - bits: 2
+      name: DCCAL_START_TXBI
+    - bits: 1
+      name: DCCAL_START_TXAQ
+    - bits: 0
+      name: DCCAL_START_TXAI
+  - addr: '0x05C3'
+    name: '0x05C3'
+    fields:
+    - bits: 15
+      name: DCWR_TXAI
+    - bits: 14
+      name: DCRD_TXAI
+    - bits: '10:0'
+      name: DC_TXAI
+  - addr: '0x05C4'
+    name: '0x05C4'
+    fields:
+    - bits: 15
+      name: DCWR_TXAQ
+    - bits: 14
+      name: DCRD_TXAQ
+    - bits: '10:0'
+      name: DC_TXAQ
+  - addr: '0x05C5'
+    name: '0x05C5'
+    fields:
+    - bits: 15
+      name: DCWR_TXBI
+    - bits: 14
+      name: DCRD_TXBI
+    - bits: '10:0'
+      name: DC_TXBI
+  - addr: '0x05C6'
+    name: '0x05C6'
+    fields:
+    - bits: 15
+      name: DCWR_TXBQ
+    - bits: 14
+      name: DCRD_TXBQ
+    - bits: '10:0'
+      name: DC_TXBQ
+  - addr: '0x05C7'
+    name: '0x05C7'
+    fields:
+    - bits: 15
+      name: DCWR_RXAI
+    - bits: 14
+      name: DCRD_RXAI
+    - bits: '10:0'
+      name: DC_RXAI
+  - addr: '0x05C8'
+    name: '0x05C8'
+    fields:
+    - bits: 15
+      name: DCWR_RXAQ
+    - bits: 14
+      name: DCRD_RXAQ
+    - bits: '10:0'
+      name: DC_RXAQ
+  - addr: '0x05C9'
+    name: '0x05C9'
+    fields:
+    - bits: 15
+      name: DCWR_RXBI
+    - bits: 14
+      name: DCRD_RXBI
+    - bits: '10:0'
+      name: DC_RXBI
+  - addr: '0x05CA'
+    name: '0x05CA'
+    fields:
+    - bits: 15
+      name: DCWR_RXBQ
+    - bits: 14
+      name: DCRD_RXBQ
+    - bits: '10:0'
+      name: DC_RXBQ
+  - addr: '0x05CB'
+    name: '0x05CB'
+    fields:
+    - bits: '15:8'
+      name: DC_RXCDIV
+    - bits: '7:0'
+      name: DC_TXCDIV
+  - addr: '0x05CC'
+    name: '0x05CC'
+    fields:
+    - bits: '11:9'
+      name: DC_HYSCMP_RXB
+    - bits: '8:6'
+      name: DC_HYSCMP_RXA
+    - bits: '5:3'
+      name: DC_HYSCMP_TXB
+    - bits: '2:0'
+      name: DC_HYSCMP_TXA
+- name: ENDIR
+  regs:
+  - addr: '0x0081'
+    name: ENDIR
+    fields:
+    - bits: 3
+      name: LDO
+    - bits: 2
+      name: CGEN
+    - bits: 1
+      name: XBUF
+    - bits: 0
+      name: AFE
+- name: LDO
+  regs:
+  - addr: '0x0092'
+    name: '0x0092'
+    fields:
+    - bits: 15
+      name: EN_LDO_DIG
+    - bits: 14
+      name: EN_LDO_DIGGN
+    - bits: 13
+      name: EN_LDO_DIGSXR
+    - bits: 12
+      name: EN_LDO_DIGSXT
+    - bits: 11
+      name: EN_LDO_DIVGN
+    - bits: 10
+      name: EN_LDO_DIVSXR
+    - bits: 9
+      name: EN_LDO_DIVSXT
+    - bits: 8
+      name: EN_LDO_LNA12
+    - bits: 7
+      name: EN_LDO_LNA14
+    - bits: 6
+      name: EN_LDO_MXRFE
+    - bits: 5
+      name: EN_LDO_RBB
+    - bits: 4
+      name: EN_LDO_RXBUF
+    - bits: 3
+      name: EN_LDO_TBB
+    - bits: 2
+      name: EN_LDO_TIA12
+    - bits: 1
+      name: EN_LDO_TIA14
+    - bits: 0
+      name: EN_G_LDO
+  - addr: '0x0093'
+    name: '0x0093'
+    fields:
+    - bits: 15
+      name: EN_LOADIMP_LDO_TLOB
+    - bits: 14
+      name: EN_LOADIMP_LDO_TPAD
+    - bits: 13
+      name: EN_LOADIMP_LDO_TXBUF
+    - bits: 12
+      name: EN_LOADIMP_LDO_VCOGN
+    - bits: 11
+      name: EN_LOADIMP_LDO_VCOSXR
+    - bits: 10
+      name: EN_LOADIMP_LDO_VCOSXT
+    - bits: 9
+      name: EN_LDO_AFE
+    - bits: 8
+      name: EN_LDO_CPGN
+    - bits: 7
+      name: EN_LDO_CPSXR
+    - bits: 6
+      name: EN_LDO_TLOB
+    - bits: 5
+      name: EN_LDO_TPAD
+    - bits: 4
+      name: EN_LDO_TXBUF
+    - bits: 3
+      name: EN_LDO_VCOGN
+    - bits: 2
+      name: EN_LDO_VCOSXR
+    - bits: 1
+      name: EN_LDO_VCOSXT
+    - bits: 0
+      name: EN_LDO_CPSXT
+  - addr: '0x0094'
+    name: '0x0094'
+    fields:
+    - bits: 15
+      name: EN_LOADIMP_LDO_CPSXT
+    - bits: 14
+      name: EN_LOADIMP_LDO_DIG
+    - bits: 13
+      name: EN_LOADIMP_LDO_DIGGN
+    - bits: 12
+      name: EN_LOADIMP_LDO_DIGSXR
+    - bits: 11
+      name: EN_LOADIMP_LDO_DIGSXT
+    - bits: 10
+      name: EN_LOADIMP_LDO_DIVGN
+    - bits: 9
+      name: EN_LOADIMP_LDO_DIVSXR
+    - bits: 8
+      name: EN_LOADIMP_LDO_DIVSXT
+    - bits: 7
+      name: EN_LOADIMP_LDO_LNA12
+    - bits: 6
+      name: EN_LOADIMP_LDO_LNA14
+    - bits: 5
+      name: EN_LOADIMP_LDO_MXRFE
+    - bits: 4
+      name: EN_LOADIMP_LDO_RBB
+    - bits: 3
+      name: EN_LOADIMP_LDO_RXBUF
+    - bits: 2
+      name: EN_LOADIMP_LDO_TBB
+    - bits: 1
+      name: EN_LOADIMP_LDO_TIA12
+    - bits: 0
+      name: EN_LOADIMP_LDO_TIA14
+  - addr: '0x0095'
+    name: '0x0095'
+    fields:
+    - bits: 15
+      name: BYP_LDO_TBB
+    - bits: 14
+      name: BYP_LDO_TIA12
+    - bits: 13
+      name: BYP_LDO_TIA14
+    - bits: 12
+      name: BYP_LDO_TLOB
+    - bits: 11
+      name: BYP_LDO_TPAD
+    - bits: 10
+      name: BYP_LDO_TXBUF
+    - bits: 9
+      name: BYP_LDO_VCOGN
+    - bits: 8
+      name: BYP_LDO_VCOSXR
+    - bits: 7
+      name: BYP_LDO_VCOSXT
+    - bits: 2
+      name: EN_LOADIMP_LDO_AFE
+    - bits: 1
+      name: EN_LOADIMP_LDO_CPGN
+    - bits: 0
+      name: EN_LOADIMP_LDO_CPSXR
+  - addr: '0x0096'
+    name: '0x0096'
+    fields:
+    - bits: 15
+      name: BYP_LDO_AFE
+    - bits: 14
+      name: BYP_LDO_CPGN
+    - bits: 13
+      name: BYP_LDO_CPSXR
+    - bits: 12
+      name: BYP_LDO_CPSXT
+    - bits: 11
+      name: BYP_LDO_DIG
+    - bits: 10
+      name: BYP_LDO_DIGGN
+    - bits: 9
+      name: BYP_LDO_DIGSXR
+    - bits: 8
+      name: BYP_LDO_DIGSXT
+    - bits: 7
+      name: BYP_LDO_DIVGN
+    - bits: 6
+      name: BYP_LDO_DIVSXR
+    - bits: 5
+      name: BYP_LDO_DIVSXT
+    - bits: 4
+      name: BYP_LDO_LNA12
+    - bits: 3
+      name: BYP_LDO_LNA14
+    - bits: 2
+      name: BYP_LDO_MXRFE
+    - bits: 1
+      name: BYP_LDO_RBB
+    - bits: 0
+      name: BYP_LDO_RXBUF
+  - addr: '0x0097'
+    name: '0x0097'
+    fields:
+    - bits: 15
+      name: SPDUP_LDO_DIVSXR
+    - bits: 14
+      name: SPDUP_LDO_DIVSXT
+    - bits: 13
+      name: SPDUP_LDO_LNA12
+    - bits: 12
+      name: SPDUP_LDO_LNA14
+    - bits: 11
+      name: SPDUP_LDO_MXRFE
+    - bits: 10
+      name: SPDUP_LDO_RBB
+    - bits: 9
+      name: SPDUP_LDO_RXBUF
+    - bits: 8
+      name: SPDUP_LDO_TBB
+    - bits: 7
+      name: SPDUP_LDO_TIA12
+    - bits: 6
+      name: SPDUP_LDO_TIA14
+    - bits: 5
+      name: SPDUP_LDO_TLOB
+    - bits: 4
+      name: SPDUP_LDO_TPAD
+    - bits: 3
+      name: SPDUP_LDO_TXBUF
+    - bits: 2
+      name: SPDUP_LDO_VCOGN
+    - bits: 1
+      name: SPDUP_LDO_VCOSXR
+    - bits: 0
+      name: SPDUP_LDO_VCOSXT
+  - addr: '0x0098'
+    name: '0x0098'
+    fields:
+    - bits: 8
+      name: SPDUP_LDO_AFE
+    - bits: 7
+      name: SPDUP_LDO_CPGN
+    - bits: 6
+      name: SPDUP_LDO_CPSXR
+    - bits: 5
+      name: SPDUP_LDO_CPSXT
+    - bits: 4
+      name: SPDUP_LDO_DIG
+    - bits: 3
+      name: SPDUP_LDO_DIGGN
+    - bits: 2
+      name: SPDUP_LDO_DIGSXR
+    - bits: 1
+      name: SPDUP_LDO_DIGSXT
+    - bits: 0
+      name: SPDUP_LDO_DIVGN
+  - addr: '0x0099'
+    name: '0x0099'
+    fields:
+    - bits: '15:8'
+      name: RDIV_VCOSXR
+    - bits: '7:0'
+      name: RDIV_VCOSXT
+  - addr: '0x009A'
+    name: '0x009A'
+    fields:
+    - bits: '15:8'
+      name: RDIV_TXBUF
+    - bits: '7:0'
+      name: RDIV_VCOGN
+  - addr: '0x009B'
+    name: '0x009B'
+    fields:
+    - bits: '15:8'
+      name: RDIV_TLOB
+    - bits: '7:0'
+      name: RDIV_TPAD
+  - addr: '0x009C'
+    name: '0x009C'
+    fields:
+    - bits: '15:8'
+      name: RDIV_TIA12
+    - bits: '7:0'
+      name: RDIV_TIA14
+  - addr: '0x009D'
+    name: '0x009D'
+    fields:
+    - bits: '15:8'
+      name: RDIV_RXBUF
+    - bits: '7:0'
+      name: RDIV_TBB
+  - addr: '0x009E'
+    name: '0x009E'
+    fields:
+    - bits: '15:8'
+      name: RDIV_MXRFE
+    - bits: '7:0'
+      name: RDIV_RBB
+  - addr: '0x009F'
+    name: '0x009F'
+    fields:
+    - bits: '15:8'
+      name: RDIV_LNA12
+    - bits: '7:0'
+      name: RDIV_LNA14
+  - addr: '0x00A0'
+    name: '0x00A0'
+    fields:
+    - bits: '15:8'
+      name: RDIV_DIVSXR
+    - bits: '7:0'
+      name: RDIV_DIVSXT
+  - addr: '0x00A1'
+    name: '0x00A1'
+    fields:
+    - bits: '15:8'
+      name: RDIV_DIGSXT
+    - bits: '7:0'
+      name: RDIV_DIVGN
+  - addr: '0x00A2'
+    name: '0x00A2'
+    fields:
+    - bits: '15:8'
+      name: RDIV_DIGGN
+    - bits: '7:0'
+      name: RDIV_DIGSXR
+  - addr: '0x00A3'
+    name: '0x00A3'
+    fields:
+    - bits: '15:8'
+      name: RDIV_CPSXT
+    - bits: '7:0'
+      name: RDIV_DIG
+  - addr: '0x00A4'
+    name: '0x00A4'
+    fields:
+    - bits: '15:8'
+      name: RDIV_CPGN
+    - bits: '7:0'
+      name: RDIV_CPSXR
+  - addr: '0x00A5'
+    name: '0x00A5'
+    fields:
+    - bits: '15:8'
+      name: RDIV_SPIBUF
+    - bits: '7:0'
+      name: RDIV_AFE
+  - addr: '0x00A6'
+    name: '0x00A6'
+    fields:
+    - bits: 12
+      name: SPDUP_LDO_SPIBUF
+    - bits: 11
+      name: SPDUP_LDO_DIGIp2
+    - bits: 10
+      name: SPDUP_LDO_DIGIp1
+    - bits: 9
+      name: BYP_LDO_SPIBUF
+    - bits: 8
+      name: BYP_LDO_DIGIp2
+    - bits: 7
+      name: BYP_LDO_DIGIp1
+    - bits: 6
+      name: EN_LOADIMP_LDO_SPIBUF
+    - bits: 5
+      name: EN_LOADIMP_LDO_DIGIp2
+    - bits: 4
+      name: EN_LOADIMP_LDO_DIGIp1
+    - bits: 3
+      name: PD_LDO_SPIBUF
+    - bits: 2
+      name: PD_LDO_DIGIp2
+    - bits: 1
+      name: PD_LDO_DIGIp1
+    - bits: 0
+      name: EN_G_LDOP
+  - addr: '0x00A7'
+    name: '0x00A7'
+    fields:
+    - bits: '15:8'
+      name: RDIV_DIGIp2
+    - bits: '7:0'
+      name: RDIV_DIGIp1
+- name: LML
+  regs:
+  - addr: '0x0020'
+    name: '0x0020'
+    fields:
+    - bits: 15
+      name: LRST_TX_B
+    - bits: 14
+      name: MRST_TX_B
+    - bits: 13
+      name: LRST_TX_A
+    - bits: 12
+      name: MRST_TX_A
+    - bits: 11
+      name: LRST_RX_B
+    - bits: 10
+      name: MRST_RX_B
+    - bits: 9
+      name: LRST_RX_A
+    - bits: 8
+      name: MRST_RX_A
+    - bits: 7
+      name: SRST_RXFIFO
+    - bits: 6
+      name: SRST_TXFIFO
+    - bits: 5
+      name: RXEN_B
+    - bits: 4
+      name: RXEN_A
+    - bits: 3
+      name: TXEN_B
+    - bits: 2
+      name: TXEN_A
+    - bits: '1:0'
+      name: MAC
+      opts:
+        0: NONE
+        1: CHA
+        2: CHB
+        3: CHAB
+  - addr: '0x0021'
+    name: '0x0021'
+    fields:
+    - bits: 11
+      name: TX_CLK_PE
+    - bits: 10
+      name: RX_CLK_PE
+    - bits: 9
+      name: SDA_PE
+    - bits: 8
+      name: SDA_DS
+    - bits: 7
+      name: SCL_PE
+    - bits: 6
+      name: SCL_DS
+    - bits: 5
+      name: SDIO_DS
+    - bits: 4
+      name: SDIO_PE
+    - bits: 3
+      name: SDO_PE
+    - bits: 2
+      name: SCLK_PE
+    - bits: 1
+      name: SEN_PE
+    - bits: 0
+      name: SPIMODE
+      opts:
+        0: 3wire
+        1: 4wire
+  - addr: '0x0022'
+    name: '0x0022'
+    fields:
+    - bits: 15
+      name: TRXIQPULSE2
+    - bits: 14
+      name: SISODDR2
+    - bits: 13
+      name: TRXIQPULSE1
+    - bits: 12
+      name: SISODDR1
+    - bits: 11
+      name: DIQ2_DS
+      opts:
+        0: 4ma
+        1: 8ma
+    - bits: 10
+      name: DIQ2_PE
+    - bits: 9
+      name: IQ_SEL_EN_2_PE
+    - bits: 8
+      name: TXNRX2_PE
+    - bits: 7
+      name: FCLK2_PE
+    - bits: 6
+      name: MCLK2_PE
+    - bits: 5
+      name: DIQ1_DS
+      opts:
+        0: 4ma
+        1: 8ma
+    - bits: 4
+      name: DIQ1_PE
+    - bits: 3
+      name: IQ_SEL_EN_1_PE
+    - bits: 2
+      name: TXNRX1_PE
+    - bits: 1
+      name: FCLK1_PE
+    - bits: 0
+      name: MCLK1_PE
+  - addr: '0x0023'
+    name: '0x0023'
+    fields:
+    - bits: 15
+      name: DIQDIRCTR2
+    - bits: 14
+      name: DIQDIR2
+      opts:
+        0: Output
+        1: Input
+    - bits: 13
+      name: DIQDIRCTR1
+    - bits: 12
+      name: DIQDIR1
+      opts:
+        0: Output
+        1: Input
+    - bits: 11
+      name: ENABLEDIRCTR2
+    - bits: 10
+      name: ENABLEDIR2
+      opts:
+        0: Output
+        1: Input
+    - bits: 9
+      name: ENABLEDIRCTR1
+    - bits: 8
+      name: ENABLEDIR1
+      opts:
+        0: Output
+        1: Input
+    - bits: 6
+      name: MOD_EN
+    - bits: 5
+      name: LML2_FIDM
+    - bits: 4
+      name: LML2_RXNTXIQ
+      opts:
+        0: RXIQ
+        1: TXIQ
+    - bits: 3
+      name: LML2_MODE
+      opts:
+        0: TRXIQ
+        1: JESD207
+    - bits: 2
+      name: LML1_FIDM
+    - bits: 1
+      name: LML1_RXNTXIQ
+      opts:
+        0: RXIQ
+        1: TXIQ
+    - bits: 0
+      name: LML1_MODE
+      opts:
+        0: TRXIQ
+        1: JESD207
+  - addr: '0x0024'
+    name: '0x0024'
+    fields:
+    - bits: '15:14'
+      name: LML1_S3S
+      opts:
+        0: AI
+        1: AQ
+        2: BI
+        3: BQ
+    - bits: '13:12'
+      name: LML1_S2S
+      opts:
+        0: AI
+        1: AQ
+        2: BI
+        3: BQ
+    - bits: '11:10'
+      name: LML1_S1S
+      opts:
+        0: AI
+        1: AQ
+        2: BI
+        3: BQ
+    - bits: '9:8'
+      name: LML1_S0S
+      opts:
+        0: AI
+        1: AQ
+        2: BI
+        3: BQ
+    - bits: '7:6'
+      name: LML1_BQP
+    - bits: '5:4'
+      name: LML1_BIP
+    - bits: '3:2'
+      name: LML1_AQP
+    - bits: '1:0'
+      name: LML1_AIP
+  - addr: '0x0025'
+    name: '0x0025'
+    fields:
+    - bits: '11:8'
+      name: LML1_BB2RF_PST
+    - bits: '4:0'
+      name: LML1_BB2RF_PRE
+  - addr: '0x0026'
+    name: '0x0026'
+    fields:
+    - bits: '11:8'
+      name: LML1_RF2BB_PST
+    - bits: '4:0'
+      name: LML1_RF2BB_PRE
+  - addr: '0x0027'
+    name: '0x0027'
+    fields:
+    - bits: '15:14'
+      name: LML2_S3S
+      opts:
+        0: AI
+        1: AQ
+        2: BI
+        3: BQ
+    - bits: '13:12'
+      name: LML2_S2S
+      opts:
+        0: AI
+        1: AQ
+        2: BI
+        3: BQ
+    - bits: '11:10'
+      name: LML2_S1S
+      opts:
+        0: AI
+        1: AQ
+        2: BI
+        3: BQ
+    - bits: '9:8'
+      name: LML2_S0S
+      opts:
+        0: AI
+        1: AQ
+        2: BI
+        3: BQ
+    - bits: '7:6'
+      name: LML2_BQP
+    - bits: '5:4'
+      name: LML2_BIP
+    - bits: '3:2'
+      name: LML2_AQP
+    - bits: '1:0'
+      name: LML2_AIP
+  - addr: '0x0028'
+    name: '0x0028'
+    fields:
+    - bits: '11:8'
+      name: LML2_BB2RF_PST
+    - bits: '4:0'
+      name: LML2_BB2RF_PRE
+  - addr: '0x0029'
+    name: '0x0029'
+    fields:
+    - bits: '11:8'
+      name: LML2_RF2BB_PST
+    - bits: '4:0'
+      name: LML2_RF2BB_PRE
+  - addr: '0x002A'
+    name: '0x002A'
+    fields:
+    - bits: '11:10'
+      name: RX_MUX
+      opts:
+        0: RxTSP
+        1: TxFIFO
+        2: LFSR
+        3: LFSR_
+    - bits: '9:8'
+      name: TX_MUX
+      opts:
+        0: PORT1
+        1: PORT2
+        2: RxTSP
+        3: RxTSP_
+    - bits: '7:6'
+      name: TXRDCLK_MUX
+      opts:
+        0: FCLK1
+        1: FCLK2
+        2: TxTSPCLK
+        3: TxTSPCLK_
+    - bits: '5:4'
+      name: TXWRCLK_MUX
+      opts:
+        0: FCLK1
+        1: FCLK2
+        2: RxTSPCLK
+        3: RxTSPCLK_
+    - bits: '3:2'
+      name: RXRDCLK_MUX
+      opts:
+        0: MCLK1
+        1: MCLK2
+        2: FCLK1
+        3: FCLK2
+    - bits: '1:0'
+      name: RXWRCLK_MUX
+      opts:
+        0: FCLK1
+        1: FCLK2
+        2: RxTSPCLK
+        3: RxTSPCLK_
+  - addr: '0x002B'
+    name: '0x002B'
+    fields:
+    - bits: 15
+      name: FCLK2_INV
+    - bits: 14
+      name: FCLK1_INV
+    - bits: 9
+      name: MCLK2_INV
+    - bits: 8
+      name: MCLK1_INV
+    - bits: '5:4'
+      name: MCLK2SRC
+      opts:
+        0: TxTSPCLKA_DIV
+        1: RxTSPCLKA_DIV
+        2: TxTSPCLKA
+        3: RxTSPCLKA
+    - bits: '3:2'
+      name: MCLK1SRC
+      opts:
+        0: TxTSPCLKA_DIV
+        1: RxTSPCLKA_DIV
+        2: TxTSPCLKA
+        3: RxTSPCLKA
+    - bits: 1
+      name: TXDIVEN
+    - bits: 0
+      name: RXDIVEN
+  - addr: '0x002C'
+    name: '0x002C'
+    fields:
+    - bits: '15:8'
+      name: TXTSPCLK_DIV
+    - bits: '7:0'
+      name: RXTSPCLK_DIV
+  - addr: '0x002E'
+    name: '0x002E'
+    fields:
+    - bits: 15
+      name: MIMO_SISO
+  - addr: '0x002F'
+    name: '0x002F'
+    fields:
+    - bits: '15:11'
+      name: VER
+    - bits: '10:6'
+      name: REV
+    - bits: '5:0'
+      name: MASK
+- name: RBB
+  regs:
+  - addr: '0x0115'
+    name: '0x0115'
+    fields:
+    - bits: 15
+      name: EN_LB_LPFH_RBB
+    - bits: 14
+      name: EN_LB_LPFL_RBB
+    - bits: 3
+      name: PD_LPFH_RBB
+    - bits: 2
+      name: PD_LPFL_RBB
+    - bits: 1
+      name: PD_PGA_RBB
+    - bits: 0
+      name: EN_G_RBB
+  - addr: '0x0116'
+    name: '0x0116'
+    fields:
+    - bits: '15:11'
+      name: R_CTL_LPF_RBB
+    - bits: '10:8'
+      name: RCC_CTL_LPFH_RBB
+    - bits: '7:0'
+      name: C_CTL_LPFH_RBB
+  - addr: '0x0117'
+    name: '0x0117'
+    fields:
+    - bits: '13:11'
+      name: RCC_CTL_LPFL_RBB
+    - bits: '10:0'
+      name: C_CTL_LPFL_RBB
+  - addr: '0x0118'
+    name: '0x0118'
+    fields:
+    - bits: '15:13'
+      name: INPUT_CTL_PGA_RBB
+      opts:
+        0: LPFL
+        1: LPFH
+        2: BYPASS
+        3: TBB
+        4: PDET
+    - bits: '9:5'
+      name: ICT_LPF_IN_RBB
+    - bits: '4:0'
+      name: ICT_LPF_OUT_RBB
+  - addr: '0x0119'
+    name: '0x0119'
+    fields:
+    - bits: 15
+      name: OSW_PGA_RBB
+    - bits: '14:10'
+      name: ICT_PGA_OUT_RBB
+    - bits: '9:5'
+      name: ICT_PGA_IN_RBB
+    - bits: '4:0'
+      name: G_PGA_RBB
+  - addr: '0x011A'
+    name: '0x011A'
+    fields:
+    - bits: '13:9'
+      name: RCC_CTL_PGA_RBB
+    - bits: '7:0'
+      name: C_CTL_PGA_RBB
+  - addr: '0x011B'
+    name: '0x011B'
+    fields:
+    - bits: '6:0'
+      name: RESRV_RBB
+- name: RFE
+  regs:
+  - addr: '0x010C'
+    name: '0x010C'
+    fields:
+    - bits: '15:12'
+      name: CDC_I_RFE
+    - bits: '11:8'
+      name: CDC_Q_RFE
+    - bits: 7
+      name: PD_LNA_RFE
+    - bits: 6
+      name: PD_RLOOPB_1_RFE
+    - bits: 5
+      name: PD_RLOOPB_2_RFE
+    - bits: 4
+      name: PD_MXLOBUF_RFE
+    - bits: 3
+      name: PD_QGEN_RFE
+    - bits: 2
+      name: PD_RSSI_RFE
+    - bits: 1
+      name: PD_TIA_RFE
+    - bits: 0
+      name: EN_G_RFE
+  - addr: '0x010D'
+    name: '0x010D'
+    fields:
+    - bits: '8:7'
+      name: SEL_PATH_RFE
+      opts:
+        0: NONE
+        1: LNAH
+        2: LNAL
+        3: LNAW
+    - bits: 6
+      name: EN_DCOFF_RXFE_RFE
+    - bits: 4
+      name: EN_INSHSW_LB1_RFE
+    - bits: 3
+      name: EN_INSHSW_LB2_RFE
+    - bits: 2
+      name: EN_INSHSW_L_RFE
+    - bits: 1
+      name: EN_INSHSW_W_RFE
+    - bits: 0
+      name: EN_NEXTRX_RFE
+      opts:
+        0: SISO
+        1: MIMO
+  - addr: '0x010E'
+    name: '0x010E'
+    fields:
+    - bits: '13:7'
+      name: DCOFFI_RFE
+    - bits: '6:0'
+      name: DCOFFQ_RFE
+  - addr: '0x010F'
+    name: '0x010F'
+    fields:
+    - bits: '14:10'
+      name: ICT_LOOPB_RFE
+    - bits: '9:5'
+      name: ICT_TIAMAIN_RFE
+    - bits: '4:0'
+      name: ICT_TIAOUT_RFE
+  - addr: '0x0110'
+    name: '0x0110'
+    fields:
+    - bits: '14:10'
+      name: ICT_LNACMO_RFE
+    - bits: '9:5'
+      name: ICT_LNA_RFE
+    - bits: '4:0'
+      name: ICT_LODC_RFE
+  - addr: '0x0111'
+    name: '0x0111'
+    fields:
+    - bits: '9:5'
+      name: CAP_RXMXO_RFE
+    - bits: '4:0'
+      name: CGSIN_LNA_RFE
+  - addr: '0x0112'
+    name: '0x0112'
+    fields:
+    - bits: '15:12'
+      name: CCOMP_TIA_RFE
+    - bits: '11:0'
+      name: CFB_TIA_RFE
+  - addr: '0x0113'
+    name: '0x0113'
+    fields:
+    - bits: '9:6'
+      name: G_LNA_RFE
+    - bits: '5:2'
+      name: G_RXLOOPB_RFE
+    - bits: '1:0'
+      name: G_TIA_RFE
+  - addr: '0x0114'
+    name: '0x0114'
+    fields:
+    - bits: '8:5'
+      name: RCOMP_TIA_RFE
+    - bits: '4:0'
+      name: RFB_TIA_RFE
+- name: RXNCO
+  regs:
+  - addr: '0x0440'
+    name: '0x0440'
+    fields:
+    - bits: '8:5'
+      name: DTHBIT
+    - bits: '4:1'
+      name: SEL
+    - bits: 0
+      name: MODE
+      opts:
+        0: FCW
+        1: PHO
+  - addr: '0x0441'
+    name: '0x0441'
+    fields:
+    - bits: '15:0'
+      name: PHO
+  - addr: '0x0442'
+    name: '0x0442'
+    fields:
+    - bits: '15:0'
+      name: FCW0_HI
+  - addr: '0x0443'
+    name: '0x0443'
+    fields:
+    - bits: '15:0'
+      name: FCW0_LO
+- name: RXTSP
+  regs:
+  - addr: '0x0400'
+    name: '0x0400'
+    fields:
+    - bits: 15
+      name: CAPTURE
+    - bits: '14:13'
+      name: CAPSEL
+      opts:
+        0: RSSI
+        1: ADCI_ADCQ
+        2: BSIGI_BSTATE
+        3: BSIGQ_BSTATE
+    - bits: 12
+      name: CAPSEL_ADC
+      opts:
+        0: RXTSP_INPUT
+        1: RXTSP_OUTPUT
+    - bits: 9
+      name: TSGFC
+      opts:
+        0: neg6db
+        1: fs
+    - bits: '8:7'
+      name: TSGFCW
+      opts:
+        1: div8
+        2: div4
+    - bits: 6
+      name: TSGDCLDQ
+    - bits: 5
+      name: TSGDCLDI
+    - bits: 4
+      name: TSGSWAPIQ
+    - bits: 3
+      name: TSGMODE
+      opts:
+        0: NCO
+        1: DC
+    - bits: 2
+      name: INSEL
+      opts:
+        0: LML
+        1: TEST
+    - bits: 1
+      name: BSTART
+    - bits: 0
+      name: EN
+  - addr: '0x0401'
+    name: '0x0401'
+    fields:
+    - bits: '10:0'
+      name: GCORRQ
+  - addr: '0x0402'
+    name: '0x0402'
+    fields:
+    - bits: '10:0'
+      name: GCORRI
+  - addr: '0x0403'
+    name: '0x0403'
+    fields:
+    - bits: '14:12'
+      name: HBD_OVR
+      opts:
+        7: BYPASS
+    - bits: '11:0'
+      name: IQCORR
+  - addr: '0x0404'
+    name: '0x0404'
+    fields:
+    - bits: '15:13'
+      name: HBD_DLY
+    - bits: '2:0'
+      name: DCCORR_AVG
+  - addr: '0x0405'
+    name: '0x0405'
+    fields:
+    - bits: '10:8'
+      name: GFIR1_L
+    - bits: '7:0'
+      name: GFIR1_N
+  - addr: '0x0406'
+    name: '0x0406'
+    fields:
+    - bits: '10:8'
+      name: GFIR2_L
+    - bits: '7:0'
+      name: GFIR2_N
+  - addr: '0x0407'
+    name: '0x0407'
+    fields:
+    - bits: '10:8'
+      name: GFIR3_L
+    - bits: '7:0'
+      name: GFIR3_N
+  - addr: '0x0408'
+    name: '0x0408'
+    fields:
+    - bits: '15:0'
+      name: AGC_K_LSB
+  - addr: '0x0409'
+    name: '0x0409'
+    fields:
+    - bits: '15:4'
+      name: AGC_ADESIRED
+    - bits: '1:0'
+      name: AGC_K_MSB
+  - addr: '0x040A'
+    name: '0x040A'
+    fields:
+    - bits: '15:14'
+      name: RSSI_MODE
+      opts:
+        0: RSSI_NORM
+        1: RSSI_I
+        2: RSSI_Q
+    - bits: '13:12'
+      name: AGC_MODE
+      opts:
+        0: AGC
+        1: RSSI
+        2: BYPASS
+    - bits: '2:0'
+      name: AGC_AVG
+  - addr: '0x040B'
+    name: '0x040B'
+    fields:
+    - bits: '15:0'
+      name: DC_REG
+  - addr: '0x040C'
+    name: '0x040C'
+    fields:
+    - bits: '15:14'
+      name: CMIX_GAIN
+      opts:
+        0: 0db
+        1: pos6db
+        2: neg6db
+    - bits: 13
+      name: CMIX_SC
+      opts:
+        0: UPCONVERT
+        1: DOWNCONVERT
+    - bits: 12
+      name: CMIX_GAINM
+    - bits: 8
+      name: DCLOOP_STOP
+    - bits: 7
+      name: CMIX_BYP
+    - bits: 6
+      name: AGC_BYP
+    - bits: 5
+      name: GFIR3_BYP
+    - bits: 4
+      name: GFIR2_BYP
+    - bits: 3
+      name: GFIR1_BYP
+    - bits: 2
+      name: DC_BYP
+    - bits: 1
+      name: GC_BYP
+    - bits: 0
+      name: PH_BYP
+- name: SXX
+  regs:
+  - addr: '0x011C'
+    name: '0x011C'
+    fields:
+    - bits: 15
+      name: RESET_N
+    - bits: 14
+      name: SPDUP_VCO
+    - bits: 13
+      name: BYPLDO_VCO
+    - bits: 12
+      name: EN_COARSEPLL
+    - bits: 11
+      name: CURLIM_VCO
+    - bits: 10
+      name: EN_DIV2_DIVPROG
+    - bits: 9
+      name: EN_INTONLY_SDM
+    - bits: 8
+      name: EN_SDM_CLK
+    - bits: 7
+      name: PD_FBDIV
+    - bits: 6
+      name: PD_LOCH_T2RBUF
+    - bits: 5
+      name: PD_CP
+    - bits: 4
+      name: PD_FDIV
+    - bits: 3
+      name: PD_SDM
+    - bits: 2
+      name: PD_VCO_COMP
+    - bits: 1
+      name: PD_VCO
+    - bits: 0
+      name: EN_G
+  - addr: '0x011D'
+    name: '0x011D'
+    fields:
+    - bits: '15:0'
+      name: FRAC_SDM_LSB
+  - addr: '0x011E'
+    name: '0x011E'
+    fields:
+    - bits: '13:4'
+      name: INT_SDM
+    - bits: '3:0'
+      name: FRAC_SDM_MSB
+  - addr: '0x011F'
+    name: '0x011F'
+    fields:
+    - bits: '14:12'
+      name: PW_DIV2_LOCH
+    - bits: '11:9'
+      name: PW_DIV4_LOCH
+    - bits: '8:6'
+      name: DIV_LOCH
+    - bits: '5:3'
+      name: TST_SX
+    - bits: 2
+      name: SEL_SDMCLK
+      opts:
+        0: CLK_DIV
+        1: CLK_REF
+    - bits: 1
+      name: SX_DITHER_EN
+    - bits: 0
+      name: REV_SDMCLK
+  - addr: '0x0120'
+    name: '0x0120'
+    fields:
+    - bits: '15:8'
+      name: VDIV_VCO
+    - bits: '7:0'
+      name: ICT_VCO
+  - addr: '0x0121'
+    name: '0x0121'
+    fields:
+    - bits: '15:11'
+      name: RSEL_LDO_VCO
+    - bits: '10:3'
+      name: CSW_VCO
+    - bits: '2:1'
+      name: SEL_VCO
+      opts:
+        0: VCOL
+        1: VCOM
+        2: VCOH
+    - bits: 0
+      name: COARSE_START
+  - addr: '0x0122'
+    name: '0x0122'
+    fields:
+    - bits: 12
+      name: REVPH_PFD
+    - bits: '11:6'
+      name: IOFFSET_CP
+    - bits: '5:0'
+      name: IPULSE_CP
+  - addr: '0x0123'
+    name: '0x0123'
+    fields:
+    - bits: 15
+      name: COARSE_STEPDONE
+    - bits: 14
+      name: COARSEPLL_COMPO
+    - bits: 13
+      name: VCO_CMPHO
+    - bits: 12
+      name: VCO_CMPLO
+    - bits: '11:8'
+      name: CP2_PLL
+    - bits: '7:4'
+      name: CP3_PLL
+    - bits: '3:0'
+      name: CZ
+  - addr: '0x0124'
+    name: '0x0124'
+    fields:
+    - bits: 4
+      name: EN_DIR_SXX
+    - bits: 3
+      name: EN_DIR_RBB
+    - bits: 2
+      name: EN_DIR_RFE
+    - bits: 1
+      name: EN_DIR_TBB
+    - bits: 0
+      name: EN_DIR_TRF
+- name: TBB
+  regs:
+  - addr: '0x0105'
+    name: '0x0105'
+    fields:
+    - bits: 15
+      name: STATPULSE_TBB
+    - bits: 14
+      name: LOOPB_SWAP_IQ
+    - bits: '13:12'
+      name: LOOPB
+      opts:
+        0: NORMAL
+        1: LB_DAC
+        2: LB_LPF_LAD
+        3: LB_TBB_OUT
+    - bits: 4
+      name: PD_LPFH_TBB
+    - bits: 3
+      name: PD_LPFIAMP_TBB
+    - bits: 2
+      name: PD_LPFLAD_TBB
+    - bits: 1
+      name: PD_LPFS5_TBB
+    - bits: 0
+      name: EN_G_TBB
+  - addr: '0x0106'
+    name: '0x0106'
+    fields:
+    - bits: '14:10'
+      name: ICT_LPFS5_F_TBB
+    - bits: '9:5'
+      name: ICT_LPFS5_PT_TBB
+    - bits: '4:0'
+      name: ICT_LPF_H_PT_TBB
+  - addr: '0x0107'
+    name: '0x0107'
+    fields:
+    - bits: '14:10'
+      name: ICT_LPFH_F_TBB
+    - bits: '9:5'
+      name: ICT_LPFLAD_F_TBB
+    - bits: '4:0'
+      name: ICT_LPFLAD_PT_TBB
+  - addr: '0x0108'
+    name: '0x0108'
+    fields:
+    - bits: '15:10'
+      name: CG_IAMP_TBB
+    - bits: '9:5'
+      name: ICT_IAMP_FRP_TBB
+    - bits: '4:0'
+      name: ICT_IAMP_GG_FRP_TBB
+  - addr: '0x0109'
+    name: '0x0109'
+    fields:
+    - bits: '15:8'
+      name: RCAL_LPFH_TBB
+    - bits: '7:0'
+      name: RCAL_LPFLAD_TBB
+  - addr: '0x010A'
+    name: '0x010A'
+    fields:
+    - bits: '15:14'
+      name: TSTIN_TBB
+      opts:
+        0: DISABLED
+        1: LPFH
+        2: LPFL
+        3: CURAMP
+    - bits: 13
+      name: BYPLADDER_TBB
+    - bits: '12:8'
+      name: CCAL_LPFLAD_TBB
+    - bits: '7:0'
+      name: RCAL_LPFS5_TBB
+  - addr: '0x010B'
+    name: LPFS5
+    fields:
+    - bits: 0
+      name: BYPASS
+      desc: Bypasses LPFS5_TBB low pass real-pole filter capacitor banks. Stage must remain active when bypass is enabled
+- name: TRF
+  regs:
+  - addr: '0x0100'
+    name: '0x0100'
+    fields:
+    - bits: 15
+      name: EN_LOWBWLOMX_TMX_TRF
+    - bits: 14
+      name: EN_NEXTTX_TRF
+      opts:
+        0: SISO
+        1: MIMO
+    - bits: '13:12'
+      name: EN_AMPHF_PDET_TRF
+    - bits: '11:10'
+      name: LOADR_PDET_TRF
+    - bits: 3
+      name: PD_PDET_TRF
+    - bits: 2
+      name: PD_TLOBUF_TRF
+    - bits: 1
+      name: PD_TXPAD_TRF
+    - bits: 0
+      name: EN_G_TRF
+  - addr: '0x0101'
+    name: '0x0101'
+    fields:
+    - bits: '15:13'
+      name: F_TXPAD_TRF
+    - bits: '12:11'
+      name: L_LOOPB_TXPAD_TRF
+    - bits: '10:6'
+      name: LOSS_LIN_TXPAD_TRF
+    - bits: '5:1'
+      name: LOSS_MAIN_TXPAD_TRF
+    - bits: 0
+      name: EN_LOOPB_TXPAD_TRF
+  - addr: '0x0102'
+    name: '0x0102'
+    fields:
+    - bits: 15
+      name: GCAS_GNDREF_TXPAD_TRF
+    - bits: '14:10'
+      name: ICT_LIN_TXPAD_TRF
+    - bits: '9:5'
+      name: ICT_MAIN_TXPAD_TRF
+    - bits: '4:0'
+      name: VGCAS_TXPAD_TRF
+  - addr: '0x0103'
+    name: '0x0103'
+    fields:
+    - bits: 11
+      name: SEL_BAND1_TRF
+    - bits: 10
+      name: SEL_BAND2_TRF
+    - bits: '9:5'
+      name: LOBIASN_TXM_TRF
+    - bits: '4:0'
+      name: LOBIASP_TXX_TRF
+  - addr: '0x0104'
+    name: '0x0104'
+    fields:
+    - bits: '7:4'
+      name: CDC_I_TRF
+    - bits: '3:0'
+      name: CDC_Q_TRF
+- name: TXNCO
+  regs:
+  - addr: '0x0240'
+    name: '0x0240'
+    fields:
+    - bits: '8:5'
+      name: DTHBIT
+    - bits: '4:1'
+      name: SEL
+    - bits: 0
+      name: MODE
+      opts:
+        0: FCW
+        1: PHO
+  - addr: '0x0241'
+    name: '0x0241'
+    fields:
+    - bits: '15:0'
+      name: PHO
+  - addr: '0x0242'
+    name: '0x0242'
+    fields:
+    - bits: '15:0'
+      name: FCW0_HI
+  - addr: '0x0243'
+    name: '0x0243'
+    fields:
+    - bits: '15:0'
+      name: FCW0_LO
+- name: TXTSP
+  regs:
+  - addr: '0x0200'
+    name: '0x0200'
+    fields:
+    - bits: 9
+      name: TSGFC
+      opts:
+        0: neg6db
+        1: fs
+    - bits: '8:7'
+      name: TSGFCW
+      opts:
+        1: div8
+        2: div4
+    - bits: 6
+      name: TSGDCLDQ
+    - bits: 5
+      name: TSGDCLDI
+    - bits: 4
+      name: TSGSWAPIQ
+    - bits: 3
+      name: TSGMODE
+      opts:
+        0: NCO
+        1: DC
+    - bits: 2
+      name: INSEL
+      opts:
+        0: LML
+        1: TEST
+    - bits: 1
+      name: BSTART
+    - bits: 0
+      name: EN
+  - addr: '0x0201'
+    name: '0x0201'
+    fields:
+    - bits: '10:0'
+      name: GCORRQ
+  - addr: '0x0202'
+    name: '0x0202'
+    fields:
+    - bits: '10:0'
+      name: GCORRI
+  - addr: '0x0203'
+    name: '0x0203'
+    fields:
+    - bits: '14:12'
+      name: HBI_OVR
+      opts:
+        7: BYPASS
+    - bits: '11:0'
+      name: IQCORR
+  - addr: '0x0204'
+    name: '0x0204'
+    fields:
+    - bits: '15:8'
+      name: DCCORRI
+    - bits: '7:0'
+      name: DCCORRQ
+  - addr: '0x0205'
+    name: '0x0205'
+    fields:
+    - bits: '10:8'
+      name: GFIR1_L
+    - bits: '7:0'
+      name: GFIR1_N
+  - addr: '0x0206'
+    name: '0x0206'
+    fields:
+    - bits: '10:8'
+      name: GFIR2_L
+    - bits: '7:0'
+      name: GFIR2_N
+  - addr: '0x0207'
+    name: '0x0207'
+    fields:
+    - bits: '10:8'
+      name: GFIR3_L
+    - bits: '7:0'
+      name: GFIR3_N
+  - addr: '0x0208'
+    name: '0x0208'
+    fields:
+    - bits: '15:14'
+      name: CMIX_GAIN
+      opts:
+        0: 0db
+        1: pos6db
+        2: neg6db
+    - bits: 13
+      name: CMIX_SC
+      opts:
+        0: UPCONVERT
+        1: DOWNCONVERT
+    - bits: 8
+      name: CMIX_BYP
+    - bits: 7
+      name: ISINC_BYP
+    - bits: 6
+      name: GFIR3_BYP
+    - bits: 5
+      name: GFIR2_BYP
+    - bits: 4
+      name: GFIR1_BYP
+    - bits: 3
+      name: DC_BYP
+    - bits: 1
+      name: GC_BYP
+    - bits: 0
+      name: PH_BYP
+  - addr: '0x020C'
+    name: '0x020C'
+    fields:
+    - bits: '15:0'
+      name: DC_REG
+- name: XBUF
+  regs:
+  - addr: '0x0085'
+    name: '0x0085'
+    fields:
+    - bits: 8
+      name: SLFB_XBUF_RX
+    - bits: 7
+      name: SLFB_XBUF_TX
+    - bits: 6
+      name: BYP_XBUF_RX
+    - bits: 5
+      name: BYP_XBUF_TX
+    - bits: 4
+      name: EN_OUT2_XBUF_TX
+    - bits: 3
+      name: EN_TBUFIN_XBUF_RX
+    - bits: 2
+      name: PD_XBUF_RX
+    - bits: 1
+      name: PD_XBUF_TX
+    - bits: 0
+      name: EN_G_XBUF

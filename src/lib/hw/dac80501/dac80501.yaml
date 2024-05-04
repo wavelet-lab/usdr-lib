@@ -1,0 +1,75 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+name:         DAC80501
+desc:         16-bit SPI/I2C DAC
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: I2C
+    wr_mask: 0x80000000
+    usdr_path: /debug/hw/dac80501/0/reg
+addr_width:   16
+data_width:   16
+field_macros: True
+
+pages:
+  - name: Top
+    regs:
+      - addr: 0x01
+        name: DEVID
+        fields:
+          - bits: "14:12"
+            name: RESOLUTION
+            desc: DAC Resolution; 0 -- 16bit; 1 -- 14bit; 2 -- 12bit
+          - bits: "7"
+            name: RSTSEL
+            desc: DAC Power on Reset; 0 - DACx0501Z reset to 0; 1 - DACx0501M reset to mid
+            
+      - addr: 0x02
+        name: SYNC
+        fields:
+          - bits: "0"
+            name: DAC_SYNC_EN
+            desc: When set to 1, the DAC output is set to update in response to an LDAC trigger (synchronous mode). When cleared to 0 ,the DAC output is set to update immediately (asynchronous mode), default.
+
+      - addr: 0x03
+        name: CONFIG
+        fields:
+          - bits: "8"
+            name: REF_PWDWN
+            desc: When set to 1, this bit disables the device internal reference.
+          - bits: "0"
+            name: DAC_PWDWN
+            desc: When set to 1, the DAC in power-down mode and the DAC output is connected to GND through a 1kOhm internal resistor.
+
+      - addr: 0x04
+        name: GAIN
+        fields:
+          - bits: "8"
+            name: REF_DIV
+            desc: When REF_DIV set to 1, the reference voltage is internally divided by a factor of 2. When REF_DIV is cleared to 0, the reference voltage is unaffected
+          - bits: "0"
+            name: BUFF_GAIN
+            desc: When set to 1, the buffer amplifier for corresponding DAC has a gain of 2. When cleared to 0, the buffer amplifier for corresponding DAC has a gain of 1.
+
+      - addr: 0x05
+        name: TRIGGER
+        fields:
+          - bits: "4"
+            name: LDAC
+            desc: Set this bit to 1 to synchronously load the DAC in synchronous mode, This bit is self resetting.
+          - bits: "3:0"
+            name: SOFT_RESET
+            desc: When set to the reserved code of 1010, this bit resets the device to the default state. These bits are self resetting.
+            
+      - addr: 0x07
+        name: STATUS
+        fields:
+          - bits: "0"
+            name: REF_ALARM
+            desc: REF_ALARM bit. Reads 1 when the difference between the reference and supply pins is below a minimum analog threshold. Reads 0 otherwise. When 1, the reference buffer is shut down, and the DAC outputs are all zero volts. The DAC codes are unaffected, and the DAC output returns to normal when the difference is above the analog threshold.
+            
+      - addr: 0x08
+        name: DAC
+

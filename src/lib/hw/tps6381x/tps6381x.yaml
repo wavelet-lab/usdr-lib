@@ -1,0 +1,64 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         TPS6381X
+desc:         RFIC
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: I2C
+    wr_mask: 0x8000
+    usdr_path: /debug/hw/tps6381x/0/reg
+addr_width:   8
+data_width:   8
+# page_prefix:  True
+# field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+  - name: Top
+    regs:
+      - addr: 0x01
+        name: CONTROL
+        fields:
+          - bits: "6"
+            name: RANGE
+            desc: This bit selects the output voltage range; 0 - Low range (1.800 V to 4.975 V); 1 - High range (2.025 V to 5.200 V)
+          - bits: "5"
+            name: ENABLE
+            desc: This bit controls operation of the converter; 0 - Converter operation disabled (Start-up value for TPS63811); 1 - Converter operation enabled (Start-up value for TPS63810)
+          - bits: "3"
+            name: FPWM
+            desc: This bit controls the forced-PWM function; 0 - Forced-PWM operation disabled; 1 - Forced-PWM operation enabled
+          - bits: "2"
+            name: RPWM
+            desc: This bit controls the ramp-PWM function; 0 - Ramp-PWM operation disabled; 1 - Ramp-PWM operation enabled
+          - bits: "1:0"
+            name: SLEW
+            desc: These bits control the slew rate of the DVS function
+            opts:
+                0: 1.0V/ms
+                1: 2.5V/ms
+                2: 5.0V/ms
+                3: 10.0V/ms
+
+      - addr: 0x02
+        name: STATUS
+        fields:
+          - bits: "1"
+            name: TSD
+            desc: This bit shows the status of the thermal shutdown function. This bit is cleared if the STATUS register is read when the overtemperature condition no longer exists; 0 - Temperature good; 1 - An overtemperature event was detected
+          - bits: "0"
+            name: PGN
+            desc: This bit shows the status of the power-good comparator. This bit is cleared if the STATUS register is read when the power-not-good condition no longer exists; 0 - Powergood; 1 - A power-not-good event was detected
+
+      - addr: 0x03
+        name: DEVID
+        
+      - addr: 0x04
+        name: VOUT1
+        
+      - addr: 0x05
+        name: VOUT2
+

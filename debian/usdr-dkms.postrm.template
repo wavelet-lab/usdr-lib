@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+dkms remove -m usdr-dkms -v #MODULE_VERSION# --all
+exit 0

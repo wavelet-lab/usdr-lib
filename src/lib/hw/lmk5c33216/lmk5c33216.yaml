@@ -1,0 +1,3444 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         LMK5C33216
+desc:         CLOCK_GENERATOR
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: I2C
+    wr_mask: 0x800000
+    usdr_path: /debug/hw/lmk5c33216/0/reg
+addr_width:   16
+data_width:   8
+
+x-opts-gpio-mod: &opt-gpio-mod
+    0x0: STATUS_OR_INT
+    0x1: INSEL01_DPLL1
+    0x2: INSEL01_DPLL2
+    0x3: INSEL01_DPLL3
+    0x1F: SYNC
+    0x20: SYSREF_REQ
+    0x21: FDEV_TRIG_DPLL1
+    0x22: FDEV_TRIG_DPLL2
+    0x23: FDEV_TRIG_DPLL3
+    0x24: FDEV_DIR_DPLL1
+    0x25: FDEV_DIR_DPLL2
+    0x26: FDEV_DIR_DPLL3
+    0x27: TOD_TRIG_SEL
+
+x-opts-gpio-sel: &opt-gpio-sel
+    0x0: XO Loss of Signal (LOS)
+    0x1: PLL1 Loss of Lock (LOL)
+    0x2: PLL2 Loss of Lock (LOL)
+    0x3: PLL3 Loss of Lock (LOL)
+    0x4: DPLL1 Loss of Phase Lock (LOPL)
+    0x5: DPLL1 Loss of Frequency Lock (LOFL)
+    0x6: PLL1 LOL | DPLL1 LOPL | DPLL1 LOFL
+    0x7: DPLL2 Loss of Phase Lock (LOPL)
+    0x8: DPLL2 Loss of Frequency Lock (LOFL)
+    0x9: PLL2 LOL | DPLL2 LOPL | DPLL2 LOFL
+    0xA: DPLL3 Loss of Phase Lock (LOPL)
+    0xB: DPLL3 Loss of Frequency Lock (LOFL)
+    0xC: PLL3 LOL | DPLL3 LOPL | DPLL3 LOFL
+    0xD: DPLL1 | DPLL2 | DPLL3 LOL
+    0xE: INTR
+    0xF: SPI Readback Data (SDO)
+    0x15: DPLL1 REF0 Selected
+    0x16: DPLL1 REF1 Selected
+    0x1A: DPLL1 Holdover Active
+    0x1B: DPLL2 REF0 Selected
+    0x1C: DPLL2 REF1 Selected
+    0x20: DPLL2 Holdover Active
+    0x21: DPLL3 REF0 Selected
+    0x22: DPLL3 REF1 Selected
+    0x26: DPLL3 Holdover Active
+    0x27: REF0 Frequency Monitor
+    0x28: REF1 Frequency Monitor
+    0x2C: REF0 Missing Clock Monitor
+    0x2D: REF1 Missing Clock Monitor
+    0x3B: REF0 Phase Validation Monitor
+    0x3C: REF1 Phase Validation Monitor
+
+x-opts-gpio-sysref-ref: &opts-gpio-sysref-ref
+    0x0: OUT_0_1
+    0x1: OUT_4_5
+    0x2: OUT_6_7
+    0x3: OUT_8_9
+    0x4: OUT_10_11
+    0x5: OUT_12_13
+
+x-out-configuration-01: &out-configuration-01
+    0x0: CH0_DIV2
+    0x14: CHDIV1
+    0x20: SYSREF_ADLY
+    0x21: SYSREF
+    0x22: STATIC_DC
+    0x28: CHDIV0
+    0x40: CH1_Bypass
+    0x80: CH0_Bypass
+
+x-in-opts: &in-opts
+    0x0: DC_DIFF_EXT
+    0x1: AC_DIFF_EXT
+    0x3: AC_DIFF_INT_100
+    0x4: HCSL_INT_50
+    0x5: AC_LVPECL_50
+    0x8: CMOS
+    0xC: SE_INT_50
+
+x-out-fmt-01: &out-fmt-01
+    0x0: DISABLED
+    0x1: LVDS
+    0x2: LVPECL
+    0x3: HSDS
+    0x4: CMOS
+
+x-out-fmt-46: &out-fmt-46
+    0x0: DISABLED
+    0x1: LVDS
+    0x2: LVPECL
+    0x3: HSDS
+    0x5: CML
+    
+x-out-fmt: &out-fmt
+    0x0: DISABLED
+    0x1: LVDS
+    0x2: LVPECL
+    0x3: HSDS
+
+x-clk-in-fanout: &clk-in-fanout
+    0x0: DISABLED
+    0x3: IN1 to CHDIV1
+    0x4: IN0 to SYSREF
+    0x7: IN0 to SYSREF, IN1 to CHDIV1
+    0xC: IN0 to CHDIV0
+    0xF: IN0 to CHDIV0, IN1 to CHDIV1
+    0x10: IN0 to CH0/2 (OUT0)
+    0x13: IN0 to CH0/2 (OUT0), IN1 to CHDIV1 (OUT1)
+    0x14: IN0 to CH0/2 (OUT0) and SYSREF (OUT1)
+    0x1C: IN0 to CH0/2 (OUT0) and CHDIV0 (OUT1)
+    0x20: IN0 to CH0/2 (OUT1)
+    0x23: IN0 to CH0/2 (OUT1), IN1 to CHDIV1 (OUT0)
+    0x24: IN0 to CH0/2 (OUT1) and SYSREF (OUT0)
+    0x2C: IN0 to CH0/2 (OUT1) and CHDIV0 (OUT0)
+    0x30: IN0 to CH0/2 (OUT0 and OUT1)
+
+x-clk-in-mux-23: &clk-in-mux-23
+    0x0: PLL1_SEC
+    0x1: PLL2
+    0x2: PLL1_PRI 
+
+x-clk-in-mux-ef: &clk-in-mux-ef
+    0x0: VCO3
+    0x1: VCO2
+    0x2: VCO1_PRI 
+
+x-clk-in-mux: &clk-in-mux
+    0x0: VCO2
+    0x1: VCO3
+
+xx-pll1-rdiv-mux-sel: &pll1-rdiv-mux-sel
+    0x0: XO
+    0x1: VCO2FBDIV
+    0x2: VCO3FBDIV
+
+xx-pll2-rdiv-mux-sel: &pll2-rdiv-mux-sel
+    0x0: XO
+    0x1: VCO1FBDIV
+    0x2: VCO3FBDIV
+
+xx-pll3-rdiv-mux-sel: &pll3-rdiv-mux-sel
+    0x0: XO
+    0x1: VCO1FBDIV
+    0x2: VCO2FBDIV
+
+pages:
+  - name: Top
+    regs:
+      - addr: 0x0
+        name: VNDRID_BY1
+        fields:
+
+      - addr: 0x1
+        name: VNDRID_BY0
+        fields:
+
+      - addr: 0x2
+        name: PRODID
+        fields:
+
+      - addr: 0x3
+        name: REVID
+        fields:
+
+      - addr: 0x10
+        name: NVMCNT
+        fields:
+
+      - addr: 0x12
+        name: SLAVEADR
+        fields:
+
+      - addr: 0x13
+        name: EEREV
+        fields:
+
+      - addr: 0x14
+        name: EE_ROM_PAGE
+        fields:
+
+      - addr: 0x15
+        name: DEV_CTL1
+        fields:
+          - bits: "7"
+            name: SPI_3WIRE_DIS
+            desc: Disable SPI 3 wire readback. ROM=Y, EEPROM=N; 0x0 = 3-wire SPI readback enabled; 0x1 = 3-wire SPI readback disabled 
+          - bits: "6"
+            name: SYNC_SW
+            desc: Software SYNC Assertion. Writing a '1' to this bit is equivalent to asserting the SYNC pin. SYNC_EN must also be set to 1. ROM=Y, EEPROM=Y 
+      - addr: 0x16
+        name: DEV_CTL2
+        fields:
+          - bits: "5"
+            name: DPLL3_EN
+            desc: Enable DPLL3. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: APLL3_EN
+            desc: Enable APLL3. ROM=Y, EEPROM=Y 
+          - bits: "3"
+            name: DPLL2_EN
+            desc: Enable DPLL2. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: APLL2_EN
+            desc: Enable APLL2. ROM=Y, EEPROM=Y 
+          - bits: "1"
+            name: DPLL1_EN
+            desc: Enable DPLL1. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: APLL1_EN
+            desc: Enable APLL1. ROM=Y, EEPROM=Y 
+      - addr: 0x17
+        name: SWRST
+        fields:
+          - bits: "6"
+            name: SWRST
+            desc: Software Reset ALL functions (active low). Writing a '0' will cause the device to return to its power-up state apart from the I2C registers and the configuration controller. The configuration controller is excluded to prevent an re-transfer of EEPROM data to on-chip registers. Not a self clearing field. ROM=N, EEPROM=N 
+      - addr: 0x18
+        name: STRT_PRTY
+        fields:
+          - bits: "5:4"
+            name: APLL3_STRT_PRTY
+            desc: APLL3 Startup Priority. 0 is highest priority. APLLs with the same priority will start simultaneously. ROM=Y, EEPROM=Y
+          - bits: "3:2"
+            name: APLL2_STRT_PRTY
+            desc: APLL2 Startup Priority. 0 is highest priority. APLLs with the same priority will start simultaneously. ROM=Y, EEPROM=Y
+          - bits: "1:0"
+            name: APLL1_STRT_PRTY
+            desc: APLL1 Startup Priority. 0 is highest priority. APLLs with the same priority will start simultaneously. ROM=Y, EEPROM=Y
+      - addr: 0x19
+        name: SYNC_CTL
+        fields:
+          - bits: "0"
+            name: SYNC_EN
+            desc: Allows SYNC from SYNC_SW and GPIO pin. For GPIO sync, must be set together with SYNC input for GPIOx_MODE. ROM=Y, EEPROM=Y 
+      - addr: 0x1A
+        name: SYSREF_REQ_CTL
+        fields:
+          - bits: "0"
+            name: SYSREF_REQ_SW
+            desc: Software SYSREF request trigger ROM=N, EEPROM=N 
+      - addr: "0x1B:0x1F"
+        name: TOD
+        fields:
+
+      - addr: 0x20
+        name: TOD_CTRL
+        fields:
+          - bits: "1"
+            name: TOD_CNTR_TRIG_SEL
+            desc: Time of Day trigger select. If using GPIO, must also set GPIOx_MODE to provide ToD trigger. ROM=Y, EEPROM=N; 0x0 = SPI; 0x1 = GPIO 
+          - bits: "0"
+            name: TOD_CNTR_EN
+            desc: Time of Day counter enable. When transitioning from 0 --> 1, the ToD counter will start from 0. ROM=Y, EEPROM=N 
+      - addr: 0x21
+        name: INT_LIVE0
+        fields:
+          - bits: "3"
+            name: LOL_PLL1
+            desc: Loss of Lock - APLL1 ROM=N, EEPROM=N 
+          - bits: "2"
+            name: LOL_PLL2
+            desc: Loss of Lock - APLL2 ROM=N, EEPROM=N 
+          - bits: "0"
+            name: LOS_FDET_XO
+            desc: Loss of Source Freq Detection - XO ROM=N, EEPROM=N 
+      - addr: 0x22
+        name: INT_LIVE1
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL1
+            desc: Loss of Phase Lock - DPLL1 ROM=N, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL1
+            desc: Loss of Frequency Lock - DPLL1 ROM=N, EEPROM=N 
+          - bits: "5"
+            name: HIST1
+            desc: Tuning word history update - DPLL1 ROM=N, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR1
+            desc: Holdover event - DPLL1 ROM=N, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH1
+            desc: Reference Switchover - DPLL1 ROM=N, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK1
+            desc: Loss of Active Reference - Missing Clock - DPLL1 ROM=N, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ1
+            desc: Loss of Active Reference - Frequency - DPLL1 ROM=N, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH1
+            desc: Loss of Active Reference - Phase - DPLL1 ROM=N, EEPROM=N 
+      - addr: 0x23
+        name: INT_LIVE2
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL2
+            desc: Loss of Phase Lock - DPLL2 ROM=N, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL2
+            desc: Loss of Frequency Lock - DPLL2 ROM=N, EEPROM=N 
+          - bits: "5"
+            name: HIST2
+            desc: Tuning word history update - DPLL2 ROM=N, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR2
+            desc: Holdover event - DPLL2 ROM=N, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH2
+            desc: Reference Switchover - DPLL2 ROM=N, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK2
+            desc: Loss of Active Reference - Missinig Clock - DPLL2 ROM=N, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ2
+            desc: Loss of Active Reference - Frequency - DPLL2 ROM=N, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH2
+            desc: Loss of Active Reference - Phase - DPLL2 ROM=N, EEPROM=N 
+      - addr: 0x24
+        name: INT_LIVE3
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL3
+            desc: Loss of Phase Lock - DPLL3 ROM=N, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL3
+            desc: Loss of Frequency Lock - DPLL3 ROM=N, EEPROM=N 
+          - bits: "5"
+            name: HIST3
+            desc: Tuning word history update - DPLL3 ROM=N, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR3
+            desc: Holdover event - DPLL3 ROM=N, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH3
+            desc: Reference Switchover - DPLL3 ROM=N, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK3
+            desc: Loss of Active Reference - Missinig Clock - DPLL3 ROM=N, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ3
+            desc: Loss of Active Reference - Frequency - DPLL3 ROM=N, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH3
+            desc: Loss of Active Reference - Phase - DPLL3 ROM=N, EEPROM=N 
+      - addr: 0x25
+        name: INT_MASK0
+        fields:
+          - bits: "3"
+            name: LOL_PLL1_MASK
+            desc: Masks Loss of Lock - APLL1. When LOL_PLL1_MASK is 1 then the LOL_PLL1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: LOL_PLL2_MASK
+            desc: Masks Loss of Lock - APLL2. When LOL_PLL2_MASK is 1 then the LOL_PLL2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: LOS_FDET_XO_MASK
+            desc: Masks Loss of Source Freq Detection - XO. When LOS_FDET_XO_MASK is 1 then the LOS_FDET_XO interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+      - addr: 0x26
+        name: INT_MASK1
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL1_MASK
+            desc: Masks Loss of Phase Lock - DPLL1. When LOPL_DPLL1_MASK is 1 then the LOPL_DPLL1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL1_MASK
+            desc: Masks Loss of Freq Lock - DPLL1. When LOFL_DPLL1_MASK is 1 then the LOFL_DPLL1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: HIST1_MASK
+            desc: Masks Tuning word history update - DPLL1. When HIST1_MASK is 1 then the HIST1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR1_MASK
+            desc: Masks Holdover event - DPLL1. When HLDOVR1_MASK is 1 then the HLDOVR1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH1_MASK
+            desc: Masks Reference Switchover - DPLL1. When REFSWITCH1_MASK is 1 then the REFSWITCH1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK1_MASK
+            desc: Masks Loss of Active Reference - Missinig Clock - DPLL1. When LOR_MISSCLK1_MASK is 1 then the LOR_MISSCLK1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ1_MASK
+            desc: Masks Loss of Active Reference - Frequency - DPLL1. When LOR_FREQ1_MASK is 1 then the LOR_FREQ1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH1_MASK
+            desc: Masks Loss of Active Reference - Phase - DPLL1. When LOR_PH1_MASK is 1 then the LOR_PH1 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+      - addr: 0x27
+        name: INT_MASK2
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL2_MASK
+            desc: Masks Loss of Phase Lock - DPLL2. When LOPL_DPLL2_MASK is 1 then the LOPL_DPLL2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL2_MASK
+            desc: Masks Loss of Freq Lock - DPLL2. When LOFL_DPLL2_MASK is 1 then the LOFL_DPLL2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: HIST2_MASK
+            desc: Masks Tuning word history update - DPLL2. When HIST2_MASK is 1 then the HIST2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR2_MASK
+            desc: Masks Holdover event - DPLL2. When HLDOVR2_MASK is 1 then the HLDOVR2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH2_MASK
+            desc: Masks Reference Switchover - DPLL2. When REFSWITCH2_MASK is 1 then the REFSWITCH2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK2_MASK
+            desc: Masks Loss of Active Reference - Missing Clock - DPLL2. When LOR_MISSCLK2_MASK is 1 then the LOR_MISSCLK2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ2_MASK
+            desc: Masks Loss of Active Reference - Frequency - DPLL2. When LOR_FREQ2_MASK is 1 then the LOR_FREQ2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH2_MASK
+            desc: Masks Loss of Active Reference - Phase - DPLL2. When LOR_PH2_MASK is 1 then the LOR_PH2 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+      - addr: 0x28
+        name: INT_MASK3
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL3_MASK
+            desc: Masks Loss of Phase Lock - DPLL3. When LOPL_DPLL3_MASK is 1 then the LOPL_DPLL3 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL3_MASK
+            desc: Masks Loss of Freq Lock - DPLL3. When LOFL_DPLL3_MASK is 1 then the LOFL_DPLL3 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: HIST3_MASK
+            desc: Masks Tuning word history update - DPLL3. When HIST3_MASK is 1 then the HIST3 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR3_MASK
+            desc: Masks Holdover event - DPLL3. When HLDOVR3_MASK is 1 then the HLDOVR3 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH3_MASK
+            desc: Masks Reference Switchover - DPLL3. When REFSWITCH3_MASK is 1 then the REFSWITCH3 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK3_MASK
+            desc: Masks Loss of Active Reference - Missinig Clock - DPLL3. When LOR_MISSCLK3_MASK is 1 then the LOR_MISSCLK3 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ3_MASK
+            desc: Masks Loss of Active Reference - Frequency - DPLL3. When LOR_FREQ3_MASK is 1 then the LOR_FREQ3 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH3_MASK
+            desc: Masks Loss of Active Reference - Phase - DPLL3. When LOR_PH3_MASK is 1 then the LOR_PH3 interrupt source is masked and will not cause the interrupt signal to be activated. ROM=Y, EEPROM=N 
+      - addr: 0x29
+        name: INT_FLAG_POL0
+        fields:
+          - bits: "3"
+            name: LOL_PLL1_POL
+            desc: LOL_PLL1 Flag Polarity. When LOL_PLL1_POL is 1 then a high on LOL_PLL1 will set the LOL_PLL1_INTR bit in register R45. When LOL_PLL1_POL is 0 then a low on LOL_PLL1 will set the LOL_PLL1_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: LOL_PLL2_POL
+            desc: LOL_PLL2 Flag Polarity. When LOL_PLL2_POL is 1 then a high on LOL_PLL2 will set the LOL_PLL2_INTR bit in register R45. When LOL_PLL2_POL is 0 then a low on LOL_PLL2 will set the LOL_PLL2_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: LOS_FDET_XO_POL
+            desc: LOS_FDET_XO Flag Polarity. When LOS_FDET_XO_POL is 1 then a high on LOS_FDET_XO will set the LOS_FDET_XO_INTR bit in register R45. When LOS_FDET_XO_POL is 0 then a low on LOS_FDET_XO will set the LOS_FDET_XO_INTR bit. ROM=Y, EEPROM=N 
+      - addr: 0x2A
+        name: INT_FLAG_POL1
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL1_POL
+            desc: LOPL_DPLL1 Flag Polarity. When LOPL_DPLL1_POL is 1 then a high on LOPL_DPLL1 will set the LOPL_DPLL1_INTR bit in register R46. When LOPL_DPLL1_POL is 0 then a low on LOPL_DPLL1 will set the LOPL_DPLL1_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL1_POL
+            desc: LOFL_DPLL1 Flag Polarity. When LOFL_DPLL1_POL is 1 then a high on LOFL_DPLL1 will set the LOFL_DPLL1_INTR bit in register R46. When LOFL_DPLL1_POL is 0 then a low on LOFL_DPLL1 will set the LOFL_DPLL1_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: HIST1_POL
+            desc: HIST1 Flag Polarity. When HIST1_POL is 1 then a high on HIST1 will set the HIST1_INTR bit in register R46. When HIST1_POL is 0 then a low on HIST1 will set the HIST1_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR1_POL
+            desc: HLDOVR1 Flag Polarity. When HLDOVR1_POL is 1 then a high on HLDOVR1 will set the HLDOVR1_INTR bit in register R46. When HLDOVR1_POL is 0 then a low on HLDOVR1 will set the HLDOVR1_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH1_POL
+            desc: REFSWITCH1 Flag Polarity. When REFSWITCH1_POL is 1 then a high on REFSWITCH1 will set the REFSWITCH1_INTR bit in register R46. When REFSWITCH1_POL is 0 then a low on REFSWITCH1 will set the REFSWITCH1_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK1_POL
+            desc: LOR_MISSCLK1 Flag Polarity. When LOR_MISSCLK1_POL is 1 then a high on LOR_MISSCLK1 will set the LOR_MISSCLK1_INTR in R40. When LOR_MISSCLK1_POL is 0 then a low on LOR_MISSCLK1 will set the LOR_MISSCLK1_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ1_POL
+            desc: LOR_FREQ1 Flag Polarity. When LOR_FREQ1_POL is 1 then a high on LOR_FREQ1 will set the LOR_FREQ1_INTR in register R46. When LOR_FREQ1_POL is 0 then a low on LOR_FREQ1 will set the LOR_FREQ1_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH1_POL
+            desc: LOR_PH1 Flag Polarity. When LOR_PH1_POL is 1 then a high on LOR_PH1 will set the LOR_PH1_INTR bit in register R46. When LOR_PH1_POL is 0 then a low on LOR_PH1 will set the LOR_PH1_INTR bit. ROM=Y, EEPROM=N 
+      - addr: 0x2B
+        name: INT_FLAG_POL2
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL2_POL
+            desc: LOPL_DPLL2 Flag Polarity. When LOPL_DPLL2_POL is 1 then a high on LOPL_DPLL2 will set the LOPL_DPLL2_INTR in register R47. When LOPL_DPLL2_POL is 0 then a low on LOPL_DPLL2 will set the LOPL_DPLL2_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL2_POL
+            desc: LOFL_DPLL2 Flag Polarity. When LOFL_DPLL2_POL is 1 then a high on LOFL_DPLL2 will set the LOFL_DPLL2_INTR bit in register R47. When LOFL_DPLL2_POL is 0 then a low on LOFL_DPLL2 will set the LOFL_DPLL2_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: HIST2_POL
+            desc: HIST2 Flag Polarity. When HIST2_POL is 1 then a high on HIST2 will set the HIST2_INTR bit in register R47. When HIST2_POL is 0 then a low on HIST2 will set the HIST2_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR2_POL
+            desc: HLDOVR2 Flag Polarity. When HLDOVR2_POL is 1 then a high on HLDOVR2 will set the HLDOVR2_INTR bit in register R47. When HLDOVR2_POL is 0 then a low on HLDOVR2 will set the HLDOVR2_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH2_POL
+            desc: REFSWITCH2 Flag Polarity. When REFSWITCH2_POL is 1 then a high on REFSWITCH2 will set the REFSWITCH2_INTR in R41.When REFSWITCH2_POL is 0 then a low on REFSWITCH2 will set the REFSWITCH2_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK2_POL
+            desc: LOR_MISSCLK2 Flag Polarity. When LOR_MISSCLK2_POL is 1 then a high on LOR_MISSCLK2 will set the LOR_MISSCLK2_INTR bit in register R47. When LOR_MISSCLK2_POL is 0 then a low on LOR_MISSCLK2 will set the LOR_MISSCLK2_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ2_POL
+            desc: LOR_FREQ2 Flag Polarity. When LOR_FREQ2_POL is 1 then a high on LOR_FREQ2 will set the LOR_FREQ2_INTR bit in register R47. When LOR_FREQ2_POL is 0 then a low on LOR_FREQ2 will set the LOR_FREQ2_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH2_POL
+            desc: LOR_FREQ2 Flag Polarity. When LOR_FREQ2_POL is 1 then a high on LOR_FREQ2 will set the LOR_FREQ2_INTR in R41. When LOR_FREQ2_POL is 0 then a low on LOR_FREQ2 will set the LOR_FREQ2_INTR bit. ROM=Y, EEPROM=N 
+      - addr: 0x2C
+        name: INT_FLAG_POL3
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL3_POL
+            desc: LOPL_DPLL3 Flag Polarity. When LOPL_DPLL3_POL is 1 then a high on LOPL_DPLL3 will set the LOPL_DPLL3_INTR bit in register R48. When LOPL_DPLL3_POL is 0 then a low on LOPL_DPLL3 will set the LOPL_DPLL3_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL3_POL
+            desc: LOFL_DPLL3 Flag Polarity. When LOFL_DPLL3_POL is 1 then a high on LOFL_DPLL3 will set the LOFL_DPLL3_INTR bit in register R48. When LOFL_DPLL3_POL is 0 then a low on LOFL_DPLL3 will set the LOFL_DPLL3_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: HIST3_POL
+            desc: HIST3 Flag Polarity. When HIST3_POL is 1 then a high on HIST3 will set the HIST3_INTR bit in register R48. When HIST3_POL is 0 then a low on HIST3 will set the HIST3_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR3_POL
+            desc: HLDOVR3 Flag Polarity. When HLDOVR3_POL is 1 then a high on HLDOVR3 will set the HLDOVR3_INTR bit in register R48. When HLDOVR3_POL is 0 then a low on HLDOVR3 will set the HLDOVR3_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH3_POL
+            desc: REFSWITCH3 Flag Polarity. When REFSWITCH3_POL is 1 then a high on REFSWITCH3 will set the REFSWITCH3_INTR bit in register R48. When REFSWITCH3_POL is 0 then a low on REFSWITCH3 will set the REFSWITCH3_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK3_POL
+            desc: LOR_MISSCLK3 Flag Polarity. When LOR_MISSCLK3_POL is 1 then a high on LOR_MISSCLK3 will set the LOR_MISSCLK3_INTR bit in register R48. When LOR_MISSCLK3_POL is 0 then a low on LOR_MISSCLK3 will set the LOR_MISSCLK3_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ3_POL
+            desc: LOR_FREQ3 Flag Polarity. When LOR_FREQ3_POL is 1 then a high on LOR_FREQ3 will set the LOR_FREQ3_INTR in R42. When LOR_FREQ3_POL is 0 then a low on LOR_FREQ3 will set the LOR_FREQ3_INTR bit. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH3_POL
+            desc: LOR_PH3 Flag Polarity. When LOR_PH3_POL is 1 then a high on LOR_PH3 will set the LOR_PH3_INTR bit in register R48. When LOR_PH3_POL is 0 then a low on LOR_PH3 will set the LOR_PH3_INTR bit. ROM=Y, EEPROM=N 
+      - addr: 0x2D
+        name: INT_FLAG0
+        fields:
+          - bits: "3"
+            name: LOL_PLL1_INTR
+            desc: LOL_PLL1 Interrupt. The LOL_PLL1_INTR bit is set when a level of the correct polarity is detected on the LOL_PLL1 interrupt source. The LOL_PLL1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "2"
+            name: LOL_PLL2_INTR
+            desc: LOL_PLL2 Interrupt. The LOL_PLL2_INTR bit is set when a level of the correct polarity is detected on the LOL_PLL2 interrupt source. The LOL_PLL2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "0"
+            name: LOS_FDET_XO_INTR
+            desc: LOL_FDET_XO Interrupt. The LOL_FDET_XO_INTR bit is set when a level of the correct polarity is detected on the LOL_FDET_XO interrupt source. The LOL_FDET_XO_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+      - addr: 0x2E
+        name: INT_FLAG1
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL1_INTR
+            desc: LOPL_DPLL1 Interrupt. The LOPL_DPLL1_INTR bit is set when a level of the correct polarity is detected on the LOPL_DPLL1 interrupt source. The LOPL_DPLL1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL1_INTR
+            desc: LOFL_DPLL1 Interrupt. The LOFL_DPLL1_INTR bit is set when a level of the correct polarity is detected on the LOFL_DPLL1 interrupt source. The LOFL_DPLL1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "5"
+            name: HIST1_INTR
+            desc: HIST1 Interrupt. The HIST1_INTR bit is set when a level of the correct polarity is detected on the HIST1 interrupt source. The HIST1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR1_INTR
+            desc: HLDOVR1 Interrupt. The HLDOVR1_INTR bit is set when a level of the correct polarity is detected on the HLDOVR1 interrupt source. The HLDOVR1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH1_INTR
+            desc: REFSWITCH1 Interrupt. The REFSWITCH1_INTR bit is set when a level of the correct polarity is detected on the REFSWITCH1 interrupt source. The REFSWITCH1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK1_INTR
+            desc: LOR_MISSCLK1 Interrupt. The LOR_MISSCLK1_INTR bit is set when a level of the correct polarity is detected on the LOR_MISSCLK1 interrupt source. The LOR_MISSCLK1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ1_INTR
+            desc: LOR_FREQ1 Interrupt. The LOR_FREQ1_INTR bit is set when a level of the correct polarity is detected on the LOR_FREQ1 interrupt source. The LOR_FREQ1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH1_INTR
+            desc: LOR_PH1 Interrupt. The LOR_PH1_INTR bit is set when a level of the correct polarity is detected on the LOR_PH1 interrupt source. The LOR_PH1_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+      - addr: 0x2F
+        name: INT_FLAG2
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL2_INTR
+            desc: LOPL_DPLL2 Interrupt. The LOPL_DPLL2_INTR bit is set when a level of the correct polarity is detected on the LOPL_DPLL2 interrupt source. The LOPL_DPLL2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL2_INTR
+            desc: LOFL_DPLL2 Interrupt. The LOFL_DPLL2_INTR bit is set when a level of the correct polarity is detected on the LOFL_DPLL2 interrupt source. The LOFL_DPLL2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "5"
+            name: HIST2_INTR
+            desc: HIST2 Interrupt. The HIST2_INTR bit is set when a level of the correct polarity is detected on the HIST2 interrupt source. The HIST2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR2_INTR
+            desc: HLDOVR2 Interrupt. The HLDOVR2_INTR bit is set when a level of the correct polarity is detected on the HLDOVR2 interrupt source. The HLDOVR2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH2_INTR
+            desc: REFSWITCH2 Interrupt. The REFSWITCH2_INTR bit is set when a level of the correct polarity is detected on the REFSWITCH2 interrupt source. The REFSWITCH2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK2_INTR
+            desc: LOR_MISSCLK2 Interrupt. The LOR_MISSCLK2_INTR bit is set when a level of the correct polarity is detected on the LOR_MISSCLK2 interrupt source. The LOR_MISSCLK2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ2_INTR
+            desc: LOR_FREQ2 Interrupt. The LOR_FREQ2_INTR bit is set when a level of the correct polarity is detected on the LOR_FREQ2 interrupt source. The LOR_FREQ2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH2_INTR
+            desc: LOR_PH2 Interrupt. The LOR_PH2_INTR bit is set when a level of the correct polarity is detected on the LOR_PH2 interrupt source. The LOR_PH2_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+      - addr: 0x30
+        name: INT_FLAG3
+        fields:
+          - bits: "7"
+            name: LOPL_DPLL3_INTR
+            desc: LOPL_DPLL3 Interrupt. The LOPL_DPLL3_INTR bit is set when a level of the correct polarity is detected on the LOPL_DPLL3 interrupt source. The LOPL_DPLL3_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "6"
+            name: LOFL_DPLL3_INTR
+            desc: LOFL_DPLL3 Interrupt. The LOFL_DPLL3_INTR bit is set when a level of the correct polarity is detected on the LOFL_DPLL3 interrupt source. The LOFL_DPLL3_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "5"
+            name: HIST3_INTR
+            desc: HIST3 Interrupt. The HIST3_INTR bit is set when a level of the correct polarity is detected on the HIST3 interrupt source. The HIST3_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "4"
+            name: HLDOVR3_INTR
+            desc: HLDOVR3 Interrupt. The HLDOVR3_INTR bit is set when a level of the correct polarity is detected on the HLDOVR3 interrupt source. The HLDOVR3_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "3"
+            name: REFSWITCH3_INTR
+            desc: REFSWITCH3 Interrupt. The REFSWITCH3_INTR bit is set when a level of the correct polarity is detected on the REFSWITCH3 interrupt source. The REFSWITCH3_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "2"
+            name: LOR_MISSCLK3_INTR
+            desc: LOR_MISSCLK3 Interrupt. The LOR_MISSCLK3_INTR bit is set when a level of the correct polarity is detected on the LOR_MISSCLK3 interrupt source. The LOR_MISSCLK3_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "1"
+            name: LOR_FREQ3_INTR
+            desc: LOR_FREQ3 Interrupt. The LOR_FREQ3_INTR bit is set when a level of the correct polarity is detected on the LOR_FREQ3 interrupt source. The LOR_FREQ3_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+          - bits: "0"
+            name: LOR_PH3_INTR
+            desc: LOR_PH3 Interrupt. The LOR_PH3_INTR bit is set when a level of the correct polarity is detected on the LOR_PH3 interrupt source. The LOR_PH3_INTR bit is cleared by writing a 1 to INT_CLR. ROM=N, EEPROM=N 
+      - addr: 0x31
+        name: INT_CTL
+        fields:
+          - bits: "1"
+            name: INT_EN
+            desc: Interrupt Enable. If INT_EN is 1 then the interrupt circuit is enabled. If INT_EN is 0 the interrupt circuit is disabled. When INT_EN is 0, interrupts cannot be signalled on the GPIOx pins, and the flag registers (*_INTR) will not be updated; however, the live status registers will still reflect the current state of the internal interrupt source signals. To provide an interrupt on a pin, a GPIOx pin must also be configured as interrupt output. Interrupts may be enabled without providing a GPIOx output to allow sticky bits to be set. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: INT_CLR
+            desc: Clears all interrupt flag (*_INTR) registers ROM=N, EEPROM=N 
+      - addr: 0x32
+        name: REFIN_STAT
+        fields:
+          - bits: "1"
+            name: REF1_VALID_STATUS
+            desc: Status of Reference Input Validation for IN1 ROM=N, EEPROM=N 
+          - bits: "0"
+            name: REF0_VALID_STATUS
+            desc: Status of Reference Input Validation for IN0 ROM=N, EEPROM=N 
+      - addr: 0x34
+        name: REFIN_STAT3
+        fields:
+          - bits: "5"
+            name: REF1_PH_STATUS
+            desc: Status of Reference 1 Phase Validation ROM=N, EEPROM=N 
+          - bits: "4"
+            name: REF1_MISSCLK_STATUS
+            desc: Status of Reference 1 Missing Clock Validation ROM=N, EEPROM=N 
+          - bits: "3"
+            name: REF1_FDET_STATUS
+            desc: Status of Reference 1 Frequency Validation ROM=N, EEPROM=N 
+          - bits: "2"
+            name: REF0_PH_STATUS
+            desc: Status of Reference 0 Phase Validation ROM=N, EEPROM=N 
+          - bits: "1"
+            name: REF0_MISSCLK_STATUS
+            desc: Status of Reference 0 Missing Clock Validation ROM=N, EEPROM=N 
+          - bits: "0"
+            name: REF0_FDET_STATUS
+            desc: Status of Reference 0 Frequency Validation ROM=N, EEPROM=N 
+      - addr: 0x35
+        name: OPCTRL_STAT
+        fields:
+          - bits: "4"
+            name: TOD_CNTR_HELD
+            desc: TOD Holded. A GPIO or SPI event has latched a holdover value. Will clear to 0 after TOD CNTR LSB is read. ROM=N, EEPROM=N 
+      - addr: 0x36
+        name: GPIO0_CONFIG
+        fields:
+          - bits: "6"
+            name: GPIO0_IN_FLT_EN
+            desc: Enable GPIO0 Input Pin Deglitch Filter ROM=Y, EEPROM=N 
+          - bits: "5:0"
+            name: GPIO0_MODE
+            desc: Select GPIO0 Pin Operating Mode. ROM=Y, EEPROM=N 
+            opts:
+                <<: *opt-gpio-mod
+      - addr: 0x37
+        name: GPIO1_CONFIG
+        fields:
+          - bits: "6"
+            name: GPIO1_IN_FLT_EN
+            desc: Enable GPIO1 Input Pin Deglitch Filter ROM=Y, EEPROM=N 
+          - bits: "5:0"
+            name: GPIO1_MODE
+            desc: Select GPIO1 Pin Operating Mode. ROM=Y, EEPROM=N 
+            opts:
+                <<: *opt-gpio-mod
+      - addr: 0x38
+        name: GPIO2_CONFIG
+        fields:
+          - bits: "6"
+            name: GPIO2_IN_FLT_EN
+            desc: Enable GPIO2 Input Pin Deglitch Filter ROM=Y, EEPROM=N 
+          - bits: "5:0"
+            name: GPIO2_MODE
+            desc: Select GPIO2 Pin Operating Mode. ROM=Y, EEPROM=N 
+            opts:
+                <<: *opt-gpio-mod
+      - addr: 0x39
+        name: GPIO0_SEL
+        fields:
+          - bits: "6:0"
+            name: GPIO0_SEL
+            desc: GPIO0 Status Signal Select. ROM=Y, EEPROM=N 
+            opts:
+                <<: *opt-gpio-sel
+      - addr: 0x3A
+        name: GPIO1_SEL
+        fields:
+          - bits: "6:0"
+            name: GPIO1_SEL
+            desc: GPIO1 Status Signal Select. ROM=Y, EEPROM=N 
+            opts:
+                <<: *opt-gpio-sel
+      - addr: 0x3B
+        name: GPIO2_SEL
+        fields:
+          - bits: "6:0"
+            name: GPIO2_SEL
+            desc: GPIO2 Status Signal Select. ROM=Y, EEPROM=N 
+            opts:
+                <<: *opt-gpio-sel
+      - addr: 0x3C
+        name: GPIO_OUT_CTL
+        fields:
+          - bits: "5"
+            name: GPIO0_OPEND
+            desc: GPIO0 Open Drain Enable ROM=Y, EEPROM=N; 0x0 = CMOS; 0x1 = NMOS open drain (external pull-up) 
+          - bits: "4"
+            name: GPIO1_OPEND
+            desc: GPIO1 Open Drain Enable ROM=Y, EEPROM=N; 0x0 = CMOS; 0x1 = NMOS open drain (external pull-up) 
+          - bits: "3"
+            name: GPIO2_OPEND
+            desc: GPIO2 Open Drain Enable ROM=Y, EEPROM=N; 0x0 = CMOS; 0x1 = NMOS open drain (external pull-up) 
+          - bits: "2"
+            name: GPIO0_POL
+            desc: GPIO0 Status Output Polarity. The GPIO0_STAT_POL bit defines the polarity of information presented on the GPIO0 output. If GPIO0_STAT_POL is set to 1, then GPIO0 is active high. If GPIO0_STAT_POL is 0, then GPIO0 is active low. ROM=Y, EEPROM=N; 0x0 = Active High; 0x1 = Active Low 
+          - bits: "1"
+            name: GPIO1_POL
+            desc: GPIO1 Status Output Polarity. The GPIO1_STAT_POL bit defines the polarity of information presented on the GPIO1 output. If GPIO1_STAT_POL is set to 1, then GPIO1 is active high. If GPIO1_STAT_POL is 0, then GPIO1 is active low. ROM=Y, EEPROM=N; 0x0 = Active High; 0x1 = Active Low 
+          - bits: "0"
+            name: GPIO2_POL
+            desc: GPIO2 Status Output Polarity. The GPIO2_STAT_POL bit defines the polarity of information presented on the GPIO2 output. If GPIO2_STAT_POL is set to 1, then GPIO2 is active high. If GPIO2_STAT_POL is 0, then GPIO2 is active low. ROM=Y, EEPROM=N; 0x0 = Active High; 0x1 = Active Low 
+      - addr: 0x3D
+        name: SYSREF_DPLL_MUTE
+        fields:
+          - bits: "4:2"
+            name: GPIO_SYSREF_SEL
+            desc: Select SYSREF output for GPIO output. When GPIOx_SEL choses SYSREF, this is the SYSREF source which is output on the GPIO. Select SYSREF after static digital delay but before the analog and digital delay. ROM=Y, EEPROM=N
+            opts:
+                <<: *opts-gpio-sysref-ref
+          - bits: "1"
+            name: MUTE_DPLL3_PHLOCK
+            desc: DPLL3 mute enabled during phase lock ROM=Y, EEPROM=Y 
+          - bits: "0"
+            name: MUTE_DPLL3_LOCK
+            desc: DPLL3 mute enabled during dpll lock ROM=Y, EEPROM=Y 
+      - addr: 0x3E
+        name: DPLL_MUTE
+        fields:
+          - bits: "5"
+            name: MUTE_DPLL2_PHLOCK
+            desc: DPLL2 mute enabled during phase lock ROM=Y, EEPROM=Y 
+          - bits: "4"
+            name: MUTE_DPLL2_LOCK
+            desc: DPLL2 mute enabled during dpll lock ROM=Y, EEPROM=Y 
+          - bits: "3"
+            name: MUTE_APLL2_LOCK
+            desc: APLL2 mute enabled during PLL lock ROM=Y, EEPROM=Y 
+          - bits: "2"
+            name: MUTE_DPLL1_PHLOCK
+            desc: DPLL1 mute enabled during phase lock ROM=Y, EEPROM=Y 
+          - bits: "1"
+            name: MUTE_DPLL1_LOCK
+            desc: DPLL1 mute enabled during dpll lock ROM=Y, EEPROM=Y 
+          - bits: "0"
+            name: MUTE_APLL1_LOCK
+            desc: APLL1 mute enabled during PLL lock ROM=Y, EEPROM=Y 
+      - addr: 0x3F
+        name: XO_CLKCTL
+        fields:
+          - bits: "4"
+            name: XO_FDET_BYP
+            desc: Freq Detector Bypass. When XO_FDET_BYP is set to 1, the output of the XO/TCXO freq detector is ignored. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: XO_ITYPE
+            desc: To be updated. XO interface type control. ROM=Y, EEPROM=Y
+            opts:
+                <<: *in-opts
+      - addr: 0x40
+        name: XO_OUT_SEL
+        fields:
+          - bits: "4"
+            name: EN_OUT0_1
+            desc: XO Output buffer path enabled to OUT0_1
+          - bits: "3"
+            name: EN_APLL3_REF
+            desc: XO Output buffer path enabled to APLL3 REF
+          - bits: "2"
+            name: EN_APLL2_REF
+            desc: XO Output buffer path enabled to APLL2 REF
+          - bits: "1"
+            name: EN_APLL1_REF
+            desc: XO Output buffer path enabled to APLL1 REF
+          - bits: "1"
+            name: EN_XO_FREQ_DETECT
+            desc: XO Output buffer path enabled to the XO Freq Detector
+      - addr: 0x43
+        name: REF1_CTL
+        fields:
+          - bits: "5"
+            name: REF1_HYST_TOGGLE
+            desc: Increases hysteresis for AC coupled clocks. For use with low frequency reference input clocks below TBD MHz which are AC coupled. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: REF1_DC_COUPLED_EN
+            desc: DC couple input. Eliminates need for hysteresis for low frequency input clocks. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: REF1_ITYPE
+            desc: To be updated. REF1 interface type control. ROM=Y, EEPROM=N
+            opts:
+                <<: *in-opts
+      - addr: 0x44
+        name: REF0_CTL
+        fields:
+          - bits: "5"
+            name: REF0_HYST_TOGGLE
+            desc: Increases hysteresis for AC coupled clocks. For use with low frequency reference input clocks below TBD MHz which are AC coupled. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: REF0_DC_COUPLED_EN
+            desc: DC couple input. Eliminates need for hysteresis for low frequency input clocks. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: REF0_ITYPE
+            desc: To be updated. REF1 interface type control. ROM=Y, EEPROM=N
+            opts:
+                <<: *in-opts
+      - addr: 0x45
+        name: OUT0_1_CMV
+        fields:
+          - bits: "7:4"
+            name: CH_0_VCM
+            desc: Sets the common-mode DC voltage for OUT0. Excluding CMOS output mode. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: CH_1_VCM
+            desc: Sets the common-mode DC voltage for OUT1. Excluding CMOS output mode. ROM=Y, EEPROM=N 
+      - addr: 0x46
+        name: OUT2_3_CMV
+        fields:
+          - bits: "7:4"
+            name: CH_2_VCM
+            desc: Sets the common-mode DC voltage for OUT2. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: CH_3_VCM
+            desc: Sets the common-mode DC voltage for OUT3. ROM=Y, EEPROM=N 
+      - addr: 0x47
+        name: OUT4_7_CMV
+        fields:
+          - bits: "7:4"
+            name: CH_4_6_VCM
+            desc: Sets the common-mode DC voltage for OUT4 and OUT5 (Excluding CML output mode). ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: CH_7_8_VCM
+            desc: Sets the common-mode DC voltage for OUT6 and OUT7. (Excluding CML output mode). ROM=Y, EEPROM=N
+      - addr: 0x48
+        name: OUT8_11_CMV
+        fields:
+          - bits: "7:4"
+            name: CH_8_9_VCM
+            desc: Sets the common-mode DC voltage for OUT8 and OUT9. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: CH_10_11_VCM
+            desc: Sets the common-mode DC voltage for OUT10 and OUT11. ROM=Y, EEPROM=N 
+      - addr: 0x49
+        name: OUT12_13_CMV
+        fields:
+          - bits: "3:0"
+            name: CH_12_13_VCM
+            desc: Sets the common-mode DC voltage for OUT12 and OUT13. ROM=Y, EEPROM=N 
+      - addr: 0x4A
+        name: OUT14_15_CMV
+        fields:
+          - bits: "7:4"
+            name: CH_14_VCM
+            desc: Sets the common-mode DC voltage for OUT14. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: CH_15_VCM
+            desc: Sets the common-mode DC voltage for OUT15. ROM=Y, EEPROM=N 
+      - addr: 0x4B
+        name: TDC3_ZDLY
+        fields:
+
+      - addr: 0x4C
+        name: TDC2_ZDLY
+        fields:
+
+      - addr: 0x4D
+        name: TDC1_ZDLY
+        fields:
+
+      - addr: 0x4E
+        name: REF_OUT_SEL
+        fields:
+
+      - addr: 0x4F
+        name: REF0_DETEN
+        fields:
+
+      - addr: 0x50
+        name: REF1_DETEN
+        fields:
+
+      - addr: 0x53
+        name: REF0_3_CLK_DIV
+        fields:
+
+      - addr: "0x54:0x56"
+        name: REF0_MISSCLK_DIV
+
+      - addr: "0x57:0x59"
+        name: REF1_MISSCLK_DIV
+
+      - addr: 0x60
+        name: REF_MISSCLK_CTL
+        fields:
+          - bits: "0"
+            name: REF0_MISSCLK_VCOSEL
+            desc: Missing/Early Clock Detector VCO selection for all references. Also selects TOD clock source. ROM=Y, EEPROM=N; 0x0 = VCO3; 0x1 = VCO2 
+      - addr: "0x61:0x63"
+        name: REF0_EARLY_CLK_DIV
+
+      - addr: "0x64:0x66"
+        name: REF1_EARLY_CLK_DIV
+
+      - addr: "0x6D:0x6E"
+        name: REF0_PPM_MIN
+
+      - addr: "0x6F:0x70"
+        name: REF0_PPM_MAX
+
+      - addr: "0x71:0x72"
+        name: REF1_PPM_MIN
+
+      - addr: "0x73:0x74"
+        name: REF1_PPM_MAX
+        
+      - addr: 0x9D
+        name: REF0_VLDTMR
+        fields:
+
+      - addr: 0x9E
+        name: REF1_VLDTMR
+        fields:
+
+      - addr: "0xA1:0xA2"
+        name: REF0_PH_VALID_THR
+
+      - addr: "0xA3:0xA4"
+        name: REF1_PH_VALID_THR
+
+      - addr: 0xAA
+        name: NVMSCRC
+        fields:
+
+      - addr: 0xAB
+        name: NVMCTL
+        fields:
+
+      - addr: "0xAD:0xAE"
+        name: MEMADR
+        fields:
+
+      - addr: 0xB0
+        name: RAMDAT
+        fields:
+
+      - addr: 0xB4
+        name: NVMUNLK
+        fields:
+
+      - addr: 0xDE
+        name: DFT_CTL
+        fields:
+          - bits: "6"
+            name: STATUS_MUX_DIV2_EN
+            desc: Enable all DivideBy2 clocks for Status MUX debug signals ROM=N, EEPROM=N 
+  - name: DPll1
+    regs:
+      - addr: 0xDF
+        name: DPLL1_REF1
+        fields:
+          - bits: "5:3"
+            name: DPLL1_REF0_AUTO_PRTY
+            desc: REF0 Priority for Automatic Switchover. Sets the priority for REF0 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st .. 0x7 = 7th 
+          - bits: "2:0"
+            name: DPLL1_REF1_AUTO_PRTY
+            desc: REF1 Priority for Automatic Switchover. Sets the priority for REF1 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st .. 0x7 = 7th 
+      - addr: 0xE1
+        name: DPLL1_REF3
+        fields:
+          - bits: "5:3"
+            name: DPLL1_REF4_AUTO_PRTY
+            desc: REF4 Priority for Automatic Switchover. Sets the priority for REF0 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st .. 0x7 = 7th 
+          - bits: "2:0"
+            name: DPLL1_REF5_AUTO_PRTY
+            desc: REF5 Priority for Automatic Switchover. Sets the priority for REF1 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st .. 0x7 = 7th 
+      - addr: 0xE2
+        name: DPLL1_REF4
+        fields:
+          - bits: "5:3"
+            name: DPLL1_MAN_REFSEL
+            desc: DPLL1 Manual Reference Selection Mode. Determines how the manually selected reference is chosen. If this is set to a '1', the manually selected reference is taken from a GPIO input pin. If it is set to a '0', the manually selected reference is taken from ROM=Y, EEPROM=N; 0x0 = REF0; 0x1 = REF1; 0x2 = Reserved; 0x3 = Reserved; 0x4 = PLL2; 0x5 = PLL3 
+          - bits: "2"
+            name: DPLL1_MAN_SWITCH_PIN_MODE
+            desc: DPLL1 Manual Reference Selection Mode. Determines how the manually selected reference is chosen. If this is set to a '1', the manually selected reference is taken from a GPIO input pin. If it is set to a '0', the manually selected reference is taken from a register. ROM=Y, EEPROM=N; 0x0 = Register; 0x1 = Pin 
+          - bits: "1:0"
+            name: DPLL1_SWITCH_MODE
+            desc: DPLL1 Reference Switchover Mode. Selects between Automatic Non-revertive, Automatic Revertive, Manual Selection with Automatic Fallback, and Manual Selection with Automatic Holdover. ROM=Y, EEPROM=N; 0x0 = Auto Non-revertive; 0x1 = Auto Revertive; 0x2 = Manual w/ Fallback; 0x3 = Manual w/ Holdover
+      - addr: 0xE3
+        name: DPLL1_REFSEL_STAT
+        fields:
+          - bits: "5:0"
+            name: DPLL1_REFSEL_STAT
+            desc: Reports the DPLL1 selected reference ROM=N, EEPROM=N; 0x0 = Holdover; 0x1 = REF0; 0x2 = REF1; 0x4 = Reserved; 0x8 = Reserved; 0x10 = APLL2; 0x20 = APLL3 
+      - addr: "0xE4:0xE5"
+        name: DPLL1_FDET_LCK
+        fields:
+          - bits: "15"
+            name: DPLL1_LOCKDET_PPM_EN
+            desc: DPLL frequency lock detect enable ROM=Y, EEPROM=N 
+          - bits: "14:0"
+            name: DPLL1_LOCKDET_PPM_MAX
+            desc: DPLL frequency lock detect in-lock threshhold ROM=Y, EEPROM=N 
+      - addr: "0xE6:0xE7"
+        name: DPLL1_FDET_UNLCK
+
+      - addr: "0xE8:0xEB"
+        name: DPLL1_FDET2_CNTSTRT
+
+      - addr: "0xEC:0xEF"
+        name: DPLL1_FDET_CNTSTRT
+
+      - addr: "0xF0:0xF3"
+        name: DPLL1_FDET_VCO_CNTSTRT
+
+      - addr: 0xF4
+        name: DPLL1_FDET_STATUS
+        fields:
+          - bits: "0"
+            name: DPLL1_STATUS_PPM_LOCKR
+            desc: lock indicator from DPLL PPM Checker ROM=N, EEPROM=N 
+      - addr: 0xF7
+        name: DPLL1_CTRL1
+        fields:
+          - bits: "7"
+            name: DPLL1_LOOP_EN
+            desc: Enable DPLL1 loop filter and R-Div mash engine ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: DPLL1_PHASE_CANCEL_EN
+            desc: Enable Phase Cancellation ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: DPLL1_PHS1_EN
+            desc: Enable Phase Slew control type 1 ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: DPLL1_ZDM_EN
+            desc: Enable Zero Delay ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: DPLL1_HIST_EN
+            desc: Enable History word to be used during holdover ROM=Y, EEPROM=N 
+      - addr: 0xF8
+        name: DPLL1_SCLR_BY1
+        fields:
+          - bits: "7"
+            name: DPLL1_HOLD_SLEW_LIM_EN
+            desc: Enable slew limiter when entering holdover. Allows slew rate control between current DPLL value before entering holdover and history value. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: DPLL1_CLK_DIV_SRC_SEL
+            desc: DPLL1 cannot be used without DPLL2 or DPLL3 operating. DPLL1 clock select; 0x0 = DPLL3; 0x1 = DPLL2 
+      - addr: "0xFA:0xFF"
+        name: DPLL1_PHOFF
+
+      - addr: "0x100:0x104"
+        name: DPLL1_FREERUN
+
+      - addr: "0x122:0x123"
+        name: DPLL1_LCKTMR
+
+      - addr: "0x126:0x127"
+        name: DPLL1_HOLDTMR
+
+      - addr: "0x128:0x129"
+        name: DPLL1_PHS1TMR
+
+      - addr: 0x12F
+        name: DPLL1_PLLK
+        fields:
+          - bits: "5:0"
+            name: DPLL1_PL_THRESH
+            desc: Phase lock in-lock threshold ROM=Y, EEPROM=N 
+      - addr: 0x130
+        name: DPLL1_PLUNLK
+        fields:
+          - bits: "5:0"
+            name: DPLL1_PL_UNLK_THRESH
+            desc: Phase lock out-of-lock threshold ROM=Y, EEPROM=N 
+      - addr: 0x131
+        name: DPLL1_PHS1LIM
+        fields:
+          - bits: "5:0"
+            name: DPLL1_PHS1_THRESH
+            desc: Phase slew type 1 threshold ROM=Y, EEPROM=N 
+      - addr: 0x134
+        name: DPLL1_HOLDLIM
+        fields:
+          - bits: "5:0"
+            name: DPLL1_HOLD_SLEW_STEP
+            desc: When DPLL exits holdover, rate of phase change relates to DPLLx_HOLD_SLEW_STEP over DPLLx_HOLD_TIMER. DPLLx_HOLD_SLEW_STEP is applied to DPLL numerator when exiting holdover or APLL numerator when using APLL relative DCO. ROM=Y, EEPROM=N 
+      - addr: 0x136
+        name: DPLL1_DBG2
+        fields:
+          - bits: "5"
+            name: DPLL1_STATUS_PL
+            desc: Readback the phase lock status ROM=N, EEPROM=N 
+      - addr: 0x137
+        name: DPLL1_DBG3
+        fields:
+          - bits: "4"
+            name: DPLL1_DCO_SLEW_ACTIVE
+            desc: Readback DCO slew status ROM=N, EEPROM=N 
+      - addr: "0x13A:0x13E"
+        name: DPLL1_FBDIV
+
+      - addr: "0x13F:0x143"
+        name: DPLL1_FBNUM
+
+      - addr: "0x144:0x148"
+        name: DPLL1_FBDEN
+        
+      - addr: "0x149:0x14D"
+        name: DPLL1_FBDIV2
+        fields:
+
+      - addr: "0x14E:0x152"
+        name: DPLL1_FBNUM2
+
+      - addr: "0x153:0x157"
+        name: DPLL1_FBDEN2
+
+      - addr: 0x158
+        name: DPLL1_FBDIV_SEL
+        fields:
+          - bits: "5"
+            name: DPLL1_REF5_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF3. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2 
+          - bits: "1"
+            name: DPLL1_REF1_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF1. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2 
+          - bits: "0"
+            name: DPLL1_REF0_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF0. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2 
+      - addr: 0x159
+        name: DPLL1_FBMASHCTL
+        fields:
+          - bits: "2:0"
+            name: DPLL1_FB_MASH_ORDER
+            desc: DPLL Feedback Divider MASH Order. ROM=Y, EEPROM=N 
+      - addr: "0x15A:0x15E"
+        name: DPLL1_FBFDEV
+
+      - addr: 0x15F
+        name: DPLL1_FBFDEVUPDATE
+        fields:
+          - bits: "0"
+            name: DPLL1_FB_FDEV_UPDATE
+            desc: Increment/Decrement DPLL Feedback Numerator value with DPLL_FB_FDEV value ROM=Y, EEPROM=N 
+      - addr: 0x160
+        name: DPLL1_FBFDEVEN
+        fields:
+          - bits: "0"
+            name: DPLL1_FB_FDEV_EN
+            desc: Enable DPLL DCO mode ROM=Y, EEPROM=N 
+      - addr: "0x161:0x165"
+        name: DPLL1_FBNUM_STAT
+
+      - addr: 0x166
+        name: DPLL1_REF_DBLR
+        fields:
+          - bits: "3"
+            name: DPLL1_REF0_DBLR_EN
+            desc: DPLL Reference 0 Doubler Enable ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: DPLL1_REF1_DBLR_EN
+            desc: DPLL Reference 1 Doubler Enable ROM=Y, EEPROM=N 
+      - addr: "0x167:0x168"
+        name: DPLL1_REF0RDIV
+
+      - addr: "0x169:0x16A"
+        name: DPLL1_REF1RDIV
+
+      - addr: "0x171:0x172"
+        name: DPLL1_REF5RDIV
+  - name: DPll2
+    regs:
+      - addr: 0x175
+        name: DPLL2_REF1
+        fields:
+          - bits: "5:3"
+            name: DPLL2_REF0_AUTO_PRTY
+            desc: REF0 Priority for Automatic Switchover. Sets the priority for REF0 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th; 0x5 = 5th; 0x6 = 6th; 0x7 = 7th 
+          - bits: "2:0"
+            name: DPLL2_REF1_AUTO_PRTY
+            desc: REF1 Priority for Automatic Switchover. Sets the priority for REF1 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th; 0x5 = 5th; 0x6 = 6th; 0x7 = 7th 
+      - addr: 0x177
+        name: DPLL2_REF3
+        fields:
+          - bits: "5:3"
+            name: DPLL2_REF4_AUTO_PRTY
+            desc: REF4 Priority for Automatic Switchover. Sets the priority for REF4 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th; 0x5 = 5th; 0x6 = 6th; 0x7 = 7th 
+          - bits: "2:0"
+            name: DPLL2_REF5_AUTO_PRTY
+            desc: REF5 Priority for Automatic Switchover. Sets the priority for REF5 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th; 0x5 = 5th; 0x6 = 6th; 0x7 = 7th 
+      - addr: 0x178
+        name: DPLL2_REF4
+        fields:
+          - bits: "5:3"
+            name: DPLL2_MAN_REFSEL
+            desc: DPLL2 Manual Reference Selection ROM=Y, EEPROM=N; 0x0 = REF0; 0x1 = REF1; 0x2 = Reserved; 0x3 = Reserved; 0x4 = PLL1; 0x5 = PLL3 
+          - bits: "2"
+            name: DPLL2_MAN_SWITCH_PIN_MODE
+            desc: DPLL2 Manual Reference Selection Mode. Determines how the manually selected reference is chosen. If this is set to a '1', the manually selected reference is taken from a GPIO input pin. If it is set to a '0', the manually selected reference is taken from a register. ROM=Y, EEPROM=N; 0x0 = Register; 0x1 = Pin 
+          - bits: "1:0"
+            name: DPLL2_SWITCH_MODE
+            desc: DPLL2 Reference Switchover Mode. Selects between Automatic Non-revertive, Automatic Revertive, Manual Selection with Automatic Fallback, and Manual Selection with Automatic Holdover. ROM=Y, EEPROM=N; 0x0 = Auto non-revertive; 0x1 = Auto revertive; 0x2 = Manual fallback; 0x3 = Manual Holdover 
+      - addr: 0x179
+        name: DPLL2_REFSEL_STAT
+        fields:
+          - bits: "5:0"
+            name: DPLL2_REFSEL_STAT
+            desc: Reads the DPLL2 selected reference ROM=N, EEPROM=N; 0x0 = Holdover; 0x1 = REF0; 0x2 = REF1; 0x4 = Reserved; 0x8 = Reserved; 0x10 = APLL1; 0x20 = APLL3 
+      - addr: "0x17A:0x17B"
+        name: DPLL2_FDET_LCK
+        fields:
+          - bits: "15"
+            name: DPLL2_LOCKDET_PPM_EN
+            desc: DPLL frequency lock detect enable ROM=Y, EEPROM=N 
+          - bits: "14:0"
+            name: DPLL2_LOCKDET_PPM_MAX
+            desc: DPLL frequency lock detect in-lock threshhold ROM=Y, EEPROM=N 
+      - addr: "0x17C:0x17D"
+        name: DPLL2_FDET_UNLCK
+        fields:
+          - bits: "14:0"
+            name: DPLL2_UNLOCKDET_PPM_MAX
+            desc: DPLL frequency lock detect out-of-lock threshhold ROM=Y, EEPROM=N 
+      - addr: "0x17E:0x181"
+        name: DPLL2_FDET2_CNTSTRT
+        fields:
+          - bits: "29:0"
+            name: DPLL2_LOCKDET2_PPM_CNTSTRT
+            desc: DPLL frequency lock detect reference count value used with DPLL2 feedback configuration 2 ROM=Y, EEPROM=N 
+      - addr: "0x182:0x185"
+        name: DPLL2_FDET_CNTSTRT
+        fields:
+          - bits: "29:0"
+            name: DPLL2_LOCKDET_PPM_CNTSTRT
+            desc: DPLL frequency lock detect reference count value used with DPLL2 feedback configuration 1 ROM=Y, EEPROM=N 
+      - addr: "0x186:0x189"
+        name: DPLL2_FDET_VCO_CNTSTRT
+        fields:
+          - bits: "29:0"
+            name: DPLL2_LOCKDET_VCO_PPM_CNTSTRT
+            desc: DPLL frequency lock detect VCO count value ROM=Y, EEPROM=N 
+      - addr: 0x18A
+        name: DPLL2_FDET_STATUS
+        fields:
+          - bits: "0"
+            name: DPLL2_STATUS_PPM_LOCK
+            desc: Readback lock indicator from DPLL PPM Checker ROM=N, EEPROM=N 
+      - addr: 0x18D
+        name: DPLL2_CTRL1
+        fields:
+          - bits: "7"
+            name: DPLL2_LOOP_EN
+            desc: Enable DPLL2 loop filter and R-Div mash engine ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: DPLL2_PHASE_CANCEL_EN
+            desc: Enable Phase Cancellation ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: DPLL2_PHS1_EN
+            desc: Enable Phase Slew control type 1 ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: DPLL2_ZDM_EN
+            desc: Enable Zero Delay ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: DPLL2_HIST_EN
+            desc: Enable History word to be used during holdover ROM=Y, EEPROM=N 
+      - addr: 0x18E
+        name: DPLL2_SCLR_BY1
+        fields:
+          - bits: "7"
+            name: DPLL2_HOLD_SLEW_LIM_EN
+            desc: Enable slew limiter when entering holdover ROM=Y, EEPROM=N 
+      - addr: "0x190:0x195"
+        name: DPLL2_PHOFF
+        fields:
+          - bits: "44:0"
+            name: DPLL2_PH_OFFSET
+            desc: Phase offset to control input to output phase in ZDM. ROM=Y, EEPROM=N 
+      - addr: "0x196:0x19A"
+        name: DPLL2_FREERUN
+        fields:
+          - bits: "39:0"
+            name: DPLL2_FREE_RUN
+            desc: DPLL2 starting word. Also non-history holdover word. ROM=Y, EEPROM=N 
+      - addr: "0x1B8:0x1B9"
+        name: DPLL2_LCKTMR
+        fields:
+          - bits: "9:0"
+            name: DPLL2_LCK_TIMER
+            desc: Minimum amount of time until DPLL2_LOPL will be deasserted after starting to lock. Timer begins once device is within valid phase lock window. ROM=Y, EEPROM=N 
+      - addr: "0x1BC:0x1BD"
+        name: DPLL2_HOLDTMR
+        fields:
+          - bits: "9:0"
+            name: DPLL2_HOLD_TIMER
+            desc: Rate of change to DPLL or APLL numerator during phase slew control. See DPLLx_HOLD_SLEW_STEP. ROM=Y, EEPROM=N 
+      - addr: "0x1BE:0x1BF"
+        name: DPLL2_PHS1TMR
+        fields:
+          - bits: "9:0"
+            name: DPLL2_PHS1_TIMER
+            desc: Phase slew control update timer. ROM=Y, EEPROM=N 
+      - addr: 0x1C5
+        name: DPLL2_PLLK
+        fields:
+          - bits: "5:0"
+            name: DPLL2_PL_THRESH
+            desc: Phase lock in-lock threshold ROM=Y, EEPROM=N 
+      - addr: 0x1C6
+        name: DPLL2_PLUNLK
+        fields:
+          - bits: "5:0"
+            name: DPLL2_PL_UNLK_THRESH
+            desc: Phase lock out-of-lock threshold ROM=Y, EEPROM=N 
+      - addr: 0x1C7
+        name: DPLL2_PHS1LIM
+        fields:
+          - bits: "5:0"
+            name: DPLL2_PHS1_THRESH
+            desc: Phase slew type 1 threshold ROM=Y, EEPROM=N 
+      - addr: 0x1CA
+        name: DPLL2_HOLDLIM
+        fields:
+          - bits: "5:0"
+            name: DPLL2_HOLD_SLEW_STEP
+            desc: When DPLL exits holdover, rate of phase change relates to DPLLx_HOLD_SLEW_STEP over DPLLx_HOLD_TIMER. DPLLx_HOLD_SLEW_STEP is applied to DPLL numerator when exiting holdover or APLL numerator when using APLL relative DCO. ROM=Y, EEPROM=N 
+      - addr: 0x1CC
+        name: DPLL2_DBG2
+        fields:
+          - bits: "5"
+            name: DPLL2_STATUS_PL
+            desc: Readback the phase lock status ROM=N, EEPROM=N 
+      - addr: 0x1CD
+        name: DPLL2_DBG3
+        fields:
+          - bits: "4"
+            name: DPLL2_DCO_SLEW_ACTIVE
+            desc: Readback DCO slew status ROM=N, EEPROM=N 
+      - addr: "0x1D0:0x1D4"
+        name: DPLL2_FBDIV
+        fields:
+          - bits: "32:0"
+            name: DPLL2_FB_DIV
+            desc: DPLL Feedback Divider N Value used with DPLL2 feedback configuration 1 ROM=Y, EEPROM=N
+      - addr: "0x1D5:0x1D9"
+        name: DPLL2_FBNUM
+        fields:
+          - bits: "39:0"
+            name: DPLL2_FB_NUM
+            desc: DPLL Feedback Divider Numerator Value used with DPLL2 feedback configuration 1 ROM=Y, EEPROM=N 
+      - addr: "0x1DA:0x1DE"
+        name: DPLL2_FBDEN
+        fields:
+          - bits: "39:0"
+            name: DPLL2_FB_DEN
+            desc: DPLL Feedback Divider Denominator Value used with DPLL2 feedback configuration 1 ROM=Y, EEPROM=N 
+      - addr: "0x1DF:0x1E3"
+        name: DPLL2_FBDIV2
+        fields:
+          - bits: "32:0"
+            name: DPLL2_FB2_DIV
+            desc: DPLL Feedback Divider N Value used with DPLL2 feedback configuration 2. ROM=Y, EEPROM=N 
+      - addr: "0x1E4:0x1E8"
+        name: DPLL2_FBNUM2
+        fields:
+          - bits: "39:0"
+            name: DPLL2_FB2_NUM
+            desc: DPLL Feedback Divider Numerator Value used with DPLL2 feedback configuration 2 ROM=Y, EEPROM=N 
+      - addr: "0x1E9:0x1ED"
+        name: DPLL2_FBDEN2
+        fields:
+          - bits: "39:0"
+            name: DPLL2_FB2_DEN
+            desc: DPLL Feedback Divider Denominator Value used with DPLL2 feedback configuration 2 ROM=Y, EEPROM=N 
+      - addr: 0x1EE
+        name: DPLL2_FBDIV_SEL
+        fields:
+          - bits: "5"
+            name: DPLL2_REF5_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF3. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2 
+          - bits: "1"
+            name: DPLL2_REF1_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF1. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2 
+          - bits: "0"
+            name: DPLL2_REF0_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF0. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2
+      - addr: 0x1EF
+        name: DPLL2_FBMASHCTL
+        fields:
+          - bits: "2:0"
+            name: DPLL2_FB_MASH_ORDER
+            desc: DPLL Feedback Divider MASH Order. ROM=Y, EEPROM=N 
+      - addr: "0x1F0:0x1F4"
+        name: DPLL2_FBFDEV
+        fields:
+          - bits: "37:0"
+            name: DPLL2_FB_FDEV
+            desc: DPLL Feedback Divider DCO Frequency Deviation Value ROM=Y, EEPROM=N 
+      - addr: 0x1F5
+        name: DPLL2_FBFDEVUPDATE
+        fields:
+          - bits: "0"
+            name: DPLL2_FB_FDEV_UPDATE
+            desc: Increment/Decrement DPLL Feedback Numerator value with DPLL_FB_FDEV value ROM=Y, EEPROM=N 
+      - addr: 0x1F6
+        name: DPLL2_FBFDEVEN
+        fields:
+          - bits: "0"
+            name: DPLL2_FB_FDEV_EN
+            desc: Enable DPLL DCO mode ROM=Y, EEPROM=N 
+      - addr: "0x1F7:0x1FB"
+        name: DPLL2_FBNUM_STAT
+        fields:
+          - bits: "39:0"
+            name: DPLL2_FB_NUM_STAT
+            desc: Readback DPLL Feedback Divider Numerator value as a result of DCO mode ROM=N, EEPROM=N 
+      - addr: 0x1FC
+        name: DPLL2_REF_DBLR
+        fields:
+          - bits: "3"
+            name: DPLL2_REF0_DBLR_EN
+            desc: DPLL Reference 0 Doubler Enable ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: DPLL2_REF1_DBLR_EN
+            desc: DPLL Reference 1 Doubler Enable ROM=Y, EEPROM=N 
+      - addr: "0x1FD:0x1FE"
+        name: DPLL2_REF0RDIV
+        fields:
+          - bits: "15:0"
+            name: DPLL2_REF0_RDIV
+            desc: DPLL Reference 0 R divider value ROM=Y, EEPROM=N 
+      - addr: "0x1FF:0x200"
+        name: DPLL2_REF1RDIV
+        fields:
+          - bits: "15:0"
+            name: DPLL2_REF1_RDIV
+            desc: DPLL Reference 1 R divider value ROM=Y, EEPROM=N 
+      - addr: "0x205:0x206"
+        name: DPLL2_REF4RDIV
+        fields:
+          - bits: "15:0"
+            name: DPLL2_REF4_RDIV
+            desc: DPLL REF4 R-divider value ROM=Y, EEPROM=N 
+      - addr: "0x207:0x208"
+        name: DPLL2_REF5RDIV
+        fields:
+          - bits: "15:0"
+            name: DPLL2_REF5_RDIV
+            desc: DPLL Reference 3 R divider value ROM=Y, EEPROM=N 
+  - name: DPll3
+    regs:
+      - addr: 0x20B
+        name: DPLL3_REF1
+        fields:
+          - bits: "5:3"
+            name: DPLL3_REF0_AUTO_PRTY
+            desc: REF0 Priority for Automatic Switchover. Sets the priority for REF0 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th; 0x5 = 5th; 0x6 = 6th; 0x7 = 7th 
+          - bits: "2:0"
+            name: DPLL3_REF1_AUTO_PRTY
+            desc: REF1 Priority for Automatic Switchover. Sets the priority for REF1 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th; 0x5 = 5th; 0x6 = 6th; 0x7 = 7th 
+      - addr: 0x20D
+        name: DPLL3_REF3
+        fields:
+          - bits: "5:3"
+            name: DPLL3_REF4_AUTO_PRTY
+            desc: REF4 Priority for Automatic Switchover. Sets the priority for REF4 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th; 0x5 = 5th; 0x6 = 6th; 0x7 = 7th 
+          - bits: "2:0"
+            name: DPLL3_REF5_AUTO_PRTY
+            desc: REF5 Priority for Automatic Switchover. Sets the priority for REF5 used in Automatic Non-Revertive, Automatic Revertive, and Manual Selection with Automatic Fallback switchover modes. ROM=Y, EEPROM=N; 0x0 = Not available for selection; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th; 0x5 = 5th; 0x6 = 6th; 0x7 = 7th 
+      - addr: 0x20E
+        name: DPLL3_REF4
+        fields:
+          - bits: "5:3"
+            name: DPLL3_MAN_REFSEL
+            desc: DPLL3 Manual Reference Selection Mode. Determines how the manually selected reference is chosen. If this is set to a '1', the manually selected reference is taken from a GPIO input pin. If it is set to a '0', the manually selected reference is taken from a register. ROM=Y, EEPROM=N; 0x0 = REF0; 0x1 = REF1; 0x2 = Reserved; 0x3 = Reserved; 0x4 = PLL1; 0x5 = PLL2 
+          - bits: "2"
+            name: DPLL3_MAN_SWITCH_PIN_MODE
+            desc: DPLL3 Manual Reference Selection Mode. Determines how the manually selected reference is chosen. If this is set to a '1', the manually selected reference is taken from a GPIO input pin. If it is set to a '0', the manually selected reference is taken from a register. ROM=Y, EEPROM=N; 0x0 = Register; 0x1 = Pin 
+          - bits: "1:0"
+            name: DPLL3_SWITCH_MODE
+            desc: DPLL3 Reference Switchover Mode. Selects between Automatic Non-revertive, Automatic Revertive, Manual Selection with Automatic Fallback, and Manual Selection with Automatic Holdover. ROM=Y, EEPROM=N; 0x0 = Auto non-revertive; 0x1 = Auto revertive; 0x2 = Manual fallback; 0x3 = Manual Holdover 
+      - addr: 0x20F
+        name: DPLL3_REFSEL_STAT
+        fields:
+          - bits: "5:0"
+            name: DPLL3_REFSEL_STAT
+            desc: Reads the DPLL3 selected reference ROM=N, EEPROM=N; 0x0 = Holdover; 0x1 = REF0; 0x2 = REF1; 0x4 = Reserved; 0x8 = Reserved; 0x10 = APLL1; 0x20 = APLL2 
+      - addr: "0x210:0x211"
+        name: DPLL3_FDET_LCK
+        fields:
+          - bits: "15"
+            name: DPLL3_LOCKDET_PPM_EN
+            desc: DPLL frequency lock detect enable ROM=Y, EEPROM=N 
+          - bits: "14:0"
+            name: DPLL3_LOCKDET_PPM_MAX
+            desc: DPLL frequency lock detect in-lock threshold ROM=Y, EEPROM=N 
+      - addr: "0x212:0x213"
+        name: DPLL3_FDET_UNLCK
+        fields:
+          - bits: "14:0"
+            name: DPLL3_UNLOCKDET_PPM_MAX
+            desc: DPLL frequency lock detect out-of-lock threshold ROM=Y, EEPROM=N 
+      - addr: "0x214:0x217"
+        name: DPLL3_FDET2_CNTSTRT
+        fields:
+          - bits: "29:0"
+            name: DPLL3_LOCKDET2_PPM_CNTSTRT
+            desc: DPLL frequency lock detect reference count value used with DPLL1 feedback configuration 2 ROM=Y, EEPROM=N 
+      - addr: "0x218:0x21B"
+        name: DPLL3_FDET_CNTSTRT
+        fields:
+          - bits: "29:0"
+            name: DPLL3_LOCKDET_PPM_CNTSTRT
+            desc: DPLL frequency lock detect reference count value used with DPLL3 feedback configuration 1 ROM=Y, EEPROM=N 
+      - addr: "0x21C:0x21F"
+        name: DPLL3_FDET_VCO_CNTSTRT
+        fields:
+          - bits: "29:0"
+            name: DPLL3_LOCKDET_VCO_PPM_CNTSTRT
+            desc: DPLL frequency lock detect VCO count value ROM=Y, EEPROM=N 
+      - addr: 0x220
+        name: DPLL3_FDET_STATUS
+        fields:
+          - bits: "0"
+            name: DPLL3_STATUS_PPM_LOCK
+            desc: Readback lock indicator from DPLL PPM Checker ROM=N, EEPROM=N 
+      - addr: 0x223
+        name: DPLL3_CTRL1
+        fields:
+          - bits: "7"
+            name: DPLL3_LOOP_EN
+            desc: Enable DPLL3 loop filter and R-Div mash engine ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: DPLL3_PHASE_CANCEL_EN
+            desc: Enable Phase Cancellation ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: DPLL3_PHS1_EN
+            desc: Enable Phase Slew control type 1 ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: DPLL3_ZDM_EN
+            desc: Enable Zero Delay mode ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: DPLL3_HIST_EN
+            desc: Enable History word to be used during holdover ROM=Y, EEPROM=N 
+      - addr: 0x224
+        name: DPLL3_SCLR_BY1
+        fields:
+          - bits: "7"
+            name: DPLL3_HOLD_SLEW_LIM_EN
+            desc: During holdover enable slew limiter ROM=Y, EEPROM=N 
+      - addr: "0x226:0x22B"
+        name: DPLL3_PHOFF
+        fields:
+          - bits: "44:0"
+            name: DPLL3_PH_OFFSET
+            desc: Phase offset to control input to output phase in ZDM. ROM=Y, EEPROM=N 
+      - addr: "0x22C:0x230"
+        name: DPLL3_FREERUN
+        fields:
+          - bits: "39:0"
+            name: DPLL3_FREE_RUN
+            desc: DPLL starting word. Also non-history holdover word. ROM=Y, EEPROM=N 
+      - addr: "0x24E:0x24F"
+        name: DPLL3_LCKTMR
+        fields:
+          - bits: "9:0"
+            name: DPLL3_LCK_TIMER
+            desc: Minimum amount of time until DPLL3_LOPL will be deasserted after starting to lock. Timer begins once device is within valid phase lock window. ROM=Y, EEPROM=N 
+      - addr: "0x252:0x253"
+        name: DPLL3_HOLDTMR
+        fields:
+          - bits: "9:0"
+            name: DPLL3_HOLD_TIMER
+            desc: Rate of change to DPLL or APLL numerator during phase slew control. See DPLLx_HOLD_SLEW_STEP. ROM=Y, EEPROM=N 
+      - addr: "0x254:0x255"
+        name: DPLL3_PHS1TMR
+        fields:
+          - bits: "9:0"
+            name: DPLL3_PHS1_TIMER
+            desc: Phase slew control update timer. ROM=Y, EEPROM=N 
+      - addr: 0x25B
+        name: DPLL3_PLLK
+        fields:
+          - bits: "5:0"
+            name: DPLL3_PL_THRESH
+            desc: Phase lock in-lock threshold ROM=Y, EEPROM=N 
+      - addr: 0x25C
+        name: DPLL3_PLUNLK
+        fields:
+          - bits: "5:0"
+            name: DPLL3_PL_UNLK_THRESH
+            desc: Phase lock out-of-lock threshold ROM=Y, EEPROM=N
+      - addr: 0x25D
+        name: DPLL3_PHS1LIM
+        fields:
+          - bits: "5:0"
+            name: DPLL3_PHS1_THRESH
+            desc: Phase slew type 1 threshold ROM=Y, EEPROM=N
+      - addr: 0x262
+        name: DPLL3_DBG2
+        fields:
+          - bits: "5"
+            name: DPLL3_STATUS_PL
+            desc: Readback the phase lock status ROM=N, EEPROM=N
+      - addr: 0x263
+        name: DPLL3_DBG3
+        fields:
+          - bits: "4"
+            name: DPLL3_DCO_SLEW_ACTIVE
+            desc: Readback DCO slew status ROM=N, EEPROM=N
+      - addr: "0x266:0x26A"
+        name: DPLL3_FBDIV
+        fields:
+          - bits: "32:0"
+            name: DPLL3_FB_DIV
+            desc: DPLL Feedback Divider N Value used with DPLL3 feedback configuration 1 ROM=Y, EEPROM=N
+      - addr: "0x26B:0x26F"
+        name: DPLL3_FBNUM
+        fields:
+          - bits: "39:0"
+            name: DPLL3_FB_NUM
+            desc: DPLL Feedback Divider Numerator Value used with DPLL3 feedback configuration 1 ROM=Y, EEPROM=N
+      - addr: "0x270:0x274"
+        name: DPLL3_FBDEN
+        fields:
+          - bits: "39:0"
+            name: DPLL3_FB_DEN
+            desc: DPLL Feedback Divider Denominator Value used with DPLL3 feedback configuration 1 ROM=Y, EEPROM=N
+      - addr: "0x275:0x279"
+        name: DPLL3_FBDIV2
+        fields:
+          - bits: "32:0"
+            name: DPLL3_FB2_DIV
+            desc: DPLL Feedback Divider N Value used with DPLL3 feedback configuration 2 ROM=Y, EEPROM=N 
+      - addr: "0x27A:0x27E"
+        name: DPLL3_FBNUM2_BY
+        fields:
+          - bits: "39:0"
+            name: DPLL3_FB2_NUM
+            desc: DPLL Feedback Divider Numerator Value used with DPLL3 feedback configuration 2 ROM=Y, EEPROM=N 
+      - addr: "0x27F:0x283"
+        name: DPLL3_FBDEN2
+        fields:
+          - bits: "39:0"
+            name: DPLL3_FB2_DEN
+            desc: DPLL Feedback Divider Denominator Value used with DPLL3 feedback configuration 2 ROM=Y, EEPROM=N 
+      - addr: 0x284
+        name: DPLL3_FBDIV_SEL
+        fields:
+          - bits: "5"
+            name: DPLL3_REF5_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF5. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2 
+          - bits: "4"
+            name: DPLL3_REF4_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF4. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2 
+          - bits: "1"
+            name: DPLL3_REF1_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF1. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2 
+          - bits: "0"
+            name: DPLL3_REF0_FB_SEL
+            desc: DPLL Feedback N, NUM, DEN select for REF0. When this bit is a 0, Value 1 is chosen for each of the three parameters. When it is set to a 1, Value 2 is used. ROM=Y, EEPROM=N; 0x0 = FB Config 1; 0x1 = FB Config 2
+      - addr: 0x285
+        name: DPLL3_FBMASHCTL
+        fields:
+          - bits: "2:0"
+            name: DPLL3_FB_MASH_ORDER
+            desc: DPLL Feedback Divider MASH Order. ROM=Y, EEPROM=N
+      - addr: "0x286:0x28A"
+        name: DPLL3_FBFDEV
+        fields:
+          - bits: "37:0"
+            name: DPLL3_FB_FDEV
+            desc: DPLL Feedback Divider DCO Frequency Deviation Value ROM=Y, EEPROM=N 
+      - addr: 0x28B
+        name: DPLL3_FBFDEVUPDATE
+        fields:
+          - bits: "0"
+            name: DPLL3_FB_FDEV_UPDATE
+            desc: Increment/Decrement DPLL Feedback Numerator value with DPLL_FB_FDEV value ROM=Y, EEPROM=N 
+      - addr: 0x28C
+        name: DPLL3_FBFDEVEN
+        fields:
+          - bits: "0"
+            name: DPLL3_FB_FDEV_EN
+            desc: Enable DPLL DCO mode ROM=Y, EEPROM=N 
+      - addr: "0x28D:0x291"
+        name: DPLL3_FBNUM_STAT
+        fields:
+          - bits: "39:0"
+            name: DPLL3_FB_NUM_STAT
+            desc: Readback DPLL Feedback Divider Numerator value as a result of DCO mode ROM=N, EEPROM=N
+      - addr: 0x292
+        name: DPLL3_REF_DBLR
+        fields:
+          - bits: "3"
+            name: DPLL3_REF0_DBLR_EN
+            desc: DPLL Reference 0 Doubler Enable ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: DPLL3_REF1_DBLR_EN
+            desc: DPLL Reference 1 Doubler Enable ROM=Y, EEPROM=N
+      - addr: "0x293:0x294"
+        name: DPLL3_REF0RDIV
+        fields:
+          - bits: "15:0"
+            name: DPLL3_REF0_RDIV
+            desc: DPLL Reference 0 R divider value ROM=Y, EEPROM=N 
+      - addr: "0x295:0x296"
+        name: DPLL3_REF1RDIV
+        fields:
+          - bits: "15:0"
+            name: DPLL3_REF1_RDIV
+            desc: DPLL Reference 1 R divider value ROM=Y, EEPROM=N 
+      - addr: "0x297:0x298"
+        name: DPLL3_REF2RDIV
+        fields:
+          - bits: "15:0"
+            name: DPLL3_REF2_RDIV
+            desc: DPLL Reference 2 R divider value ROM=Y, EEPROM=N
+      - addr: "0x29D:0x29E"
+        name: DPLL3_REF5RDIV
+        fields:
+          - bits: "15:0"
+            name: DPLL3_REF5_RDIV
+            desc: DPLL Reference 5 R divider value ROM=Y, EEPROM=N
+  - name: APll1
+    regs:
+      - addr: 0x2C3
+        name: APLL1_CP_RPU
+        fields:
+          - bits: "7:0"
+            name: PLL1_CP_PU_R
+            desc: PLL charge pump pull-up resistor selection ROM=Y, EEPROM=N; 0x0 = Disabled; 0x1 = 78 kΩ; 0x2 = 39 kΩ; 0x3 = 26 kΩ; 0x4 = 20 kΩ; 0x5 = 15.9 kΩ; 0x6 = 13.2 kΩ; 0x7 = 11.3 kΩ; 0x8 = 9.8 kΩ; 0x9 = 8.71 kΩ; 0xA = 7.83 kΩ; 0xB = 7.12 kΩ; 0xC = 6.58 kΩ; 0xD = 6.07 kΩ; 0xE = 5.63 kΩ; 0xF = 5.25 kΩ; 0x10 = 4.9 kΩ; 0x11 = 4.61 kΩ; 0x12 = 4.35 kΩ; 0x13 = 4.12 kΩ; 0x14 = 3.94 kΩ; 0x15 = 3.75 kΩ; 0x16 = 3.57 kΩ; 0x17 = 3.42 kΩ; 0x18 = 3.27 kΩ; 0x19 = 3.14 kΩ; 0x1A = 3.01 kΩ; 0x1B = 2.9 kΩ; 0x1C = 2.81 kΩ; 0x1D = 2.71 kΩ; 0x1E = 2.62 kΩ; 0x1F = 2.53 kΩ; 0x20 = 2.4 kΩ; 0x21 = 2.33 kΩ; 0x22 = 2.26 kΩ; 0x23 = 2.2 kΩ; 0x24 = 2.14 kΩ; 0x25 = 2.09 kΩ; 0x26 = 2.03 kΩ; 0x27 = 1.98 kΩ; 0x28 = 1.93 kΩ; 0x29 = 1.88 kΩ; 0x2A = 1.84 kΩ; 0x2B = 1.79 kΩ; 0x2C = 1.76 kΩ; 0x2D = 1.72 kΩ; 0x2E = 1.68 kΩ; 0x2F = 1.65 kΩ; 0x30 = 1.61 kΩ; 0x31 = 1.58 kΩ; 0x32 = 1.55 kΩ; 0x33 = 1.52 kΩ; 0x34 = 1.49 kΩ; 0x35 = 1.46 kΩ; 0x36 = 1.44 kΩ; 0x37 = 1.41 kΩ; 0x38 = 1.38 kΩ; 0x39 = 1.36 kΩ; 0x3A = 1.34 kΩ; 0x3B = 1.31 kΩ; 0x3C = 1.29 kΩ; 0x3D = 1.27 kΩ; 0x3E = 1.25 kΩ; 0x3F = 1.23 kΩ; 0x40 = 1.2 kΩ; 0x41 = 1.18 kΩ; 0x42 = 1.16 kΩ; 0x43 = 1.15 kΩ; 0x44 = 1.13 kΩ; 0x45 = 1.12 kΩ; 0x46 = 1.1 kΩ; 0x47 = 1.08 kΩ; 0x48 = 1.07 kΩ; 0x49 = 1.05 kΩ; 0x4A = 1.04 kΩ; 0x4B = 1.03 kΩ; 0x4C = 1.01 kΩ; 0x4D = 1 kΩ; 0x4E = 0.989 kΩ; 0x4F = 0.977 kΩ; 0x50 = 0.964 kΩ; 0x51 = 0.952 kΩ; 0x52 = 0.941 kΩ; 0x53 = 0.929 kΩ; 0x54 = 0.92 kΩ; 0x55 = 0.909 kΩ; 0x56 = 0.898 kΩ; 0x57 = 0.888 kΩ; 0x58 = 0.878 kΩ; 0x59 = 0.868 kΩ; 0x5A = 0.858 kΩ; 0x5B = 0.849 kΩ; 0x5C = 0.841 kΩ; 0x5D = 0.832 kΩ; 0x5E = 0.823 kΩ; 0x5F = 0.814 kΩ; 0x60 = 0.8 kΩ; 0x61 = 0.792 kΩ; 0x62 = 0.784 kΩ; 0x63 = 0.776 kΩ; 0x64 = 0.769 kΩ; 0x65 = 0.762 kΩ; 0x66 = 0.754 kΩ; 0x67 = 0.747 kΩ; 0x68 = 0.74 kΩ; 0x69 = 0.733 kΩ; 0x6A = 0.726 kΩ; 0x6B = 0.719 kΩ; 0x6C = 0.713 kΩ; 0x6D = 0.707 kΩ; 0x6E = 0.7 kΩ; 0x6F = 0.694 kΩ; 0x70 = 0.688 kΩ; 0x71 = 0.682 kΩ; 0x72 = 0.676 kΩ; 0x73 = 0.67 kΩ; 0x74 = 0.665 kΩ; 0x75 = 0.659 kΩ; 0x76 = 0.654 kΩ; 0x77 = 0.648 kΩ; 0x78 = 0.643 kΩ; 0x79 = 0.637 kΩ; 0x7A = 0.632 kΩ; 0x7B = 0.627 kΩ; 0x7C = 0.623 kΩ; 0x7D = 0.618 kΩ; 0x7E = 0.613 kΩ; 0x7F = 0.608 kΩ; 0x80 = 0.6 kΩ; 0x81 = 0.595 kΩ; 0x82 = 0.591 kΩ; 0x83 = 0.586 kΩ; 0x84 = 0.583 kΩ; 0x85 = 0.578 kΩ; 0x86 = 0.574 kΩ; 0x87 = 0.57 kΩ; 0x88 = 0.565 kΩ; 0x89 = 0.561 kΩ; 0x8A = 0.557 kΩ; 0x8B = 0.553 kΩ; 0x8C = 0.55 kΩ; 0x8D = 0.546 kΩ; 0x8E = 0.542 kΩ; 0x8F = 0.538 kΩ; 0x90 = 0.535 kΩ; 0x91 = 0.531 kΩ; 0x92 = 0.527 kΩ; 0x93 = 0.524 kΩ; 0x94 = 0.521 kΩ; 0x95 = 0.517 kΩ; 0x96 = 0.514 kΩ; 0x97 = 0.51 kΩ; 0x98 = 0.507 kΩ; 0x99 = 0.504 kΩ; 0x9A = 0.5 kΩ; 0x9B = 0.497 kΩ; 0x9C = 0.494 kΩ; 0x9D = 0.491 kΩ; 0x9E = 0.488 kΩ; 0x9F = 0.485 kΩ; 0xA0 = 0.48 kΩ; 0xA1 = 0.477 kΩ; 0xA2 = 0.474 kΩ; 0xA3 = 0.471 kΩ; 0xA4 = 0.469 kΩ; 0xA5 = 0.466 kΩ; 0xA6 = 0.463 kΩ; 0xA7 = 0.46 kΩ; 0xA8 = 0.458 kΩ; 0xA9 = 0.455 kΩ; 0xAA = 0.452 kΩ; 0xAB = 0.45 kΩ; 0xAC = 0.447 kΩ; 0xAD = 0.445 kΩ; 0xAE = 0.442 kΩ; 0xAF = 0.44 kΩ; 0xB0 = 0.437 kΩ; 0xB1 = 0.435 kΩ; 0xB2 = 0.432 kΩ; 0xB3 = 0.43 kΩ; 0xB4 = 0.428 kΩ; 0xB5 = 0.425 kΩ; 0xB6 = 0.423 kΩ; 0xB7 = 0.421 kΩ; 0xB8 = 0.419 kΩ; 0xB9 = 0.416 kΩ; 0xBA = 0.414 kΩ; 0xBB = 0.412 kΩ; 0xBC = 0.41 kΩ; 0xBD = 0.408 kΩ; 0xBE = 0.406 kΩ; 0xBF = 0.404 kΩ; 0xC0 = 0.4 kΩ; 0xC1 = 0.398 kΩ; 0xC2 = 0.396 kΩ; 0xC3 = 0.394 kΩ; 0xC4 = 0.392 kΩ; 0xC5 = 0.39 kΩ; 0xC6 = 0.388 kΩ; 0xC7 = 0.386 kΩ; 0xC8 = 0.384 kΩ; 0xC9 = 0.382 kΩ; 0xCA = 0.381 kΩ; 0xCB = 0.379 kΩ; 0xCC = 0.377 kΩ; 0xCD = 0.375 kΩ; 0xCE = 0.373 kΩ; 0xCF = 0.372 kΩ; 0xD0 = 0.37 kΩ; 0xD1 = 0.368 kΩ; 0xD2 = 0.366 kΩ; 0xD3 = 0.365 kΩ; 0xD4 = 0.363 kΩ; 0xD5 = 0.361 kΩ; 0xD6 = 0.36 kΩ; 0xD7 = 0.358 kΩ; 0xD8 = 0.356 kΩ; 0xD9 = 0.355 kΩ; 0xDA = 0.353 kΩ; 0xDB = 0.352 kΩ; 0xDC = 0.35 kΩ; 0xDD = 0.349 kΩ; 0xDE = 0.347 kΩ; 0xDF = 0.345 kΩ; 0xE0 = 0.343 kΩ; 0xE1 = 0.341 kΩ; 0xE2 = 0.34 kΩ; 0xE3 = 0.338 kΩ; 0xE4 = 0.337 kΩ; 0xE5 = 0.336 kΩ; 0xE6 = 0.334 kΩ; 0xE7 = 0.333 kΩ; 0xE8 = 0.331 kΩ; 0xE9 = 0.33 kΩ; 0xEA = 0.328 kΩ; 0xEB = 0.327 kΩ; 0xEC = 0.326 kΩ; 0xED = 0.325 kΩ; 0xEE = 0.323 kΩ; 0xEF = 0.322 kΩ; 0xF0 = 0.32 kΩ; 0xF1 = 0.319 kΩ; 0xF2 = 0.318 kΩ; 0xF3 = 0.317 kΩ; 0xF4 = 0.315 kΩ; 0xF5 = 0.314 kΩ; 0xF6 = 0.313 kΩ; 0xF7 = 0.312 kΩ; 0xF8 = 0.31 kΩ; 0xF9 = 0.309 kΩ; 0xFA = 0.308 kΩ; 0xFB = 0.307 kΩ; 0xFC = 0.306 kΩ; 0xFD = 0.304 kΩ; 0xFE = 0.303 kΩ; 0xFF = 0.302 kΩ
+      - addr: 0x2C4
+        name: APLL1_CPG
+        fields:
+          - bits: "1:0"
+            name: PLL1_CPG
+            desc: PLL charge pump gain Pump up/down. ROM=Y, EEPROM=Y; 0x0 = 1.6 mA; 0x1 = 3.2 mA; 0x2 = 4.8 mA; 0x3 = 6.4 mA
+      - addr: 0x2C5
+        name: APLL1_LPF_R2
+        fields:
+          - bits: "5:0"
+            name: PLL1_LF_R2
+            desc: PLL Loop Filter R2 setting ROM=Y, EEPROM=N; 0x0 = 0.016 kΩ; 0x1 = 0.262 kΩ; 0x2 = 0.357 kΩ; 0x3 = 0.166 kΩ; 0x4 = 0.642 kΩ; 0x5 = 0.199 kΩ; 0x6 = 0.244 kΩ; 0x7 = 0.142 kΩ; 0x8 = 1.14 kΩ; 0x9 = 0.222 kΩ; 0xA = 0.283 kΩ; 0xB = 0.152 kΩ; 0xC = 0.425 kΩ; 0xD = 0.177 kΩ; 0xE = 0.21 kΩ; 0xF = 0.132 kΩ; 0x10 = 0.847 kΩ; 0x11 = 1.06 kΩ; 0x12 = 1.16 kΩ; 0x13 = 0.966 kΩ; 0x14 = 1.44 kΩ; 0x15 = 0.998 kΩ; 0x16 = 1.04 kΩ; 0x17 = 0.941 kΩ; 0x18 = 1.94 kΩ; 0x19 = 1.02 kΩ; 0x1A = 1.08 kΩ; 0x1B = 0.951 kΩ; 0x1C = 1.22 kΩ; 0x1D = 0.976 kΩ; 0x1E = 1.01 kΩ; 0x1F = 0.931 kΩ; 0x20 = 1.66 kΩ; 0x21 = 1.88 kΩ; 0x22 = 1.97 kΩ; 0x23 = 1.78 kΩ; 0x24 = 2.26 kΩ; 0x25 = 1.81 kΩ; 0x26 = 1.86 kΩ; 0x27 = 1.76 kΩ; 0x28 = 2.75 kΩ; 0x29 = 1.84 kΩ; 0x2A = 1.9 kΩ; 0x2B = 1.77 kΩ; 0x2C = 2.04 kΩ; 0x2D = 1.79 kΩ; 0x2E = 1.82 kΩ; 0x2F = 1.75 kΩ; 0x30 = 2.46 kΩ; 0x31 = 2.68 kΩ; 0x32 = 2.77 kΩ; 0x33 = 2.58 kΩ; 0x34 = 3.06 kΩ; 0x35 = 2.61 kΩ; 0x36 = 2.66 kΩ; 0x37 = 2.56 kΩ; 0x38 = 3.55 kΩ; 0x39 = 2.64 kΩ; 0x3A = 2.7 kΩ; 0x3B = 2.57 kΩ; 0x3C = 2.84 kΩ; 0x3D = 2.59 kΩ; 0x3E = 2.62 kΩ; 0x3F = 2.55 kΩ 
+      - addr: 0x2C6
+        name: APLL1_LPF_R3
+        fields:
+          - bits: "5:0"
+            name: PLL1_LF_R3
+            desc: PLL Loop Filter R3 setting ROM=Y, EEPROM=N; 0x0 = 0.016 kΩ; 0x1 = 0.277 kΩ; 0x2 = 0.657 kΩ; 0x3 = 0.214 kΩ; 0x4 = 0.754 kΩ; 0x5 = 0.221 kΩ; 0x6 = 0.375 kΩ; 0x7 = 0.183 kΩ; 0x8 = 0.863 kΩ; 0x9 = 1.08 kΩ; 0xA = 1.46 kΩ; 0xB = 1.01 kΩ; 0xC = 1.55 kΩ; 0xD = 1.02 kΩ; 0xE = 1.17 kΩ; 0xF = 0.982 kΩ; 0x10 = 1.68 kΩ; 0x11 = 1.89 kΩ; 0x12 = 2.27 kΩ; 0x13 = 1.83 kΩ; 0x14 = 2.37 kΩ; 0x15 = 1.84 kΩ; 0x16 = 1.99 kΩ; 0x17 = 1.8 kΩ; 0x18 = 2.48 kΩ; 0x19 = 2.69 kΩ; 0x1A = 3.07 kΩ; 0x1B = 2.63 kΩ; 0x1C = 3.17 kΩ; 0x1D = 2.63 kΩ; 0x1E = 2.79 kΩ; 0x1F = 2.6 kΩ; 0x20 = 3.31 kΩ; 0x21 = 3.52 kΩ; 0x22 = 3.9 kΩ; 0x23 = 3.46 kΩ; 0x24 = 4 kΩ; 0x25 = 3.47 kΩ; 0x26 = 3.62 kΩ; 0x27 = 3.43 kΩ; 0x28 = 4.11 kΩ; 0x29 = 4.32 kΩ; 0x2A = 4.7 kΩ; 0x2B = 4.26 kΩ; 0x2C = 4.8 kΩ; 0x2D = 4.26 kΩ; 0x2E = 4.42 kΩ; 0x2F = 4.23 kΩ; 0x30 = 4.92 kΩ; 0x31 = 5.14 kΩ; 0x32 = 5.52 kΩ; 0x33 = 5.07 kΩ; 0x34 = 5.61 kΩ; 0x35 = 5.08 kΩ; 0x36 = 5.23 kΩ; 0x37 = 5.04 kΩ; 0x38 = 5.72 kΩ; 0x39 = 5.94 kΩ; 0x3A = 6.32 kΩ; 0x3B = 5.87 kΩ; 0x3C = 6.41 kΩ; 0x3D = 5.88 kΩ; 0x3E = 6.03 kΩ; 0x3F = 5.84 kΩ 
+      - addr: 0x2C7
+        name: APLL1_LPF_R4
+        fields:
+          - bits: "5:0"
+            name: PLL1_LF_R4
+            desc: PLL Loop Filter R4 setting ROM=Y, EEPROM=N; 0x0 = 0.016 kΩ; 0x1 = 0.277 kΩ; 0x2 = 0.657 kΩ; 0x3 = 0.214 kΩ; 0x4 = 0.754 kΩ; 0x5 = 0.221 kΩ; 0x6 = 0.375 kΩ; 0x7 = 0.183 kΩ; 0x8 = 0.863 kΩ; 0x9 = 1.08 kΩ; 0xA = 1.46 kΩ; 0xB = 1.01 kΩ; 0xC = 1.55 kΩ; 0xD = 1.02 kΩ; 0xE = 1.17 kΩ; 0xF = 0.982 kΩ; 0x10 = 1.68 kΩ; 0x11 = 1.89 kΩ; 0x12 = 2.27 kΩ; 0x13 = 1.83 kΩ; 0x14 = 2.37 kΩ; 0x15 = 1.84 kΩ; 0x16 = 1.99 kΩ; 0x17 = 1.8 kΩ; 0x18 = 2.48 kΩ; 0x19 = 2.69 kΩ; 0x1A = 3.07 kΩ; 0x1B = 2.63 kΩ; 0x1C = 3.17 kΩ; 0x1D = 2.63 kΩ; 0x1E = 2.79 kΩ; 0x1F = 2.6 kΩ; 0x20 = 3.31 kΩ; 0x21 = 3.52 kΩ; 0x22 = 3.9 kΩ; 0x23 = 3.46 kΩ; 0x24 = 4 kΩ; 0x25 = 3.47 kΩ; 0x26 = 3.62 kΩ; 0x27 = 3.43 kΩ; 0x28 = 4.11 kΩ; 0x29 = 4.32 kΩ; 0x2A = 4.7 kΩ; 0x2B = 4.26 kΩ; 0x2C = 4.8 kΩ; 0x2D = 4.26 kΩ; 0x2E = 4.42 kΩ; 0x2F = 4.23 kΩ; 0x30 = 4.92 kΩ; 0x31 = 5.14 kΩ; 0x32 = 5.52 kΩ; 0x33 = 5.07 kΩ; 0x34 = 5.61 kΩ; 0x35 = 5.08 kΩ; 0x36 = 5.23 kΩ; 0x37 = 5.04 kΩ; 0x38 = 5.72 kΩ; 0x39 = 5.94 kΩ; 0x3A = 6.32 kΩ; 0x3B = 5.87 kΩ; 0x3C = 6.41 kΩ; 0x3D = 5.88 kΩ; 0x3E = 6.03 kΩ; 0x3F = 5.84 kΩ
+      - addr: 0x2C8
+        name: APLL1_LPF_C3C4
+        fields:
+          - bits: "7:6"
+            name: PLL1_DISABLE_3RD4TH
+            desc: PLL Loop Filter Disconnects C3 and C4 ROM=Y, EEPROM=N; 0x0 = C3/C4 Disconnected; 0x1 = C3=Enabled, C4=Disconnected; 0x2 = C3=Disconnected, C4=Enabled; 0x3 = C3=Enabled, C4=Enabled 
+          - bits: "5:3"
+            name: PLL1_LF_C3
+            desc: PLL Loop Filter C3 setting ROM=Y, EEPROM=N; 0x0 = 0 pF; 0x1 = 10 pF; 0x2 = 20 pF; 0x3 = 30 pF; 0x4 = 40 pF; 0x5 = 50 pF; 0x6 = 60 pF; 0x7 = 70 pF 
+          - bits: "2:0"
+            name: PLL1_LF_C4
+            desc: PLL Loop Filter C4 setting ROM=Y, EEPROM=N; 0x0 = 0 pF; 0x1 = 10 pF; 0x2 = 20 pF; 0x3 = 30 pF; 0x4 = 40 pF; 0x5 = 50 pF; 0x6 = 60 pF; 0x7 = 70 pF
+      - addr: "0x2C9:0x2CA"
+        name: APLL1_RDIV
+        fields:
+          - bits: "8:0"
+            name: PLL1_RDIV
+            desc: PLL R Divider ROM=Y, EEPROM=Y 
+      - addr: 0x2CB
+        name: APLL1_RDIV_CTL
+        fields:
+          - bits: "4"
+            name: PLL1_RDIV_XO_EN
+            desc: APLL reference source is from XO. Must also enable XO to drive this APLL with XO_OUT_BUF_EN[1] = 1 ROM=Y, EEPROM=Y 
+          - bits: "3"
+            name: PLL1_RDIV_XO_DBLR_EN
+            desc: Enables XO Doubler ROM=Y, EEPROM=Y 
+          - bits: "2"
+            name: PLL1_RDIV_BYPASS_EN
+            desc: Bypass R Divider ROM=Y, EEPROM=Y 
+          - bits: "1:0"
+            name: PLL1_RDIV_MUX_SEL
+            desc: Select R Divider input. When enabling reference from feedback divider, the APLL PLLx_VCO_BUF_2REF_EN bit must also be set appropriately. ROM=Y, EEPROM=Y; 0x0 = XO; 0x1 = VCO2 feedback divider; 0x2 = VCO3 feedback divider
+            opts:
+                <<: *pll1-rdiv-mux-sel
+      - addr: "0x2CC:0x2CD"
+        name: APLL1_NDIV
+        fields:
+          - bits: "8:0"
+            name: PLL1_NDIV
+            desc: PLL N Divider ROM=Y, EEPROM=Y 
+      - addr: 0x2CE
+        name: APLL1_NUM_MSB
+        fields:
+          - bits: "7:0"
+            name: PLL1_NUM_MSB
+            desc: "PLL Numerator MSB's when DPLL is disabled and MASH is 24 bit programmable Denominator ROM=Y, EEPROM=Y"
+      - addr: "0x2CF:0x2D3"
+        name: APLL1_NUM
+        fields:
+          - bits: "39:0"
+            name: PLL1_NUM
+            desc: PLL Numerator in DPLL Mode, PLL Denominator when DPLL mode is disabled ROM=Y, EEPROM=Y
+      - addr: 0x2D4
+        name: APLL1_MASH_CTL
+        fields:
+          - bits: "5:4"
+            name: PLL1_DTHRMODE
+            desc: PLL MASH Dither Mode ROM=Y, EEPROM=N; 0x0 = Constant Dither MACC2; 0x1 = Constant Dither MACC2 and MACC3; 0x2 = LFSR Dither MACC2; 0x3 = Dither Disabled
+          - bits: "3:2"
+            name: PLL1_ORDER
+            desc: PLL MASH Order ROM=Y, EEPROM=N; 0x0 = Integer Mode Divider; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd
+          - bits: "0"
+            name: PLL1_MODE
+            desc: In APLL 24-bit num/den mode, APLL denominator is programmable. Recommended not for use with DPLL mode. In 24-bit mode, the denominator is stored in PLL1_NUM[23:0] The numerator is stored in (PLL1_NUM_MSB << 16) + PLL1_NUM[39:24]. In APLL 40-bit mode, APLL denominator is fixed. For use with DPLL. ROM=Y, EEPROM=Y; 0x0 = APLL 24-bit num/den; 0x1 = APLL 40-bit num (Req for DPLL)
+      - addr: "0x2D5:0x2D9"
+        name: APLL1_NUM_STAT
+        fields:
+          - bits: "39:0"
+            name: APLL1_NUM_STAT
+            desc: Readback current MASH Numerator after FDEV and or DPLL correction ROM=N, EEPROM=N 
+      - addr: 0x2DB
+        name: APLL1_VCO_PRIDIV_CTL
+        fields:
+          - bits: "7"
+            name: PLL1_PRI_DIV_SYNC_EN
+            desc: PLL1 Primary Divider Sync Enable. Enables synchronization of primary post-dividers and reference dividers at startup for PLL1. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: PLL1_PRI_DIV_EN
+            desc: Enables the primary VCO1 divider ROM=Y, EEPROM=Y 
+          - bits: "5:3"
+            name: PLL1_PRI_DIV
+            desc: Sets the primary VCO1 divider divide value from 2 to 7 ROM=Y, EEPROM=Y; 0x0 = 2 (Reserved); 0x1 = 2; 0x2 = 3; 0x3 = 4; 0x4 = 5; 0x5 = 6; 0x6 = 7 
+          - bits: "2:0"
+            name: PLL1_PRI_DIV_DRVR_EN
+            desc: "Enables primary VCO1 divider output driver to channel output banks: [Bit 0] -> OUT0_1 [Bit 1] -> OUT2_3 [Bit 2] -> OUT14_15 ROM=Y, EEPROM=Y"
+      - addr: 0x2DC
+        name: APLL1_VCO_SECDIV_CTL
+        fields:
+          - bits: "7"
+            name: PLL1_SEC_DIV_SYNC_EN
+            desc: PLL1 Secondary Divider Sync Enable. Enables synchronization of secondary post-dividers and reference dividers at startup for PLL1. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: PLL1_SEC_DIV_EN
+            desc: Enables the secondary VCO1 divider ROM=Y, EEPROM=Y 
+          - bits: "5:3"
+            name: PLL1_SEC_DIV
+            desc: Sets the secondary VCO1 divider divide value from 2 to 7 ROM=Y, EEPROM=Y; 0x0 = 2 (Reserved); 0x1 = 2; 0x2 = 3; 0x3 = 4; 0x4 = 5; 0x5 = 6; 0x6 = 7 
+          - bits: "2:0"
+            name: PLL1_SEC_DIV_DRVR_EN
+            desc: "Enables the secondary VCO1 divider output driver to channel output banks: [Bit 0] -> OUT0_1 [Bit 1] -> OUT2_3 [Bit 2] -> Reserved ROM=Y, EEPROM=Y"
+      - addr: 0x2DD
+        name: APLL1_VCO_BUF_CTL
+        fields:
+          - bits: "7"
+            name: PLL1_VCO_BUF_EN
+            desc: Enables the VCO1 Buffer which drives the DPLL feedback, reference window detector, DPLL reference for cascade mode, and test mode ROM=Y, EEPROM=N 
+          - bits: "6:5"
+            name: PLL1_VCO_BUF_2REF_EN
+            desc: Enables the VCO1 Div By 4 Buffer output driver to APLL2/3 reference input for cascade mode. [0] - > APLL2, [1] -> APLL3 ROM=Y, EEPROM=Y 
+          - bits: "4"
+            name: PLL1_VCO_BUF_2DPLL_EN
+            desc: Enables the VCO1 Buffer output driver to DPLL feedback divider ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: PLL1_VCO_BUF_PPM_CHECK_EN
+            desc: Enables the VCO1 Div By 48 Buffer output driver to DPLL/PPM frequency detector ROM=Y, EEPROM=N 
+          - bits: "1:0"
+            name: PLL1_VCO_BUF_FB_TDC_EN
+            desc: Enables VCO1 Div By 8 Buffer output driver to TDC2 and TDC3 for cascade mode [0] = TDC2 driver enable [1] = TDC3 driver enable ROM=Y, EEPROM=N 
+      - addr: 0x2E5
+        name: APLL1_CALSTAT1
+        fields:
+          - bits: "5"
+            name: PLL1_VM_INSIDE
+            desc: Denotes if the VCO tuning voltage is within operational range. ROM=N, EEPROM=N 
+          - bits: "4"
+            name: PLL1_VM_HI
+            desc: vco_hi status. Denotes if the charge pump voltage is too high and outside range ROM=N, EEPROM=N 
+  - name: APll2
+    regs:
+      - addr: 0x305
+        name: APLL2_CAL
+        fields:
+          - bits: "3:2"
+            name: PLL2_CLSDWAIT
+            desc: Sets the calibration closed loop wait time to allow the vtune voltage to settle after switching to new capcode ROM=Y, EEPROM=N; 0x0 = 300 us; 0x1 = 3 ms; 0x2 = 30 ms; 0x3 = 300 ms 
+          - bits: "1:0"
+            name: PLL2_OPENWAIT
+            desc: Sets the initial delay for the VCO to settle before starting the frequency calibration ROM=Y, EEPROM=N; 0x0 = 20 us; 0x1 = 400 us; 0x2 = 8 ms; 0x3 = 200 ms
+      - addr: 0x309
+        name: APLL2_CP_PU
+        fields:
+          - bits: "7:0"
+            name: PLL2_CP_PU_R
+            desc: PLL charge pump pull-up resistor selection ROM=Y, EEPROM=N; 0x0 = Disabled; 0x1 = 78 kΩ; 0x2 = 39 kΩ; 0x3 = 26 kΩ; 0x4 = 20 kΩ; 0x5 = 15.9 kΩ; 0x6 = 13.2 kΩ; 0x7 = 11.3 kΩ; 0x8 = 9.8 kΩ; 0x9 = 8.71 kΩ; 0xA = 7.83 kΩ; 0xB = 7.12 kΩ; 0xC = 6.58 kΩ; 0xD = 6.07 kΩ; 0xE = 5.63 kΩ; 0xF = 5.25 kΩ; 0x10 = 4.9 kΩ; 0x11 = 4.61 kΩ; 0x12 = 4.35 kΩ; 0x13 = 4.12 kΩ; 0x14 = 3.94 kΩ; 0x15 = 3.75 kΩ; 0x16 = 3.57 kΩ; 0x17 = 3.42 kΩ; 0x18 = 3.27 kΩ; 0x19 = 3.14 kΩ; 0x1A = 3.01 kΩ; 0x1B = 2.9 kΩ; 0x1C = 2.81 kΩ; 0x1D = 2.71 kΩ; 0x1E = 2.62 kΩ; 0x1F = 2.53 kΩ; 0x20 = 2.4 kΩ; 0x21 = 2.33 kΩ; 0x22 = 2.26 kΩ; 0x23 = 2.2 kΩ; 0x24 = 2.14 kΩ; 0x25 = 2.09 kΩ; 0x26 = 2.03 kΩ; 0x27 = 1.98 kΩ; 0x28 = 1.93 kΩ; 0x29 = 1.88 kΩ; 0x2A = 1.84 kΩ; 0x2B = 1.79 kΩ; 0x2C = 1.76 kΩ; 0x2D = 1.72 kΩ; 0x2E = 1.68 kΩ; 0x2F = 1.65 kΩ; 0x30 = 1.61 kΩ; 0x31 = 1.58 kΩ; 0x32 = 1.55 kΩ; 0x33 = 1.52 kΩ; 0x34 = 1.49 kΩ; 0x35 = 1.46 kΩ; 0x36 = 1.44 kΩ; 0x37 = 1.41 kΩ; 0x38 = 1.38 kΩ; 0x39 = 1.36 kΩ; 0x3A = 1.34 kΩ; 0x3B = 1.31 kΩ; 0x3C = 1.29 kΩ; 0x3D = 1.27 kΩ; 0x3E = 1.25 kΩ; 0x3F = 1.23 kΩ; 0x40 = 1.2 kΩ; 0x41 = 1.18 kΩ; 0x42 = 1.16 kΩ; 0x43 = 1.15 kΩ; 0x44 = 1.13 kΩ; 0x45 = 1.12 kΩ; 0x46 = 1.1 kΩ; 0x47 = 1.08 kΩ; 0x48 = 1.07 kΩ; 0x49 = 1.05 kΩ; 0x4A = 1.04 kΩ; 0x4B = 1.03 kΩ; 0x4C = 1.01 kΩ; 0x4D = 1 kΩ; 0x4E = 0.989 kΩ; 0x4F = 0.977 kΩ; 0x50 = 0.964 kΩ; 0x51 = 0.952 kΩ; 0x52 = 0.941 kΩ; 0x53 = 0.929 kΩ; 0x54 = 0.92 kΩ; 0x55 = 0.909 kΩ; 0x56 = 0.898 kΩ; 0x57 = 0.888 kΩ; 0x58 = 0.878 kΩ; 0x59 = 0.868 kΩ; 0x5A = 0.858 kΩ; 0x5B = 0.849 kΩ; 0x5C = 0.841 kΩ; 0x5D = 0.832 kΩ; 0x5E = 0.823 kΩ; 0x5F = 0.814 kΩ; 0x60 = 0.8 kΩ; 0x61 = 0.792 kΩ; 0x62 = 0.784 kΩ; 0x63 = 0.776 kΩ; 0x64 = 0.769 kΩ; 0x65 = 0.762 kΩ; 0x66 = 0.754 kΩ; 0x67 = 0.747 kΩ; 0x68 = 0.74 kΩ; 0x69 = 0.733 kΩ; 0x6A = 0.726 kΩ; 0x6B = 0.719 kΩ; 0x6C = 0.713 kΩ; 0x6D = 0.707 kΩ; 0x6E = 0.7 kΩ; 0x6F = 0.694 kΩ; 0x70 = 0.688 kΩ; 0x71 = 0.682 kΩ; 0x72 = 0.676 kΩ; 0x73 = 0.67 kΩ; 0x74 = 0.665 kΩ; 0x75 = 0.659 kΩ; 0x76 = 0.654 kΩ; 0x77 = 0.648 kΩ; 0x78 = 0.643 kΩ; 0x79 = 0.637 kΩ; 0x7A = 0.632 kΩ; 0x7B = 0.627 kΩ; 0x7C = 0.623 kΩ; 0x7D = 0.618 kΩ; 0x7E = 0.613 kΩ; 0x7F = 0.608 kΩ; 0x80 = 0.6 kΩ; 0x81 = 0.595 kΩ; 0x82 = 0.591 kΩ; 0x83 = 0.586 kΩ; 0x84 = 0.583 kΩ; 0x85 = 0.578 kΩ; 0x86 = 0.574 kΩ; 0x87 = 0.57 kΩ; 0x88 = 0.565 kΩ; 0x89 = 0.561 kΩ; 0x8A = 0.557 kΩ; 0x8B = 0.553 kΩ; 0x8C = 0.55 kΩ; 0x8D = 0.546 kΩ; 0x8E = 0.542 kΩ; 0x8F = 0.538 kΩ; 0x90 = 0.535 kΩ; 0x91 = 0.531 kΩ; 0x92 = 0.527 kΩ; 0x93 = 0.524 kΩ; 0x94 = 0.521 kΩ; 0x95 = 0.517 kΩ; 0x96 = 0.514 kΩ; 0x97 = 0.51 kΩ; 0x98 = 0.507 kΩ; 0x99 = 0.504 kΩ; 0x9A = 0.5 kΩ; 0x9B = 0.497 kΩ; 0x9C = 0.494 kΩ; 0x9D = 0.491 kΩ; 0x9E = 0.488 kΩ; 0x9F = 0.485 kΩ; 0xA0 = 0.48 kΩ; 0xA1 = 0.477 kΩ; 0xA2 = 0.474 kΩ; 0xA3 = 0.471 kΩ; 0xA4 = 0.469 kΩ; 0xA5 = 0.466 kΩ; 0xA6 = 0.463 kΩ; 0xA7 = 0.46 kΩ; 0xA8 = 0.458 kΩ; 0xA9 = 0.455 kΩ; 0xAA = 0.452 kΩ; 0xAB = 0.45 kΩ; 0xAC = 0.447 kΩ; 0xAD = 0.445 kΩ; 0xAE = 0.442 kΩ; 0xAF = 0.44 kΩ; 0xB0 = 0.437 kΩ; 0xB1 = 0.435 kΩ; 0xB2 = 0.432 kΩ; 0xB3 = 0.43 kΩ; 0xB4 = 0.428 kΩ; 0xB5 = 0.425 kΩ; 0xB6 = 0.423 kΩ; 0xB7 = 0.421 kΩ; 0xB8 = 0.419 kΩ; 0xB9 = 0.416 kΩ; 0xBA = 0.414 kΩ; 0xBB = 0.412 kΩ; 0xBC = 0.41 kΩ; 0xBD = 0.408 kΩ; 0xBE = 0.406 kΩ; 0xBF = 0.404 kΩ; 0xC0 = 0.4 kΩ; 0xC1 = 0.398 kΩ; 0xC2 = 0.396 kΩ; 0xC3 = 0.394 kΩ; 0xC4 = 0.392 kΩ; 0xC5 = 0.39 kΩ; 0xC6 = 0.388 kΩ; 0xC7 = 0.386 kΩ; 0xC8 = 0.384 kΩ; 0xC9 = 0.382 kΩ; 0xCA = 0.381 kΩ; 0xCB = 0.379 kΩ; 0xCC = 0.377 kΩ; 0xCD = 0.375 kΩ; 0xCE = 0.373 kΩ; 0xCF = 0.372 kΩ; 0xD0 = 0.37 kΩ; 0xD1 = 0.368 kΩ; 0xD2 = 0.366 kΩ; 0xD3 = 0.365 kΩ; 0xD4 = 0.363 kΩ; 0xD5 = 0.361 kΩ; 0xD6 = 0.36 kΩ; 0xD7 = 0.358 kΩ; 0xD8 = 0.356 kΩ; 0xD9 = 0.355 kΩ; 0xDA = 0.353 kΩ; 0xDB = 0.352 kΩ; 0xDC = 0.35 kΩ; 0xDD = 0.349 kΩ; 0xDE = 0.347 kΩ; 0xDF = 0.345 kΩ; 0xE0 = 0.343 kΩ; 0xE1 = 0.341 kΩ; 0xE2 = 0.34 kΩ; 0xE3 = 0.338 kΩ; 0xE4 = 0.337 kΩ; 0xE5 = 0.336 kΩ; 0xE6 = 0.334 kΩ; 0xE7 = 0.333 kΩ; 0xE8 = 0.331 kΩ; 0xE9 = 0.33 kΩ; 0xEA = 0.328 kΩ; 0xEB = 0.327 kΩ; 0xEC = 0.326 kΩ; 0xED = 0.325 kΩ; 0xEE = 0.323 kΩ; 0xEF = 0.322 kΩ; 0xF0 = 0.32 kΩ; 0xF1 = 0.319 kΩ; 0xF2 = 0.318 kΩ; 0xF3 = 0.317 kΩ; 0xF4 = 0.315 kΩ; 0xF5 = 0.314 kΩ; 0xF6 = 0.313 kΩ; 0xF7 = 0.312 kΩ; 0xF8 = 0.31 kΩ; 0xF9 = 0.309 kΩ; 0xFA = 0.308 kΩ; 0xFB = 0.307 kΩ; 0xFC = 0.306 kΩ; 0xFD = 0.304 kΩ; 0xFE = 0.303 kΩ; 0xFF = 0.302 kΩ
+      - addr: 0x30A
+        name: APLL2_CPG
+        fields:
+          - bits: "3:0"
+            name: PLL2_CPG
+            desc: PLL charge pump gain ROM=Y, EEPROM=Y; 0x0 = 0 mA; 0x1 = 0.4 mA; 0x2 = 0.8 mA; 0x3 = 1.2 mA; 0x4 = 1.6 mA; 0x5 = 2.0 mA; 0x6 = 2.4 mA; 0x7 = 2.8 mA; 0x8 = 3.0 mA; 0x9 = 3.4 mA; 0xA = 3.8 mA; 0xB = 4.2 mA; 0xC = 4.6 mA; 0xD = 5.0 mA; 0xE = 5.4 mA; 0xF = 5.8 mA
+      - addr: 0x30B
+        name: APLL2_LPF_R2
+        fields:
+          - bits: "5:0"
+            name: PLL2_LF_R2
+            desc: PLL Loop Filter R2 setting ROM=Y, EEPROM=N
+      - addr: 0x30C
+        name: APLL2_LPF_R3
+        fields:
+          - bits: "5:0"
+            name: PLL2_LF_R3
+            desc: PLL Loop Filter R3 setting ROM=Y, EEPROM=N; 0x0 = 0.016 kΩ; 0x1 = 0.277 kΩ; 0x2 = 0.657 kΩ; 0x3 = 0.214 kΩ; 0x4 = 0.754 kΩ; 0x5 = 0.221 kΩ; 0x6 = 0.375 kΩ; 0x7 = 0.183 kΩ; 0x8 = 0.863 kΩ; 0x9 = 1.08 kΩ; 0xA = 1.46 kΩ; 0xB = 1.01 kΩ; 0xC = 1.55 kΩ; 0xD = 1.02 kΩ; 0xE = 1.17 kΩ; 0xF = 0.982 kΩ; 0x10 = 1.68 kΩ; 0x11 = 1.89 kΩ; 0x12 = 2.27 kΩ; 0x13 = 1.83 kΩ; 0x14 = 2.37 kΩ; 0x15 = 1.84 kΩ; 0x16 = 1.99 kΩ; 0x17 = 1.8 kΩ; 0x18 = 2.48 kΩ; 0x19 = 2.69 kΩ; 0x1A = 3.07 kΩ; 0x1B = 2.63 kΩ; 0x1C = 3.17 kΩ; 0x1D = 2.63 kΩ; 0x1E = 2.79 kΩ; 0x1F = 2.6 kΩ; 0x20 = 3.31 kΩ; 0x21 = 3.52 kΩ; 0x22 = 3.9 kΩ; 0x23 = 3.46 kΩ; 0x24 = 4 kΩ; 0x25 = 3.47 kΩ; 0x26 = 3.62 kΩ; 0x27 = 3.43 kΩ; 0x28 = 4.11 kΩ; 0x29 = 4.32 kΩ; 0x2A = 4.7 kΩ; 0x2B = 4.26 kΩ; 0x2C = 4.8 kΩ; 0x2D = 4.26 kΩ; 0x2E = 4.42 kΩ; 0x2F = 4.23 kΩ; 0x30 = 4.92 kΩ; 0x31 = 5.14 kΩ; 0x32 = 5.52 kΩ; 0x33 = 5.07 kΩ; 0x34 = 5.61 kΩ; 0x35 = 5.08 kΩ; 0x36 = 5.23 kΩ; 0x37 = 5.04 kΩ; 0x38 = 5.72 kΩ; 0x39 = 5.94 kΩ; 0x3A = 6.32 kΩ; 0x3B = 5.87 kΩ; 0x3C = 6.41 kΩ; 0x3D = 5.88 kΩ; 0x3E = 6.03 kΩ; 0x3F = 5.84 kΩ 
+      - addr: 0x30D
+        name: APLL2_LPF_R4
+        fields:
+          - bits: "5:0"
+            name: PLL2_LF_R4
+            desc: PLL Loop Filter R4 setting ROM=Y, EEPROM=N; 0x0 = 0.016 kΩ; 0x1 = 0.277 kΩ; 0x2 = 0.657 kΩ; 0x3 = 0.214 kΩ; 0x4 = 0.754 kΩ; 0x5 = 0.221 kΩ; 0x6 = 0.375 kΩ; 0x7 = 0.183 kΩ; 0x8 = 0.863 kΩ; 0x9 = 1.08 kΩ; 0xA = 1.46 kΩ; 0xB = 1.01 kΩ; 0xC = 1.55 kΩ; 0xD = 1.02 kΩ; 0xE = 1.17 kΩ; 0xF = 0.982 kΩ; 0x10 = 1.68 kΩ; 0x11 = 1.89 kΩ; 0x12 = 2.27 kΩ; 0x13 = 1.83 kΩ; 0x14 = 2.37 kΩ; 0x15 = 1.84 kΩ; 0x16 = 1.99 kΩ; 0x17 = 1.8 kΩ; 0x18 = 2.48 kΩ; 0x19 = 2.69 kΩ; 0x1A = 3.07 kΩ; 0x1B = 2.63 kΩ; 0x1C = 3.17 kΩ; 0x1D = 2.63 kΩ; 0x1E = 2.79 kΩ; 0x1F = 2.6 kΩ; 0x20 = 3.31 kΩ; 0x21 = 3.52 kΩ; 0x22 = 3.9 kΩ; 0x23 = 3.46 kΩ; 0x24 = 4 kΩ; 0x25 = 3.47 kΩ; 0x26 = 3.62 kΩ; 0x27 = 3.43 kΩ; 0x28 = 4.11 kΩ; 0x29 = 4.32 kΩ; 0x2A = 4.7 kΩ; 0x2B = 4.26 kΩ; 0x2C = 4.8 kΩ; 0x2D = 4.26 kΩ; 0x2E = 4.42 kΩ; 0x2F = 4.23 kΩ; 0x30 = 4.92 kΩ; 0x31 = 5.14 kΩ; 0x32 = 5.52 kΩ; 0x33 = 5.07 kΩ; 0x34 = 5.61 kΩ; 0x35 = 5.08 kΩ; 0x36 = 5.23 kΩ; 0x37 = 5.04 kΩ; 0x38 = 5.72 kΩ; 0x39 = 5.94 kΩ; 0x3A = 6.32 kΩ; 0x3B = 5.87 kΩ; 0x3C = 6.41 kΩ; 0x3D = 5.88 kΩ; 0x3E = 6.03 kΩ; 0x3F = 5.84 kΩ
+      - addr: 0x30E
+        name: APLL2_LPF_C3C4
+        fields:
+          - bits: "7:6"
+            name: PLL2_DISABLE_3RD4TH
+            desc: PLL Loop Filter Disconnects C3 and C4 ROM=Y, EEPROM=N; 0x0 = C3/C4 Disconnected; 0x1 = C3=Enabled, C4=Disconnected; 0x2 = C3=Disconnected, C4=Enabled; 0x3 = C3=Enabled, C4=Enabled 
+          - bits: "5:3"
+            name: PLL2_LF_C3
+            desc: PLL Loop Filter C3 setting ROM=Y, EEPROM=N; 0x0 = 0 pF; 0x1 = 10 pF; 0x2 = 20 pF; 0x3 = 30 pF; 0x4 = 40 pF; 0x5 = 50 pF; 0x6 = 60 pF; 0x7 = 70 pF 
+          - bits: "2:0"
+            name: PLL2_LF_C4
+            desc: PLL Loop Filter C4 setting ROM=Y, EEPROM=N; 0x0 = 0 pF; 0x1 = 10 pF; 0x2 = 20 pF; 0x3 = 30 pF; 0x4 = 40 pF; 0x5 = 50 pF; 0x6 = 60 pF; 0x7 = 70 pF 
+      - addr: "0x30F:0x310"
+        name: APLL2_RDIV
+        fields:
+          - bits: "8:0"
+            name: PLL2_RDIV
+            desc: PLL R Divider ROM=Y, EEPROM=Y 
+      - addr: 0x311
+        name: APLL2_RDIV_CTL
+        fields:
+          - bits: "4"
+            name: PLL2_RDIV_XO_EN
+            desc: APLL reference source is from XO. Must also enable XO to drive this APLL with XO_OUT_BUF_EN[2] = 1 ROM=Y, EEPROM=Y 
+          - bits: "3"
+            name: PLL2_RDIV_XO_DBLR_EN
+            desc: Enables XO Doubler ROM=Y, EEPROM=Y 
+          - bits: "2"
+            name: PLL2_RDIV_BYPASS_EN
+            desc: Bypass R Divider ROM=Y, EEPROM=Y 
+          - bits: "1:0"
+            name: PLL2_RDIV_MUX_SEL
+            desc: "Select R Divider input: 0=XO, 1=VCO1 feedback divider, 2=VCO3 feedback divider ROM=Y, EEPROM=Y; 0x0 = XO; 0x1 = VCO1 feedback divider; 0x2 = VCO3 feedback divider"
+            opts:
+                <<: *pll2-rdiv-mux-sel
+      - addr: "0x312:0x313"
+        name: APLL2_NDIV
+        fields:
+          - bits: "8:0"
+            name: PLL2_NDIV
+            desc: PLL N Divider ROM=Y, EEPROM=Y 
+      - addr: 0x314
+        name: APLL2_NUM_MSB
+        fields:
+          - bits: "7:0"
+            name: PLL2_NUM_MSB
+            desc: "PLL Numerator MSB's when DPLL is disabled and MASH is 24 bit programmable Denominator ROM=Y, EEPROM=Y"
+      - addr: "0x315:0x319"
+        name: APLL2_NUM
+        fields:
+          - bits: "39:0"
+            name: PLL2_NUM
+            desc: PLL Numerator in DPLL Mode, PLL Denominator when DPLL mode is disabled ROM=Y, EEPROM=Y 
+      - addr: 0x31A
+        name: APLL2_MASH_CTL
+        fields:
+          - bits: "5:4"
+            name: PLL2_DTHRMODE
+            desc: PLL MASH Dither Mode ROM=Y, EEPROM=N; 0x0 = Constant Dither MACC2; 0x1 = Constant Dither MACC2 and MACC3; 0x2 = LFSR Dither MACC2; 0x3 = Dither Disabled 
+          - bits: "3:1"
+            name: PLL2_ORDER
+            desc: PLL MASH Order ROM=Y, EEPROM=N; 0x0 = Integer Mode Divider; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd 
+          - bits: "0"
+            name: PLL2_MODE
+            desc: In APLL 24-bit num/den mode, APLL denominator is programmable. Not for use with DPLL mode. In 24-bit mode, the denominator is stored in PLL2_NUM[23:0] The numerator is stored in (PLL2_NUM_MSB << 16) + PLL2_NUM[39:24]. In APLL 40-bit mode, APLL denominator is fixed. For use with DPLL. ROM=Y, EEPROM=Y; 0x0 = APLL 24-bit num/den; 0x1 = APLL 40-bit num (Req for DPLL) 
+      - addr: "0x31B:0x31F"
+        name: APLL2_NUM_STAT
+        fields:
+          - bits: "39:0"
+            name: PLL2_NUM_STAT
+            desc: Readback current MASH Numerator after FDEV and or DPLL correction ROM=N, EEPROM=N 
+      - addr: 0x323
+        name: APLL2_VCO_BUF_CTL
+        fields:
+          - bits: "6"
+            name: PLL2_VCO_DIV_3_SEL
+            desc: "Selects VCO2 divide value for OUT4/OUT6 CML Output Drivers from: 0=VCO2 Div By 2, or 1=VCO2 Div By 3. ROM=Y, EEPROM=Y; 0x0 = 2; 0x1 = 3"
+          - bits: "5"
+            name: PLL2_VCO_DIV_2_3_EN
+            desc: Enables the VCO2 Div By 2 or 3 divide block used for driving CML outputs ROM=Y, EEPROM=Y 
+          - bits: "4"
+            name: PLL2_VCO_BUF_EN
+            desc: Enables the VCO2 Buffer which drives the DPLL feedback, reference window detector, DPLL reference for cascade mode, and test mode ROM=Y, EEPROM=N 
+          - bits: "3:2"
+            name: PLL2_VCO_BUF_2REF_EN
+            desc: Enables the VCO2 Div By 4 buffer output driver to [0] -> APLL1 and [1] -> APLL3 reference input for cascade mode. ROM=Y, EEPROM=Y 
+          - bits: "1"
+            name: PLL2_VCO_BUF_2DPLL_EN
+            desc: Enables the VCO2 Buffer output driver to DPLL2 feedback divider ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: PLL2_VCO_BUF_2WNDDET_EN
+            desc: Enables the VCO2 Div By 5 Buffer output driver to reference window detectors input buffer and prepares predivided clock for DPLL2 loopfilter and PPM/Frequency detector. ROM=Y, EEPROM=N 
+      - addr: 0x324
+        name: APLL2_VCO_DIV
+        fields:
+          - bits: "5"
+            name: PLL2_VCO_DIV_SYNC_EN
+            desc: PLL2 Divider Sync Enable. Enables synchronization of post-dividers and reference dividers at startup for PLL2. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: PLL2_VCO_DIV_EN
+            desc: Enables the VCO2 Div By 2 to 13 divide block. ROM=Y, EEPROM=Y 
+          - bits: "3:0"
+            name: PLL2_VCO_DIV
+            desc: Sets the VCO2 divider divide value from 2 to 13 ROM=Y, EEPROM=Y; 0x0 = 2 (Reserved); 0x1 = 2 (Reserved); 0x2 = 2; 0x3 = 3; 0x4 = 4; 0x5 = 5; 0x6 = 6; 0x7 = 7; 0x8 = 8; 0x9 = 9; 0xA = 10; 0xB = 11; 0xC = 12; 0xD = 13
+      - addr: 0x325
+        name: APLL2_VCO_DRVR
+        fields:
+          - bits: "6:5"
+            name: PLL2_VCO_BUF_FB_TDC_EN
+            desc: Enables VCO2 Div By 10 Buffer output driver to TDC1 and TDC3 for cascade mode [0] = TDC1 driver enable [1] = TDC3 driver enable ROM=Y, EEPROM=N 
+          - bits: "4:0"
+            name: PLL2_VCO_DIV_DRVR_EN
+            desc: "Enables VCO2 to Outputs output buffer outputs: [0] -> OUT0_1, [1] - > OUT2_3, [2] -> OUT4_5 and OUT6_7, [3] -> OUT8_9, OUT10_11, and OUT12_13, and [4] -> OUT14_15. ROM=Y, EEPROM=Y"
+      - addr: 0x32D
+        name: APLL2_CALSTAT1
+        fields:
+          - bits: "5"
+            name: PLL2_VM_INSIDE
+            desc: Denotes if the VCO tuning voltage is within operational range. ROM=N, EEPROM=N 
+  - name: APll3
+    regs:
+      - addr: 0x348
+        name: APLL3_CPBLEED
+        fields:
+          - bits: "7:0"
+            name: PLL3_CPBAW_BLEED
+            desc: PLL charge pump pull-up resistor selection ROM=Y, EEPROM=N; 0x0 = Disabled; 0x1 = 78 kΩ; 0x2 = 39 kΩ; 0x3 = 26 kΩ; 0x4 = 20 kΩ; 0x5 = 15.9 kΩ; 0x6 = 13.2 kΩ; 0x7 = 11.3 kΩ; 0x8 = 9.8 kΩ; 0x9 = 8.71 kΩ; 0xA = 7.83 kΩ; 0xB = 7.12 kΩ; 0xC = 6.58 kΩ; 0xD = 6.07 kΩ; 0xE = 5.63 kΩ; 0xF = 5.25 kΩ; 0x10 = 4.9 kΩ; 0x11 = 4.61 kΩ; 0x12 = 4.35 kΩ; 0x13 = 4.12 kΩ; 0x14 = 3.94 kΩ; 0x15 = 3.75 kΩ; 0x16 = 3.57 kΩ; 0x17 = 3.42 kΩ; 0x18 = 3.27 kΩ; 0x19 = 3.14 kΩ; 0x1A = 3.01 kΩ; 0x1B = 2.9 kΩ; 0x1C = 2.81 kΩ; 0x1D = 2.71 kΩ; 0x1E = 2.62 kΩ; 0x1F = 2.53 kΩ; 0x20 = 2.4 kΩ; 0x21 = 2.33 kΩ; 0x22 = 2.26 kΩ; 0x23 = 2.2 kΩ; 0x24 = 2.14 kΩ; 0x25 = 2.09 kΩ; 0x26 = 2.03 kΩ; 0x27 = 1.98 kΩ; 0x28 = 1.93 kΩ; 0x29 = 1.88 kΩ; 0x2A = 1.84 kΩ; 0x2B = 1.79 kΩ; 0x2C = 1.76 kΩ; 0x2D = 1.72 kΩ; 0x2E = 1.68 kΩ; 0x2F = 1.65 kΩ; 0x30 = 1.61 kΩ; 0x31 = 1.58 kΩ; 0x32 = 1.55 kΩ; 0x33 = 1.52 kΩ; 0x34 = 1.49 kΩ; 0x35 = 1.46 kΩ; 0x36 = 1.44 kΩ; 0x37 = 1.41 kΩ; 0x38 = 1.38 kΩ; 0x39 = 1.36 kΩ; 0x3A = 1.34 kΩ; 0x3B = 1.31 kΩ; 0x3C = 1.29 kΩ; 0x3D = 1.27 kΩ; 0x3E = 1.25 kΩ; 0x3F = 1.23 kΩ; 0x40 = 1.2 kΩ; 0x41 = 1.18 kΩ; 0x42 = 1.16 kΩ; 0x43 = 1.15 kΩ; 0x44 = 1.13 kΩ; 0x45 = 1.12 kΩ; 0x46 = 1.1 kΩ; 0x47 = 1.08 kΩ; 0x48 = 1.07 kΩ; 0x49 = 1.05 kΩ; 0x4A = 1.04 kΩ; 0x4B = 1.03 kΩ; 0x4C = 1.01 kΩ; 0x4D = 1 kΩ; 0x4E = 0.989 kΩ; 0x4F = 0.977 kΩ; 0x50 = 0.964 kΩ; 0x51 = 0.952 kΩ; 0x52 = 0.941 kΩ; 0x53 = 0.929 kΩ; 0x54 = 0.92 kΩ; 0x55 = 0.909 kΩ; 0x56 = 0.898 kΩ; 0x57 = 0.888 kΩ; 0x58 = 0.878 kΩ; 0x59 = 0.868 kΩ; 0x5A = 0.858 kΩ; 0x5B = 0.849 kΩ; 0x5C = 0.841 kΩ; 0x5D = 0.832 kΩ; 0x5E = 0.823 kΩ; 0x5F = 0.814 kΩ; 0x60 = 0.8 kΩ; 0x61 = 0.792 kΩ; 0x62 = 0.784 kΩ; 0x63 = 0.776 kΩ; 0x64 = 0.769 kΩ; 0x65 = 0.762 kΩ; 0x66 = 0.754 kΩ; 0x67 = 0.747 kΩ; 0x68 = 0.74 kΩ; 0x69 = 0.733 kΩ; 0x6A = 0.726 kΩ; 0x6B = 0.719 kΩ; 0x6C = 0.713 kΩ; 0x6D = 0.707 kΩ; 0x6E = 0.7 kΩ; 0x6F = 0.694 kΩ; 0x70 = 0.688 kΩ; 0x71 = 0.682 kΩ; 0x72 = 0.676 kΩ; 0x73 = 0.67 kΩ; 0x74 = 0.665 kΩ; 0x75 = 0.659 kΩ; 0x76 = 0.654 kΩ; 0x77 = 0.648 kΩ; 0x78 = 0.643 kΩ; 0x79 = 0.637 kΩ; 0x7A = 0.632 kΩ; 0x7B = 0.627 kΩ; 0x7C = 0.623 kΩ; 0x7D = 0.618 kΩ; 0x7E = 0.613 kΩ; 0x7F = 0.608 kΩ; 0x80 = 0.6 kΩ; 0x81 = 0.595 kΩ; 0x82 = 0.591 kΩ; 0x83 = 0.586 kΩ; 0x84 = 0.583 kΩ; 0x85 = 0.578 kΩ; 0x86 = 0.574 kΩ; 0x87 = 0.57 kΩ; 0x88 = 0.565 kΩ; 0x89 = 0.561 kΩ; 0x8A = 0.557 kΩ; 0x8B = 0.553 kΩ; 0x8C = 0.55 kΩ; 0x8D = 0.546 kΩ; 0x8E = 0.542 kΩ; 0x8F = 0.538 kΩ; 0x90 = 0.535 kΩ; 0x91 = 0.531 kΩ; 0x92 = 0.527 kΩ; 0x93 = 0.524 kΩ; 0x94 = 0.521 kΩ; 0x95 = 0.517 kΩ; 0x96 = 0.514 kΩ; 0x97 = 0.51 kΩ; 0x98 = 0.507 kΩ; 0x99 = 0.504 kΩ; 0x9A = 0.5 kΩ; 0x9B = 0.497 kΩ; 0x9C = 0.494 kΩ; 0x9D = 0.491 kΩ; 0x9E = 0.488 kΩ; 0x9F = 0.485 kΩ; 0xA0 = 0.48 kΩ; 0xA1 = 0.477 kΩ; 0xA2 = 0.474 kΩ; 0xA3 = 0.471 kΩ; 0xA4 = 0.469 kΩ; 0xA5 = 0.466 kΩ; 0xA6 = 0.463 kΩ; 0xA7 = 0.46 kΩ; 0xA8 = 0.458 kΩ; 0xA9 = 0.455 kΩ; 0xAA = 0.452 kΩ; 0xAB = 0.45 kΩ; 0xAC = 0.447 kΩ; 0xAD = 0.445 kΩ; 0xAE = 0.442 kΩ; 0xAF = 0.44 kΩ; 0xB0 = 0.437 kΩ; 0xB1 = 0.435 kΩ; 0xB2 = 0.432 kΩ; 0xB3 = 0.43 kΩ; 0xB4 = 0.428 kΩ; 0xB5 = 0.425 kΩ; 0xB6 = 0.423 kΩ; 0xB7 = 0.421 kΩ; 0xB8 = 0.419 kΩ; 0xB9 = 0.416 kΩ; 0xBA = 0.414 kΩ; 0xBB = 0.412 kΩ; 0xBC = 0.41 kΩ; 0xBD = 0.408 kΩ; 0xBE = 0.406 kΩ; 0xBF = 0.404 kΩ; 0xC0 = 0.4 kΩ; 0xC1 = 0.398 kΩ; 0xC2 = 0.396 kΩ; 0xC3 = 0.394 kΩ; 0xC4 = 0.392 kΩ; 0xC5 = 0.39 kΩ; 0xC6 = 0.388 kΩ; 0xC7 = 0.386 kΩ; 0xC8 = 0.384 kΩ; 0xC9 = 0.382 kΩ; 0xCA = 0.381 kΩ; 0xCB = 0.379 kΩ; 0xCC = 0.377 kΩ; 0xCD = 0.375 kΩ; 0xCE = 0.373 kΩ; 0xCF = 0.372 kΩ; 0xD0 = 0.37 kΩ; 0xD1 = 0.368 kΩ; 0xD2 = 0.366 kΩ; 0xD3 = 0.365 kΩ; 0xD4 = 0.363 kΩ; 0xD5 = 0.361 kΩ; 0xD6 = 0.36 kΩ; 0xD7 = 0.358 kΩ; 0xD8 = 0.356 kΩ; 0xD9 = 0.355 kΩ; 0xDA = 0.353 kΩ; 0xDB = 0.352 kΩ; 0xDC = 0.35 kΩ; 0xDD = 0.349 kΩ; 0xDE = 0.347 kΩ; 0xDF = 0.345 kΩ; 0xE0 = 0.343 kΩ; 0xE1 = 0.341 kΩ; 0xE2 = 0.34 kΩ; 0xE3 = 0.338 kΩ; 0xE4 = 0.337 kΩ; 0xE5 = 0.336 kΩ; 0xE6 = 0.334 kΩ; 0xE7 = 0.333 kΩ; 0xE8 = 0.331 kΩ; 0xE9 = 0.33 kΩ; 0xEA = 0.328 kΩ; 0xEB = 0.327 kΩ; 0xEC = 0.326 kΩ; 0xED = 0.325 kΩ; 0xEE = 0.323 kΩ; 0xEF = 0.322 kΩ; 0xF0 = 0.32 kΩ; 0xF1 = 0.319 kΩ; 0xF2 = 0.318 kΩ; 0xF3 = 0.317 kΩ; 0xF4 = 0.315 kΩ; 0xF5 = 0.314 kΩ; 0xF6 = 0.313 kΩ; 0xF7 = 0.312 kΩ; 0xF8 = 0.31 kΩ; 0xF9 = 0.309 kΩ; 0xFA = 0.308 kΩ; 0xFB = 0.307 kΩ; 0xFC = 0.306 kΩ; 0xFD = 0.304 kΩ; 0xFE = 0.303 kΩ; 0xFF = 0.302 kΩ
+      - addr: 0x349
+        name: APLL3_CPG
+        fields:
+          - bits: "3:0"
+            name: PLL3_CPG
+            desc: PLL charge pump gain ROM=Y, EEPROM=N; 0x0 = 0 mA; 0x1 = 0.4 mA; 0x2 = 0.8 mA; 0x3 = 1.2 mA; 0x4 = 1.6 mA; 0x5 = 2.0 mA; 0x6 = 2.4 mA; 0x7 = 2.8 mA; 0x8 = 3.0 mA; 0x9 = 3.4 mA; 0xA = 3.8 mA; 0xB = 4.2 mA; 0xC = 4.6 mA; 0xD = 5.0 mA; 0xE = 5.4 mA; 0xF = 5.8 mA
+      - addr: 0x34A
+        name: APLL3_LPF_R2
+        fields:
+          - bits: "5:0"
+            name: PLL3_LF_R2
+            desc: PLL Loop Filter R2 setting ROM=Y, EEPROM=N; 0x0 = 0.0139 kΩ; 0x1 = 0.51 kΩ; 0x2 = 0.826 kΩ; 0x3 = 1.23 kΩ; 0x4 = 1.85 kΩ; 0x5 = 2.26 kΩ; 0x6 = 2.57 kΩ; 0x7 = 2.97 kΩ; 0x8 = 3.3 kΩ; 0x9 = 3.75 kΩ; 0xA = 4.07 kΩ; 0xB = 4.47 kΩ; 0xC = 5.09 kΩ; 0xD = 5.5 kΩ; 0xE = 5.81 kΩ; 0xF = 6.22 kΩ; 0x10 = 6.57 kΩ; 0x11 = 7.01 kΩ; 0x12 = 7.33 kΩ; 0x13 = 7.73 kΩ; 0x14 = 8.36 kΩ; 0x15 = 8.76 kΩ; 0x16 = 9.08 kΩ; 0x17 = 9.48 kΩ; 0x18 = 9.81 kΩ; 0x19 = 10.3 kΩ; 0x1A = 10.6 kΩ; 0x1B = 11 kΩ; 0x1C = 11.6 kΩ; 0x1D = 12 kΩ; 0x1E = 12.3 kΩ; 0x1F = 12.7 kΩ; 0x20 = 13 kΩ; 0x21 = 13.5 kΩ; 0x22 = 13.8 kΩ; 0x23 = 14.2 kΩ; 0x24 = 14.8 kΩ; 0x25 = 15.2 kΩ; 0x26 = 15.6 kΩ; 0x27 = 16 kΩ; 0x28 = 16.3 kΩ; 0x29 = 16.7 kΩ; 0x2A = 17.1 kΩ; 0x2B = 17.5 kΩ; 0x2C = 18.1 kΩ; 0x2D = 18.5 kΩ; 0x2E = 18.8 kΩ; 0x2F = 19.2 kΩ; 0x30 = 19.6 kΩ; 0x31 = 20 kΩ; 0x32 = 20.3 kΩ; 0x33 = 20.7 kΩ; 0x34 = 21.3 kΩ; 0x35 = 21.7 kΩ; 0x36 = 22.1 kΩ; 0x37 = 22.5 kΩ; 0x38 = 22.8 kΩ; 0x39 = 23.2 kΩ; 0x3A = 23.6 kΩ; 0x3B = 24 kΩ; 0x3C = 24.6 kΩ; 0x3D = 25 kΩ; 0x3E = 25.3 kΩ; 0x3F = 25.7 kΩ 
+      - addr: 0x34B
+        name: APLL3_LPF_R3
+        fields:
+          - bits: "5:0"
+            name: PLL3_LF_R3
+            desc: PLL Loop Filter R3 setting ROM=Y, EEPROM=N; 0x0 = 0.0139 kΩ; 0x1 = 0.51 kΩ; 0x2 = 0.826 kΩ; 0x3 = 1.23 kΩ; 0x4 = 1.85 kΩ; 0x5 = 2.26 kΩ; 0x6 = 2.57 kΩ; 0x7 = 2.97 kΩ; 0x8 = 3.3 kΩ; 0x9 = 3.75 kΩ; 0xA = 4.07 kΩ; 0xB = 4.47 kΩ; 0xC = 5.09 kΩ; 0xD = 5.5 kΩ; 0xE = 5.81 kΩ; 0xF = 6.22 kΩ; 0x10 = 6.57 kΩ; 0x11 = 7.01 kΩ; 0x12 = 7.33 kΩ; 0x13 = 7.73 kΩ; 0x14 = 8.36 kΩ; 0x15 = 8.76 kΩ; 0x16 = 9.08 kΩ; 0x17 = 9.48 kΩ; 0x18 = 9.81 kΩ; 0x19 = 10.3 kΩ; 0x1A = 10.6 kΩ; 0x1B = 11 kΩ; 0x1C = 11.6 kΩ; 0x1D = 12 kΩ; 0x1E = 12.3 kΩ; 0x1F = 12.7 kΩ; 0x20 = 13 kΩ; 0x21 = 13.5 kΩ; 0x22 = 13.8 kΩ; 0x23 = 14.2 kΩ; 0x24 = 14.8 kΩ; 0x25 = 15.2 kΩ; 0x26 = 15.6 kΩ; 0x27 = 16 kΩ; 0x28 = 16.3 kΩ; 0x29 = 16.7 kΩ; 0x2A = 17.1 kΩ; 0x2B = 17.5 kΩ; 0x2C = 18.1 kΩ; 0x2D = 18.5 kΩ; 0x2E = 18.8 kΩ; 0x2F = 19.2 kΩ; 0x30 = 19.6 kΩ; 0x31 = 20 kΩ; 0x32 = 20.3 kΩ; 0x33 = 20.7 kΩ; 0x34 = 21.3 kΩ; 0x35 = 21.7 kΩ; 0x36 = 22.1 kΩ; 0x37 = 22.5 kΩ; 0x38 = 22.8 kΩ; 0x39 = 23.2 kΩ; 0x3A = 23.6 kΩ; 0x3B = 24 kΩ; 0x3C = 24.6 kΩ; 0x3D = 25 kΩ; 0x3E = 25.3 kΩ; 0x3F = 25.7 kΩ 
+      - addr: 0x34C
+        name: APLL3_LPF_R4
+        fields:
+          - bits: "5:0"
+            name: PLL3_LF_R4
+            desc: PLL Loop Filter R4 setting ROM=Y, EEPROM=N; 0x0 = 0.0139 kΩ; 0x1 = 0.51 kΩ; 0x2 = 0.826 kΩ; 0x3 = 1.23 kΩ; 0x4 = 1.85 kΩ; 0x5 = 2.26 kΩ; 0x6 = 2.57 kΩ; 0x7 = 2.97 kΩ; 0x8 = 3.3 kΩ; 0x9 = 3.75 kΩ; 0xA = 4.07 kΩ; 0xB = 4.47 kΩ; 0xC = 5.09 kΩ; 0xD = 5.5 kΩ; 0xE = 5.81 kΩ; 0xF = 6.22 kΩ; 0x10 = 6.57 kΩ; 0x11 = 7.01 kΩ; 0x12 = 7.33 kΩ; 0x13 = 7.73 kΩ; 0x14 = 8.36 kΩ; 0x15 = 8.76 kΩ; 0x16 = 9.08 kΩ; 0x17 = 9.48 kΩ; 0x18 = 9.81 kΩ; 0x19 = 10.3 kΩ; 0x1A = 10.6 kΩ; 0x1B = 11 kΩ; 0x1C = 11.6 kΩ; 0x1D = 12 kΩ; 0x1E = 12.3 kΩ; 0x1F = 12.7 kΩ; 0x20 = 13 kΩ; 0x21 = 13.5 kΩ; 0x22 = 13.8 kΩ; 0x23 = 14.2 kΩ; 0x24 = 14.8 kΩ; 0x25 = 15.2 kΩ; 0x26 = 15.6 kΩ; 0x27 = 16 kΩ; 0x28 = 16.3 kΩ; 0x29 = 16.7 kΩ; 0x2A = 17.1 kΩ; 0x2B = 17.5 kΩ; 0x2C = 18.1 kΩ; 0x2D = 18.5 kΩ; 0x2E = 18.8 kΩ; 0x2F = 19.2 kΩ; 0x30 = 19.6 kΩ; 0x31 = 20 kΩ; 0x32 = 20.3 kΩ; 0x33 = 20.7 kΩ; 0x34 = 21.3 kΩ; 0x35 = 21.7 kΩ; 0x36 = 22.1 kΩ; 0x37 = 22.5 kΩ; 0x38 = 22.8 kΩ; 0x39 = 23.2 kΩ; 0x3A = 23.6 kΩ; 0x3B = 24 kΩ; 0x3C = 24.6 kΩ; 0x3D = 25 kΩ; 0x3E = 25.3 kΩ; 0x3F = 25.7 kΩ 
+      - addr: 0x34D
+        name: APLL3_LPF_C3C4
+        fields:
+          - bits: "5:3"
+            name: PLL3_LF_C3
+            desc: PLL Loop Filter C3 setting ROM=Y, EEPROM=N; 0x0 = 0 pF; 0x1 = 10 pF; 0x2 = 20 pF; 0x3 = 30 pF; 0x4 = 40 pF; 0x5 = 50 pF; 0x6 = 60 pF; 0x7 = 70 pF 
+          - bits: "2:0"
+            name: PLL3_LF_C4
+            desc: PLL Loop Filter C4 setting ROM=Y, EEPROM=N; 0x0 = 0 pF; 0x1 = 10 pF; 0x2 = 20 pF; 0x3 = 30 pF; 0x4 = 40 pF; 0x5 = 50 pF; 0x6 = 60 pF; 0x7 = 70 pF 
+      - addr: "0x34E:0x34F"
+        name: APLL3_RDIV
+        fields:
+          - bits: "8:0"
+            name: PLL3_RDIV
+            desc: PLL R Divider ROM=Y, EEPROM=Y 
+      - addr: 0x350
+        name: APLL3_RDIV_CTL
+        fields:
+          - bits: "4"
+            name: PLL3_RDIV_XO_EN
+            desc: APLL reference source is from XO. Must also enable XO to drive this APLL with XO_OUT_BUF_EN[3] = 1 ROM=Y, EEPROM=Y 
+          - bits: "3"
+            name: PLL3_RDIV_XO_DBLR_EN
+            desc: Enables XO Doubler ROM=Y, EEPROM=Y 
+          - bits: "2"
+            name: PLL3_RDIV_BYPASS_EN
+            desc: Bypass R Divider ROM=Y, EEPROM=Y 
+          - bits: "1:0"
+            name: PLL3_RDIV_MUX_SEL
+            desc: "Select R Divider input: 0=XO, 1=VCO1 feedback divider, 2=VCO2 feedback divider ROM=Y, EEPROM=Y; 0x0 = XO; 0x1 = VCO1 feedback divider; 0x2 = VCO2 feedback divider"
+            opts:
+                <<: *pll3-rdiv-mux-sel
+      - addr: "0x351:0x352"
+        name: APLL3_NDIV
+        fields:
+          - bits: "8:0"
+            name: PLL3_NDIV
+            desc: PLL N Divider ROM=Y, EEPROM=Y 
+      - addr: 0x353
+        name: APLL3_NUM_MSB
+        fields:
+          - bits: "7:0"
+            name: PLL3_NUM_MSB
+            desc: "PLL Numerator MSB's when DPLL is disabled and MASH is 24 bit programmable Denominator ROM=Y, EEPROM=Y"
+      - addr: "0x354:0x358"
+        name: APLL3_NUM
+        fields:
+          - bits: "39:0"
+            name: PLL3_NUM
+            desc: PLL Numerator in DPLL Mode, PLL Denominator when DPLL mode is disabled ROM=Y, EEPROM=Y
+      - addr: "0x353:0x355"
+        name: APLL3_DEN_APLL
+      - addr: "0x356:0x358"
+        name: APLL3_NUM_APLL
+      - addr: 0x359
+        name: APLL3_MASH_CTL
+        fields:
+          - bits: "5:4"
+            name: PLL3_DTHRMODE
+            desc: PLL MASH Dither Mode ROM=Y, EEPROM=N; 0x0 = Constant Dither MACC2; 0x1 = Constant Dither MACC2 and MACC3; 0x2 = LFSR Dither MACC2; 0x3 = Dither Disabled 
+          - bits: "3:1"
+            name: PLL3_ORDER
+            desc: PLL MASH Order ROM=Y, EEPROM=N; 0x0 = Integer Mode Divider; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd 
+          - bits: "0"
+            name: PLL3_MODE
+            desc: "In APLL 24-bit num/den mode, APLL denominator is programmable. Recommended not for use with DPLL mode. In 24-bit mode, the denominator is stored in PLL3_NUM[23:0] The numerator is stored in (PLL3_NUM_MSB << 16) + PLL3_NUM[39:24]. In APLL 40-bit mode, APLL denominator is fixed. For use with DPLL. ROM=Y, EEPROM=Y; 0x0 = APLL 24-bit num/den; 0x1 = APLL 40-bit num (Req for DPLL)"
+      - addr: "0x35A:0x35E"
+        name: APLL3_NUM_STAT
+        fields:
+          - bits: "39:0"
+            name: PLL3_NUM_STAT
+            desc: Readback current MASH Numerator after FDEV and or DPLL correction ROM=N, EEPROM=N
+      - addr: 0x360
+        name: APLL3_VCO_CTL
+        fields:
+          - bits: "6:4"
+            name: PLL3_PRI_DIV
+            desc: Sets the VCO3 primary divider divide value from 1 to 7 ROM=Y, EEPROM=Y; 0x0 = 1; 0x1 = 2; 0x2 = 3; 0x3 = 4; 0x4 = 5; 0x5 = 6; 0x6 = 7 
+          - bits: "3:0"
+            name: PLL3_CHAN_EN
+            desc: "Enables the VCO3 to Outputs output buffer outputs: [0] -> OUT0_1, [1] -> OUT4_5 and OUT6_7, and [2] -> OUT8_9, OUT10_11, and OUT12_13 [3] -> OUT14 and OUT15 ROM=Y, EEPROM=Y"
+          - bits: 3
+            name: PLL3_CHAN_EN_14_15
+          - bits: 2
+            name: PLL3_CHAN_EN_8_9_10_11_12_13
+          - bits: 1
+            name: PLL3_CHAN_EN_4_5_6_7
+          - bits: 0
+            name: PLL3_CHAN_EN_0_1
+      - addr: 0x361
+        name: APLL3_VCO_CTL2
+        fields:
+          - bits: "5"
+            name: PLL3_DIV_SYNC_EN
+            desc: PLL3 Divider Sync Enable. Enables synchronization of post-dividers and reference dividers at startup for PLL3. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: PLL3_CHAN_SEL_DIV1TO7
+            desc: Selects the VCO3 to Outputs output buffer to be driven by VCO3 Div By 1 to 7 divide block. If selected, Div By 5 block must be deselected. ROM=Y, EEPROM=Y 
+
+          - bits: "2:0"
+            name: PLL3_CLKDRVRBYP46_SEL
+            desc: "Selects the VCO3 divide value for OUT4/OUT6 CML Output Drivers from: [0] -> VCO3, or [2] -> VCO3 Div By 1 to 7. ROM=Y, EEPROM=Y; 0x0 = Disabled; 0x1 = Bypass; 0x2 = Reserved; 0x4 = Div By 1 to 7"
+      - addr: 0x362
+        name: APLL3_VCO_BUF_CTL
+        fields:
+          - bits: "7:6"
+            name: PLL3_VCO_BUF_2REF_EN
+            desc: Enables the VCO3 Div By 2 buffer output driver to [0] -> APLL1 and [1] -> APLL2 reference input for cascade mode. ROM=Y, EEPROM=Y 
+          - bits: "5"
+            name: PLL3_2X_PLLN_EN
+            desc: Enables the frequency doubler available in the VCO3 to APLL3 N- divider/DPLL3 feedback clock path. ROM=Y, EEPROM=N 
+          - bits: "4:3"
+            name: PLL3_PLLN_OUT_EN
+            desc: Enables the VCO3 output buffer driver to [0] -> APLL3 N-divider and [1] -> DPLL3 feedback clock input mux. ROM=Y, EEPROM=Y 
+          - bits: "2"
+            name: PLL3_WIN_DET_DRVR_EN
+            desc: Enables the VCO3 Div By 2 Buffer output driver to reference window detectors input buffer, ROM=Y, EEPROM=N 
+          - bits: "1:0"
+            name: PLL3_VCO_BUF_FB_TDC_EN
+            desc: Enables VCO3 Div By 4 Buffer output driver to TDC1 and TDC2 for cascade mode [0] = TDC1 driver enable [1] = TDC2 driver enable ROM=Y, EEPROM=N 
+  - name: Out0_1
+    regs:
+      - addr: 0x3C1
+        name: OUT0_MODE
+        fields:
+          - bits: "7"
+            name: OUT_0_HSDSBOOST
+            desc: OUT0 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_0_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_0_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_0_AMP
+            desc: "OUT0 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. For CMOS mode only: Enables individual terminals for CMOS output, which will otherwise be in high-Z state ([Bit 0] enables -> OUT0_P as CMOS, [Bit 1] enables OUT0_N as CMOS). ROM=Y, EEPROM=Y; 0x0 = 00; 0x1 = 01; 0x2 = 10; 0x3 = 11"
+          - bits: "4"
+            name: OUT_0_LDO_EN
+            desc: Except for current savings this bit should always be 1. This bit must be set to enable Vcm output LDO on OUT0. ROM=Y, EEPROM=Y 
+          - bits: "3"
+            name: OUT_0_STATIC_LOW
+            desc: "When OUT0 is forced to a static output, this bit determines if the output voltage will be 0: Static Low 1: Static High ROM=Y, EEPROM=N; 0x0 = L; 0x1 = H"
+          - bits: "2:0"
+            name: OUT_0_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS; 0x4 = CMOS
+            opts:
+                <<: *out-fmt-01
+      - addr: 0x3C2
+        name: OUT0_CTL_P
+        fields:
+          - bits: "3"
+            name: OUT_0_P_INVERT_POLARITY
+            desc: OUT0P CMOS Invert Polarity. Setting this bit inverts the polarity of the positive terminal of OUT0 for CMOS outputs. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: OUT_0_N_INVERT_POLARITY
+            desc: OUT0N CMOS Invert Polarity. Setting this bit inverts the polarity of the negative terminal of OUT0 for CMOS outputs. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: OUT_0_P_FORCELOW
+            desc: OUT0P CMOS Force Low. Setting this bit forces the positive terminal of OUT0 low. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: OUT_0_N_FORCELOW
+            desc: OUT0N CMOS Force Low. Setting this bit forces the negative terminal of OUT0 low. ROM=Y, EEPROM=N 
+      - addr: 0x3C3
+        name: OUT0_CTL
+        fields:
+          - bits: "7:0"
+            name: OUT_0_CONFIGURATION
+            desc: OUT0 Configuration. Selects from CH0 Bypass, CH1 Bypass, CHDIV0, CHDIV1, CH0/2 low-noise divide by two path, SYSREF, SYSREF + Analog Delay, or static DC H/L. ROM=N, EEPROM=N; 0x0 = CH0/2; 0x14 = CHDIV1; 0x20 = SYSREF+ADLY; 0x21 = SYSREF; 0x22 = Static DC; 0x28 = CHDIV0; 0x40 = CH1 Bypass; 0x80 = CH0 Bypass
+            opts:
+                <<: *out-configuration-01
+      - addr: 0x3C4
+        name: OUT1_MODE
+        fields:
+          - bits: "7"
+            name: OUT_1_HSDSBOOST
+            desc: OUT1 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_1_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_1_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_1_AMP
+            desc: "OUT1 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. For CMOS mode only: Enables individual terminals for CMOS output, which will otherwise be in high-Z state ([0] -> OUT1P, [1] -> OUT1N). ROM=Y, EEPROM=Y; 0x0 = 00; 0x1 = 01; 0x2 = 10; 0x3 = 11"
+          - bits: "4"
+            name: OUT_1_LDO2_SEL
+            desc: Except for current savings this bit should always be 1. Rename to OUT_1_LDO_EN. This bit must be set to enable Vcm output LDO on OUT1. ROM=Y, EEPROM=Y 
+          - bits: "3"
+            name: OUT_1_STATIC_LOW
+            desc: When OUT1 is forced to a static output, this bit determines if the output voltage will be 0=Static Low or 1=Static High ROM=Y, EEPROM=N; 0x0 = L; 0x1 = H 
+          - bits: "2:0"
+            name: OUT_1_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS; 0x4 = CMOS
+            opts:
+                <<: *out-fmt-01
+      - addr: 0x3C5
+        name: OUT1_CTL_P
+        fields:
+          - bits: "3"
+            name: OUT_1_P_INVERT_POLARITY
+            desc: OUT1P CMOS Invert Polarity. Setting this bit inverts the polarity of the positive terminal of OUT1 for CMOS outputs. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: OUT_1_N_INVERT_POLARITY
+            desc: OUT1N CMOS Invert Polarity. Setting this bit inverts the polarity of the negative terminal of OUT1 for CMOS outputs. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: OUT_1_P_FORCELOW
+            desc: OUT1P CMOS Force Low. Setting this bit forces the positive terminal of OUT1 low. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: OUT_1_N_FORCELOW
+            desc: OUT1N CMOS Force Low. Setting this bit forces the negative terminal of OUT1 low. ROM=Y, EEPROM=N 
+      - addr: 0x3C6
+        name: OUT1_CTL
+        fields:
+          - bits: "7:0"
+            name: OUT_1_CONFIGURATION
+            desc: OUT1 Configuration. Selects from CH0 Bypass, CH1 Bypass, CHDIV0, CHDIV1, CH0/2 low-noise divide by two path, SYSREF, SYSREF + Analog Delay, or static DC H/L. ROM=N, EEPROM=N; 0x0 = CH0/2; 0x14 = CHDIV1; 0x20 = SYSREF+ADLY; 0x21 = SYSREF; 0x22 = Static DC; 0x28 = CHDIV0; 0x40 = CH1 Bypass; 0x80 = CH0 Bypass
+            opts:
+                <<: *out-configuration-01
+      - addr: 0x3C7
+        name: OUT0_1_CMOS_CTL
+        fields:
+          - bits: "1"
+            name: OUT_0_1_CMOS_OUT_VOLTAGE_SEL
+            desc: CMOS LDO Voltage. Selects CMOS LDO voltage. ROM=Y, EEPROM=Y; 0x0 = 1.8V; 0x1 = 2.65V 
+          - bits: "0"
+            name: OUT_0_1_CMOS_OUT_LDO_EN
+            desc: CMOS LDO Enable. Enables LDO used for CMOS outputs. Must be enabled for CMOS mode. ROM=Y, EEPROM=Y 
+      - addr: 0x3C8
+        name: CH0_1_ZDLY
+        fields:
+          - bits: "3:1"
+            name: OUT_0_1_ZDM_TDC_SEL
+            desc: "Select zero delay output to TDC's ROM=Y, EEPROM=N; 0x0 = None; 0x1 = TDC1; 0x2 = TDC2; 0x4 = TDC3"
+          - bits: "0"
+            name: OUT_0_1_ZDM_EN
+            desc: Enable the output from CH_DIV0_1 to be used as DPLL feedback input for zero delay mode ROM=Y, EEPROM=N 
+      - addr: 0x3C9
+        name: CH0_1_CTL
+        fields:
+          - bits: "6"
+            name: OUT_0_1_DIV_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: OUT_0_1_DIV_SYNC_EN
+            desc: OUT0_1 Divider Sync Enable. Enables synchronization of chandiv and div2 dividers at startup for OUT0_1. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_0_1_SR_DIV_SYNC_EN
+            desc: OUT0_1 SYSREF Divider Sync Enable. Enables synchronization of SYSREF dividers at startup for OUT0_1. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_0_1_CH0_CHAN_POL_SEL
+            desc: OUT0_1 Ch0 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the Ch0 channel divider. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: OUT_0_1_CH1_CHAN_POL_SEL
+            desc: OUT0_1 Ch1 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the Ch1 channel divider. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: OUT_0_1_CH0_DIV_EN
+            desc: "OUT0_1 Ch0 ChanDiv Enable. Enables the Ch0 channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y"
+          - bits: "0"
+            name: OUT_0_1_CH1_DIV_EN
+            desc: "OUT0_1 Ch1 ChanDiv Enable. Enables the Ch1 channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y"
+      - addr: 0x3CC
+        name: CH0_1_MUX_CTL2_P
+        fields:
+          - bits: "1"
+            name: OUT_0_1_CH0_CH_DIV_SR_MUX_CLK_SEL
+            desc: OUT0_1 Ch0 ChanDiv to SYSREF Input Clock Select. When set, the Ch0 channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N; 0x0 = POS POL to SR_DIV; 0x1 = NEG POL to SR_DIV 
+      - addr: 0x3CD
+        name: CH0_1_MUX_CTL2
+        fields:
+          - bits: "7:2"
+            name: OUT_0_1_CLK_IN_FANOUT
+            desc: OUT0_1 input clock fanout. Distributes the input clock to the channel dividers and the standalone divide-by-2s. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x3 = IN1 to CHDIV1; 0x4 = IN0 to SYSREF; 0x7 = IN0 to SYSREF, IN1 to CHDIV1; 0xC = IN0 to CHDIV0; 0xF = IN0 to CHDIV0, IN1 to CHDIV1; 0x10 = IN0 to CH0/2 (OUT0); 0x13 = IN0 to CH0/2 (OUT0), IN1 to CHDIV1 (OUT1); 0x14 = IN0 to CH0/2 (OUT0) and SYSREF (OUT1); 0x1C = IN0 to CH0/2 (OUT0) and CHDIV0 (OUT1); 0x20 = IN0 to CH0/2 (OUT1); 0x23 = IN0 to CH0/2 (OUT1), IN1 to CHDIV1 (OUT0); 0x24 = IN0 to CH0/2 (OUT1) and SYSREF (OUT0); 0x2C = IN0 to CH0/2 (OUT1) and CHDIV0 (OUT0); 0x30 = IN0 to CH0/2 (OUT0 and OUT1)
+            opts:
+                <<: *clk-in-fanout
+      - addr: "0x3CE:0x3CF"
+        name: CH0_1_CH0_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_0_1_CH0_CH_STATIC_OFFSET
+            desc: OUT0_1 Ch0 ChanDiv Static Offset. Code which delays the output of the Ch0 channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x3D0:0x3D1"
+        name: CH0_1_CH1_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_0_1_CH1_CH_STATIC_OFFSET
+            desc: OUT0_1 Ch1 ChanDiv Static Offset. Code which delays the output of the Ch1 channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x3D2:0x3D3"
+        name: CH0_1_CH0_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_0_1_CH0_CH_DIV
+            desc: OUT0_1 Ch0 Channel Divider (ChanDiv) Divide Value. ROM=Y, EEPROM=Y 
+      - addr: "0x3D4:0x3D5"
+        name: CH0_1_CH1_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_0_1_CH1_CH_DIV
+            desc: OUT0_1 Ch1 Channel Divider (ChanDiv) Divide Value. ROM=Y, EEPROM=Y 
+      - addr: 0x3D6
+        name: CH0_1_SR_ANA_DELAY
+        fields:
+          - bits: "4:0"
+            name: OUT_0_1_SR_ANA_DELAY
+            desc: OUT0_1 SYSREF Analog Delay. Specified here in multiples of one delay step duration. ROM=Y, EEPROM=N 
+      - addr: 0x3D7
+        name: CH0_1_SR_ANA_DELAY_CTL
+        fields:
+          - bits: "5"
+            name: OUT_0_1_SR_ANA_DELAY_DIV2_SEL
+            desc: OUT0_1 SYSREF Analog Delay Div By 2 Select. Divides the incoming clock by 2 to double the delay step size. Useful for increasing analog delay range, given high incoming clock frequencies. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_0_1_SR_ANA_DELAY_EN
+            desc: OUT0_1 SYSREF Analog Delay Enable. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_0_1_SR_ANA_DELAY_SMALL_STEP_EN
+            desc: OUT0_1 SYSREF Analog Delay Small Step Enable. If set to 1, the analog delay generator will use both rising and falling edges of the incoming clock to halve delay step size. Useful for when large pre- divider values have been used. ROM=Y, EEPROM=N 
+          - bits: "2:0"
+            name: OUT_0_1_SR_ANA_DELAY_RANGE
+            desc: Analog delay range is set according to the period entering the SYSREF analog delay block. The period can be calcualted as (OUT_x_y_SR_ANA_DELAY_DIV2_SEL + 1) / (OUT_x_y_SR_ANA_DELAY_SMALL_STEP_EN + 1) / SYSREF source frequency. For OUT_x_y_SR_CH_DIV_BYPASS = 1 SYSREF source frequency = VCO post divider frequency up to maximum of 1500 MHz if or OUT_x_y_SR_CH_DIV_BYPASS = 0 the channel divider frequency. Calculated range must fall between 333 ps and 1050 ps. ROM=Y, EEPROM=N; 0x0 = Reserved; 0x1 = Reserved; 0x2 = 333 ps to 450 ps; 0x3 = > 450 ps to 600 ps; 0x4 = > 600 ps to 750 ps; 0x5 = > 750 ps to 1050 ps; 0x6 = Reserved; 0x7 = Reserved 
+      - addr: 0x3D8
+        name: CH0_1_SR_DDLY
+        fields:
+          - bits: "4:0"
+            name: OUT_0_1_SR_DDLY
+            desc: OUT0_1 SYSREF Digital Delay Value. Measured in VCO half-cycles. ROM=Y, EEPROM=N
+      - addr: "0x3D9:0x3DB"
+        name: CH0_1_SR_DIV
+        fields:
+          - bits: "19:0"
+            name: OUT_0_1_SR_DIV
+            desc: OUT0_1 SYSREF Divide Value. ROM=Y, EEPROM=N 
+      - addr: "0x3DC:0x3DD"
+        name: CH0_1_SR_STATIC_OFFSET
+        fields:
+          - bits: "14:0"
+            name: OUT_0_1_SR_DIV_STATIC_OFFSET
+            desc: OUT0_1 SYSREF Divider Static Offset. Static offset code which delays the output of the SYSREF divider. ROM=Y, EEPROM=N 
+      - addr: 0x3DE
+        name: CH0_1_SR_CTL
+        fields:
+          - bits: "6"
+            name: OUT_0_1_SR_GPIO_EN
+            desc: Enable SYSREF to digtop used for 1PPS phase validation, SYSREF_REQ and SYSREF GPIO output ROM=Y, EEPROM=N 
+
+          - bits: "4:2"
+            name: OUT_0_1_PULSE_COUNT
+            desc: OUT0_1 SYSREF Pulse Count. The number of SYSREF pulses which will be generated by a SYSREF request. ROM=Y, EEPROM=N 
+          - bits: "1:0"
+            name: OUT_0_1_SR_MODE
+            desc: OUT0_1 SYSREF Mode. Selects Pulser mode, Continuous mode, or None. ROM=Y, EEPROM=N; 0x0 = None; 0x1 = Continuous; 0x2 = Pulser
+      - addr: 0x3DF
+        name: CH0_1_DFT
+        fields:
+          - bits: "5"
+            name: OUT_0_1_SR_CH0_DIV_BYPASS
+            desc: OUT0_1 cascaded SYSREF bypass mux. If set, bypasses CHDIV0 for the SYSREF input clock. This is useful for minimizing the step size of the digital delay adjustments on the SYSREF clock. ROM=Y, EEPROM=N; 0x0 = ChanDiv input to SysRef; 0x1 = Bypass ChanDiv 
+  - name: Out2_3
+    regs:
+      - addr: 0x400
+        name: OUT2_MODE
+        fields:
+          - bits: "6"
+            name: OUT_2_HSDSBOOST
+            desc: OUT2 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_2_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_2_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "5:4"
+            name: OUT_2_AMP
+            desc: OUT2 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+
+          - bits: "2:0"
+            name: OUT_2_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x401
+        name: OUT2_CTL
+        fields:
+          - bits: "2:0"
+            name: OUT_2_CONFIGURATION
+            desc: OUT2 Mode Configuration ROM=N, EEPROM=N; 0x2 = Static DC; 0x3 = CHDIV; 0x4 = BYPASS
+      - addr: 0x402
+        name: CH2_CTL
+        fields:
+          - bits: "7"
+            name: OUT_2_CHAN_POL_SEL
+            desc: OUT2 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "6:5"
+            name: OUT_2_CLK_MUX
+            desc: OUT2 Input Clock Select. Selects the input clock which will be used to drive the output. ROM=N, EEPROM=N; 0x0 = PLL1_SEC; 0x1 = PLL2; 0x2 = PLL1_PRI 
+            opts:
+                <<: *clk-in-mux-23
+          - bits: "3"
+            name: OUT_2_DIV_EN
+            desc: "OUT2 ChanDiv Enable. Enables the channel divider. Note: SYSREF/ chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
+          - bits: "2:0"
+            name: OUT_2_CH_MUX_SEL
+            desc: OUT2 Clock Enable. Bit 2, if set, passes the selected VCO1 clock (VCO1P or VCO1S), to the second stage of clock selection. Bit 1 and Bit0 enable the selected clock to drive the channel divider and the channel divider retimer respectively. ROM=Y, EEPROM=Y; 0x0 = PLL2->BYPASS; 0x3 = PLL2->CHDIV; 0x4 = PLL1->BYPASS; 0x7 = PLL1->CHDIV
+      - addr: 0x403
+        name: CH2_CTL2
+        fields:
+          - bits: "4"
+            name: OUT_2_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_2_SYNC_EN
+            desc: OUT2 ChanDiv Sync Enable. Enables synchronization of chandiv dividers at startup for OUT2. ROM=Y, EEPROM=N 
+      - addr: "0x404:0x405"
+        name: CH2_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_2_CH_STATIC_OFFSET
+            desc: OUT2 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x406:0x407"
+        name: CH2_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_2_CH_DIV
+            desc: OUT2 ChanDiv Divide Value. ROM=Y, EEPROM=Y 
+      - addr: 0x420
+        name: OUT3_MODE
+        fields:
+          - bits: "6"
+            name: OUT_3_HSDSBOOST
+            desc: OUT3 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_3_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_3_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "5:4"
+            name: OUT_3_AMP
+            desc: OUT3 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+
+          - bits: "2:0"
+            name: OUT_3_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x421
+        name: OUT3_CTL
+        fields:
+          - bits: "2:0"
+            name: OUT_3_CONFIGURATION
+            desc: OUT3 Mode Configuration. ROM=Y, EEPROM=Y; 0x2 = Static DC; 0x3 = CHDIV; 0x4 = BYPASS
+      - addr: 0x422
+        name: CH3_CTL
+        fields:
+          - bits: "7"
+            name: OUT_3_CHAN_POL_SEL
+            desc: OUT3 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "6:5"
+            name: OUT_3_CLK_MUX
+            desc: OUT3 Input Clock Select. Selects the input clock which will be used to drive the output. ROM=N, EEPROM=N; 0x0 = PLL1_SEC; 0x1 = PLL2; 0x2 = PLL1_PRI 
+            opts:
+                <<: *clk-in-mux-23
+          - bits: "3"
+            name: OUT_3_DIV_EN
+            desc: "OUT3 ChanDiv Enable. Enables the channel divider. Note: SYSREF/ chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
+          - bits: "2:0"
+            name: OUT_3_CH_MUX_SEL
+            desc: OUT3 Clock Enable. Bit 2, if set, passes the selected VCO1 clock (VCO1P or VCO1S), to the second stage of clock selection. Bit 1 and Bit0 enable the selected clock to drive the channel divider and the channel divider retimer respectively. ROM=Y, EEPROM=Y; 0x0 = PLL2->BYPASS; 0x3 = PLL2->CHDIV; 0x4 = PLL1->BYPASS; 0x7 = PLL1->CHDIV 
+      - addr: 0x423
+        name: CH3_CTL2
+        fields:
+          - bits: "4"
+            name: OUT_3_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_3_SYNC_EN
+            desc: OUT3 ChanDiv Sync Enable. Enables synchronization of chandiv dividers at startup for OUT3. ROM=Y, EEPROM=N 
+      - addr: "0x424:0x425"
+        name: CH3_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_3_CH_STATIC_OFFSET
+            desc: OUT3 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x426:0x427"
+        name: CH3_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_3_CH_DIV
+            desc: OUT3 ChanDiv Divide Value. ROM=Y, EEPROM=Y
+  - name: Out4_5
+    regs:
+      - addr: 0x440
+        name: CH4_5_SR_ANA_DLY_TRIM
+        fields:
+          - bits: "2:0"
+            name: OUT_4_5_SR_ANA_DLY_BIASTRIM
+            desc: Channel Analog Delay Bias Trim ROM=N, EEPROM=Y 
+      - addr: 0x441
+        name: OUT4_MODE
+        fields:
+          - bits: "7"
+            name: OUT_4_HSDSBOOST
+            desc: OUT4 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_4_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_4_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_4_AMP
+            desc: OUT4 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, HSDS, and CML outputs. ROM=Y, EEPROM=Y 
+          - bits: "2:0"
+            name: OUT_4_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS; 0x4 = Reserved; 0x5 = CML
+            opts:
+                <<: *out-fmt-46
+      - addr: 0x442
+        name: OUT4_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_4_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x443
+        name: OUT5_MODE
+        fields:
+          - bits: "7"
+            name: OUT_5_HSDSBOOST
+            desc: OUT5 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_5_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_5_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_5_AMP
+            desc: OUT5 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+          - bits: "4:3"
+            name: OUT_5_PREPWR
+            desc: Output buffer predriver power setting ROM=Y, EEPROM=Y 
+          - bits: "2:0"
+            name: OUT_5_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x444
+        name: OUT5_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_5_CONFIGURATION
+            desc: 0x0 = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x445
+        name: CH4_5_CTL
+        fields:
+          - bits: "5"
+            name: OUT_4_5_DIV_SYNC_EN
+            desc: OUT4_5 Divider Sync Enable. Enables synchronization of chandiv dividers at startup for OUT4_5. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_4_5_SR_DIV_SYNC_EN
+            desc: OUT4_5 SYSREF Divider Sync Enable. Enables synchronization of SYSREF dividers at startup for OUT4_5. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: OUT_4_5_CHAN_POL_SEL
+            desc: OUT4_5 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: OUT_4_5_DIV_EN
+            desc: "OUT4_5 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
+      - addr: 0x446
+        name: CH4_5_CTL2
+        fields:
+          - bits: "7"
+            name: OUT_4_5_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: OUT_4_5_ZDM_EN
+            desc: OUT4_5 zero delay output enable ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: OUT_4_5_CLK_IN_SEL
+            desc: "OUT4_5 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
+            opts:
+                <<: *clk-in-mux
+          - bits: "4"
+            name: OUT_4_5_CH_DIV_SR_MUX_CLK_SEL
+            desc: OUT4_5 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: OUT_4_5_CH_MUX_SEL
+            desc: "OUT4_5 Input Clock Enable. Enables the selected clock to various inputs: [0] -> ChanDiv, [1] -> ChanDiv Retimer, [2] -> Div2 to OUT4, [3] -> Div2 to OUT5 ROM=Y, EEPROM=Y; 0x0 = OFF; 0x1 = SYSREF; 0x3 = CHDIV; 0x4 = DIV2->OUT8; 0x5 = DIV2->OUT8, SYSREF->OUT9; 0x7 = DIV2->OUT8, CHDIV->OUT9; 0x8 = DIV2->OUT9; 0x9 = SYSREF->OUT8, DIV2->OUT9; 0xB = CHDIV->OUT8, DIV2->OUT9; 0xC = DIV2->OUT8, DIV2->OUT9"
+      - addr: "0x447:0x448"
+        name: CH4_5_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_4_5_CH_STATIC_OFFSET
+            desc: OUT4_5 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x449:0x44A"
+        name: CH4_5_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_4_5_CH_DIV
+            desc: OUT4_5 ChanDiv Divide Value. ROM=Y, EEPROM=Y 
+      - addr: 0x44B
+        name: CH4_5_SR_ANA_DELAY
+        fields:
+          - bits: "4:0"
+            name: OUT_4_5_SR_ANA_DELAY
+            desc: OUT4_5 SYSREF Analog Delay. Specified here in multiples of one delay step duration. ROM=Y, EEPROM=N
+      - addr: 0x44C
+        name: CH4_5_SR_ANA_DELAY_CTL
+        fields:
+          - bits: "5"
+            name: OUT_4_5_SR_ANA_DELAY_DIV2_SEL
+            desc: OUT4_5 SYSREF Analog Delay Div By 2 Select. Divides the incoming clock by 2 to double the delay step size. Useful for increasing analog delay range, given high incoming clock frequencies. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_4_5_SR_ANA_DELAY_EN
+            desc: OUT4_5 SYSREF Analog Delay Enable. Enables the analog delay generator. Set to a 0 to save power if analog delay generator is not needed. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_4_5_SR_ANA_DELAY_SMALL_STEP_EN
+            desc: OUT4_5 SYSREF Analog Delay Small Step Enable. If set to 1, the analog delay generator will use both rising and falling edges of the incoming clock to halve delay step size. Useful for when large pre- divider values have been used. ROM=Y, EEPROM=N 
+          - bits: "2:0"
+            name: OUT_4_5_SR_ANA_DELAY_RANGE
+            desc: Analog delay range is set according to the period entering the SYSREF analog delay block. The period can be calcualted as (OUT_x_y_SR_ANA_DELAY_DIV2_SEL + 1) / (OUT_x_y_SR_ANA_DELAY_SMALL_STEP_EN + 1) / SYSREF source frequency. For OUT_x_y_SR_CH_DIV_BYPASS = 1 SYSREF source frequency = VCO post divider frequency up to maximum of 1500 MHz if or OUT_x_y_SR_CH_DIV_BYPASS = 0 the channel divider frequency. Calculated range must fall between 333 ps and 1050 ps. ROM=Y, EEPROM=N; 0x0 = Reserved; 0x1 = Reserved; 0x2 = 333 ps to 450 ps; 0x3 = > 450 ps to 600 ps; 0x4 = > 600 ps to 750 ps; 0x5 = > 750 ps to 1050 ps; 0x6 = Reserved; 0x7 = Reserved 
+      - addr: 0x44D
+        name: CH4_5_SR_DDLY
+        fields:
+          - bits: "4:0"
+            name: OUT_4_5_SR_DDLY
+            desc: OUT4_5 SYSREF Digital Delay Value. Measured in VCO half-cycles. ROM=Y, EEPROM=N
+      - addr: "0x44E:0x450"
+        name: CH4_5_SR_DIV
+        fields:
+          - bits: "19:0"
+            name: OUT_4_5_SR_DIV
+            desc: OUT4_5 SYSREF Divide Value. ROM=Y, EEPROM=N 
+      - addr: "0x451:0x452"
+        name: CH4_5_SR_STATIC_OFFSET
+        fields:
+          - bits: "14:0"
+            name: OUT_4_5_SR_DIV_STATIC_OFFSET
+            desc: OUT4_5 SYSREF Divider Static Offset. Static offset code which delays the output of the SYSREF divider. ROM=Y, EEPROM=N
+      - addr: 0x453
+        name: CH4_5_SR_PULSE_CTL
+        fields:
+          - bits: "5:3"
+            name: OUT_4_5_PULSE_COUNT
+            desc: OUT4_5 SYSREF Pulse Count. The number of SYSREF pulses which will be generated by a SYSREF request. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: OUT_4_5_SR_GPIO_EN
+            desc: Enables SYSREF to digital for SYSREF_req and GPIO output ROM=Y, EEPROM=N 
+          - bits: "1:0"
+            name: OUT_4_5_SR_MODE
+            desc: OUT4_5 SYSREF Mode. When this bit is set, the SYSREF operates in Continuous Mode. When cleared, the SYSREF operates in Pulse Mode. ROM=Y, EEPROM=N; 0x0 = None; 0x1 = Continuous; 0x2 = Pulser 
+      - addr: 0x454
+        name: CH4_5_DFT
+        fields:
+          - bits: "4"
+            name: OUT_4_5_SR_CH_DIV_BYPASS
+            desc: OUT4_5 cascaded SYSREF bypass mux. If set, bypasses OUT4_5 channel divider for the SYSREF input clock. This is useful for minimizing the step size of the digital delay adjustments on the SYSREF clock. ROM=Y, EEPROM=N
+  - name: Out6_7
+    regs:
+      - addr: 0x461
+        name: OUT6_MODE
+        fields:
+          - bits: "7"
+            name: OUT_6_HSDSBOOST
+            desc: OUT6 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_6_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_6_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_6_AMP
+            desc: OUT6 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, HSDS, and CML outputs. ROM=Y, EEPROM=Y 
+          - bits: "2:0"
+            name: OUT_6_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS; 0x4 = Reserved; 0x5 = CML
+            opts:
+                <<: *out-fmt-46
+      - addr: 0x462
+        name: OUT6_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_6_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS 
+      - addr: 0x463
+        name: OUT7_MODE
+        fields:
+          - bits: "7"
+            name: OUT_7_HSDSBOOST
+            desc: OUT7 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_7_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_7_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_7_AMP
+            desc: OUT7 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+          - bits: "4:3"
+            name: OUT_7_PREPWR
+            desc: Output buffer predriver power setting ROM=Y, EEPROM=Y 
+          - bits: "2:0"
+            name: OUT_7_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x464
+        name: OUT7_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_7_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x465
+        name: CH6_7_CTL
+        fields:
+          - bits: "5"
+            name: OUT_6_7_DIV_SYNC_EN
+            desc: OUT6_7 Divider Sync Enable. Enables synchronization of chandiv dividers at startup for OUT6_7. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_6_7_SR_DIV_SYNC_EN
+            desc: OUT6_7 SYSREF Divider Sync Enable. Enables synchronization of SYSREF dividers at startup for OUT6_7. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: OUT_6_7_CHAN_POL_SEL
+            desc: OUT6_7 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: OUT_6_7_DIV_EN
+            desc: "OUT6_7 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y"
+      - addr: 0x466
+        name: CH6_7_CTL2
+        fields:
+          - bits: "7"
+            name: OUT_6_7_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: OUT_6_7_CLK_IN_SEL
+            desc: "OUT6_7 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
+            opts:
+                <<: *clk-in-mux
+          - bits: "4"
+            name: OUT_6_7_CH_DIV_SR_MUX_CLK_SEL
+            desc: OUT6_7 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: OUT_6_7_CH_MUX_SEL
+            desc: "OUT6_7 Input Clock Enable. Enables the selected clock to various inputs: [0] -> ChanDiv, [1] -> ChanDiv Retimer, [2] -> Div2 to OUT6, [3] -> Div2 to OUT7 ROM=Y, EEPROM=Y; 0x0 = OFF; 0x1 = SYSREF; 0x3 = CHDIV; 0x4 = DIV2->OUT8; 0x5 = DIV2->OUT8, SYSREF->OUT9; 0x7 = DIV2->OUT8, CHDIV->OUT9; 0x8 = DIV2->OUT9; 0x9 = SYSREF->OUT8, DIV2->OUT9; 0xB = CHDIV->OUT8, DIV2->OUT9; 0xC = DIV2->OUT8, DIV2->OUT9"
+      - addr: "0x467:0x468"
+        name: CH6_7_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_6_7_CH_STATIC_OFFSET
+            desc: OUT6_7 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x469:0x46A"
+        name: CH6_7_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_6_7_CH_DIV
+            desc: OUT6_7 ChanDiv Divide Value. ROM=Y, EEPROM=Y 
+      - addr: 0x46B
+        name: CH6_7_SR_ANA_DELAY
+        fields:
+          - bits: "4:0"
+            name: OUT_6_7_SR_ANA_DELAY
+            desc: OUT6_7 SYSREF Analog Delay. Specified here in multiples of one delay step duration. ROM=Y, EEPROM=N 
+      - addr: 0x46C
+        name: CH6_7_SR_ANA_DELAY_CTL
+        fields:
+          - bits: "5"
+            name: OUT_6_7_SR_ANA_DELAY_DIV2_SEL
+            desc: OUT6_7 SYSREF Analog Delay Div By 2 Select. Divides the incoming clock by 2 to double the delay step size. Useful for increasing analog delay range, given high incoming clock frequencies. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_6_7_SR_ANA_DELAY_EN
+            desc: OUT6_7 SYSREF Analog Delay Enable. Enables the analog delay generator. Set to a 0 to save power if analog delay generator is not needed. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_6_7_SR_ANA_DELAY_SMALL_STEP_EN
+            desc: OUT6_7 SYSREF Analog Delay Small Step Enable. If set to 1, the analog delay generator will use both rising and falling edges of the incoming clock to halve delay step size. Useful for when large pre- divider values have been used. ROM=Y, EEPROM=N 
+          - bits: "2:0"
+            name: OUT_6_7_SR_ANA_DELAY_RANGE
+            desc: Analog delay range is set according to the period entering the SYSREF analog delay block. The period can be calcualted as (OUT_x_y_SR_ANA_DELAY_DIV2_SEL + 1) / (OUT_x_y_SR_ANA_DELAY_SMALL_STEP_EN + 1) / SYSREF source frequency. For OUT_x_y_SR_CH_DIV_BYPASS = 1 SYSREF source frequency = VCO post divider frequency up to maximum of 1500 MHz if or OUT_x_y_SR_CH_DIV_BYPASS = 0 the channel divider frequency. Calculated range must fall between 333 ps and 1050 ps. ROM=Y, EEPROM=N; 0x0 = Reserved; 0x1 = Reserved; 0x2 = 333 ps to 450 ps; 0x3 = > 450 ps to 600 ps; 0x4 = > 600 ps to 750 ps; 0x5 = > 750 ps to 1050 ps; 0x6 = Reserved; 0x7 = Reserved 
+      - addr: 0x46D
+        name: CH6_7_SR_DDLY
+        fields:
+          - bits: "4:0"
+            name: OUT_6_7_SR_DDLY
+            desc: OUT6_7 SYSREF Digital Delay Value. Measured in VCO half-cycles. ROM=Y, EEPROM=N
+      - addr: "0x46E:0x470"
+        name: CH6_7_SR_DIV
+        fields:
+          - bits: "19:0"
+            name: OUT_6_7_SR_DIV
+            desc: OUT6_7 SYSREF Divide Value. ROM=Y, EEPROM=N
+      - addr: "0x471:0x472"
+        name: CH6_7_SR_STATIC_OFFSET
+        fields:
+          - bits: "14:0"
+            name: OUT_6_7_SR_DIV_STATIC_OFFSET
+            desc: OUT6_7 SYSREF Divider Static Offset. Static offset code which delays the output of the SYSREF divider. ROM=Y, EEPROM=N
+      - addr: 0x473
+        name: CH6_7_SR_PULSE_CTL
+        fields:
+          - bits: "5:3"
+            name: OUT_6_7_PULSE_COUNT
+            desc: OUT6_7 SYSREF Pulse Count. The number of SYSREF pulses which will be generated by a SYSREF request. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: OUT_6_7_SR_GPIO_EN
+            desc: Enable SYSREF to digital for sysre_req and GPIO output ROM=Y, EEPROM=N 
+          - bits: "1:0"
+            name: OUT_6_7_SR_MODE
+            desc: OUT6_7 SYSREF Mode. When this bit is set, the SYSREF operates in Continuous Mode. When cleared, the SYSREF operates in PULSE MODE. ROM=Y, EEPROM=N; 0x0 = None; 0x1 = Continuous; 0x2 = Pulser 
+      - addr: 0x474
+        name: CH6_7_DFT
+        fields:
+          - bits: "4"
+            name: OUT_6_7_SR_CH_DIV_BYPASS
+            desc: OUT6_7 cascaded SYSREF bypass mux. If set, bypasses OUT6_7 channel divider for the SYSREF input clock. This is useful for minimizing the step size of the digital delay adjustments on the SYSREF clock. ROM=Y, EEPROM=N
+  - name: Out8_9
+    regs:
+      - addr: 0x481
+        name: OUT8_MODE
+        fields:
+          - bits: "7"
+            name: OUT_8_HSDSBOOST
+            desc: OUT8 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_8_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_8_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_8_AMP
+            desc: OUT8 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+
+          - bits: "2:0"
+            name: OUT_8_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x482
+        name: OUT8_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_8_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x483
+        name: OUT9_MODE
+        fields:
+          - bits: "7"
+            name: OUT_9_HSDSBOOST
+            desc: OUT9 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_9_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_9_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_9_AMP
+            desc: OUT9 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+          - bits: "4:3"
+            name: OUT_9_PREPWR
+            desc: Output buffer predriver power setting ROM=Y, EEPROM=Y 
+          - bits: "2:0"
+            name: OUT_9_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x484
+        name: OUT9_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_9_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x485
+        name: CH8_9_CTL
+        fields:
+          - bits: "5"
+            name: OUT_8_9_DIV_SYNC_EN
+            desc: OUT8_9 Divider Sync Enable. Enables synchronization of chandiv dividers at startup for OUT8_9. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_8_9_SR_DIV_SYNC_EN
+            desc: OUT8_9 SYSREF Divider Sync Enable. Enables synchronization of SYSREF dividers at startup for OUT8_9. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: OUT_8_9_CHAN_POL_SEL
+            desc: OUT8_9 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: OUT_8_9_DIV_EN
+            desc: "OUT8_9 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y"
+      - addr: 0x486
+        name: CH8_9_CTL2
+        fields:
+          - bits: "7"
+            name: OUT_8_9_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: OUT_8_9_CLK_IN_SEL
+            desc: "OUT8_9 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
+            opts:
+                <<: *clk-in-mux
+          - bits: "4"
+            name: OUT_8_9_CH_DIV_SR_MUX_CLK_SEL
+            desc: OUT8_9 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: OUT_8_9_CH_MUX_SEL
+            desc: "OUT8_9 Input Clock Enable. Enables the selected clock to various inputs: [0] -> ChanDiv, [1] -> ChanDiv Retimer, [2] -> Div2 to OUT8, [3] -> Div2 to OUT9 ROM=Y, EEPROM=Y; 0x0 = OFF; 0x1 = SYSREF; 0x3 = CHDIV; 0x4 = DIV2->OUT8; 0x5 = DIV2->OUT8, SYSREF->OUT9; 0x7 = DIV2->OUT8, CHDIV->OUT9; 0x8 = DIV2->OUT9; 0x9 = SYSREF->OUT8, DIV2->OUT9; 0xB = CHDIV->OUT8, DIV2->OUT9; 0xC = DIV2->OUT8, DIV2->OUT9"
+      - addr: "0x487:0x488"
+        name: CH8_9_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_8_9_CH_STATIC_OFFSET
+            desc: OUT8_9 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x489:0x48A"
+        name: CH8_9_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_8_9_CH_DIV
+            desc: OUT8_9 ChanDiv Divide Value. ROM=Y, EEPROM=Y 
+      - addr: 0x48B
+        name: CH8_9_SR_ANA_DELAY
+        fields:
+          - bits: "4:0"
+            name: OUT_8_9_SR_ANA_DELAY
+            desc: OUT8_9 SYSREF Analog Delay. Specified here in multiples of one delay step duration. ROM=Y, EEPROM=N 
+      - addr: 0x48C
+        name: CH8_9_SR_ANA_DELAY_CTL
+        fields:
+          - bits: "5"
+            name: OUT_8_9_SR_ANA_DELAY_DIV2_SEL
+            desc: OUT8_9 SYSREF Analog Delay Div By 2 Select. Divides the incoming clock by 2 to double the delay step size. Useful for increasing analog delay range, given high incoming clock frequencies. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_8_9_SR_ANA_DELAY_EN
+            desc: OUT8_9 SYSREF Analog Delay Enable. Enables the analog delay generator. Set to a 0 to save power if analog delay generator is not needed. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_8_9_SR_ANA_DELAY_SMALL_STEP_EN
+            desc: OUT8_9 SYSREF Analog Delay Small Step Enable. If set to 1, the analog delay generator will use both rising and falling edges of the incoming clock to halve delay step size. Useful for when large pre- divider values have been used. ROM=Y, EEPROM=N 
+          - bits: "2:0"
+            name: OUT_8_9_SR_ANA_DELAY_RANGE
+            desc: Analog delay range is set according to the period entering the SYSREF analog delay block. The period can be calcualted as (OUT_x_y_SR_ANA_DELAY_DIV2_SEL + 1) / (OUT_x_y_SR_ANA_DELAY_SMALL_STEP_EN + 1) / SYSREF source frequency. For OUT_x_y_SR_CH_DIV_BYPASS = 1 SYSREF source frequency = VCO post divider frequency up to maximum of 1500 MHz if or OUT_x_y_SR_CH_DIV_BYPASS = 0 the channel divider frequency. Calculated range must fall between 333 ps and 1050 ps. ROM=Y, EEPROM=N; 0x0 = Reserved; 0x1 = Reserved; 0x2 = 333 ps to 450 ps; 0x3 = > 450 ps to 600 ps; 0x4 = > 600 ps to 750 ps; 0x5 = > 750 ps to 1050 ps; 0x6 = Reserved; 0x7 = Reserved 
+      - addr: 0x48D
+        name: CH8_9_SR_DDLY
+        fields:
+          - bits: "4:0"
+            name: OUT_8_9_SR_DDLY
+            desc: OUT8_9 SYSREF Digital Delay Value. Measured in VCO half-cycles. ROM=Y, EEPROM=N 
+      - addr: "0x48E:0x490"
+        name: CH8_9_SR_DIV
+        fields:
+          - bits: "19:0"
+            name: OUT_8_9_SR_DIV
+            desc: OUT8_9 SYSREF Divide Value. ROM=Y, EEPROM=N
+      - addr: "0x491:0x492"
+        name: CH8_9_SR_STATIC_OFFSET
+        fields:
+          - bits: "14:0"
+            name: OUT_8_9_SR_DIV_STATIC_OFFSET
+            desc: OUT8_9 SYSREF Divider Static Offset. Static offset code which delays the output of the SYSREF divider. ROM=Y, EEPROM=N 
+      - addr: 0x493
+        name: CH8_9_SR_PULSE_CTL
+        fields:
+          - bits: "5:3"
+            name: OUT_8_9_PULSE_COUNT
+            desc: OUT8_9 SYSREF Pulse Count. The number of SYSREF pulses which will be generated by a SYSREF request. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: OUT_8_9_SR_GPIO_EN
+            desc: Enable SYSREF to digital for sysre_req and GPIO output ROM=Y, EEPROM=N 
+          - bits: "1:0"
+            name: OUT_8_9_SR_MODE
+            desc: OUT8_9 SYSREF Mode. When this bit is set, the SYSREF operates in Continuous Mode. When cleared, the SYSREF operates in PULSE MODE. ROM=Y, EEPROM=N; 0x0 = None; 0x1 = Continuous; 0x2 = Pulser
+  - name: Out10_11
+    regs:
+      - addr: 0x4A1
+        name: OUT10_MODE
+        fields:
+          - bits: "7"
+            name: OUT_10_HSDSBOOST
+            desc: OUT10 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_10_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_10_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_10_AMP
+            desc: OUT10 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+          - bits: "2:0"
+            name: OUT_10_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x4A2
+        name: OUT10_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_10_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x4A3
+        name: OUT11_MODE
+        fields:
+          - bits: "7"
+            name: OUT_11_HSDSBOOST
+            desc: OUT11 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_11_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_11_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_11_AMP
+            desc: OUT11 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+          - bits: "4:3"
+            name: OUT_11_PREPWR
+            desc: Output buffer predriver power setting ROM=Y, EEPROM=Y 
+          - bits: "2:0"
+            name: OUT_11_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x4A4
+        name: OUT11_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_11_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x4A5
+        name: CH10_11_CTL
+        fields:
+          - bits: "5"
+            name: OUT_10_11_DIV_SYNC_EN
+            desc: OUT10_11 Divider Sync Enable. Enables synchronization of chandiv dividers at startup for OUT10_11. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_10_11_SR_DIV_SYNC_EN
+            desc: OUT10_11 SYSREF Divider Sync Enable. Enables synchronization of SYSREF dividers at startup for OUT10_11. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: OUT_10_11_CHAN_POL_SEL
+            desc: OUT10_11 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: OUT_10_11_DIV_EN
+            desc: "OUT10_11 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y"
+      - addr: 0x4A6
+        name: CH10_11_CTL2
+        fields:
+          - bits: "7"
+            name: OUT_10_11_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "6"
+            name: OUT_10_11_ZDM_EN
+            desc: OUT10_11 zero delay output enable. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: OUT_10_11_CLK_IN_SEL
+            desc: "OUT10_11 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
+            opts:
+                <<: *clk-in-mux
+          - bits: "4"
+            name: OUT_10_11_CH_DIV_SR_MUX_CLK_SEL
+            desc: OUT10_11 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: OUT_10_11_CH_MUX_SEL
+            desc: "OUT10_11 Input Clock Enable. Enables the selected clock to various inputs: [0] -> ChanDiv, [1] -> ChanDiv Retimer, [2] -> Div2 to OUT10, [3] -> Div2 to OUT11 ROM=Y, EEPROM=Y; 0x0 = OFF; 0x1 = SYSREF; 0x3 = CHDIV; 0x4 = DIV2->OUT8; 0x5 = DIV2->OUT8, SYSREF->OUT9; 0x7 = DIV2->OUT8, CHDIV->OUT9; 0x8 = DIV2->OUT9; 0x9 = SYSREF->OUT8, DIV2->OUT9; 0xB = CHDIV->OUT8, DIV2->OUT9; 0xC = DIV2->OUT8, DIV2->OUT9"
+      - addr: "0x4A7:0x4A8"
+        name: CH10_11_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_10_11_CH_STATIC_OFFSET
+            desc: OUT10_11 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x4A9:0x4AA"
+        name: CH10_11_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_10_11_CH_DIV
+            desc: OUT10_11 ChanDiv Divide Value. ROM=Y, EEPROM=Y
+      - addr: 0x4AB
+        name: CH10_11_SR_ANA_DELAY
+        fields:
+          - bits: "4:0"
+            name: OUT_10_11_SR_ANA_DELAY
+            desc: OUT10_11 SYSREF Analog Delay. Specified here in multiples of one delay step duration. ROM=Y, EEPROM=N 
+      - addr: 0x4AC
+        name: CH10_11_SR_ANA_DELAY_CTL
+        fields:
+          - bits: "5"
+            name: OUT_10_11_SR_ANA_DELAY_DIV2_SEL
+            desc: OUT10_11 SYSREF Analog Delay Div By 2 Select. Divides the incoming clock by 2 to double the delay step size. Useful for increasing analog delay range, given high incoming clock frequencies. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_10_11_SR_ANA_DELAY_EN
+            desc: OUT10_11 SYSREF Analog Delay Enable. Enables the analog delay generator. Set to a 0 to save power if analog delay generator is not needed. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_10_11_SR_ANA_DELAY_SMALL_STEP_EN
+            desc: OUT10_11 SYSREF Analog Delay Small Step Enable. If set to 1, the analog delay generator will use both rising and falling edges of the incoming clock to halve delay step size. Useful for when large pre- divider values have been used. ROM=Y, EEPROM=N 
+          - bits: "2:0"
+            name: OUT_10_11_SR_ANA_DELAY_RANGE
+            desc: Analog delay range is set according to the period entering the SYSREF analog delay block. The period can be calcualted as (OUT_x_y_SR_ANA_DELAY_DIV2_SEL + 1) / (OUT_x_y_SR_ANA_DELAY_SMALL_STEP_EN + 1) / SYSREF source frequency. For OUT_x_y_SR_CH_DIV_BYPASS = 1 SYSREF source frequency = VCO post divider frequency up to maximum of 1500 MHz if or OUT_x_y_SR_CH_DIV_BYPASS = 0 the channel divider frequency. Calculated range must fall between 333 ps and 1050 ps. ROM=Y, EEPROM=N; 0x0 = Reserved; 0x1 = Reserved; 0x2 = 333 ps to 450 ps; 0x3 = > 450 ps to 600 ps; 0x4 = > 600 ps to 750 ps; 0x5 = > 750 ps to 1050 ps; 0x6 = Reserved; 0x7 = Reserved 
+      - addr: 0x4AD
+        name: CH10_11_SR_DDLY
+        fields:
+          - bits: "4:0"
+            name: OUT_10_11_SR_DDLY
+            desc: OUT10_11 SYSREF Digital Delay Value. Measured in VCO half- cycles. ROM=Y, EEPROM=N 
+      - addr: "0x4AE:0x4B0"
+        name: CH10_11_SR_DIV
+        fields:
+          - bits: "19:0"
+            name: OUT_10_11_SR_DIV
+            desc: OUT10_11 SYSREF Divide Value. ROM=Y, EEPROM=N 
+      - addr: "0x4B1:0x4B2"
+        name: CH10_11_SR_STATIC_OFFSET
+        fields:
+          - bits: "14:0"
+            name: OUT_10_11_SR_DIV_STATIC_OFFSET
+            desc: OUT10_11 SYSREF Divider Static Offset. Static offset code which delays the output of the SYSREF divider. ROM=Y, EEPROM=N 
+      - addr: 0x4B3
+        name: CH10_11_SR_PULSE_CTL
+        fields:
+          - bits: "5:3"
+            name: OUT_10_11_PULSE_COUNT
+            desc: OUT10_11 SYSREF Pulse Count. The number of SYSREF pulses which will be generated by a SYSREF request. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: OUT_10_11_SR_GPIO_EN
+            desc: Enable SYSREF to digital for sysre_req and GPIO output ROM=Y, EEPROM=N 
+          - bits: "1:0"
+            name: OUT_10_11_SR_MODE
+            desc: OUT10_11 SYSREF Mode. When this bit is set, the SYSREF operates in Continuous Mode. When cleared, the SYSREF operates in PULSE MODE. ROM=Y, EEPROM=N; 0x0 = None; 0x1 = Continuous; 0x2 = Pulser 
+      - addr: 0x4B4
+        name: CH10_11_DFT
+        fields:
+          - bits: "4"
+            name: OUT_10_11_SR_CH_DIV_BYPASS
+            desc: OUT10_11 cascaded SYSREF bypass mux. If set, bypasses OUT10_11 channel divider for the SYSREF input clock. This is useful for minimizing the step size of the digital delay adjustments on the SYSREF clock. ROM=Y, EEPROM=N
+  - name: Out12_13
+    regs:
+      - addr: 0x4C1
+        name: OUT12_MODE
+        fields:
+          - bits: "7"
+            name: OUT_12_HSDSBOOST
+            desc: OUT12 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_12_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_12_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_12_AMP
+            desc: OUT12 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+
+          - bits: "2:0"
+            name: OUT_12_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x4C2
+        name: OUT12_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_12_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x4C3
+        name: OUT13_MODE
+        fields:
+          - bits: "7"
+            name: OUT_13_HSDSBOOST
+            desc: OUT13 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_13_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_13_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "6:5"
+            name: OUT_13_AMP
+            desc: OUT13 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+          - bits: "4:3"
+            name: OUT_13_PREPWR
+            desc: Output buffer predriver power setting ROM=Y, EEPROM=Y 
+          - bits: "2:0"
+            name: OUT_13_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x4C4
+        name: OUT13_CTL
+        fields:
+          - bits: "4:0"
+            name: OUT_13_CONFIGURATION
+            desc: = CH/2; 0x8 = SYSREF+ADLY; 0x9 = SYSREF; 0xA = Static DC; 0xC = CHDIV; 0x10 = BYPASS
+      - addr: 0x4C5
+        name: CH12_13_CTL
+        fields:
+          - bits: "5"
+            name: OUT_12_13_DIV_SYNC_EN
+            desc: OUT12_13 Divider Sync Enable. Enables synchronization of chandiv dividers at startup for OUT12_13. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_12_13_SR_DIV_SYNC_EN
+            desc: OUT12_13 SYSREF Divider Sync Enable. Enables synchronization of SYSREF dividers at startup for OUT12_13. ROM=Y, EEPROM=N 
+          - bits: "1"
+            name: OUT_12_13_CHAN_POL_SEL
+            desc: OUT12_13 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "0"
+            name: OUT_12_13_DIV_EN
+            desc: "OUT12_13 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y"
+      - addr: 0x4C6
+        name: CH12_13_CTL2
+        fields:
+          - bits: "7"
+            name: OUT_12_13_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "5"
+            name: OUT_12_13_CLK_IN_SEL
+            desc: "OUT12_13 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
+            opts:
+                <<: *clk-in-mux
+          - bits: "4"
+            name: OUT_12_13_CH_DIV_SR_MUX_CLK_SEL
+            desc: OUT12_13 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
+          - bits: "3:0"
+            name: OUT_12_13_CH_MUX_SEL
+            desc: "OUT12_13 Input Clock Enable. Enables the selected clock to various inputs: [0] -> ChanDiv, [1] -> ChanDiv Retimer, [2] -> Div2 to OUT12, [3] -> Div2 to OUT13 ROM=Y, EEPROM=Y; 0x0 = OFF; 0x1 = SYSREF; 0x3 = CHDIV; 0x4 = DIV2->OUT8; 0x5 = DIV2->OUT8, SYSREF->OUT9; 0x7 = DIV2->OUT8, CHDIV->OUT9; 0x8 = DIV2->OUT9; 0x9 = SYSREF->OUT8, DIV2->OUT9; 0xB = CHDIV->OUT8, DIV2->OUT9; 0xC = DIV2->OUT8, DIV2->OUT9"
+      - addr: "0x4C7:0x4C8"
+        name: CH12_13_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_12_13_CH_STATIC_OFFSET
+            desc: OUT12_13 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x4C9:0x4CA"
+        name: CH12_13_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_12_13_CH_DIV
+            desc: OUT12_13 ChanDiv Divide Value. ROM=Y, EEPROM=Y 
+      - addr: 0x4CB
+        name: CH12_13_SR_ANA_DELAY
+        fields:
+          - bits: "4:0"
+            name: OUT_12_13_SR_ANA_DELAY
+            desc: OUT12_13 SYSREF Analog Delay. Specified here in multiples of one delay step duration. ROM=Y, EEPROM=N 
+      - addr: 0x4CC
+        name: CH12_13_SR_ANA_DELAY_CTL
+        fields:
+          - bits: "5"
+            name: OUT_12_13_SR_ANA_DELAY_DIV2_SEL
+            desc: OUT12_13 SYSREF Analog Delay Div By 2 Select. Divides the incoming clock by 2 to double the delay step size. Useful for increasing analog delay range, given high incoming clock frequencies. ROM=Y, EEPROM=N 
+          - bits: "4"
+            name: OUT_12_13_SR_ANA_DELAY_EN
+            desc: OUT12_13 SYSREF Analog Delay Enable. Enables the analog delay generator. Set to a 0 to save power if analog delay generator is not needed. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_12_13_SR_ANA_DELAY_SMALL_STEP_EN
+            desc: OUT12_13 SYSREF Analog Delay Small Step Enable. If set to 1, the analog delay generator will use both rising and falling edges of the incoming clock to halve delay step size. Useful for when large pre- divider values have been used. ROM=Y, EEPROM=N 
+          - bits: "2:0"
+            name: OUT_12_13_SR_ANA_DELAY_RANGE
+            desc: Analog delay range is set according to the period entering the SYSREF analog delay block. The period can be calcualted as (OUT_x_y_SR_ANA_DELAY_DIV2_SEL + 1) / (OUT_x_y_SR_ANA_DELAY_SMALL_STEP_EN + 1) / SYSREF source frequency. For OUT_x_y_SR_CH_DIV_BYPASS = 1 SYSREF source frequency = VCO post divider frequency up to maximum of 1500 MHz if or OUT_x_y_SR_CH_DIV_BYPASS = 0 the channel divider frequency. Calculated range must fall between 333 ps and 1050 ps. ROM=Y, EEPROM=N; 0x0 = Reserved; 0x1 = Reserved; 0x2 = 333 ps to 450 ps; 0x3 = > 450 ps to 600 ps; 0x4 = > 600 ps to 750 ps; 0x5 = > 750 ps to 1050 ps; 0x6 = Reserved; 0x7 = Reserved
+      - addr: 0x4CD
+        name: CH12_13_SR_DDLY
+        fields:
+          - bits: "4:0"
+            name: OUT_12_13_SR_DDLY
+            desc: OUT12_13 SYSREF Digital Delay Value. Measured in VCO half- cycles. ROM=Y, EEPROM=N
+      - addr: "0x4CE:0x4D0"
+        name: CH12_13_SR_DIV
+        fields:
+          - bits: "19:0"
+            name: OUT_12_13_SR_DIV
+            desc: OUT12_13 SYSREF Divide Value. ROM=Y, EEPROM=N
+      - addr: "0x4D1:0x4D2"
+        name: CH12_13_SR_STATIC_OFFSET
+        fields:
+          - bits: "14:0"
+            name: OUT_12_13_SR_DIV_STATIC_OFFSET
+            desc: OUT12_13 SYSREF Divider Static Offset. Static offset code which delays the output of the SYSREF divider. ROM=Y, EEPROM=N
+      - addr: 0x4D3
+        name: CH12_13_SR_PULSE_CTL
+        fields:
+          - bits: "5:3"
+            name: OUT_12_13_PULSE_COUNT
+            desc: OUT12_13 SYSREF Pulse Count. The number of SYSREF pulses which will be generated by a SYSREF request. ROM=Y, EEPROM=N 
+          - bits: "2"
+            name: OUT_12_13_SR_GPIO_EN
+            desc: Enable SYSREF to digital for sysre_req and GPIO output ROM=Y, EEPROM=N 
+          - bits: "1:0"
+            name: OUT_12_13_SR_MODE
+            desc: OUT12_13 SYSREF Mode. When this bit is set, the SYSREF operates in Continuous Mode. When cleared, the SYSREF operates in PULSE MODE. ROM=Y, EEPROM=N; 0x0 = None; 0x1 = Continuous; 0x2 = Pulser
+      - addr: 0x4D4
+        name: CH12_13_DFT
+        fields:
+          - bits: "4"
+            name: OUT_12_13_SR_CH_DIV_BYPASS
+            desc: OUT12_13 cascaded SYSREF bypass mux. If set, bypasses OUT12_13 channel divider for the SYSREF input clock. This is useful for minimizing the step size of the digital delay adjustments on the SYSREF clock. ROM=Y, EEPROM=N
+  - name: Out14_15
+    regs:
+      - addr: 0x4E0
+        name: OUT14_MODE
+        fields:
+          - bits: "6"
+            name: OUT_14_HSDSBOOST
+            desc: OUT14 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_14_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_14_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "5:4"
+            name: OUT_14_AMP
+            desc: OUT14 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+
+          - bits: "2:0"
+            name: OUT_14_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x4E1
+        name: OUT14_CTL
+        fields:
+          - bits: "2:0"
+            name: OUT_14_CONFIGURATION
+            desc: OUT14 Configuration.; 0x2 = Static DC; 0x3 = CHDIV; 0x4 = BYPASS
+      - addr: 0x4E2
+        name: CH14_CTL
+        fields:
+          - bits: "7"
+            name: OUT_14_CHAN_POL_SEL
+            desc: OUT14 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "6:5"
+            name: OUT_14_CLK_MUX
+            desc: OUT14 Input Clock Select. Selects the input clock which will be used to drive the output. ROM=N, EEPROM=N; 0x0 = VCO3; 0x1 = VCO2; 0x2 = VCO1_PRI
+            opts:
+                <<: *clk-in-mux-ef
+          - bits: "3"
+            name: OUT_14_DIV_EN
+            desc: "OUT14 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
+          - bits: "2:0"
+            name: OUT_14_CH_MUX_SEL
+            desc: OUT14 Clock Enable. Bit 2, if set, passes the selected clock (VCO3 or VCO1P), to the second stage of clock selection. Bit 1 and Bit0 enable the selected clock to drive the channel divider and the channel divider retimer respectively. ROM=Y, EEPROM=Y; 0x0 = PLL2->BYPASS; 0x3 = PLL2->CHDIV; 0x4 = PLL1,3->BYPASS; 0x7 = PLL1,3->CHDIV
+      - addr: 0x4E3
+        name: CH14_CTL2
+        fields:
+          - bits: "4"
+            name: OUT_14_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_14_SYNC_EN
+            desc: OUT14 ChanDiv Sync Enable. Enables synchronization of chandiv dividers at startup for OUT14. ROM=Y, EEPROM=N
+      - addr: "0x4E4:0x4E5"
+        name: CH14_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_14_CH_STATIC_OFFSET
+            desc: OUT14 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x4E6:0x4E7"
+        name: CH14_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_14_CH_DIV
+            desc: OUT14 ChanDiv Divide Value. ROM=Y, EEPROM=Y
+      - addr: 0x500
+        name: OUT15_MODE
+        fields:
+          - bits: "6"
+            name: OUT_15_HSDSBOOST
+            desc: OUT15 HSDS Mode Boosted Amplitude. When this bit is set to 0, OUT_15_AMP can select from 300mVpp to 600mVpp. When this bit is set to 1, OUT_15_AMP can select from 600mVpp to 900mVpp. ROM=Y, EEPROM=Y 
+          - bits: "5:4"
+            name: OUT_15_AMP
+            desc: OUT15 Amplitude Select. Selects one of four available single-ended Vpp amplitudes for LVDS, LVPECL, and HSDS outputs. ROM=Y, EEPROM=Y 
+
+          - bits: "2:0"
+            name: OUT_15_FMT
+            desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
+            opts:
+                <<: *out-fmt
+      - addr: 0x501
+        name: OUT15_CTL
+        fields:
+          - bits: "2:0"
+            name: OUT_15_CONFIGURATION
+            desc: = Static DC; 0x3 = CHDIV; 0x4 = BYPASS
+      - addr: 0x502
+        name: CH15_CTL
+        fields:
+          - bits: "7"
+            name: OUT_15_CHAN_POL_SEL
+            desc: OUT15 ChanDiv Polarity Select. When cleared, this bit inverts the polarity of the input to the channel divider. ROM=Y, EEPROM=N 
+          - bits: "6:5"
+            name: OUT_15_CLK_MUX
+            desc: OUT15 Input Clock Select. Selects the input clock which will be used to drive the output. ROM=N, EEPROM=N; 0x0 = VCO3; 0x1 = VCO2; 0x2 = VCO1_PRI 
+            opts:
+                <<: *clk-in-mux-ef
+          - bits: "3"
+            name: OUT_15_DIV_EN
+            desc: "OUT15 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
+          - bits: "2:0"
+            name: OUT_15_CH_MUX_SEL
+            desc: OUT15 Clock Enable. Bit 2, if set, passes the selected VCO1 clock (VCO1P or VCO1S), to the second stage of clock selection. Bit 1 and Bit0 enable the selected clock to drive the channel divider and the channel divider retimer respectively. ROM=Y, EEPROM=Y; 0x0 = PLL2->BYPASS; 0x3 = PLL2->CHDIV; 0x4 = PLL1,3->BYPASS; 0x7 = PLL1,3->CHDIV
+      - addr: 0x503
+        name: CH15_CTL2
+        fields:
+          - bits: "4"
+            name: OUT_15_MUTE_EN
+            desc: Mute enable. ROM=Y, EEPROM=N 
+          - bits: "3"
+            name: OUT_15_SYNC_EN
+            desc: OUT15 ChanDiv Sync Enable. Enables synchronization of chandiv dividers at startup for OUT15. ROM=Y, EEPROM=N 
+      - addr: "0x504:0x505"
+        name: CH15_STATIC_OFFSET
+        fields:
+          - bits: "11:0"
+            name: OUT_15_CH_STATIC_OFFSET
+            desc: OUT15 ChanDiv Static Offset. Static offset code which delays the output of the channel divider. ROM=Y, EEPROM=Y 
+      - addr: "0x506:0x507"
+        name: CH15_DIV
+        fields:
+          - bits: "11:0"
+            name: OUT_15_CH_DIV
+            desc: OUT15 ChanDiv Divide Value. ROM=Y, EEPROM=Y 
