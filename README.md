@@ -12,7 +12,7 @@ sudo add-apt-repository ppa:wavelet-lab/usdr-lib
 sudo apt update
 ```
 
-#### Install the package
+#### Install the tools
 
 ```shell
 sudo apt install usdr-tools
@@ -33,38 +33,38 @@ sudo apt install usdr-dkms
 #### Install the development package
 
 ```shell
-sudo apt install usdr-dev
+sudo apt install libusdr-dev
 ```
 
-# Build from source
+## Build from source
 
-## Clone the repository
+#### Clone the repository
 
 ```shell
 git clone https://github.com/wavelet-lab/usdr-lib.git ./usdr-lib
 cd usdr-lib
 ```
 
-## Dependencies
+#### Dependencies
 
 ```shell
 sudo apt install build-essential cmake python3 python3-venv python3-yaml dwarves -y
 sudo apt install libusb-1.0-0-dev check dkms -y
 ```
 
-## Build
+#### Build
 
 ```shell
 mkdir build
 cd build
-cmake ../src
+cmake ../src -DENABLE_TESTS=OFF
 make
 ```
 
-## Build kernel module
+#### Build kernel module
 
 ```shell
 sudo apt install linux-headers-$(uname -r)
-cd src/lib/lowlevel/pcie_uram/driver
+cd ../src/lib/lowlevel/pcie_uram/driver
 sudo insmod usdr_pcie_uram.ko
 ````
