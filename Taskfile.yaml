@@ -9,7 +9,7 @@ tasks:
         DEBIAN_FRONTEND: "noninteractive"
     cmds:
       - docker build --platform {{.PLATFORM}} -t {{.DOCKER_IMAGE}} -f {{.DOCKER_FILE}} .
-      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work {{.DOCKER_IMAGE}}
+      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work -v ~/.gnupg:/mnt/gnupg {{.DOCKER_IMAGE}}
       - docker exec -ti $(docker ps -lq) /bin/bash
 
   buildbox-ubuntu2004-amd64:
@@ -75,3 +75,15 @@ tasks:
       - rm -rf /build/*
       - cmake /work -DENABLE_TESTS=OFF
       - make
+
+  ppa:
+    desc: Upload the debian package to the ppa(ment to be run inside the buildbox)
+    preconditions:
+      - test -d /mnt/gnupg
+    cmds:
+      - rm -rf /root/.gnupg
+      - cp -ra /mnt/gnupg /root/.gnupg 2>/dev/null | true
+      - rm -rf /root/.gnupg/S.* /root/.gnupg/public-keys.d/.* /root/.gnupg/public-keys.d/*.lock
+      - gpg-agent --daemon
+      - debuild -S
+      - dput ppa:wavelet-lab/usdr-lib /work/../*.changes

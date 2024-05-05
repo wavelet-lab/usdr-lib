@@ -2,11 +2,13 @@ Source: usdr
 Section: misc
 Priority: optional
 Maintainer: Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>
-Standards-Version: 0.9.0
+Standards-Version: 0.9.2
 Homepage: https://github.com/wavelet-lab/usdr-lib
 Vcs-Browser: https://github.com/wavelet-lab/usdr-lib
 Vcs-Git: https://github.com/wavelet-lab/usdr-lib.git
 Build-Depends:
+     debhelper (>= 12.10),
+     dh-dkms (>= 3.0.11),
      build-essential,
      cmake,
      python3,
@@ -50,7 +52,7 @@ Description: Development files for uSDR devices
 
 Package: usdr-tools
 Architecture: amd64 arm64
-Section: kernel
+Section: misc
 Priority: optional
 Depends:
     libusdr (= ${binary:Version}),
