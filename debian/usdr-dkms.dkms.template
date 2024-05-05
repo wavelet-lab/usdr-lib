@@ -1,8 +1,7 @@
 PACKAGE_NAME="usdr-dkms"
 PACKAGE_VERSION=#MODULE_VERSION#
 CLEAN="make clean"
-MAKE[0]="make KERN_DIR=/lib/modules/${kernelver}/build"
-BUILT_MODULE_NAME[0]="usdr"
-BUILT_MODULE_LOCATION[0]="src/"
+MAKE[0]="make -C ${kernel_source_dir} M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build"
+BUILT_MODULE_NAME[0]="usdr_pcie_uram"
 DEST_MODULE_LOCATION[0]="/kernel/drivers/misc"
 AUTOINSTALL="yes"

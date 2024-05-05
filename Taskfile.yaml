@@ -73,7 +73,7 @@ tasks:
     cmds:
       - rm -rf /build/.*
       - rm -rf /build/*
-      - cmake /work -DENABLE_TESTS=OFF
+      - cmake /work/src
       - make
 
   ppa:
