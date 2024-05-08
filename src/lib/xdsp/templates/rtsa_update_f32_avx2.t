@@ -16,8 +16,8 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     const __m256 v_mine        = _mm256_set1_ps(mine);
     const __m256 v_corr        = _mm256_set1_ps(corr - (float)st->upper_pwr_bound);
     const __m256 divs_for_dB   = _mm256_set1_ps((float)st->divs_for_dB);
-    const __m256 log2_mul      = _mm256_set1_ps(FASTLOG2_MUL);
-    const __m256 log2_sub      = _mm256_set1_ps(FASTLOG2_SUB);
+    const __m256 log2_mul      = _mm256_set1_ps(WVLT_FASTLOG2_MUL);
+    const __m256 log2_sub      = _mm256_set1_ps(WVLT_FASTLOG2_SUB);
     const __m256 sign_bit      = _mm256_set1_ps(-0.0f);
     const __m256i v_depth      = _mm256_set1_epi32((int32_t)rtsa_depth);
     const __m256 max_ind       = _mm256_set1_ps((float)(rtsa_depth - 1) - 0.5f);
