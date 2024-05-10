@@ -63,7 +63,7 @@ static void setup(void)
     st->lower_pwr_bound = LOWER_PWR_BOUND;
     st->upper_pwr_bound = UPPER_PWR_BOUND;
     st->divs_for_dB     = DIVS_FOR_DB;
-    st->averaging       = AVGS;
+    st->charging_frame  = AVGS;
     st->raise_coef      = RAISE_COEF;
     st->decay_coef      = DECAY_COEF;
     rtsa_calc_depth(st);

@@ -112,7 +112,7 @@ struct fft_rtsa_settings
     int16_t lower_pwr_bound;  // lower pwr levej, dB (e.g. -120)
     unsigned divs_for_dB;     // pwr granularity within 1 dB (e.g. 100)
     unsigned rtsa_depth;      // need to be calced by rtsa_calc_depth()!
-    unsigned averaging;       // averaging count for 1 cycle. Optimal if it is 2^n
+    unsigned charging_frame;  // charge iterations (FFT count) for one full charge/discharge. Looks like "contrast". Should by > 0 and optimal if it is 2^n
     unsigned raise_coef;      // charge speed multiplier, 1 - the slowest. Preferred value == 24+
     unsigned decay_coef;      // discharge speed divider, 1 - the slowest. Optimal if it is 2^n. Preferred value == 1.
 };

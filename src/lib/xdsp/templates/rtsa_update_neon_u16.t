@@ -9,8 +9,8 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     //
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const unsigned rtsa_depth = st->rtsa_depth;
-    const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->averaging;
-    const unsigned decay_rate_pw2 = (unsigned)(wvlt_fastlog2(st->averaging * st->decay_coef) + 0.5);
+    const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
+    const unsigned decay_rate_pw2 = (unsigned)(wvlt_fastlog2(st->charging_frame * st->decay_coef) + 0.5);
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
     const float32x4_t v_mine        = vdupq_n_f32(mine);
