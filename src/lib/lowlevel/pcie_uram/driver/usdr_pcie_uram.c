@@ -20,10 +20,12 @@
 #include <linux/slab.h>
 #include <linux/stddef.h>
 #include <linux/string.h>
+#include <linux/eventpoll.h>
 #include <asm/page.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
+#include <linux/ktime.h>
 
 #include "./pcie_uram_driver_if.h"
 #include "./si2c.h"
@@ -41,6 +43,26 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION("0.1");
 
 //#define OLD_IRQ
+
+// Fixups for old kernel modules
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
+typedef unsigned __poll_t;
+#ifndef EPOLLIN
+#define EPOLLIN		0x00000001
+#endif
+
+#ifndef EPOLLOUT
+#define EPOLLOUT	0x00000004
+#endif
+
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+static int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
+{
+    return dev->irq + nr;
+}
+#endif
 
 enum device_flags {
     DEV_VALID = 1,
@@ -80,7 +102,9 @@ struct stream_state {
     //union {
     //    struct stream_core_state_rxbrst rxbrst;
     //} cores;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+    struct dma_attrs dma_attr;
+#endif
     struct usdr_dmabuf dmab[0];
 };
 
@@ -431,7 +455,13 @@ irq_found:
             d->streaming[event_no].stat_data[k + 0] = data[1]; // 0
             d->streaming[event_no].stat_data[k + 1] = data[2]; // 1
             d->streaming[event_no].stat_data[k + 2] = data[3]; // 2
-            d->streaming[event_no].stat_data[k + 3] = ets;     // Timestamp
+            d->streaming[event_no].stat_data[k + 3] =
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+                 ets.tv64;     // Timestamp
+#else
+                 ets;
+#endif
+
             d->streaming[event_no].stat_wptr++;
             
             //dev_notice(&d->pdev->dev, "BUCKET %d IRQ %d: Event %d Flag: %d; RPTR %d; Data: %08x_%08x_%08x_%08x %016llx\n",
@@ -716,12 +746,16 @@ static int usdr_device_initialie(struct usdr_dev *usdrdev)
 
     
     //Initialize interrupt routines
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(4,11,0)
+    res = pci_enable_msi_range(usdrdev->pdev, 1, 1);
+#else
     res = pci_alloc_irq_vectors(usdrdev->pdev, 1, 1, PCI_IRQ_MSI);
+#endif
     if (res < 1) {
         dev_err(&usdrdev->pdev->dev, "pci_alloc_irq_vectors: unable to initialize interrupts: %d\n", res);
         return res;
     }
-    
+
     // Configure Bucket 0
     irq = 0;
     snprintf(&usdrdev->int_names[INTNAMES_MAX * irq], INTNAMES_MAX, "usdr%d_b%d", usdrdev->devno, 0);
@@ -795,13 +829,20 @@ static int usdr_stream_initialize(struct usdr_dev *usdrdev,
     s->dma_buffs = sdma->dma_bufs;
     s->dma_buff_size = newsz;
     s->dma_buffer_flags = flags;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+    init_dma_attrs(&s->dma_attr);
+#endif
 
     for (i = 0; i < sdma->dma_bufs; i++) {
             s->dmab[i].kvirt = dma_alloc_attrs(&usdrdev->pdev->dev,
                                              s->dma_buff_size,
                                              &s->dmab[i].phys,
                                              GFP_KERNEL,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
                                              s->dma_buffer_flags);
+#else
+                                             &s->dma_attr);
+#endif
             if (!s->dmab[i].kvirt) {
                     printk(KERN_INFO PFX "Failed to allocate %d DMA buffer", i);
                     goto failed_alloc;
@@ -851,7 +892,11 @@ failed_alloc:
                        s->dma_buff_size,
                        s->dmab[i - 1].kvirt,
                        s->dmab[i - 1].phys,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+                       &s->dma_attr);
+#else
                        s->dma_buffer_flags);
+#endif
     }
     kfree(s);
     return -ENOMEM;
@@ -876,7 +921,12 @@ static int usdr_stream_free(struct usdr_dev *usdrdev, unsigned sno)
                        s->dma_buff_size,
                        s->dmab[i - 1].kvirt,
                        s->dmab[i - 1].phys,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+                       &s->dma_attr);
+#else
                        s->dma_buffer_flags);
+#endif
+
     }
 
     kfree(s);
@@ -1374,7 +1424,11 @@ static int usdrfd_mmap(struct file *filp, struct vm_area_struct *vma)
                              usdrdev->streams[streamno]->dmab[bno].kvirt,
                              usdrdev->streams[streamno]->dmab[bno].phys,
                              usdrdev->streams[streamno]->dma_buff_size,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+                             &usdrdev->streams[streamno]->dma_attr);
+#else
                              usdrdev->streams[streamno]->dma_buffer_flags);
+#endif
         vma->vm_pgoff = vm_pgoff;
         //vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
