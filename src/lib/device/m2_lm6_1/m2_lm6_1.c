@@ -1049,5 +1049,5 @@ struct device_factory_ops s_ops = {
 
 int usdr_device_register_m2_lm6_1()
 {
-    return usdr_device_register(M2_LM6_1_DEVICE_ID, &s_ops);
+    return usdr_device_register(M2_LM6_1_DEVICE_ID_C, &s_ops);
 }
