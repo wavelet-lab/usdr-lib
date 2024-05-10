@@ -2,12 +2,12 @@ version: '3'
 
 tasks:
   deb:
-    desc: Build the debian package(ment to be run inside the buildbox)
+    desc: Build the debian package
     cmds:
       - debuild -us -uc
 
   build:
-    desc: Build the project(ment to be run inside the buildbox)
+    desc: Build the project
     preconditions:
       - test -d /work/build
     dir: /work/build
@@ -18,7 +18,7 @@ tasks:
       - make
 
   ppa:
-    desc: Upload the debian package to the ppa(ment to be run inside the buildbox)
+    desc: Upload the debian package to the ppa
     preconditions:
       - test -d /mnt/gnupg
     cmds:
