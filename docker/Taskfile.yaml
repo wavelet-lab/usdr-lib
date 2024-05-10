@@ -21,6 +21,7 @@ tasks:
     desc: Cleans after the debian package build
     cmds:
       - rm -f /work/*.deb /work/*.dsc /work/*.changes /work/*.tar.gz /work/*.build
+      - rm -rf /work/work/debian
 
   build:
     desc: Build the project
