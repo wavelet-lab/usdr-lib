@@ -1,4 +1,5 @@
 # usdr-lib
+
 uSDR software libraries, driver and utilities
 
 ## Installation from packages
@@ -28,6 +29,7 @@ sudo apt install soapysdr-module-usdr
 
 ```shell
 sudo apt install usdr-dkms
+sudo modprobe usdr_pcie_uram
 ```
 
 #### Install the development package
@@ -47,6 +49,14 @@ cd usdr-lib
 
 #### Dependencies
 
+##### Ubuntu 18.04
+
+```shell
+#TODO!!!
+```
+
+##### Ubuntu 20.04, 22.04, 24.04
+
 ```shell
 sudo apt install build-essential cmake python3 python3-venv python3-yaml dwarves -y
 sudo apt install libusb-1.0-0-dev check dkms -y
@@ -57,7 +67,7 @@ sudo apt install libusb-1.0-0-dev check dkms -y
 ```shell
 mkdir build
 cd build
-cmake ../src -DENABLE_TESTS=OFF
+cmake ../src
 make
 ```
 
@@ -66,5 +76,6 @@ make
 ```shell
 sudo apt install linux-headers-$(uname -r)
 cd ../src/lib/lowlevel/pcie_uram/driver
+make
 sudo insmod usdr_pcie_uram.ko
 ````
