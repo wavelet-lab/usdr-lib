@@ -14,3 +14,5 @@ usdr-dkms.postinst
 usdr-dkms.postrm
 usdr-dkms.dkms
 usdr-dev.install
+libusdr.install
+soapysdr-module-usdr.install

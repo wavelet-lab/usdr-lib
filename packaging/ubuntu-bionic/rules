@@ -13,6 +13,10 @@ override_dh_auto_configure:
 	sed 's/#MODULE_VERSION#/$(DEB_VERSION_UPSTREAM)/g' debian/usdr-dkms.install.template > debian/usdr-dkms.install
 	sed 's/#MODULE_VERSION#/$(DEB_VERSION_UPSTREAM)/g' debian/usdr-dkms.dkms.template > debian/usdr-dkms.dkms
 
+	# Substitute architecture in install files
+	sed 's/##DEB_HOST_MULTIARCH##/$(DEB_HOST_MULTIARCH)/g' debian/libusdr.install.template > debian/libusdr.install
+	sed 's/##DEB_HOST_MULTIARCH##/$(DEB_HOST_MULTIARCH)/g' debian/soapysdr-module-usdr.install.template > debian/soapysdr-module-usdr.install
+
 	# Generate the dev package install file
 	cat debian/libusdr-dev.install.template > debian/libusdr-dev.install
 
