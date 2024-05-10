@@ -11,14 +11,14 @@ RUN apt-get install build-essential curl -y
 # Install fresh version of Cmake
 RUN apt-get install libssl-dev -y
 RUN cd /tmp \
-    && curl https://cmake.org/files/v3.16/cmake-3.16.9.tar.gz -o cmake-3.16.9.tar.gz \
-    && tar xvf cmake-3.16.9.tar.gz \
-    && cd cmake-3.16.9 \
+    && curl https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -o cmake-3.28.3.tar.gz \
+    && tar xvf cmake-3.28.3.tar.gz \
+    && cd cmake-3.28.3 \
     && ./bootstrap \
     && make \
     && make install \
     && cd .. \
-    && rm -rf cmake-3.16.9 cmake-3.16.9.tar.gz \
+    && rm -rf cmake-3.28.3 cmake-3.28.3.tar.gz \
     && update-alternatives --install /usr/bin/cmake cmake /usr/local/bin/cmake 10
 
 RUN apt-get install python3.8 python3.8-distutils -y
