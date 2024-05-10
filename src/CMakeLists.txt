@@ -47,7 +47,6 @@ endif(ENABLE_VERILATOR)
 
 # GDB Version <10 can't pase parameters correctly
 add_compile_options(
-    "-fcf-protection=none"
     "$<$<CONFIG:DEBUG>:-O0;-g>"
     "$<$<CONFIG:RELEASE>:-O3>"
 )

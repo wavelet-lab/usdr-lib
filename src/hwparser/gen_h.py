@@ -178,7 +178,7 @@ class GenH:
                     defc = "#define MAKE_%s_%s(%s)" % (self.h_name, name, reduce(lambda x, y: "%s, %s" % (x, y), [x.name.lower() for x in r.fields]))
                     #defc += " ((%s << %d) |" % (name, self.data_width)
                     defc += " %s(%s," % (def_macro, name)
-                    defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s(((%s) << %s) & %s)" % (self.TAB, x.name.lower(), (y := self.fieldName(x)) + "_OFF", y + "_MSK") for x in r.fields ])
+                    defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s(((%s) << %s) & %s)" % (self.TAB, x.name.lower(), self.fieldName(x) + "_OFF", self.fieldName(x) + "_MSK") for x in r.fields ])
                     defc += ")"
                     print(defc)
                 else:
@@ -186,7 +186,7 @@ class GenH:
                     value_off = reduce(lambda x, y: min(x, y), [x.bits_l for x in r.fields])
                     if len(r.fields) > 1:
                         defc = "#define MAKE_%s_%s_LONG(%s) (" % (self.h_name, name, reduce(lambda x, y: "%s, %s" % (x, y), [x.name.lower() for x in r.fields]))
-                        defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s(((%s) << %s) & %s)" % (self.TAB, x.name.lower(), (y := self.fieldName(x)) + "_OFF", y + "_MSK") for x in r.fields ])
+                        defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s(((%s) << %s) & %s)" % (self.TAB, x.name.lower(), self.fieldName(x) + "_OFF", self.fieldName(x) + "_MSK") for x in r.fields ])
                         defc += ")"
                         print(defc)
 
@@ -235,7 +235,8 @@ class GenH:
             regn = self.regName(r).lower()
             for f in r.fields:
                 fname = f.name.lower()
-                fldn = (FLDN := self.fieldName(f)).lower()
+                FLDN = self.fieldName(f)
+                fldn = FLDN.lower()
                 fn = "static inline void %s_%s_set(%s_t* p, %s %s) { " % (sn, fldn, sn, tp, fname)
                 fn += "p->%s = (p->%s & ~%s_MSK) | ((%s << %s_OFF) & %s_MSK); }" % (regn, regn, FLDN, fname, FLDN, FLDN)
                 print(fn)
