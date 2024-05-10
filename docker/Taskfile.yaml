@@ -1,0 +1,30 @@
+version: '3'
+
+tasks:
+  deb:
+    desc: Build the debian package(ment to be run inside the buildbox)
+    cmds:
+      - debuild -us -uc
+
+  build:
+    desc: Build the project(ment to be run inside the buildbox)
+    preconditions:
+      - test -d /work/build
+    dir: /work/build
+    cmds:
+      - rm -rf /work/build/.*
+      - rm -rf /work/build/*
+      - cmake /work/work/src
+      - make
+
+  ppa:
+    desc: Upload the debian package to the ppa(ment to be run inside the buildbox)
+    preconditions:
+      - test -d /mnt/gnupg
+    cmds:
+      - rm -rf /root/.gnupg
+      - cp -ra /mnt/gnupg /root/.gnupg 2>/dev/null | true
+      - rm -rf /root/.gnupg/S.* /root/.gnupg/public-keys.d/.* /root/.gnupg/public-keys.d/*.lock
+      - gpg-agent --daemon
+      - debuild -S
+      - dput ppa:wavelet-lab/usdr-lib /work/../*.changes
