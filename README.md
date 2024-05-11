@@ -53,7 +53,7 @@ cd usdr-lib
 
 ```shell
 sudo apt install build-essential dwarves -y
-sudo apt install libusb-1.0-0-dev check dkms curl-y
+sudo apt install libusb-1.0-0-dev check dkms curl -y
 
 # Install fresh version of Cmake
 apt-get install libssl-dev -y
