@@ -43,7 +43,7 @@ sudo apt install libusdr-dev
 #### Clone the repository
 
 ```shell
-git clone https://github.com/wavelet-lab/usdr-lib.git ./usdr-lib
+git clone https://github.com/wavelet-lab/usdr-lib.git
 cd usdr-lib
 ```
 
