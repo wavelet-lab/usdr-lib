@@ -1,89 +1,11 @@
 version: '3'
 
-tasks:
+includes:
+
   buildbox:
-    internal: true
-    interactive: true
-    env:
-        DOCKER_CLI_HINTS: "false"
-        DEBIAN_FRONTEND: "noninteractive"
-    cmds:
-      - docker build --platform {{.PLATFORM}} -t {{.DOCKER_IMAGE}} -f {{.DOCKER_FILE}} .
-      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work -v ~/.gnupg:/mnt/gnupg {{.DOCKER_IMAGE}}
-      - docker exec -ti $(docker ps -lq) /bin/bash
+    taskfile: ./Taskfile.buildbox.yaml
+    optional: true
 
-  buildbox-ubuntu2004-amd64:
-    cmds:
-      - task: buildbox
-        vars:
-          PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-ubuntu2004-amd64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2004.amd64
-
-  buildbox-ubuntu2204-amd64:
-    cmds:
-      - task: buildbox
-        vars:
-          PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-ubuntu2204-amd64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2204.amd64
-
-  buildbox-ubuntu2404-amd64:
-    cmds:
-      - task: buildbox
-        vars:
-          PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-ubuntu2304-amd64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2404.amd64
-
-  buildbox-ubuntu2004-arm64:
-    cmds:
-      - task: buildbox
-        vars:
-          PLATFORM: linux/arm64
-          DOCKER_IMAGE: buildbox-ubuntu2004-arm64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2004.arm64
-
-  buildbox-ubuntu2204-arm64:
-    cmds:
-      - task: buildbox
-        vars:
-          PLATFORM: linux/arm64
-          DOCKER_IMAGE: buildbox-ubuntu2204-arm64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2204.arm64
-
-  buildbox-ubuntu2404-arm64:
-    cmds:
-      - task: buildbox
-        vars:
-          PLATFORM: linux/arm64
-          DOCKER_IMAGE: buildbox-ubuntu2404-arm64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2404.arm64
-
-  deb:
-    desc: Build the debian package(ment to be run inside the buildbox)
-    cmds:
-      - debuild -us -uc
-
-  build:
-    desc: Build the project(ment to be run inside the buildbox)
-    preconditions:
-      - test -d /build
-    dir: /build
-    cmds:
-      - rm -rf /build/.*
-      - rm -rf /build/*
-      - cmake /work/src
-      - make
-
-  ppa:
-    desc: Upload the debian package to the ppa(ment to be run inside the buildbox)
-    preconditions:
-      - test -d /mnt/gnupg
-    cmds:
-      - rm -rf /root/.gnupg
-      - cp -ra /mnt/gnupg /root/.gnupg 2>/dev/null | true
-      - rm -rf /root/.gnupg/S.* /root/.gnupg/public-keys.d/.* /root/.gnupg/public-keys.d/*.lock
-      - gpg-agent --daemon
-      - debuild -S
-      - dput ppa:wavelet-lab/usdr-lib /work/../*.changes
+  d:
+    taskfile: /Taskfile.yaml
+    optional: true

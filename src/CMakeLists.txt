@@ -4,6 +4,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(usdr-world C)
 
+include(GNUInstallDirs)
+
 if(POLICY CMP0148)
     cmake_policy(SET CMP0148 OLD) #PythonInterp
 endif()
@@ -47,7 +49,6 @@ endif(ENABLE_VERILATOR)
 
 # GDB Version <10 can't pase parameters correctly
 add_compile_options(
-    "-fcf-protection=none"
     "$<$<CONFIG:DEBUG>:-O0;-g>"
     "$<$<CONFIG:RELEASE>:-O3>"
 )
@@ -82,3 +83,5 @@ message(STATUS "######################################################")
 feature_summary(WHAT DISABLED_FEATURES)
 message(STATUS "usdr version: v${USDR_VERSION}")
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "Install libs: ${CMAKE_INSTALL_LIBDIR}")
+message(STATUS "######################################################")

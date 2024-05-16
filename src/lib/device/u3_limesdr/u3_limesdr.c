@@ -463,5 +463,5 @@ struct device_factory_ops s_ops = {
 
 int usdr_device_register_limesdr()
 {
-    return usdr_device_register(U3_LIMESDR_DEVICE_ID, &s_ops);
+    return usdr_device_register(U3_LIMESDR_DEVICE_ID_C, &s_ops);
 }

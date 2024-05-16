@@ -1,5 +1,7 @@
 # Dev
 .idea/
+obj-*/
+/debian
 
 # Prerequisites
 *.d

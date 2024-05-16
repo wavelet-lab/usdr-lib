@@ -17,7 +17,6 @@ option(ENABLE_VERILATOR "Enable verilator lowlevel bridge" OFF)
 #option(CROSS_ARM    "Enable cross compilation for ARM (UGLY UGLY, fix me please!)" OFF)
 
 add_compile_options(
-    "-fcf-protection=none"
     "$<$<CONFIG:DEBUG>:-O0;-g>"
     "$<$<CONFIG:RELEASE>:-O3>"
 )
