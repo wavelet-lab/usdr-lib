@@ -7,20 +7,28 @@ tasks:
     cmds:
       - rm -f debian
       - ln -s packaging/ubuntu debian
-      - debuild -us -ucls
+      - debuild -us -uc
 
   deb-ubuntu-bionic:
-    desc: Build the debian packages for Ubuntu Bionic
+    desc: Build the debian packages for Ubuntu Bionic(18.04)
     dir: /work/work
     cmds:
       - rm -f debian
       - ln -s packaging/ubuntu-bionic debian
       - debuild -us -uc
 
+  deb-debian-bookworm:
+    desc: Build the debian packages for Debian Bookworm(12)
+    dir: /work/work
+    cmds:
+      - rm -f debian
+      - ln -s packaging/debian-bookworm debian
+      - debuild -us -uc
+
   deb-clean:
     desc: Cleans after the debian package build
     cmds:
-      - rm -f /work/*.deb /work/*.dsc /work/*.changes /work/*.tar.gz /work/*.build
+      - rm -f /work/*.deb /work/*.dsc /work/*.changes /work/*.tar.gz /work/*.build /work/*.buildinfo
       - rm -rf /work/work/debian
 
   build:

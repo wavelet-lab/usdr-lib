@@ -1,0 +1,3 @@
+src/lib/lowlevel/pcie_uram/*.h usr/include/usdr/lowlevel/pcie_uram/
+src/lib/ipblks/*.h usr/include/usdr/ipblks/
+src/lib/device/*.h usr/include/usdr/device/

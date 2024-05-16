@@ -1,0 +1,5 @@
+usdr (0.9.4~bookworm1) stable; urgency=low
+
+  * Initial public release
+
+ -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Sat, 6 May 2024 00:00:00 +0000
