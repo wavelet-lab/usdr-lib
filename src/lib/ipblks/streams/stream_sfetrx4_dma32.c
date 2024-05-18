@@ -551,6 +551,7 @@ static int initialize_stream_rx_32(device_t* device,
     if (res)
         return res;
 
+    need_tx_stat = 1; // Enable stats in all cases
     res = dma_rx32_configure(device->dev, 0, sx_cfg_base, &fc, (need_tx_stat) ? ENABLE_TX_STATS : 0);
     if (res)
         return res;
