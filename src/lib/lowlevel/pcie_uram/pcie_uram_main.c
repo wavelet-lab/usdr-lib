@@ -342,6 +342,8 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
         if (meminsz > 4)
             return -EINVAL;
 
+        usleep(1000);
+
         memcpy(ioi2c.wrb, pout, memoutsz);
         USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d: W=%d R=%d DW=%08x\n",
                  ls_op_addr, ioi2c.wcnt, ioi2c.rcnt, ioi2c.wrw);
