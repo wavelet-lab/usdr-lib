@@ -29,20 +29,6 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
     return lowlevel_reg_rd32(dev, 0, 16 + (bank / 4), data);
 }
 
-uint64_t get_xilinx_rev_h(unsigned rev)
-{
-        uint64_t day = (rev >> 27) & 0x1f;
-        uint64_t month = (rev >> 23) & 0x0f;
-        uint64_t year = (rev >> 17) & 0x3f;
-        uint64_t hour = (rev >> 12) & 0x1f;
-        uint64_t min = (rev >> 6) & 0x3f;
-        uint64_t sec = (rev >> 0) & 0x3f;
-        uint64_t h = 0;
-
-        h = sec + (min + (hour + (day + (month + (2000 + year) * 100) * 100) * 100) * 100) * 100;
-        return h;
-}
-
 
 int main(int argc, char** argv)
 {
@@ -60,7 +46,7 @@ int main(int argc, char** argv)
     memset(outa, 0xff, SIZEOF_ARRAY(outa));
     memset(outb, 0xff, SIZEOF_ARRAY(outb));
 
-    usdrlog_setlevel(NULL, USDR_LOG_INFO);
+    usdrlog_setlevel(NULL, USDR_LOG_WARNING);
     usdrlog_enablecolorize(NULL);
 
     while ((opt = getopt(argc, argv, "U:l:w:r:dFGC")) != -1) {

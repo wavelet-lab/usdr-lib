@@ -18,6 +18,20 @@ enum xlnx_devids {
     XLNX_DEVID_XC7K160T = 0x0364c093,
 };
 
+static inline
+uint64_t get_xilinx_rev_h(unsigned rev)
+{
+    uint64_t day = (rev >> 27) & 0x1f;
+    uint64_t month = (rev >> 23) & 0x0f;
+    uint64_t year = (rev >> 17) & 0x3f;
+    uint64_t hour = (rev >> 12) & 0x1f;
+    uint64_t min = (rev >> 6) & 0x3f;
+    uint64_t sec = (rev >> 0) & 0x3f;
+    uint64_t h = 0;
+
+    h = sec + (min + (hour + (day + (month + (2000 + year) * 100) * 100) * 100) * 100) * 100;
+    return h;
+}
 
 struct xlnx_image_params {
     uint32_t devid;
