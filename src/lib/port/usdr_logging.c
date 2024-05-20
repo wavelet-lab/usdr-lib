@@ -5,9 +5,17 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
-static unsigned s_def_loglevel = USDR_LOG_INFO;
+static unsigned s_def_loglevel = USDR_LOG_ERROR;
 static bool s_colorize = false;
+
+void __attribute__ ((constructor(101))) setup_logging(void) {
+    char *envlog = getenv("USDR_LOGLEVEL");
+    if (envlog) {
+        s_def_loglevel = atoi(envlog);
+    }
+}
 
 #define s_logfile stderr
 
