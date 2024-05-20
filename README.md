@@ -38,6 +38,36 @@ sudo modprobe usdr_pcie_uram
 sudo apt install libusdr-dev
 ```
 
+### Ubuntu 18.04, Debian 12
+
+#### Download
+
+Go to [releases page](https://github.com/wavelet-lab/usdr-lib/releases) and download the corresponding archive.
+
+* Ubuntu 18.04: `usdr_0.9.4~bionic1.tar`
+* Debian 12: `usdr_0.9.4~bookworm1.tar`
+
+#### Unpack
+
+##### Ubuntu 18.04
+
+```shell
+tar xf usdr_0.9.4~bionic1.tar
+```
+
+##### Debian 12
+
+```shell
+tar xf usdr_0.9.4~bookworm1.tar
+```
+
+#### Install package
+
+```shell
+sudo apt install libusb-1.0-0 libsoapysdr0.8 dkms
+sudo dpkg -i *.deb
+```
+
 ## Build from source
 
 #### Clone the repository
@@ -72,7 +102,7 @@ curl https://bootstrap.pypa.io/get-pip.py | python3.8
 python3.8 -m pip install pyyaml
 ```
 
-##### Ubuntu 20.04, 22.04, 24.04
+##### Ubuntu 20.04, 22.04, 24.04, Debian 12
 
 ```shell
 sudo apt install build-essential cmake python3 python3-venv python3-yaml dwarves -y

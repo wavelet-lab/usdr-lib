@@ -34,8 +34,16 @@ tasks:
       - task: buildbox
         vars:
           PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-ubuntu2304-amd64
+          DOCKER_IMAGE: buildbox-ubuntu2404-amd64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2404
+
+  debian12-amd64:
+    cmds:
+      - task: buildbox
+        vars:
+          PLATFORM: linux/amd64
+          DOCKER_IMAGE: buildbox-debian12-amd64
+          DOCKER_FILE: docker/Dockerfile.buildbox.debian12
 
   ubuntu1804-aarch64:
     cmds:
@@ -68,3 +76,11 @@ tasks:
           PLATFORM: linux/arm64
           DOCKER_IMAGE: buildbox-ubuntu2404-aarch64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2404
+
+  debian12-aarch64:
+    cmds:
+      - task: buildbox
+        vars:
+          PLATFORM: linux/arm64
+          DOCKER_IMAGE: buildbox-debian12-aarch64
+          DOCKER_FILE: docker/Dockerfile.buildbox.debian12
