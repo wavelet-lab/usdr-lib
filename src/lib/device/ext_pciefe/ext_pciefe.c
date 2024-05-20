@@ -274,7 +274,7 @@ int board_ext_pciefe_init(lldev_t dev,
             return res;
         if (dummy == 0xbaadbeef) {
             USDR_LOG("PCIF",
-                     (params == NULL) ? USDR_LOG_WARNING : USDR_LOG_ERROR,
+                     (params == NULL) ? USDR_LOG_INFO : USDR_LOG_ERROR,
                      "Unable to initialize expander %d\n", i);
             return (params == NULL) ? -ENODEV : -EIO;
         }

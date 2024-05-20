@@ -28,172 +28,6 @@
 //
 // NOTE Freq set required for IO opeartion since it's automatically trigger POWERON for LMS
 //
-
-#if 0   //unused
-static const uint32_t s_dsp_ucode_fir2[] = {
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01005ff7,
-    0x010061f6,
-    0x010001f5,
-    0x010001f4,
-    0x010001f3,
-    0x010001f2,
-    0x01000111,
-    0x010081ff,
-    0x01006000,
-    0x01005e00,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01ca11bc,
-    0x01d1d3be,
-    0x01d995bf,
-    0x01e157bf,
-    0x01e919bf,
-    0x01f0dbbf,
-    0x01f89dbf,
-    0x01fc5f80,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01bea128,
-    0x01d87128,
-    0x017b9128,
-    0x01c6e128,
-    0x01eaa128,
-    0x01f9c128,
-    0x01fed9a8,
-    0x01000090,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x0128a237,
-    0x01281cfc,
-    0x01280c50,
-    0x01280581,
-    0x0128023c,
-    0x012800c0,
-    0x0128002f,
-    0x01180006,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01000000,
-    0x01128279,
-    0x01128200,
-    0x01128200,
-    0x01128200,
-    0x01128200,
-    0x01128200,
-    0x01128200,
-    0x01028200,
-    0x010000ff,
-    0x01000000,
-    0x0100009f,
-};
-#endif
-
 enum BUSIDX_m2_lm6_1_rev000 {
     I2C_BUS_LP8758 = 0,
     I2C_BUS_SI5332A = 1,
@@ -309,9 +143,6 @@ static int dev_m2_lm6_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, u
 static int dev_m2_lm6_1_debug_lms6002d_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_debug_lms6002d_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
-//static int dev_m2_lm6_1_debug_pciefe_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-//static int dev_m2_lm6_1_debug_pciefe_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
-
 static int dev_m2_lm6_1_i2c_addr_ext_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm6_1_sdr_atcrbs_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -327,6 +158,8 @@ static int dev_m2_lm6_1_sdr_clkmeas_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 
 static int dev_m2_lm6_1_sdr_revision_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 static int dev_m2_lm6_1_sdr_rfe_throttle_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
+static int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 
 static
 const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
@@ -348,7 +181,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/rx/tia/rfb",   { dev_m2_lm6_1_sdr_rx_tia_rfb_set, NULL }},
 
     { "/dm/sdr/0/rx/dc/meas",   { NULL, dev_m2_lm6_1_sdr_rx_dc_meas_get }},
-    { "/dm/sdr/0/rx/dccorr",    { dev_m2_lm6_1_sdr_rx_dccorr_set, NULL }},
+    { "/dm/sdr/0/rx/dccorr",    { dev_m2_lm6_1_sdr_rx_dccorr_set, dev_m2_lm6_1_sdr_dccorr_get }},
     { "/dm/sdr/0/tx/dccorr",    { dev_m2_lm6_1_sdr_tx_dccorr_set, NULL }},
 
     { "/dm/sdr/0/calibrate",    { dev_m2_lm6_1_sdr_dc_calib, NULL }},
@@ -370,8 +203,6 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/tx/waveform_gen", { dev_m2_lm6_1_sdr_tx_waveform_gen_set, NULL}},
 
     { "/debug/hw/lms6002d/0/reg",  { dev_m2_lm6_1_debug_lms6002d_reg_set, dev_m2_lm6_1_debug_lms6002d_reg_get }},
-//    { "/debug/hw/pciefe/0/reg",  { dev_m2_lm6_1_debug_pciefe_reg_set, dev_m2_lm6_1_debug_pciefe_reg_get }},
-
 
     { "/dm/sdr/0/tx/enable",      { dev_m2_lm6_1_sdr_tx_enable_set, NULL }},
 
@@ -460,6 +291,17 @@ int dev_m2_lm6_1_i2c_addr_ext_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t va
     return usdr_i2c_addr_ext_set(&d->d, value);
 }
 
+int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+   // struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    uint32_t v = 0;
+    int res = dev_gpi_get32(ud->dev, 20, &v);
+    if (res)
+        return res;
+
+    *ovalue = v;
+    return 0;
+}
 
 int dev_m2_lm6_1_debug_lms6002d_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {

@@ -71,7 +71,7 @@ int lmk5c33216_create(lldev_t dev, unsigned subdev, unsigned lsaddr, ext_i2c_fun
     if (res)
         return res;
 
-    USDR_LOG("5C33", USDR_LOG_ERROR, "LMK5C33216 DEVID[0/1/2/3] = %02x %02x %02x %02x\n", dummy[3], dummy[2], dummy[1], dummy[0]);
+    USDR_LOG("5C33", USDR_LOG_INFO, "LMK5C33216 DEVID[0/1/2/3] = %02x %02x %02x %02x\n", dummy[3], dummy[2], dummy[1], dummy[0]);
     if ( dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x40 || dummy[0] != 0x05 ) {
         return -ENODEV;
     }

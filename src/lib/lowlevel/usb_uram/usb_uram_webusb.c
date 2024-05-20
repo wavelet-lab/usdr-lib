@@ -9,9 +9,6 @@
 #include "../../webusb/controller.h"
 #include "../../device/generic_usdr/generic_regs.h"
 #include "../../ipblks/si2c.h"
-#include "../../device/mp_lm7_1_gps/xsdr_ctrl.h"
-
-xsdr_dev_t* get_xsdr_dev(pdevice_t udev);
 
 static
     const char* webusb_uram_plugin_info_str(unsigned iparam) {
@@ -282,46 +279,17 @@ static
 };
 
 static
-    uint32_t s_debug_lms7002m_last;
-
-static
     int _dif_set_uint(struct webusb_device* d, const char* entity,
                   uint64_t val)
 {
-    struct webusb_device_ugen *dev = (struct webusb_device_ugen *)d;
-    if (strcmp(entity, "/debug/hw/lms7002m/0/reg") != 0)
-        return -EINVAL;
-    if (dev->base.type_sdr != SDR_XSDR)
-        return -EINVAL;
-
-    unsigned chan = val >> 32;
-    xsdr_dev_t* xsdrdev = get_xsdr_dev(dev->base.ll.pdev);
-    int res = lms7002m_mac_set(&xsdrdev->base.lmsstate, chan);
-
-    s_debug_lms7002m_last = ~0u;
-    res = res ? res : lowlevel_spi_tr32(xsdrdev->base.lmsstate.dev, 0,
-                                        SPI_LMS7, val & 0xffffffff, &s_debug_lms7002m_last);
-    if(!res)
-        USDR_LOG("XDEV", USDR_LOG_WARNING, "Debug LMS7/%d REG %08x => %08x\n",
-                 chan, (unsigned)val,
-                 s_debug_lms7002m_last);
-
-    return res;
+    return -EINVAL;
 }
 
 static
     int _dif_get_uint(struct webusb_device* d, const char* entity,
                   uint64_t *oval)
 {
-    struct webusb_device_ugen *dev = (struct webusb_device_ugen *)d;
-    if (dev->base.type_sdr != SDR_XSDR)
-        return -EINVAL;
-
-    if (strcmp(entity, "/debug/hw/lms7002m/0/reg") != 0)
-        return -EINVAL;
-
-    *oval = s_debug_lms7002m_last;
-    return 0;
+    return -EINVAL;
 }
 
 static

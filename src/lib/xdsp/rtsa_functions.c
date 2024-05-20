@@ -20,19 +20,19 @@ void rtsa_init(fft_rtsa_data_t* rtsa_data, unsigned fft_size)
 #include "templates/rtsa_update_u16_generic.t"
 DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_generic)
 
-#ifdef __AVX2__
+#ifdef WVLT_AVX2
 #define TEMPLATE_FUNC_NAME rtsa_update_avx2
-VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx2,fma"))
 #include "templates/rtsa_update_u16_avx2.t"
 DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_avx2)
-#endif  //__AVX2__
+#endif  //WVLT_AVX2
 
-#ifdef WVLT_ARCH_ARM64
+#ifdef WVLT_NEON
 #define TEMPLATE_FUNC_NAME rtsa_update_neon
 VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/rtsa_update_neon_u16.t"
 DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_neon)
-#endif
+#endif  //WVLT_NEON
 
 rtsa_update_function_t rtsa_update_c(generic_opts_t cpu_cap, const char** sfunc)
 {

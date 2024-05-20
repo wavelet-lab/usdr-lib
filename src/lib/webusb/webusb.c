@@ -1,7 +1,7 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
-﻿#include "webusb.h"
+#include "webusb.h"
 #include "tiny-json.h"
 #include "controller.h"
 

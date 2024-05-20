@@ -74,7 +74,7 @@ int usdr_dif_process_cmd(struct usdr_debug_ctx* ctx, char *cmd, unsigned len,
     }
 }
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
 static void* usdr_dif_thread(void* param)
 {
     int ret;
@@ -185,7 +185,7 @@ int usdr_dif_init(const char *params,
                   //void *obj,
                   struct usdr_debug_ctx** octx)
 {
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
 
     int res;
     const char* fifoname = "usdr_debug_pipe";
@@ -222,7 +222,7 @@ failed_create_thread:
 
 int usdr_dif_free(struct usdr_debug_ctx* ctx)
 {
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
     close(ctx->fd);
 
     pthread_cancel(ctx->debug_thread);

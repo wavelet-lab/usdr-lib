@@ -18,7 +18,7 @@
 
 #include "../ipblks/espi_flash.h"
 #include "../ipblks/xlnx_bitstream.h"
-#include "../device/mp_lm7_1_gps/xsdr_ctrl.h"
+#include "../device/m2_lm7_1/xsdr_ctrl.h"
 
 // TODO: get rid of this foo
 xsdr_dev_t* get_xsdr_dev(pdevice_t udev);

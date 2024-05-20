@@ -26,7 +26,7 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 DECLARE_TR_FUNC_FILTER(conv_filter_interpolate_interleave_generic)
 
 
-#ifdef __SSSE3__
+#ifdef WVLT_SSE3
 #define TEMPLATE_FUNC_NAME conv_filter_sse3
 VWLT_ATTRIBUTE(optimize("-O3"), target("ssse3"))
 #include "templates/conv_filter_sse3.t"
@@ -36,10 +36,9 @@ DECLARE_TR_FUNC_FILTER(conv_filter_sse3)
 VWLT_ATTRIBUTE(optimize("-O3"), target("ssse3"))
 #include "templates/conv_filter_interleave_sse3.t"
 DECLARE_TR_FUNC_FILTER(conv_filter_interleave_sse3)
-#endif //__SSSE3__
+#endif  //WVLT_SSE3
 
-
-#ifdef __AVX2__
+#ifdef WVLT_AVX2
 #define TEMPLATE_FUNC_NAME conv_filter_avx2
 VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 #include "templates/conv_filter_avx2.t"
@@ -49,7 +48,7 @@ DECLARE_TR_FUNC_FILTER(conv_filter_avx2)
 VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 #include "templates/conv_filter_interleave_avx2.t"
 DECLARE_TR_FUNC_FILTER(conv_filter_interleave_avx2)
-#endif //__AVX2__
+#endif  //WVLT_AVX2
 
 
 filter_function_t conv_filter_c(generic_opts_t cpu_cap, const char** sfunc)

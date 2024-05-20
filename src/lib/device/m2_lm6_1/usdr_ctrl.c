@@ -17,6 +17,7 @@
 #include "../hw/tmp114/tmp114.h"
 #include "../hw/si5332/si5332.h"
 #include "../hw/tps6381x/tps6381x.h"
+#include "../ipblks/xlnx_bitstream.h"
 
 #include "../generic_usdr/generic_regs.h"
 
@@ -386,9 +387,6 @@ int usdr_ctor(lldev_t dev, subdev_t sub, struct usdr_dev *d)
 
 int usdr_i2c_addr_ext_set(struct usdr_dev *d, uint8_t addr)
 {
-    // return lowlevel_reg_wr32(d->base.dev, d->subdev, M2PCI_REG_STAT_CTRL,
-    //                          (1u << 31) | ((uint32_t)addr << 24) | 0x60 | (0x6au << 8) | (0x75u << 16));
-
     return lowlevel_reg_wr32(d->base.dev, d->subdev, M2PCI_REG_STAT_CTRL,
                              MAKE_I2C_LUT(0x80 | addr, I2C_DEV_TMP114NB, I2C_DEV_CLKGEN, I2C_DEV_PMIC_FPGA));
 }
@@ -399,6 +397,7 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
     int res;
     uint16_t rev = 0xffff;
     uint32_t did;
+    uint32_t uaccess;
 
     if (ext_clk && ext_fref) {
         if ((ext_fref < 23e6) || (ext_fref > 41e6)) {
@@ -448,15 +447,18 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
     strncpy(d->cfg_auto_tx[1].name1, "B2", sizeof(d->cfg_auto_tx[0].name0));
 
     // Get HWID
+    res = dev_gpi_get32(dev, IGPI_USR_ACCESS2, &uaccess);
+    if (res)
+        return res;
 
     res = dev_gpi_get32(dev, IGPI_HWID, &d->hwid);
-
     if (res)
         return res;
 
     d->hw_board_hasmixer = false;
     d->hw_board_rev = (d->hwid >> 8) & 0xff;
-    USDR_LOG("XDEV", USDR_LOG_INFO, "HWID %08x USDR Board rev.%d\n", d->hwid, d->hw_board_rev);
+    USDR_LOG("XDEV", USDR_LOG_WARNING, "HWID %08x USDR Board rev.%d Device `%s` FirmwareID %08x (%lld)\n",
+             d->hwid, d->hw_board_rev, lowlevel_get_devname(dev), uaccess, (long long)get_xilinx_rev_h(uaccess));
 
     switch (d->hw_board_rev) {
     case USDR_REV_1:
@@ -497,18 +499,14 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
         int devid = ~0u;
 
         // Check TMP114
-        // res = lowlevel_reg_wr32(dev, 0, M2PCI_REG_STAT_CTRL,
-        //                         (1u << 31) | I2C_DEV_PMIC_FPGA | (I2C_DEV_CLKGEN << 8) | (I2C_DEV_TMP114NB << 16));
         res = tmp114_devid_get(dev, d->subdev, I2C_BUS_TEMP, &devid);
         if (res)
             return res;
 
-        USDR_LOG("UDEV", USDR_LOG_WARNING, "TMP114 DEVID=%x\n", devid);
+        if (devid != 0x1114) {
+            USDR_LOG("UDEV", USDR_LOG_ERROR, "TMP114 DEVID=%x\n", devid);
+        }
     }
-
-    //res = lowlevel_reg_wr32(dev, 0, M2PCI_REG_STAT_CTRL,
-    //                        (1u << 31) | 0x60 | (0x6au << 8) | (0x75u << 16));
-
 
     res = lp8758_get_rev(dev, d->subdev, I2C_BUS_LP8758, &rev);
     if (res)
@@ -516,7 +514,7 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
 
     if (rev != 0xe001) {
         USDR_LOG("UDEV", USDR_LOG_ERROR, "PMIC ID is incorrect: %04x\n", rev);
- //       return -EFAULT; /////////////////////////////////////////////////////////////////////////////////////
+        return -EFAULT;
     }
 
     res = res ? res : lp8758_ss(dev, d->subdev, I2C_BUS_LP8758, 0);
@@ -532,9 +530,9 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
 
     res = res ? res : lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 1, 1800);
     // Increase 1.8V rail to get more samplerate
-//    res = lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 3, 2100);
-//    if (res)
-//        return res;
+    // res = lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 3, 2100);
+    // if (res)
+    //     return res;
 
     res = res ? res : lp8758_vout_ctrl(dev, d->subdev, I2C_BUS_LP8758, 0, 1, 1); //1v0 -- less affected
     res = res ? res : lp8758_vout_ctrl(dev, d->subdev, I2C_BUS_LP8758, 1, 1, 1); //2v5 -- less affected
@@ -559,12 +557,9 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
     if (res)
         return res;
 
-    USDR_LOG("UDEV", USDR_LOG_ERROR, " ============================================== 9 =========================================\n");
-
     usleep(10000);
 
     // Turn on clock buffers
-  //  res = si5332_init(dev, 0, I2C_BUS_SI5332A, 1, d->hw_board_rev == USDR_REV_2 ? true : false);
     res = si5332_init(dev, 0, I2C_BUS_SI5332A, 1,
                       ext_clk == -1 ? (d->hw_board_rev == USDR_REV_3 ? false : true) : ext_clk,
                       d->hw_board_rev == USDR_REV_3 ? true : false);
@@ -573,26 +568,6 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
         res = dev_gpo_set(dev, IGPO_ENABLE_OSC, ext_clk == 1 ? 0 : 1);
         usleep(1000);
     }
-
-   //res = si5332_init(dev, 0, I2C_BUS_SI5332A, 1,  true);
-    //    res = si5332_init(dev, 0, I2C_BUS_SI5332A, 1,  d->hw_board_rev == USDR_REV_2 ? true : false );
-
-
- //   if (res) ////////////////////////////////////////////////////////////////////////////////////////////////////
- //       goto fail;
-
-
-//    res = lp8758_reg_rd(dev, 0, I2C_BUS_TPS63811, 0x03, &pmic_id[0]);
-//    if (res)
-//        goto fail;
-//    res = lp8758_reg_rd(dev, 0, I2C_BUS_TPS63811, 0x05, &pmic_id[1]);
-//    if (res)
-//        goto fail;
-
-//    d->revision = ((pmic_id[0] == 0xff && pmic_id[1] == 0xff) ? 0 : 1);
-
-//    USDR_LOG("UDEV", USDR_LOG_INFO, "M2_LM6_1: PMIC2 ID %02x:%02x\n",
-//             pmic_id[0], pmic_id[1]);
 
     // Wait for clock to settle
     usleep(10000);
@@ -628,6 +603,7 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
     res = res ? res : lms6002d_set_rx_path(&d->lms, d->cfg_auto_rx[1].band);
     res = res ? res : lms6002d_set_tx_path(&d->lms, d->cfg_auto_tx[0].band);
 
+    res = res ? res : dev_gpo_set(dev, IGPO_DCCORR, 1);
     return res;
 
 fail:
@@ -649,6 +625,7 @@ int usdr_dtor(struct usdr_dev *d)
     return 0;
 }
 
+// We need to enable RX RF to get forward clocking
 #if 0
 int usdr_pwren(struct usdr_dev *d, bool on)
 {
