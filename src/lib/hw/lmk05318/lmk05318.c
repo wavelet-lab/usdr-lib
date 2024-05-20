@@ -79,7 +79,7 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, ext_i2c_func_
     if (res)
         return res;
 
-    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 DEVID[0/1/2/3] = %02x %02x %02x %02x\n", dummy[3], dummy[2], dummy[1], dummy[0]);
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 DEVID[0/1/2/3] = %02x %02x %02x %02x\n", dummy[3], dummy[2], dummy[1], dummy[0]);
 
     if ( dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x35 || dummy[0] != 0x42 ) {
         return -ENODEV;
