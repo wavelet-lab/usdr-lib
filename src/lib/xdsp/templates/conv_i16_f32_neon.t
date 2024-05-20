@@ -18,7 +18,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
         vf[0] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in)) );
         vf[1] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in + 4)) );
         vf[2] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in + 8)) );
-        vf[3] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in + 16)) );
+        vf[3] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in + 12)) );
 
         vf[0] = vmulq_n_f32(vf[0], CONV_SCALE);
         vf[1] = vmulq_n_f32(vf[1], CONV_SCALE);
@@ -28,7 +28,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
         vst1q_f32(out, vf[0]);
         vst1q_f32(out + 4,  vf[1]);
         vst1q_f32(out + 8,  vf[2]);
-        vst1q_f32(out + 16, vf[3]);
+        vst1q_f32(out + 12, vf[3]);
 
         out += 16;
         in += 16;
