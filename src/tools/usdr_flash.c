@@ -128,6 +128,38 @@ int main(int argc, char** argv)
     }
     fprintf(stderr, "Flash ID id %08x (%s)!\n", fid, fid_str);
 
+
+    //Check image
+    res = (no_device) ? 0 : espi_flash_read(dev, 0, 10, 512, 0, 256, outb);
+    if (res) {
+        fprintf(stderr, "Failed to read current golden image header! res=%d\n", res);
+        return 4;
+    }
+    res = (no_device) ? 0 : espi_flash_read(dev, 0, 10, 512, MASTER_IMAGE_OFF, 256, outb + 256);
+    if (res) {
+        fprintf(stderr, "Failed to read current master image header! res=%d\n", res);
+        return 4;
+    }
+
+    res = (no_device) ? 0 : xlnx_btstrm_parse_header((const uint32_t* )outb, 256/4, &image);
+    if (res) {
+        fprintf(stderr, "It looks like the FPGA G image is corrupted! res=%d\n", res);
+        return 4;
+    }
+    res = (no_device) ? 0 : xlnx_btstrm_parse_header((const uint32_t* )(outb + 256), 256/4, &image_master);
+    if (res) {
+        fprintf(stderr, "It looks like the FPGA M image is corrupted! res=%d\n", res);
+    } else {
+        mp = true;
+    }
+
+    fprintf(stderr, "Actual firmware in use:      FirmwareID %08x (%lld)\n",
+            curfwid, (long long)get_xilinx_rev_h(curfwid));
+    fprintf(stderr, "Golden image: DEVID %08x FirmwareID %08x (%lld)\n",
+            image.devid, image.usr_access2, (long long)get_xilinx_rev_h(image.usr_access2));
+    fprintf(stderr, "Master image: DEVID %08x FirmwareID %08x (%lld)\n",
+            image_master.devid, image_master.usr_access2, (long long)get_xilinx_rev_h(image_master.usr_access2));
+
     uint32_t off = (golden) ? 0 : MASTER_IMAGE_OFF;
     unsigned total_length = SIZEOF_ARRAY(outa);
     if (rdwr == 2) {
@@ -153,30 +185,6 @@ int main(int argc, char** argv)
             return 3;
         }
         fclose(w);
-
-        //Check image
-        res = (no_device) ? 0 : espi_flash_read(dev, 0, 10, 512, 0, 256, outb);
-        if (res) {
-            fprintf(stderr, "Failed to read current golden image header! res=%d\n", res);
-            return 4;
-        }
-        res = (no_device) ? 0 : espi_flash_read(dev, 0, 10, 512, MASTER_IMAGE_OFF, 256, outb + 256);
-        if (res) {
-            fprintf(stderr, "Failed to read current master image header! res=%d\n", res);
-            return 4;
-        }
-
-        res = (no_device) ? 0 : xlnx_btstrm_parse_header((const uint32_t* )outb, 256/4, &image);
-        if (res) {
-            fprintf(stderr, "It looks like the FPGA G image is corrupted! res=%d\n", res);
-            return 4;
-        }
-        res = (no_device) ? 0 : xlnx_btstrm_parse_header((const uint32_t* )(outb + 256), 256/4, &image_master);
-        if (res) {
-            fprintf(stderr, "It looks like the FPGA M image is corrupted! res=%d\n", res);
-        } else {
-            mp = true;
-        }
 
         res = xlnx_btstrm_parse_header((const uint32_t* )outa, 256/4, &file);
         if (res) {
