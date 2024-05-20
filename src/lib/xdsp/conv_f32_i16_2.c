@@ -11,14 +11,14 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/conv_f32_i16_generic.t"
 DECLARE_TR_FUNC_1_1(conv_f32_i16_generic)
 
-#ifdef __SSE2__
+#ifdef WVLT_SSE2
 #define TEMPLATE_FUNC_NAME conv_f32_i16_sse2
 VWLT_ATTRIBUTE(optimize("-O3"), target("sse2"))
 #include "templates/conv_f32_i16_generic.t"
 DECLARE_TR_FUNC_1_1(conv_f32_i16_sse2)
 #endif
 
-#ifdef __AVX__
+#ifdef WVLT_AVX
 #define TEMPLATE_FUNC_NAME conv_f32_i16_avx
 VWLT_ATTRIBUTE(optimize("-O3"), target("avx"))
 #include "templates/conv_f32_i16_generic.t"

@@ -21,7 +21,8 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/fftad_norm_generic.t"
 DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_generic)
 
-#ifdef __AVX2__
+#ifdef WVLT_AVX2
+
 #define TEMPLATE_FUNC_NAME fftad_init_avx2
 VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 #include "templates/fftad_init_avx2.t"
@@ -36,7 +37,8 @@ DECLARE_TR_FUNC_FFTAD_ADD(fftad_add_avx2)
 VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 #include "templates/fftad_norm_avx2.t"
 DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_avx2)
-#endif //__AVX2__
+
+#endif //WVLT_AVX2
 
 // Bin(0) = SUM(x0 .. xn) = (A/2) * N
 // valueDBFS = 20*log10(abs(value))

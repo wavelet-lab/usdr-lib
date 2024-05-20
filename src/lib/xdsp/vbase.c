@@ -10,13 +10,15 @@ generic_opts_t cpu_vcap_obtain(unsigned flags)
 {
     generic_opts_t cap = OPT_GENERIC;
 
-#if defined (__EMSCRIPTEN__) && ( defined (WVLT_ARCH_X86_64) || defined (WVLT_ARCH_X86) )
-    cap = OPT_SSE41;
-
-#elif defined (WVLT_ARCH_ARM64)
+#ifdef WVLT_SIMD_ARM
     cap = OPT_NEON; //aarch64 should _always_ support NEON
 
-#elif defined (WVLT_ARCH_X86_64) || defined (WVLT_ARCH_X86)
+#elif defined(WVLT_SIMD_INTEL)
+
+#ifdef __EMSCRIPTEN__
+    cap = OPT_SSE41;
+
+#else
     unsigned max_cpu = OPT_AVX512BW;
 
     if (flags & CVF_LIMIT_VCPU) {
@@ -42,7 +44,9 @@ generic_opts_t cpu_vcap_obtain(unsigned flags)
         cap = OPT_SSE2;
     else if (__builtin_cpu_supports("sse") && max_cpu >= OPT_SSE)
         cap = OPT_SSE;
-#endif
+
+#endif  //__EMSCRIPTEN__
+#endif  //WVLT_SIMD_ARM
 
     g_cpu_vcap = cap;
     return cap;
