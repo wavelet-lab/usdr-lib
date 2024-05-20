@@ -5,7 +5,6 @@
 #include <usdr_port.h>
 #include <usdr_logging.h>
 #include <usdr_lowlevel.h>
-//#include <lms6002d_defs.h>
 #include <string.h>
 
 #include <def_lms6002d.h>
@@ -31,22 +30,6 @@ enum lms6002d_pll {
 };
 
 // Helper macros
-
-
-#if 0
-static
-int lms6002d_spi_wr(lms6002d_state_t* obj, uint16_t reg)
-{
-    int  res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, reg, NULL);
-    if (res)
-        return res;
-
-    USDR_LOG("6002", USDR_LOG_INFO, "reg wr %04x\n", reg);
-    return 0;
-}
-#endif
-
-
 static
 int lms6002d_spi_post(lms6002d_state_t* obj, uint16_t* regs, unsigned count)
 {
@@ -87,18 +70,11 @@ int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, struct lms600
     out->fref = 0;
 
     // TODO replace through options
-    // out->top_encfg = (uint8_t)MAKE_LMS6002D_TOP_ENCFG(0, 0, 0, 0, 0, 1);
     out->top_encfg = (uint8_t)MAKE_LMS6002D_TOP_ENCFG(0, 1, 1, 0, 0, 1);
     out->top_enreg = (uint8_t)MAKE_LMS6002D_TOP_ENREG(0, 0, 0, 0, 0, 0, 0, 0);
     out->rxpll_vco_div_bufsel = (uint8_t)MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(0, 0, 1);
     out->rfe_gain_lna_sel = 0xc0;
 
-    // out->rxpll_0x25 = 1;
-    // out->rxfe_0x71 = 0;
-    // out->rxfe_0x72 = 0;
-    // out->rxfe_0x75 = 0xc0;
-    // out->topclk_0x09 = 0;
-    // out->topclk_0x05 = 0;
     memset(out->rclpfcal, 3, sizeof(out->rclpfcal));
 
     res = lms6002d_spi_rd(out, TOP_CHIPID, &rev);
@@ -107,7 +83,7 @@ int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, struct lms600
 
     uint16_t cfg_regs[] = {
         MAKE_LMS6002D_TOP_ENCFG(0, 0, 0, 0, 0, 1),
-        //MAKE_LMS6002D_TOP_ENCFG(0, 1, 1, 0, 0, 1),
+
         MAKE_LMS6002D_REG_WR(TOP_ENCFG, out->top_encfg),
         MAKE_LMS6002D_REG_WR(TOP_ENREG, out->top_enreg),
         MAKE_LMS6002D_TOP_POWER(0, 1, 0, 1, 0), // XCO control, with bias
@@ -130,38 +106,6 @@ int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, struct lms600
     if (res)
         return res;
 
-#if 0
-    res = lms6002d_spi_wr(out, MAKE_LMS6002D_TOP_ENCFG(0, 0, 0, 0, 0, 1));
-    if (res)
-        return res;
-
-    res = lms6002d_spi_wr(out, MAKE_LMS6002D_TOP_ENCFG(0, 1, 1, 0, 0, 1));
-    if (res)
-        return res;
-
-    res = lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(TOP_ENREG, out->top_enreg));
-    if (res)
-        return res;
-
-    res = lms6002d_spi_wr(out, MAKE_LMS6002D_TOP_POWER(0, 1, 0, 1, 0)); // XCO control, with bias
-    //res = lms6002d_spi_wr(out, MAKE_LMS6002D_TOP_POWER(0, 0, 0, 1, 0)); // XCO control, no bias
-    if (res)
-        return res;
-
-//    lms6002d_spi_wr(out, 0x17E0 | 0x8000);
-    lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(TXPLL_VCO_REG_PFD_U, 0xE0)); // 0x17E0 | 0x8000);
-    lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(RXPLL_VCO_REG_PFD_U, 0xE3)); // 0x27E3 | 0x8000);
-    lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(RFE_CTRL, 0x01));            // 0x7001 | 0x8000);
-
-    // FAQ v1.0r12, 5.27:
-    lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(TRF_CTRL4, 0x40));      // 0x4740 | 0x8000); // Improving Tx spurious emission performance
-    lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(AFE_RX_CTRL2, 0x29));   // 0x5929 | 0x8000); // Improving ADC’s performance
-    lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(RXVGA2_CTRL, 0x36));    // 0x6436 | 0x8000); // Common Mode Voltage For ADC’s
-    lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(RFE_RDLINT_LNA, 0x37)); // 0x7937 | 0x8000); // Higher LNA Gain
-
-    // IQ, neg polarity
-    lms6002d_spi_wr(out, MAKE_LMS6002D_REG_WR(AFE_MISC_CTRL, 0xb0));  // 0x5ab0 | 0x8000);
-#endif
     USDR_LOG("6002", USDR_LOG_NOTE, "lms6002d rev=%02x\n", rev);
     return (rev != 0xff) ? 0 : -ENODEV;
 }
@@ -559,7 +503,6 @@ int lms6002d_set_rxvga2_gain(lms6002d_state_t* obj, unsigned vga)
         vga = 20;
 
     uint16_t regs[] = {
-        //(0x6500) | 0x8000 | (vga & 0x1f),
         MAKE_LMS6002D_RXVGA2_GAIN_COMB(vga),
     };
 
@@ -575,7 +518,6 @@ int lms6002d_set_rxvga2ab_gain(lms6002d_state_t* obj, unsigned vga2a, unsigned v
         vga2b = 10;
 
     uint16_t regs[] = {
-        //(0x6800) | 0x8000 | (vga2b << 4) | vga2a,
         MAKE_LMS6002D_RXVGA2_GAIN(vga2b, vga2a),
     };
 
@@ -600,16 +542,11 @@ int lms6002d_set_rx_path(lms6002d_state_t* obj, unsigned path)
     SET_LMS6002D_RFE_GAIN_LNA_SEL_LNASEL(obj->rfe_gain_lna_sel, path);
 
     uint16_t regs[] = {
-        // MAKE_LMS6002D_LMS6002D_RXPLL_0x25(GET_LMS6002D_LMS6002D_RXPLL_SELVCO(obj->rxpll_0x25),
-        //                                   GET_LMS6002D_LMS6002D_RXPLL_FRANGE(obj->rxpll_0x25),
-        //                                   path),
         MAKE_LMS6002D_REG_WR(RXPLL_VCO_DIV_BUFSEL, obj->rxpll_vco_div_bufsel),
         MAKE_LMS6002D_REG_WR(RFE_GAIN_LNA_SEL, obj->rfe_gain_lna_sel),
-
-        //0x7500 | 0x8000 | (obj->rxfe_0x75 & 0xCF) | ((path & 0x3) << 4),
     };
 
-    USDR_LOG("6002", USDR_LOG_WARNING, "Set PATH %d: %04x %04x\n", path,
+    USDR_LOG("6002", USDR_LOG_INFO, "Set PATH %d: %04x %04x\n", path,
              regs[0], regs[1]);
 
     //obj->rxpll_0x25 = regs[0];
@@ -621,7 +558,6 @@ int lms6002d_set_rx_path(lms6002d_state_t* obj, unsigned path)
 int lms6002d_set_tx_path(lms6002d_state_t* obj, unsigned path)
 {
     uint16_t regs[] = {
-        //0x8000 | 0x4400 | ((path & 0x3) << 3) | (path == 3 ? 0 : 4),
         MAKE_LMS6002D_TRF_PA_CTRL(path, path == 3 ? 1 : 0),
     };
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
@@ -661,10 +597,6 @@ int lms6002d_calibration_loop(lms6002d_state_t* obj, uint16_t reg, uint8_t addr,
         if (res)
             return res;
         ureg &= 0x1f;
-
-        //if ((GET_LMS6002D_LMS6002D_TOP_DC_LOCK(ulck) != 0) &&
-        //       (GET_LMS6002D_LMS6002D_TOP_DC_LOCK(ulck) != 7))
-        //    continue;
 
         if (ureg == 0x1f) {
             uint16_t p[] = { (reg << 8) | MAKE_LMS6002D_TOP_DC_REG(0),
@@ -727,11 +659,6 @@ int lms6002d_cal_lpf(lms6002d_state_t* obj)
 
         MAKE_LMS6002D_AFE_MISC(0, 1, 1, 1, 1, 1),
         MAKE_LMS6002D_REG_WR(TOP_ENREG, obj->top_enreg),
-
-        // MAKE_LMS6002D_TOP_ENREG(0, 0, 1, 0, 0,
-        //     GET_LMS6002D_TOP_ENREG_CLK_RX_DSM_SPI(obj->topclk_0x09),
-        //     0,
-        //     GET_LMS6002D_TOP_ENREG_CLK_TX_DSM_SPI(obj->topclk_0x09))
     };
     res = lms6002d_spi_post(obj, regs_0, SIZEOF_ARRAY(regs_0));
     if (res)
@@ -742,8 +669,6 @@ int lms6002d_cal_lpf(lms6002d_state_t* obj)
         uint16_t regs_c1[] = {
             MAKE_LMS6002D_RXLPF_DACBP(0, ureg),
             MAKE_LMS6002D_TXLPF_DACBP(0, ureg),
-            //0x8000 | 0x5500 | (ureg & 0x3f),
-            //0x8000 | 0x3500 | (ureg & 0x3f),
         };
         res = lms6002d_spi_post(obj, regs_c1, SIZEOF_ARRAY(regs_c1));
         if (res)
@@ -753,12 +678,8 @@ int lms6002d_cal_lpf(lms6002d_state_t* obj)
 
     SET_LMS6002D_TOP_ENREG_CLK_LPF_CAL(obj->top_enreg, 0);
 
-    regs_0[0] = MAKE_LMS6002D_AFE_MISC(1, 1, 1, 1, 1, 1); //0x8000 | 0x5F9f; //Power down DC offset comparators
+    regs_0[0] = MAKE_LMS6002D_AFE_MISC(1, 1, 1, 1, 1, 1); //Power down DC offset comparators
     regs_0[1] = MAKE_LMS6002D_REG_WR(TOP_ENREG, obj->top_enreg);
-    // MAKE_LMS6002D_TOP_ENREG(0, 0, 0, 0, 0,
-    //                   GET_LMS6002D_TOP_ENREG_CLK_RX_DSM_SPI(obj->topclk_0x09),
-    //                   0,
-    //                   GET_LMS6002D_TOP_ENREG_CLK_TX_DSM_SPI(obj->topclk_0x09));
     res = lms6002d_spi_post(obj, regs_0, SIZEOF_ARRAY(regs_0));
     if (res)
         return res;
@@ -806,7 +727,6 @@ fail_q:
     return 0;
 }
 
-
 int lms6002d_cal_vga2(lms6002d_state_t* obj)
 {
     int res;
@@ -818,10 +738,6 @@ int lms6002d_cal_vga2(lms6002d_state_t* obj)
         MAKE_LMS6002D_RXVGA2_PD_CALIB(0, 0),
         MAKE_LMS6002D_REG_WR(TOP_ENREG, obj->top_enreg),
         //0x8000 | 0x6e00, //Turn on VGA2 comparators
-        //MAKE_LMS6002D_TOP_ENREG(0, 0, 0, 1, 0,
-        //    GET_LMS6002D_TOP_ENREG_CLK_RX_DSM_SPI(obj->topclk_0x09),
-        //    0,
-        //    GET_LMS6002D_TOP_ENREG_CLK_TX_DSM_SPI(obj->topclk_0x09))
     };
     res = lms6002d_spi_post(obj, regs_0, SIZEOF_ARRAY(regs_0));
     if (res)
@@ -849,7 +765,7 @@ int lms6002d_cal_vga2(lms6002d_state_t* obj)
 
 fail_cal:
     SET_LMS6002D_TOP_ENREG_CLK_RX_VGA2_DCCAL(obj->top_enreg, 0);
-    regs_0[0] = MAKE_LMS6002D_RXVGA2_PD_CALIB(1, 1); //0x8000 | 0x6ec0; // Turn off VGA2 comparators
+    regs_0[0] = MAKE_LMS6002D_RXVGA2_PD_CALIB(1, 1); // Turn off VGA2 comparators
     regs_0[1] = MAKE_LMS6002D_REG_WR(TOP_ENREG, obj->top_enreg);
     res = lms6002d_spi_post(obj, regs_0, SIZEOF_ARRAY(regs_0));
     if (res)
@@ -864,27 +780,12 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
     // SET tx to 320Mhz
     int res;
     uint8_t rcal;
-    // uint16_t regs[] = {
-    //     MAKE_LMS6002D_TOP_ENREG(0, 0, 0, 0, 0,
-    //         GET_LMS6002D_LMS6002D_TOP_CLK_EN_RX_DSM_SPI(obj->topclk_0x09),
-    //         0,
-    //         1),
-    //     MAKE_LMS6002D_LMS6002D_TOP_0x05(0, 1, 1,
-    //         1,
-    //         GET_LMS6002D_LMS6002D_TOP_SRXEN(obj->topclk_0x05),
-    //     1),
-    // };
-
     if (bcode >= LPF_BANDS)
         return -EINVAL;
 
     res = lms6002d_trf_enable(obj, 1);
     if (res)
         return res;
-
-    // res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
-    // if (res)
-    //     return res;
 
     res = lms6002d_tune_pll(obj, true, 320000000);
     if (res)
@@ -917,8 +818,6 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
     // TODO disable TX when TX is not needed
     // Store calibration value
     uint16_t regs_1[] = {
-       // 0x8000 | 0x5600 | GET_LMS6002D_LMS6002D_TOP_RCCAL_LPFCAL(rcal) << 4,
-       // 0x8000 | 0x3600 | GET_LMS6002D_LMS6002D_TOP_RCCAL_LPFCAL(rcal) << 4,
         MAKE_LMS6002D_TOP_LPF_CTRL(0, 1, 0, 0),
         MAKE_LMS6002D_TOP_LPF_CAL(0, 0, bcode),
     };
@@ -932,9 +831,6 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
 int lms6002d_set_rxfedc(lms6002d_state_t* obj, int8_t dci, int8_t dcq)
 {
     uint16_t regs[] = {
-        //0x8000 | 0x7180 | ( dci & 0x7f),
-        //0x8000 | 0x7280 | ( dcq & 0x7f),
-
         MAKE_LMS6002D_RFE_IN1SEL_DCI(1, dci),
         MAKE_LMS6002D_RFE_INLOAD_DCQ(1, dcq),
     };
@@ -947,7 +843,6 @@ int lms6002d_set_rxfedc(lms6002d_state_t* obj, int8_t dci, int8_t dcq)
 int lms6002d_set_tia_cfb(lms6002d_state_t* obj, uint8_t value)
 {
     uint16_t regs[] = {
-         //0x7700 | 0x8000 | (value),
         MAKE_LMS6002D_RFE_CFB_TIA(value),
     };
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
@@ -956,164 +851,7 @@ int lms6002d_set_tia_cfb(lms6002d_state_t* obj, uint8_t value)
 int lms6002d_set_tia_rfb(lms6002d_state_t* obj, uint8_t value)
 {
     uint16_t regs[] = {
-         //0x7600 | 0x8000 | (value),
         MAKE_LMS6002D_RFE_RFB_TIA(value),
     };
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
-
-
-
-
-
-#if 0
-#include <stdio.h>
-
-static
-int write_reg(lms6002d_state_t* obj, uint8_t reg,  uint8_t val)
-{
-    return lms6002d_spi_wr(obj, ((uint16_t)reg << 8) | val | 0x8000);
-}
-
-static
-uint8_t read_reg(lms6002d_state_t* obj, uint8_t reg)
-{
-    uint8_t v;
-    lms6002d_spi_rd(obj, reg, &v);
-    return v;
-}
-
-
-double txrx_pll_tune(lms6002d_state_t* obj, uint8_t reg, double ref_clock, double out_freq)
-{
-    write_reg(obj, 0x17, 0xE0);
-    write_reg(obj, 0x27, 0xE3);
-    write_reg(obj, 0x70, 0x01);
-
-    // FAQ v1.0r12, 5.27:
-    write_reg(obj, 0x47, 0x40); // Improving Tx spurious emission performance
-    write_reg(obj, 0x59, 0x29); // Improving ADC’s performance
-    write_reg(obj, 0x64, 0x36); // Common Mode Voltage For ADC’s
-    write_reg(obj, 0x79, 0x37); // Higher LNA Gain
-
-    // Supported frequency ranges and corresponding FREQSEL values.
-    static const struct vco_sel { double fmin; double fmax; int8_t value; } freqsel[] = {
-        { 0.2325e9,   0.285625e9, 0x27 },
-        { 0.285625e9, 0.336875e9, 0x2f },
-        { 0.336875e9, 0.405e9,    0x37 },
-        { 0.405e9,    0.465e9,    0x3f },
-        { 0.465e9,    0.57125e9,  0x26 },
-        { 0.57125e9,  0.67375e9,  0x2e },
-        { 0.67375e9,  0.81e9,     0x36 },
-        { 0.81e9,     0.93e9,     0x3e },
-        { 0.93e9,     1.1425e9,   0x25 },
-        { 1.1425e9,   1.3475e9,   0x2d },
-        { 1.3475e9,   1.62e9,     0x35 },
-        { 1.62e9,     1.86e9,     0x3d },
-        { 1.86e9,     2.285e9,    0x24 },
-        { 2.285e9,    2.695e9,    0x2c },
-        { 2.695e9,    3.24e9,     0x34 },
-        { 3.24e9,     3.72e9,     0x3c },
-    };
-
-    printf("lms6002d_dev::txrx_pll_tune(ref_clock=%f, out_freq=%f)\n", ref_clock, out_freq);
-
-    // Find frequency range and FREQSEL for the given frequency
-    int8_t found_freqsel = -1;
-    for (unsigned i = 0; i < (int)sizeof(freqsel) / sizeof(freqsel[0]); i++) {
-        if (out_freq > freqsel[i].fmin && out_freq <= freqsel[i].fmax) {
-            found_freqsel = freqsel[i].value; break;
-        }
-    }
-    if (found_freqsel == -1)
-    {
-        // Unsupported frequency range
-        return -1;
-    }
-
-    // Calculate NINT, NFRAC
-    int64_t vco_x = 1 << ((found_freqsel & 0x7) - 3);
-    int64_t nint = vco_x * out_freq / ref_clock;
-    int64_t nfrac = (1 << 23) * (vco_x * out_freq - nint * ref_clock) / ref_clock;
-    double actual_freq = (nint + nfrac/((double)(1<<23))) * (ref_clock/vco_x);
-
-    // DEBUG
-    printf("FREQSEL=%d VCO_X=%d NINT=%d  NFRAC=%d ACTUAL_FREQ=%f\n\n", (int)found_freqsel, (int)vco_x, (int)nint, (int)nfrac, actual_freq);
-
-    // Write NINT, NFRAC
-    write_reg(obj, reg + 0x0, (nint >> 1) & 0xff);    // NINT[8:1]
-    write_reg(obj, reg + 0x1, ((nfrac >> 16) & 0x7f) | ((nint & 0x1) << 7)); //NINT[0] nfrac[22:16]
-    write_reg(obj, reg + 0x2, (nfrac >> 8) & 0xff);  // NFRAC[15:8]
-    write_reg(obj, reg + 0x3, (nfrac) & 0xff);     // NFRAC[7:0]
-    // Write FREQSEL
-    write_reg(obj, reg + 0x5, (found_freqsel << 2)); // FREQSEL[5:0]
-    // Reset VOVCOREG, OFFDOWN to default
-    // -- I think this is not needed here, as it changes settings which
-    //    we may want to set beforehand.
-//    write_reg(reg + 0x8, 0x40); // VOVCOREG[3:1] OFFDOWN[4:0]
-//    write_reg(reg + 0x9, 0x94); // VOVCOREG[0] VCOCAP[5:0]
-
-    uint32_t dr = 0;
-
-    lowlevel_reg_wr32(obj->dev, obj->subdev, 0, (1<<29) | 1);
-    lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, 0x4000, &dr);
-
-
-    read_reg(obj, reg + 0x0);    // NINT[8:1]
-    read_reg(obj, reg + 0x1); //NINT[0] nfrac[22:16]
-    read_reg(obj, reg + 0x2);  // NFRAC[15:8]
-    read_reg(obj, reg + 0x3);     // NFRAC[7:0]
-
-    // DEBUG
-    //reg_dump();
-
-    // Poll VOVCO
-    int start_i = -1;
-    int stop_i = -1;
-    enum State { VCO_HIGH, VCO_NORM, VCO_LOW } state = VCO_HIGH;
-    for (int i = 0; i < 64; i++) {
-        // Update VCOCAP
-        write_reg(obj, reg + 0x9, i);
-        usleep((long)(50));
-
-        int comp = read_reg(obj, reg + 0x0a);
-        switch (comp >> 6) {
-        case 0x02: //HIGH
-            break;
-        case 0x01: //LOW
-            if (state == VCO_NORM) {
-                stop_i = i - 1;
-                state = VCO_LOW;
-                printf("Low\n");
-            }
-            break;
-        case 0x00: //NORMAL
-            if (state == VCO_HIGH) {
-                start_i = i;
-                state = VCO_NORM;
-                printf("Norm\n");
-            }
-            break;
-        default: //ERROR
-            printf("ERROR: Incorrect VCOCAP reading while tuning\n");
-            return -1;
-        }
-        printf("VOVCO[%d]=%x\n", i, (comp>>6));
-    }
-    if (VCO_NORM == state)
-        stop_i = 63;
-
-    if (start_i == -1 || stop_i == -1) {
-        printf("ERROR: Can't find VCOCAP value while tuning\n");
-        return -1;
-    }
-
-    // Tune to the middle of the found VCOCAP range
-    int avg_i = (start_i + stop_i) / 2;
-    printf("START=%d STOP=%d SET=%d\n", start_i, stop_i, avg_i);
-    write_reg(obj, reg + 0x09, avg_i);
-
-    // Return actual frequency we've tuned to
-    return actual_freq;
-}
-#endif
