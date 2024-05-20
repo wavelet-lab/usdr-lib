@@ -67,7 +67,6 @@ include_directories(${USDR_INCLUDE_DIRS})
 
 if(WVLT_ARCH_X86 OR WVLT_ARCH_X86_64)
     set_source_files_properties(${XDSPLIB_FILES} PROPERTIES COMPILE_FLAGS "-msse4.1")
-    set_source_files_properties(../xdsp/conv_i16_f32_2.c PROPERTIES COMPILE_FLAGS  "-mavx2")
 elseif(WVLT_ARCH_ARM64)
     #set_source_files_properties(${XDSPLIB_FILES} PROPERTIES COMPILE_FLAGS "-mfpu=neon")
 endif()
