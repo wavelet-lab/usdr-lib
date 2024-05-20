@@ -628,6 +628,7 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
     res = res ? res : lms6002d_set_rx_path(&d->lms, d->cfg_auto_rx[1].band);
     res = res ? res : lms6002d_set_tx_path(&d->lms, d->cfg_auto_tx[0].band);
 
+    res = res ? res : dev_gpo_set(dev, IGPO_DCCORR, 1);
     return res;
 
 fail:

@@ -183,6 +183,7 @@ enum {
     IGPO_USB2_CFG   = 6,
     IGPO_BOOSTER    = 7,
     IGPO_LED        = 8,
+    IGPO_DCCORR     = 9,
 
     IGPO_FRONT      = 15,
     IGPO_CLKMEAS    = 16,

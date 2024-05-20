@@ -328,6 +328,8 @@ static int dev_m2_lm6_1_sdr_clkmeas_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 static int dev_m2_lm6_1_sdr_revision_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 static int dev_m2_lm6_1_sdr_rfe_throttle_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
+static int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
+
 static
 const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/ll/i2c/0/addr_ext",     { dev_m2_lm6_1_i2c_addr_ext_set, NULL } },
@@ -348,7 +350,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/rx/tia/rfb",   { dev_m2_lm6_1_sdr_rx_tia_rfb_set, NULL }},
 
     { "/dm/sdr/0/rx/dc/meas",   { NULL, dev_m2_lm6_1_sdr_rx_dc_meas_get }},
-    { "/dm/sdr/0/rx/dccorr",    { dev_m2_lm6_1_sdr_rx_dccorr_set, NULL }},
+    { "/dm/sdr/0/rx/dccorr",    { dev_m2_lm6_1_sdr_rx_dccorr_set, dev_m2_lm6_1_sdr_dccorr_get }},
     { "/dm/sdr/0/tx/dccorr",    { dev_m2_lm6_1_sdr_tx_dccorr_set, NULL }},
 
     { "/dm/sdr/0/calibrate",    { dev_m2_lm6_1_sdr_dc_calib, NULL }},
@@ -460,6 +462,17 @@ int dev_m2_lm6_1_i2c_addr_ext_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t va
     return usdr_i2c_addr_ext_set(&d->d, value);
 }
 
+int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+   // struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    uint32_t v = 0;
+    int res = dev_gpi_get32(ud->dev, 20, &v);
+    if (res)
+        return res;
+
+    *ovalue = v;
+    return 0;
+}
 
 int dev_m2_lm6_1_debug_lms6002d_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
