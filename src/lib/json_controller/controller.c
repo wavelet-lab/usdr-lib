@@ -38,6 +38,7 @@ static const struct idx_list s_method_list[] = {
     { "sdr_setup_rx_rtsa_stream", SDR_RX_SETUP_RTSA_STREAM },
     { "sdr_start_rx_stream",      SDR_RX_START_STREAM },
     { "sdr_stop_rx_stream",       SDR_RX_STOP_STREAM },
+    { "sdr_control_rx_stream",    SDR_RX_CONTROL_STREAM },
 };
 
 static const struct idx_list s_param_list[] = {
@@ -58,7 +59,15 @@ static const struct idx_list s_param_list[] = {
     // daemon request params
     //
     { "connection_string", SDRC_CONNECT_STRING },
-    { "fps",        SDRC_FPS }
+    { "fps",               SDRC_FPS },
+    { "fft_size",          SDRC_FFT_SIZE },
+    { "fft_window_type",   SDRC_FFT_WINDOW_TYPE },
+    { "fft_avg",           SDRC_FFT_AVG },
+    { "upper_pwr_bound",   SDRC_UPPER_PWR_BOUND },
+    { "lower_pwr_bound",   SDRC_LOWER_PWR_BOUND },
+    { "divs_for_db",       SDRC_DIVS_FOR_DB },
+    { "saturation",        SDRC_SATURATION },
+    { "contrast",          SDRC_CONTRAST },
 };
 
 static int parse_parameter(const char* parameter)

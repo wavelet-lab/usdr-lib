@@ -39,6 +39,14 @@ enum sdr_call_parameters {
     //
     SDRC_CONNECT_STRING,
     SDRC_FPS,
+    SDRC_FFT_SIZE,
+    SDRC_FFT_WINDOW_TYPE,
+    SDRC_FFT_AVG,
+    SDRC_UPPER_PWR_BOUND,
+    SDRC_LOWER_PWR_BOUND,
+    SDRC_DIVS_FOR_DB,
+    SDRC_CONTRAST,
+    SDRC_SATURATION,
 
     SDRC_PARAMS_MAX,
 };
@@ -85,6 +93,7 @@ enum sdr_call_type {
     SDR_RX_SETUP_RTSA_STREAM,
     SDR_RX_START_STREAM,
     SDR_RX_STOP_STREAM,
+    SDR_RX_CONTROL_STREAM,
 };
 
 enum {
