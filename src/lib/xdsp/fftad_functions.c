@@ -35,7 +35,7 @@ VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 DECLARE_TR_FUNC_FFTAD_ADD(fftad_add_avx2)
 
 #define TEMPLATE_FUNC_NAME fftad_norm_avx2
-VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx2,fma"))
 #include "templates/fftad_norm_avx2.t"
 DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_avx2)
 
