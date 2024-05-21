@@ -11,7 +11,6 @@
 #include "controller_usdr.h"
 #include "controller_xsdr.h"
 #include "controller_lime.h"
-#include "usdr_logging.h"
 
 static const struct idx_list s_method_list[] = {
     { "sdr_init_streaming",   SDR_INIT_STREAMING },

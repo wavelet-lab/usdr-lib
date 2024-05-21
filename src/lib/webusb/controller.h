@@ -15,6 +15,8 @@
 #include <../models/dm_stream.h>
 #include <../models/dm_dev_impl.h>
 
+#include "usdr_logging.h"
+
 enum sdr_call_parameters {
     SDRC_CHANS,
     SDRC_SAMPLERATE,
