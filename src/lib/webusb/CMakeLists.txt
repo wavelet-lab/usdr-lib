@@ -66,7 +66,7 @@ include_directories(${USDR_INCLUDE_FILES})
 include_directories(${USDR_INCLUDE_DIRS})
 
 if(WVLT_ARCH_X86 OR WVLT_ARCH_X86_64)
-    set_source_files_properties(${XDSPLIB_FILES} PROPERTIES COMPILE_FLAGS "-msse4.1 -mfma")
+    set_source_files_properties(${XDSPLIB_FILES} PROPERTIES COMPILE_FLAGS "-msse4.1")
 elseif(WVLT_ARCH_ARM64)
     #set_source_files_properties(${XDSPLIB_FILES} PROPERTIES COMPILE_FLAGS "-mfpu=neon")
 endif()
