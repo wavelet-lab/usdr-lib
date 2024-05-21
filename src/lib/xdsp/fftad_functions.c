@@ -4,6 +4,7 @@
 #include <math.h>
 #include "fftad_functions.h"
 #include "attribute_switch.h"
+#include "fast_math.h"
 
 
 #define TEMPLATE_FUNC_NAME fftad_init_generic

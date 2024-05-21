@@ -57,7 +57,7 @@ else()
     endif(ENABLE_TESTS)
 
     if(WVLT_ARCH_X86 OR WVLT_ARCH_X86_64)
-        add_definitions("-msse4.1")
+        add_definitions("-msse4.1 -mfma")
     elseif(WVLT_ARCH_ARM64)
         #add_definitions("-mfpu=neon")
     endif()

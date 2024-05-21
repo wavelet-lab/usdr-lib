@@ -88,7 +88,7 @@ typedef void (*fftad_init_function_t)
 typedef void (*fftad_add_function_t)
     (fft_acc_t* __restrict p, wvlt_fftwf_complex * __restrict d, unsigned fftsz);
 typedef void (*fftad_norm_function_t)
-    (fft_acc_t* __restrict p, unsigned fftsz, float scale, float corr, double* __restrict outa);
+    (fft_acc_t* __restrict p, unsigned fftsz, float scale, float corr, float* __restrict outa);
 
 
 #define DECLARE_TR_FUNC_FFTAD_INIT(conv_fn) \
@@ -100,7 +100,7 @@ void tr_##conv_fn (fft_acc_t* __restrict p, wvlt_fftwf_complex * __restrict d, u
 { conv_fn(p, d, fftsz); }
 
 #define DECLARE_TR_FUNC_FFTAD_NORM(conv_fn) \
-void tr_##conv_fn (fft_acc_t* __restrict p, unsigned fftsz, float scale, float corr, double* __restrict outa) \
+void tr_##conv_fn (fft_acc_t* __restrict p, unsigned fftsz, float scale, float corr, float* __restrict outa) \
 { conv_fn(p, fftsz, scale, corr, outa); }
 
 

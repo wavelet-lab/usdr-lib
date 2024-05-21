@@ -25,7 +25,7 @@ static inline void fftad_add(struct fft_accumulate_data* p, wvlt_fftwf_complex* 
     return (*fftad_add_c(cpu_vcap_get(), NULL))(p, d, fftsz);
 }
 
-static inline void fftad_norm(struct fft_accumulate_data* p, unsigned fftsz, float scale, float corr, double* outa)
+static inline void fftad_norm(struct fft_accumulate_data* p, unsigned fftsz, float scale, float corr, float* outa)
 {
     return (*fftad_norm_c(cpu_vcap_get(), NULL))(p, fftsz, scale, corr, outa);
 }
