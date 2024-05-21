@@ -146,4 +146,15 @@ void tr_##conv_fn (wvlt_fftwf_complex* __restrict in, unsigned fft_size, \
                    float fcale_mpy, float mine, float corr) \
 { conv_fn( in, fft_size, rtsa_data, fcale_mpy, mine, corr ); }
 
+
+//FFT windows conv
+
+typedef void (*fft_window_cf32_function_t)
+    (wvlt_fftwf_complex* __restrict in, unsigned fftsz, float* __restrict wnd, wvlt_fftwf_complex* __restrict out);
+
+#define DECLARE_TR_FUNC_FFT_WINDOW_CF32(conv_fn) \
+void tr_##conv_fn (wvlt_fftwf_complex* __restrict in, unsigned fftsz, float* __restrict wnd, \
+                   wvlt_fftwf_complex* __restrict out) \
+{ conv_fn(in, fftsz, wnd, out); }
+
 #endif
