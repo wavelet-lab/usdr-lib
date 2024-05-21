@@ -32,6 +32,11 @@ enum sdr_call_parameters {
     SDRC_PARAM,
     SDRC_THROTTLE_ON,
     SDRC_MODE,
+    //
+    // daemon requests
+    //
+    SDRC_CONNECT_STRING,
+
     SDRC_PARAMS_MAX,
 };
 
@@ -65,6 +70,12 @@ enum sdr_call_type {
     SDR_CRTL_STREAMING,
     SDR_GET_REVISION,
     SDR_CALIBRATE,
+    //
+    // daemon requests
+    //
+    SDR_DISCOVER,
+    SDR_CONNECT,
+    SDR_DISCONNECT,
 };
 
 enum {

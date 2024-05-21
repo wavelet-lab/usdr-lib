@@ -27,7 +27,13 @@ static const struct idx_list s_method_list[] = {
     { "sdr_debug_dump",       SDR_DEBUG_DUMP },
     { "sdr_ctrl_streaming",   SDR_CRTL_STREAMING },
     { "sdr_get_revision",     SDR_GET_REVISION },
-    { "sdr_calibrate",        SDR_CALIBRATE }
+    { "sdr_calibrate",        SDR_CALIBRATE },
+    //
+    // daemon requests
+    //
+    { "sdr_discover",         SDR_DISCOVER },
+    { "sdr_connect",          SDR_CONNECT },
+    { "sdr_disconnect",       SDR_DISCONNECT }
 };
 
 static const struct idx_list s_param_list[] = {
@@ -44,6 +50,7 @@ static const struct idx_list s_param_list[] = {
     { "param",      SDRC_PARAM },
     { "throttleon", SDRC_THROTTLE_ON },
     { "mode",       SDRC_MODE },
+    { "connection_string", SDRC_CONNECT_STRING },
 };
 
 static int parse_parameter(const char* parameter)
