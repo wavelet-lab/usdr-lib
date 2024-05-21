@@ -15,6 +15,8 @@
 #include <../models/dm_stream.h>
 #include <../models/dm_dev_impl.h>
 
+#include "tiny-json.h"
+
 #include "usdr_logging.h"
 
 enum sdr_call_parameters {
@@ -33,9 +35,10 @@ enum sdr_call_parameters {
     SDRC_THROTTLE_ON,
     SDRC_MODE,
     //
-    // daemon requests
+    // daemon request params
     //
     SDRC_CONNECT_STRING,
+    SDRC_FPS,
 
     SDRC_PARAMS_MAX,
 };
@@ -50,6 +53,7 @@ enum {
 struct sdr_call_paramteters {
     uintptr_t parameters_uint[SDRC_PARAMS_MAX];
     uint8_t  parameters_type[SDRC_PARAMS_MAX];
+    unsigned parameters_len[SDRC_PARAMS_MAX];
 };
 
 
@@ -76,6 +80,11 @@ enum sdr_call_type {
     SDR_DISCOVER,
     SDR_CONNECT,
     SDR_DISCONNECT,
+    SDR_RX_SETUP_RAW_STREAM,
+    SDR_RX_SETUP_SA_STREAM,
+    SDR_RX_SETUP_RTSA_STREAM,
+    SDR_RX_START_STREAM,
+    SDR_RX_STOP_STREAM,
 };
 
 enum {
@@ -122,6 +131,9 @@ struct idx_list {
     unsigned idx;
 };
 
-int controller_prepare_rpc(char* request, sdr_call_t* psdrc);
+#define MAX_JSON_OBJS 64
+
+json_t const* allocate_json(char* request, json_t* storage);
+int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* parent);
 
 #endif

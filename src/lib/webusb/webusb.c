@@ -104,7 +104,14 @@ int webusb_process_rpc(
     int res = 0;
     struct sdr_call sdrc;
 
-    res = controller_prepare_rpc(request, &sdrc);
+    json_t storage[MAX_JSON_OBJS];
+    json_t const* parent = allocate_json(request, storage);
+    if(!parent)
+    {
+        return -EINVAL;
+    }
+
+    res = controller_prepare_rpc(request, &sdrc, parent);
     if(res)
         return res;
 

@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include "tiny-json.h"
 
 #include "../ipblks/streams/streams.h"
 #include "controller.h"
@@ -31,9 +30,14 @@ static const struct idx_list s_method_list[] = {
     //
     // daemon requests
     //
-    { "sdr_discover",         SDR_DISCOVER },
-    { "sdr_connect",          SDR_CONNECT },
-    { "sdr_disconnect",       SDR_DISCONNECT }
+    { "sdr_discover",             SDR_DISCOVER },
+    { "sdr_connect",              SDR_CONNECT },
+    { "sdr_disconnect",           SDR_DISCONNECT },
+    { "sdr_setup_rx_raw_stream",  SDR_RX_SETUP_RAW_STREAM },
+    { "sdr_setup_rx_sa_stream",   SDR_RX_SETUP_SA_STREAM },
+    { "sdr_setup_rx_rtsa_stream", SDR_RX_SETUP_RTSA_STREAM },
+    { "sdr_start_rx_stream",      SDR_RX_START_STREAM },
+    { "sdr_stop_rx_stream",       SDR_RX_STOP_STREAM },
 };
 
 static const struct idx_list s_param_list[] = {
@@ -50,7 +54,11 @@ static const struct idx_list s_param_list[] = {
     { "param",      SDRC_PARAM },
     { "throttleon", SDRC_THROTTLE_ON },
     { "mode",       SDRC_MODE },
+    //
+    // daemon request params
+    //
     { "connection_string", SDRC_CONNECT_STRING },
+    { "fps",        SDRC_FPS }
 };
 
 static int parse_parameter(const char* parameter)
@@ -99,19 +107,22 @@ static int get_req_parameters(struct sdr_call *psdrc, json_t const* parent)
     return 0;
 }
 
-#define MAX_JSON_OBJS 64
 
-int controller_prepare_rpc(char* request, sdr_call_t* psdrc)
+json_t const* allocate_json(char* request, json_t* storage)
 {
-    psdrc->call_type = SDR_NOP;
-    memset(psdrc->params.parameters_type, 0, sizeof(psdrc->params.parameters_type));
-
-    json_t storage[MAX_JSON_OBJS];
     json_t const* parent = json_create(request, storage, MAX_JSON_OBJS);
     if (!parent) {
         USDR_LOG("WEBU", USDR_LOG_DEBUG, "Can't parse JSON: `%s`\n", request);
-        return -EINVAL;
+        return NULL;
     }
+    return parent;
+}
+
+int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* parent)
+{
+    psdrc->call_type = SDR_NOP;
+    memset(psdrc->params.parameters_type, 0, sizeof(psdrc->params.parameters_type));
+    memset(psdrc->params.parameters_len, 0, sizeof(psdrc->params.parameters_len));
 
     jsonType_t const type = json_getType( parent );
     if ( type != JSON_OBJ ) {
@@ -353,7 +364,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
                              pcall->params.parameters_uint[SDRC_CHANS] : 0;
         unsigned pktsyms = (pcall->params.parameters_type[SDRC_PACKETSIZE] == SDRC_PARAM_TYPE_INT) ?
                                pcall->params.parameters_uint[SDRC_PACKETSIZE] : 0;
-        const char* fmt = (pcall->params.parameters_type[SDRC_DATA_FORMAT] == SDRC_PARAM_TYPE_INT) ?
+        const char* fmt = (pcall->params.parameters_type[SDRC_DATA_FORMAT] == SDRC_PARAM_TYPE_STRING) ?
                               (const char*)pcall->params.parameters_uint[SDRC_DATA_FORMAT] : 0;
 
         unsigned samplerate = (pcall->params.parameters_type[SDRC_SAMPLERATE] == SDRC_PARAM_TYPE_INT) ?

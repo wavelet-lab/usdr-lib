@@ -28,6 +28,9 @@ struct sample_format {
 #define SFMT_CI12 "ci12"
 #define SFMT_CI16 "ci16"
 
+#define SFMT_F32  "f32"
+#define SFMT_CF32 "cf32"
+
 /// unspecified format, i.e. special structure-like format,
 /// in that case @ref spburst represent total number of bytes
 /// in the structure
