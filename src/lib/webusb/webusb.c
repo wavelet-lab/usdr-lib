@@ -127,10 +127,3 @@ int webusb_destroy(pdm_dev_t dmdev)
 {
     return usdr_dmd_close(dmdev);
 }
-
-sdr_type_t get_device_sdr_type(lldev_t lldev)
-{
-    webusb_device_t* dev = (webusb_device_t*)lldev;
-    return dev->type_sdr;
-}
-

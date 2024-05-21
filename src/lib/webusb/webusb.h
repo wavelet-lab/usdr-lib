@@ -76,12 +76,12 @@ typedef struct webusb_ops webusb_ops_t;
 static inline
     int webusb_ll_generic_get(lldev_t dev, int generic_op, const char** pout)
 {
+    webusb_device_t* d = (webusb_device_t*)dev;
+
     switch(generic_op)
     {
-    case LLGO_DEVICE_NAME: {
-        *pout = "webusb";
-        return 0;
-    }
+    case LLGO_DEVICE_NAME: *pout = "webusb"; return 0;
+    case LLGO_DEVICE_SDR_TYPE: *pout = (const char*)d->type_sdr; return 0;
     }
 
     return -EINVAL;

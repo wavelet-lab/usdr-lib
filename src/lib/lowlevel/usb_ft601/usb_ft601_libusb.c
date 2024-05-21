@@ -125,6 +125,7 @@ int usbft601_uram_generic_get(lldev_t dev, int generic_op, const char** pout)
     switch (generic_op) {
     case LLGO_DEVICE_NAME: *pout = d->gdev.name; return 0;
     case LLGO_DEVICE_UUID: *pout = (const char*)d->gdev.devid.d; return 0;
+    case LLGO_DEVICE_SDR_TYPE: *pout = (const char*)d->gdev.sdrtype; return 0;
     }
 
     return -EINVAL;

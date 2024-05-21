@@ -232,10 +232,14 @@ int generic_rpc_call(pdm_dev_t dmdev,
 {
     int res = 0;
 
+    sdr_type_t sdrtype;
+    res = dmdev->lldev->ops->generic_get(dmdev->lldev, LLGO_DEVICE_SDR_TYPE, (const char**)&sdrtype);
+    if(res)
+        return res;
+
     const struct sdr_call *pcall = sdrc;
     unsigned outbufsz = response_maxlen;
     char* outbuffer = response;
-    //const char *inbuffer = request;
 
     unsigned long chans = (pcall->params.parameters_type[SDRC_CHANS] == SDRC_PARAM_TYPE_INT) ?
                               pcall->params.parameters_uint[SDRC_CHANS] : 0;
@@ -268,7 +272,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         char device_name[16] = {0};
 
         //FIXME! Temporary decision to preserve compatibility
-        switch(get_device_sdr_type(dmdev->lldev)) {
+        switch(sdrtype) {
         case SDR_XSDR: strncpy(device_name, "xsdr",         sizeof(device_name)); break;
         case SDR_USDR: strncpy(device_name, "usdr",         sizeof(device_name)); break;
         case SDR_LIME: strncpy(device_name, "limesdr_mini", sizeof(device_name)); break;
@@ -522,7 +526,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
     }
 
     //particular calls (we should get rid of them soon)
-    switch(get_device_sdr_type(dmdev->lldev)) {
+    switch(sdrtype) {
     case SDR_XSDR : {
         return xsdr_call(dmdev, sdrc, response_maxlen, response, request);
     }

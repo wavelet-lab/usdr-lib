@@ -106,8 +106,6 @@ int generic_rpc_call(pdm_dev_t dmdev,
                      char* response,
                      char* request);
 
-sdr_type_t get_device_sdr_type(lldev_t lldev);
-
 struct idx_list {
     const char *param;
     unsigned idx;

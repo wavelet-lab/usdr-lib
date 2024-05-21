@@ -45,6 +45,7 @@ typedef struct device device_t;
 enum lowlevel_generic_ops {
     LLGO_DEVICE_NAME,
     LLGO_DEVICE_UUID,
+    LLGO_DEVICE_SDR_TYPE,
 };
 
 enum llstream_flags {
