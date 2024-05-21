@@ -6,9 +6,9 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/fft_window_cf32_generic.t"
 DECLARE_TR_FUNC_FFT_WINDOW_CF32(fft_window_cf32_generic)
 
-#ifdef __AVX2__
+#ifdef WVLT_AVX2
 #define TEMPLATE_FUNC_NAME fft_window_cf32_avx2
-VWLT_ATTRIBUTE(optimize("-O3"))
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 #include "templates/fft_window_cf32_avx2.t"
 DECLARE_TR_FUNC_FFT_WINDOW_CF32(fft_window_cf32_avx2)
 #endif
