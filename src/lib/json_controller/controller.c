@@ -7,9 +7,15 @@
 
 #include "../ipblks/streams/streams.h"
 #include "controller.h"
-#include "controller_usdr.h"
-#include "controller_xsdr.h"
+#include "controller_ugen.h"
 #include "controller_lime.h"
+
+#include "../ipblks/espi_flash.h"
+#include "../ipblks/xlnx_bitstream.h"
+#include "../device/m2_lm7_1/xsdr_ctrl.h"
+
+// TODO: get rid of this foo
+xsdr_dev_t* get_xsdr_dev(pdevice_t udev);
 
 static const struct idx_list s_method_list[] = {
     { "sdr_init_streaming",   SDR_INIT_STREAMING },
@@ -548,17 +554,32 @@ int generic_rpc_call(pdm_dev_t dmdev,
         snprintf(outbuffer, outbufsz, "{\"result\":0}");
         return 0;
     }
+    case SDR_CALIBRATE:
+    {
+        if(sdrtype != SDR_XSDR)
+            return -ENOTSUP;
+
+        unsigned chans = (pcall->params.parameters_type[SDRC_CHANS] == SDRC_PARAM_TYPE_INT) ?
+                             pcall->params.parameters_uint[SDRC_CHANS] : 0;
+        unsigned param = (pcall->params.parameters_type[SDRC_PARAM] == SDRC_PARAM_TYPE_INT) ?
+                             pcall->params.parameters_uint[SDRC_PARAM] : 0;
+
+        res = xsdr_calibrate(get_xsdr_dev(dmdev->lldev->pdev), chans, param, NULL);
+        if (res)
+            return res;
+
+        snprintf(outbuffer, outbufsz, "{\"result\":0}");
+        return 0;
+    }
     default:
         break; //should process it in particular call
     }
 
     //particular calls (we should get rid of them soon)
     switch(sdrtype) {
-    case SDR_XSDR : {
-        return xsdr_call(dmdev, sdrc, response_maxlen, response, request);
-    }
+    case SDR_XSDR:
     case SDR_USDR:  {
-        return usdr_call(dmdev, sdrc, response_maxlen, response, request);
+        return general_call(dmdev, sdrc, response_maxlen, response, request);
     }
     case SDR_LIME:  {
         return lime_call(dmdev,sdrc,response_maxlen,response,request);

@@ -81,8 +81,7 @@ static int check_firmware_header(lldev_t dev, const char* data, bool update_gold
 }
 
 int general_call(pdm_dev_t dmdev, const struct sdr_call *pcall,
-                unsigned outbufsz, char *outbuffer, const char *inbuffer,
-                fn_callback_t func, void* obj)
+                unsigned outbufsz, char *outbuffer, const char *inbuffer)
 {
     lldev_t lldev = dmdev->lldev;
 
