@@ -5,6 +5,8 @@
 #define _WEBUSB_GENERIC_H
 
 #include <errno.h>
+#include "../webusb/webusb.h"
+
 
 static inline
     int webusb_generic_plugin_discovery(unsigned pcount, const char** filterparams,

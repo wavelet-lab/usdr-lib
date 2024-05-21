@@ -7,7 +7,6 @@
 #include "libusb_vidpid_map.h"
 #include "../../device/u3_limesdr/limesdr_ctrl.h"
 #include "webusb_generic.h"
-#include "../../webusb/controller.h"
 
 limesdr_dev_t* get_limesdr_dev(pdevice_t udev);
 

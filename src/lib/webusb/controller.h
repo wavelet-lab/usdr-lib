@@ -6,7 +6,14 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "webusb.h"
+
+#include <../device/device.h>
+#include <usdr_lowlevel.h>
+
+#include <../models/dm_dev.h>
+#include <../models/dm_rate.h>
+#include <../models/dm_stream.h>
+#include <../models/dm_dev_impl.h>
 
 enum sdr_call_parameters {
     SDRC_CHANS,
@@ -77,15 +84,33 @@ struct sdr_call {
     unsigned call_data_ptr;
     unsigned call_data_size;
 };
+typedef struct sdr_call sdr_call_t;
 
 enum sdr_param_call {
     SDR_PC_SET_SAMPLERATE,
 };
 
+typedef int (*rpc_call_fn)(pdm_dev_t dmdev,
+                           pusdr_dms_t* usds,
+                           struct sdr_call* sdrc,
+                           unsigned response_maxlen,
+                           char* response,
+                           char* request);
+
 int generic_rpc_call(pdm_dev_t dmdev,
+                     pusdr_dms_t* usds,
                      struct sdr_call* sdrc,
                      unsigned response_maxlen,
                      char* response,
                      char* request);
+
+sdr_type_t get_device_sdr_type(lldev_t lldev);
+
+struct idx_list {
+    const char *param;
+    unsigned idx;
+};
+
+int controller_prepare_rpc(char* request, sdr_call_t* psdrc);
 
 #endif
