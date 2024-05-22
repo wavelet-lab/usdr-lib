@@ -162,9 +162,9 @@ int main(UNUSED int argc, UNUSED char** argv)
     const char* filename = "out.data";
     const char* infilename = "/dev/zero";
     int opt;
-    unsigned chmsk = 0x3;
+    unsigned chmsk = 0x1;
     bool chmsk_alter = false;
-    const char* fmt = "&i16";
+    const char* fmt = "ci16";
     unsigned samples = 4096;
     unsigned loglevel = USDR_LOG_TRACE;
     unsigned resync = 1;
