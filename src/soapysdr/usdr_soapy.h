@@ -7,6 +7,7 @@
 #include <map>
 #include <set>
 #include <memory>
+#include <atomic>
 
 #include "../lib/models/dm_all.h"
 extern "C" {
@@ -15,6 +16,12 @@ extern "C" {
 
 
 #include <stdio.h>
+
+enum rfic_type_t {
+    RFIC_LMS6002D,
+    RFIC_LMS7002M,
+    RFIC_UNKNOWN
+};
 
 class usdr_handle
 {
@@ -295,7 +302,7 @@ private:
 
         unsigned chmsk = 0;
 
-        bool active = false;
+        std::atomic<bool> active;
 
         ring_circbuf_t* rxcbuf  = nullptr;
     };
@@ -325,5 +332,11 @@ private:
     uint64_t tx_pkts;
 
     FILE* rd;
+
+    rfic_type_t type = RFIC_UNKNOWN;
+    double _actual_bandwidth[2] = { 0, 0 };
+    double _actual_frequency[2] = { 0, 0 };
+
+    double _actual_gains[10] = { 0, };
 };
 
