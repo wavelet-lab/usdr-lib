@@ -259,7 +259,7 @@ static int usb_post_regout(usb_dev_t* dev, uint32_t *regoutbuffer, unsigned coun
 
     res = libusb_to_errno(libusb_submit_transfer(transfer));
     if (res) {
-        USDR_LOG("USBX", USDR_LOG_ERROR, "FAILED to post REGOUT %d\n", res);
+        USDR_LOG("USBX", USDR_LOG_ERROR, "FAILED to post REGOUT %d (%s)\n", res, strerror(-res));
         return res;
     }
 
