@@ -494,18 +494,15 @@ void SoapyUSDR::setBandwidth(const int direction, const size_t channel, const do
 {
     if (bw == 0.0) return; //special ignore value
 
-    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setBandwidth(, %d, %g MHz)",  int(channel), bw/1e6);
-    int res;
-
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
     const char* pname = get_sdr_param(0, dir, "bandwidth",  NULL);
+    int res;
+    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setBandwidth(%s, %g MHz)",dir, bw/1e6);
 
-    res = usdr_dme_set_uint(_dev->dev(), pname,
-                            bw);
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    res = usdr_dme_set_uint(_dev->dev(), pname, bw);
     if (res)
         throw std::runtime_error("SoapyUSDR::setBandwidth(" + std::string(pname) + ") error");
-
 }
 
 double SoapyUSDR::getBandwidth(const int /*direction*/, const size_t /*channel*/) const
@@ -623,7 +620,6 @@ std::vector<std::string> SoapyUSDR::listSensors(void) const
 {
     std::vector<std::string> sensors;
     sensors.push_back("clock_locked");
-    sensors.push_back("lms7_temp");
     sensors.push_back("board_temp");
     return sensors;
 }
@@ -638,15 +634,6 @@ SoapySDR::ArgInfo SoapyUSDR::getSensorInfo(const std::string &name) const
         info.type = SoapySDR::ArgInfo::BOOL;
         info.value = "false";
         info.description = "CGEN clock is locked, good VCO selection.";
-    }
-    else if (name == "lms7_temp")
-    {
-        info.key = "lms7_temp";
-        info.name = "LMS7 Temperature";
-        info.type = SoapySDR::ArgInfo::FLOAT;
-        info.value = "0.0";
-        info.units = "C";
-        info.description = "The temperature of the LMS7002M in degrees C.";
     }
     else if (name == "board_temp")
     {
@@ -667,13 +654,16 @@ std::string SoapyUSDR::readSensor(const std::string &name) const
     {
         return "true";
     }
-    else if (name == "lms7_temp")
-    {
-        return "0.0";
-    }
     else if (name == "board_temp")
     {
-        return "0.0";
+        uint64_t val;
+        int res = usdr_dme_get_uint(_dev->dev(), "/dm/sensor/temp", &val);
+        if (res)
+            return "NaN";
+
+        int32_t v = (int32_t)((uint32_t)val);
+        float temp = v / 256.0;
+        return std::to_string(temp);
     }
 
     throw std::runtime_error("SoapyUSDR::readSensor("+name+") - unknown sensor name");
@@ -865,11 +855,11 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
                    direction == SOAPY_SDR_RX ? "RX" : "TX", format.c_str(), (unsigned)channels.size());
 
     //TODO: multi stream
-    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     size_t num_channels = channels.size();
     if (num_channels < 1)
         num_channels = 1;
     size_t chmsk = (num_channels == 1) ? 0x1 : 0x3;
+    unsigned pktSamples = 0;
     const char* uformat = (format == SOAPY_SDR_CF32) ? "cf32" :
                           (format == SOAPY_SDR_CS16) ? "ci16" : NULL;
 
@@ -889,14 +879,30 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
         }
     }
 
+    if (args.count("bufferLength")) {
+        const std::string& buffer_length = args.at("bufferLength");
+        pktSamples = std::atoi(buffer_length.c_str());
+        if (pktSamples < 128) {
+            throw std::runtime_error("SoapyUSDR::setupStream([bufferLength="+buffer_length+") is too small");
+        }
+        if (pktSamples > 128*1024) {
+            throw std::runtime_error("SoapyUSDR::setupStream([bufferLength="+buffer_length+") is too large");
+        }
+    }
+
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+
     _streams[direction].fmt = uformat;
     _streams[direction].chmsk = chmsk;
     _streams[direction].stream = direction == SOAPY_SDR_RX ? "/ll/srx/0" : "/ll/stx/0";
 
     // FIXUP (TODO get MTU size)
     if (direction == SOAPY_SDR_RX) {
-        _streams[direction].nfo.pktsyms = (_desired_rx_pkt == 0) ? 1920 : _desired_rx_pkt;
+        _streams[direction].nfo.pktsyms =
+            (pktSamples != 0) ? pktSamples :
+            (_desired_rx_pkt != 0) ? _desired_rx_pkt : 1920;
     } else {
+        // TODO add discovery
         _streams[direction].nfo.pktsyms = 8192;
     }
 
@@ -951,8 +957,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     }
 
     // TODO: time
-    //res = usdr_dms_sync(_dev->dev(), "off", 1, &ustr->strm);
-    res = usdr_dms_sync(_dev->dev(), "rx", 1, &ustr->strm);
+    res = usdr_dms_sync(_dev->dev(), "off", 1, &ustr->strm);
     if (res) {
         throw std::runtime_error("SoapyUSDR::setupStream failed!");
     }
@@ -965,7 +970,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
         SoapySDR::logf(SOAPY_SDR_INFO, "SoapyUSDR::setupStream() -> resync!!!");
         res = usdr_dms_sync(_dev->dev(), "rx", 2, pstr);
     }
-/////////////////////////////////////////////////////////////////////////////
+
 
     return (SoapySDR::Stream *)&_streams[direction];
 }
@@ -1005,56 +1010,25 @@ int SoapyUSDR::activateStream(
 {
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     USDRStream* ustr = (USDRStream*)(stream);
+    bool tx_dir = (ustr == &_streams[SOAPY_SDR_TX]);
     int res;
 
     SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::activateStream(%s, @ %lld ns, %d samples, %08x)",
                    ustr->stream, timeNs, (unsigned)numElems, flags);
 
     // Todo set bandwidth
-    setBandwidth(SOAPY_SDR_TX, 0, 20e6);
-    setBandwidth(SOAPY_SDR_RX, 0, 20e6);
+    // setBandwidth(SOAPY_SDR_TX, 0, 20e6);
+    // setBandwidth(SOAPY_SDR_RX, 0, 20e6);
 
     setUParam(SOAPY_SDR_TX, "gain", NULL, 25); //After filter
 
     setUParam(SOAPY_SDR_RX, "gain", "vga", 30);
     setUParam(SOAPY_SDR_RX, "gain", "pga", 0);
 
-#if 0
-    res = usdr_dms_create_ex(_dev->dev(), ustr->stream, ustr->fmt, ustr->chmsk,
-                             (numElems == 0) ? ustr->nfo.pktsyms : numElems,
-                             0, &ustr->strm);
-    if (res) {
-        return SOAPY_SDR_NOT_SUPPORTED;
-    }
+    res = usdr_dms_sync(_dev->dev(), tx_dir ? "tx" : "rx", 1, &ustr->strm);
 
-    res = usdr_dms_info(ustr->strm, &ustr->nfo);
-    if (res) {
-        throw std::runtime_error("SoapyUSDR::setupStream failed!");
-    }
-
-    SoapySDR::logf(SOAPY_SDR_INFO, "SoapyUSDR::activateStream(%s) %d Samples per packet, burst size %d * %d chs; res = %d",
-                   ustr->stream, numElems, ustr->nfo.pktsyms, ustr->nfo.channels, res);
-
-    // TODO: time
-    res = usdr_dms_sync(_dev->dev(), "off", 1, &ustr->strm);
-    if (res) {
-        throw std::runtime_error("SoapyUSDR::setupStream failed!");
-    }
-
-    res = usdr_dms_op(ustr->strm, USDR_DMS_START, 0);
     ustr->active = true;
-
-    if (ustr->self->_streams[0].active && ustr->self->_streams[1].active) {
-        pusdr_dms_t pstr[2] = { ustr->self->_streams[0].strm, ustr->self->_streams[1].strm };
-        SoapySDR::logf(SOAPY_SDR_INFO, "SoapyUSDR::activateStream() -> resync!!!");
-        res = usdr_dms_sync(_dev->dev(), "rx", 2, pstr);
-    }
-
-#else
-    res = 0;
-#endif
-
-    return (res) ? SOAPY_SDR_NOT_SUPPORTED : 0;
+    return 0;
 }
 
 int SoapyUSDR::deactivateStream(
@@ -1063,20 +1037,10 @@ int SoapyUSDR::deactivateStream(
         const long long timeNs)
 {
     USDRStream* ustr = (USDRStream*)(stream);
-
     SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::deactivateStream(%s, @ %lld ns, %08x)",
                    ustr->stream, timeNs, flags);
 
-    if (ustr->rxcbuf) {
-        ring_circbuf_destroy(ustr->rxcbuf);
-        ustr->rxcbuf = nullptr;
-    }
-
-    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    usdr_dms_op(ustr->strm, USDR_DMS_STOP, 0);
-    usdr_dms_destroy(ustr->strm);
-    ustr->strm = NULL;
-
+    ustr->active = false;
     return 0;
 }
 
@@ -1124,6 +1088,7 @@ int SoapyUSDR::readStream(
             res = usdr_dms_recv(ustr->strm, chans, timeoutUs, &nfo);
             if (res == 0) {
                 ustr->rxcbuf->wpos += ustr->nfo.pktbszie;
+                last_recv_pkt_time = nfo.fsymtime;
             }
         } while (res == 0);
 
