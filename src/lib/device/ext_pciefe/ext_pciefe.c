@@ -408,7 +408,7 @@ int board_ext_pciefe_init(lldev_t dev,
         char b[2048];
         uart_core_t uc;
         res = (res) ? res : uart_core_init(dev, subdev, DEFAULT_UART_IO, &uc);
-        res = (res) ? res : uart_core_rx_collect(&uc, sizeof(b), b, 250);
+        res = (res) ? res : uart_core_rx_collect(&uc, sizeof(b), b, 2250);
         if (res > 0)
             res = 0;
         USDR_LOG("M2PE", USDR_LOG_ERROR, "UART: `%s`\n", b);
