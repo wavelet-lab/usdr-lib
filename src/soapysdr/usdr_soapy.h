@@ -9,6 +9,10 @@
 #include <memory>
 
 #include "../lib/models/dm_all.h"
+extern "C" {
+#include "../common/ring_circbuf.h"
+}
+
 
 #include <stdio.h>
 
@@ -292,6 +296,8 @@ private:
         unsigned chmsk = 0;
 
         bool active = false;
+
+        ring_circbuf_t* rxcbuf  = nullptr;
     };
 
     const char* get_sdr_param(int sdridx, const char* dir, const char* par, const char* subpar);
