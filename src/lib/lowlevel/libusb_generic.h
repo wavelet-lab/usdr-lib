@@ -198,7 +198,7 @@ void buffers_reset(struct buffers* rb);
 unsigned buffers_produce(struct buffers *prxb);
 unsigned buffers_consume(struct buffers *prxb);
 
-int buffers_ready_wait(struct buffers *rxb, unsigned timeout_us);
+int buffers_ready_wait(struct buffers *rxb, int64_t timeout_us);
 int buffers_ready_post(struct buffers *rxb);
 
 unsigned buffers_available_get(struct buffers *prxb);

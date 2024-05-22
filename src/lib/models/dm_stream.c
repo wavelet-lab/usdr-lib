@@ -91,19 +91,19 @@ int usdr_dms_sync(pdm_dev_t device,
 
 int usdr_dms_recv(pusdr_dms_t stream,
                   void **stream_buffs,
-                  unsigned timeout,
+                  unsigned timeout_ms,
                   struct usdr_dms_recv_nfo* nfo)
 {
     struct stream_handle* h = (struct stream_handle*)stream;
-    return h->ops->recv(h, (char**)stream_buffs, timeout, nfo);
+    return h->ops->recv(h, (char**)stream_buffs, timeout_ms, nfo);
 }
 
 int usdr_dms_send(pusdr_dms_t stream,
                   const void **stream_buffs,
                   unsigned samples,
                   dm_time_t timestamp,
-                  unsigned timeout)
+                  unsigned timeout_ms)
 {
     struct stream_handle* h = (struct stream_handle*)stream;
-    return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout);
+    return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms);
 }
