@@ -177,6 +177,9 @@ int usdr_dmd_create_string(const char* connection_string, pdm_dev_t* odev)
                 USDR_LOG("DSTR", USDR_LOG_NOTE, "BUS[%d] = %s\n", j, token);
             }
             bus_cnt = j;
+        } else if (strcmp(par.params[k], "loglevel") == 0) {
+            int loglevel = atoi(par.value[k]);
+            usdrlog_setlevel(NULL, loglevel);
         }
     }
 
