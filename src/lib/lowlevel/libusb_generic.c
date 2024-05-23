@@ -405,9 +405,9 @@ void buffers_deinit(struct buffers* rb)
     rb->stop = true;
     for (unsigned i = 0; i < rb->transfers_count; i++) {
         res = libusb_to_errno(libusb_cancel_transfer(rb->transfers[i]));
-        if(res)
-        {
-            USDR_LOG("USBX", USDR_LOG_WARNING, "libusb_cancel_transfer() error, res=%d\n", res);
+        if (res && res != -ENXIO) {
+            USDR_LOG("USBX", USDR_LOG_WARNING, "libusb_cancel_transfer(%d/%d) error, res=%d\n",
+                     i, rb->transfers_count, res);
         }
     }
 
@@ -667,6 +667,7 @@ int buffers_usb_free(struct buffers *prxb)
     free(prxb->bd);
     prxb->bd = NULL;
 
+    prxb->transfers_count = 0;
     return 0;
 }
 

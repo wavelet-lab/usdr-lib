@@ -14,7 +14,7 @@
 int usdr_dms_destroy(pusdr_dms_t stream)
 {
     struct stream_handle* h = (struct stream_handle*)stream;
-    return h->ops->destroy(h);
+    return h->dev->unregister_stream(h->dev, h);
 }
 
 int usdr_dms_info(pusdr_dms_t stream, usdr_dms_nfo_t* nfo)
