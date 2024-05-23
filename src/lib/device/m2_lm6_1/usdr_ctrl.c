@@ -92,6 +92,7 @@ enum sigtype {
     USDR_RX_LO_CHANGED,
     USDR_TX_LNA_CHANGED,
     USDR_RX_LNA_CHANGED,
+    USDR_SAMPLERATE_CHANGED,
 };
 
 static int8_t _lms6002d_rxvga1_db_to_int(double db)
@@ -273,6 +274,15 @@ static int _usdr_signal_event(usdr_dev_t *d, enum sigtype t)
             res = (res) ? res : _usdr_set_lna_tx(d, cfgidx);
         }
         return res;
+
+    case USDR_SAMPLERATE_CHANGED:
+        if (d->mexir_en && (d->cfg_auto_rx[d->rx_cfg_path].band == RXPATH_LNA3)) {
+            d->rfic_rx_lo = d->mixer_lo + d->rx_lo;
+            USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: RX LO corrected to %.3f Mhz (LNB = %.3f)\n",
+                     lowlevel_get_devname(d->base.dev), d->rfic_rx_lo / 1.0e6, d->mixer_lo / 1.0e6);
+
+            return lms6002d_tune_pll(&d->lms, false, d->rfic_rx_lo);
+        }
     }
 
     return 0;
@@ -311,11 +321,22 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
     int res;
 
     res = si5332_set_layout(dev, 0, I2C_BUS_SI5332A, &nfo, d->hw_board_rev == USDR_REV_3 ? false : true, &d->si_vco_freq);
-    if (res)
-        return res;
 
     // TODO: Add ability to alter it
     d->mixer_lo = d->si_vco_freq / 8;
+
+    // Apply automatic RF Freq correction if external mixer is active
+    if (d->mexir_en) {
+        res = res ? res : _usdr_signal_event(d, USDR_SAMPLERATE_CHANGED);
+    }
+
+    // If user didn't set BW filter set it to samplerate
+    if (!d->rx_bw.set && rxrate > 1) {
+        res = res ? res : lms6002d_set_bandwidth(&d->lms, false, rxrate);
+    }
+    if (!d->tx_bw.set && txrate > 1) {
+        res = res ? res : lms6002d_set_bandwidth(&d->lms, true, txrate);
+    }
 
     // FIME: Remove DEBUG
     // check clocks
@@ -330,7 +351,7 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
                  v & 0xfffffff, q & 0xfffffff, t & 0xfffffff);
     }
 
-    return 0;
+    return res;
 }
 
 
@@ -714,6 +735,13 @@ int usdr_rfic_bb_set_badwidth(struct usdr_dev *d,
                               unsigned* actualbw)
 {
     if (actualbw) *actualbw = bw;
+
+    if (!dir_tx) {
+        opt_u32_set_val(&d->rx_bw, bw);
+    } else {
+        opt_u32_set_val(&d->tx_bw, bw);
+    }
+
     return lms6002d_set_bandwidth(&d->lms, dir_tx, bw);
 }
 
