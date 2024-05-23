@@ -905,6 +905,18 @@ SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int /*direction*/, cons
         argInfos.push_back(info);
     }
 
+    //link format
+    {
+        SoapySDR::ArgInfo info;
+        info.key = "bufferLength";
+        info.name = "Buffer Length";
+        info.description = "Hardware packet size over the link.";
+        info.type = SoapySDR::ArgInfo::INT;
+        info.value = _desired_rx_pkt;
+        argInfos.push_back(info);
+    }
+
+
     return argInfos;
 }
 
