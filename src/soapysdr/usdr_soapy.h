@@ -338,5 +338,7 @@ private:
     double _actual_frequency[2] = { 0, 0 };
 
     double _actual_gains[10] = { 0, };
+
+    std::string _clk_source = "internal";
 };
 
