@@ -563,6 +563,8 @@ void SoapyUSDR::setUParam(const int direction, const char* param, const char* su
 
 void SoapyUSDR::setBandwidth(const int direction, const size_t channel, const double bw)
 {
+    (void)channel;
+
     if (bw == 0.0) return; //special ignore value
 
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
@@ -622,7 +624,7 @@ SoapySDR::RangeList SoapyUSDR::getMasterClockRates(void) const
 
 std::vector<std::string> SoapyUSDR::listClockSources(void) const
 {
-    return { "internal" };
+    return { "internal", "external" };
 }
 
 void SoapyUSDR::setClockSource(const std::string &source)
@@ -630,14 +632,17 @@ void SoapyUSDR::setClockSource(const std::string &source)
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
 
     SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setClockSource(%s)", source.c_str());
+    int res = usdr_dme_set_uint(_dev->dev(), "/dm/sdr/refclk/path", (uintptr_t)source.c_str());
+    if (res) {
+        throw std::invalid_argument("SoapyUSDR::setClockSource("+source+") failed");
+    }
 
-    if (source == "internal")
-        return;
+    _clk_source = source;
 }
 
 std::string SoapyUSDR::getClockSource(void) const
 {
-    return "internal";
+    return _clk_source;
 }
 
 /*******************************************************************
@@ -957,11 +962,14 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     _streams[direction].chmsk = chmsk;
     _streams[direction].stream = direction == SOAPY_SDR_RX ? "/ll/srx/0" : "/ll/stx/0";
 
-    // FIXUP (TODO get MTU size)
     if (direction == SOAPY_SDR_RX) {
+        // We need a better way to calculate packet size
+        unsigned defbufsz =
+            (_actual_rx_rate >= 7.6e6) ? 7680 : (_actual_rx_rate >= 3.8e6) ? 3840 : 1920;
+
         _streams[direction].nfo.pktsyms =
             (pktSamples != 0) ? pktSamples :
-            (_desired_rx_pkt != 0) ? _desired_rx_pkt : 1920;
+            (_desired_rx_pkt != 0) ? _desired_rx_pkt : defbufsz;
     } else {
         // TODO add discovery
         _streams[direction].nfo.pktsyms = 8192;
@@ -1026,11 +1034,11 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     res = usdr_dms_op(ustr->strm, USDR_DMS_START, 0);
     ustr->active = true;
 
-    if (ustr->self->_streams[0].active && ustr->self->_streams[1].active) {
-        pusdr_dms_t pstr[2] = { ustr->self->_streams[0].strm, ustr->self->_streams[1].strm };
-        SoapySDR::logf(SOAPY_SDR_INFO, "SoapyUSDR::setupStream() -> resync!!!");
-        res = usdr_dms_sync(_dev->dev(), "rx", 2, pstr);
-    }
+    // if (ustr->self->_streams[0].active && ustr->self->_streams[1].active) {
+    //     pusdr_dms_t pstr[2] = { ustr->self->_streams[0].strm, ustr->self->_streams[1].strm };
+    //     SoapySDR::logf(SOAPY_SDR_INFO, "SoapyUSDR::setupStream() -> resync!!!");
+    //     res = usdr_dms_sync(_dev->dev(), "rx", 2, pstr);
+    // }
 
 
     return (SoapySDR::Stream *)&_streams[direction];
@@ -1072,8 +1080,6 @@ int SoapyUSDR::activateStream(
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     USDRStream* ustr = (USDRStream*)(stream);
     bool tx_dir = (ustr == &_streams[SOAPY_SDR_TX]);
-    int res;
-
     SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::activateStream(%s, @ %lld ns, %d samples, %08x)",
                    ustr->stream, timeNs, (unsigned)numElems, flags);
 
@@ -1086,7 +1092,9 @@ int SoapyUSDR::activateStream(
     // setUParam(SOAPY_SDR_RX, "gain", "vga", 30);
     // setUParam(SOAPY_SDR_RX, "gain", "pga", 0);
 
-    res = usdr_dms_sync(_dev->dev(), tx_dir ? "tx" : "rx", 1, &ustr->strm);
+    int res = usdr_dms_sync(_dev->dev(), tx_dir ? "tx" : "rx", 1, &ustr->strm);
+    if (res)
+        return SOAPY_SDR_STREAM_ERROR;
 
     ustr->active = true;
     return 0;
