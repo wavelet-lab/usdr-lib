@@ -78,9 +78,11 @@ struct usdr_dms_recv_nfo {
     struct usdr_dms_frame_nfo parts[0];
 };
 
+
+//
 int usdr_dms_recv(pusdr_dms_t stream,
                   void **stream_buffs,
-                  unsigned timeout,
+                  unsigned timeout_ms,
                   struct usdr_dms_recv_nfo* nfo);
 
 int usdr_dms_send(pusdr_dms_t stream,

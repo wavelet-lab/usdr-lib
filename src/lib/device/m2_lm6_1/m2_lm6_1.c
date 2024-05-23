@@ -110,6 +110,9 @@ static int dev_m2_lm6_1_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 static int dev_m2_lm6_1_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_rx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_sdr_tx_gain_vga1_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_sdr_tx_gain_vga2_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int dev_m2_lm6_1_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -190,6 +193,8 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/tx/freqency",  { dev_m2_lm6_1_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/rx/gain",      { dev_m2_lm6_1_sdr_rx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain",      { dev_m2_lm6_1_sdr_tx_gain_set, NULL }},
+    { "/dm/sdr/0/tx/gain/vga1", { dev_m2_lm6_1_sdr_tx_gain_vga1_set, NULL }},
+    { "/dm/sdr/0/tx/gain/vga2", { dev_m2_lm6_1_sdr_tx_gain_vga2_set, NULL }},
     { "/dm/sdr/0/rx/gain/pga",  { dev_m2_lm6_1_sdr_rx_gainpga_set, NULL }},
     { "/dm/sdr/0/rx/gain/vga",  { dev_m2_lm6_1_sdr_rx_gainvga_set, NULL }},
     { "/dm/sdr/0/rx/gain/lna",  { dev_m2_lm6_1_sdr_rx_gainlna_set, NULL }},
@@ -513,6 +518,16 @@ int dev_m2_lm6_1_sdr_rx_gain_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint6
     return usdr_rfic_set_gain(&d->d, GAIN_RX_VGA1, value, NULL);
 }
 int dev_m2_lm6_1_sdr_tx_gain_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    return usdr_rfic_set_gain(&d->d, GAIN_TX_VGA2, value, NULL);
+}
+int dev_m2_lm6_1_sdr_tx_gain_vga1_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1*)ud;
+    return usdr_rfic_set_gain(&d->d, GAIN_TX_VGA1, value, NULL);
+}
+int dev_m2_lm6_1_sdr_tx_gain_vga2_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
     return usdr_rfic_set_gain(&d->d, GAIN_TX_VGA2, value, NULL);

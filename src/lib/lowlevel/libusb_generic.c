@@ -482,7 +482,7 @@ unsigned buffers_consume(struct buffers *prxb)
     return (prxb->bufno_cons++) & (prxb->buf_max - 1);
 }
 
-int buffers_ready_wait(struct buffers *rxb, unsigned timeout_us)
+int buffers_ready_wait(struct buffers *rxb, int64_t timeout_us)
 {
     int res;
     if (rxb->fd_event >= 0) {
