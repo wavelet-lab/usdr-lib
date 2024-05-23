@@ -958,6 +958,13 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
 
+    if (_streams[direction].setup && _streams[direction].active) {
+        throw std::runtime_error("SoapyUSDR::setupStream(" + std::string(_streams[direction].stream) + ") is active, deactivate it first!");
+    }
+    if (_streams[direction].setup) {
+        closeStream((SoapySDR::Stream *)&_streams[direction]);
+    }
+
     _streams[direction].fmt = uformat;
     _streams[direction].chmsk = chmsk;
     _streams[direction].stream = direction == SOAPY_SDR_RX ? "/ll/srx/0" : "/ll/stx/0";
@@ -1032,7 +1039,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     }
 
     res = usdr_dms_op(ustr->strm, USDR_DMS_START, 0);
-    ustr->active = true;
+    ustr->setup = true;
 
     // if (ustr->self->_streams[0].active && ustr->self->_streams[1].active) {
     //     pusdr_dms_t pstr[2] = { ustr->self->_streams[0].strm, ustr->self->_streams[1].strm };
@@ -1046,8 +1053,10 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
 
 void SoapyUSDR::closeStream(SoapySDR::Stream *stream)
 {
-    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     USDRStream* ustr = (USDRStream*)(stream);
+    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::closeStream(%s)\n", ustr->stream);
+
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
 
     if (ustr->strm) {
         usdr_dms_op(ustr->strm, USDR_DMS_STOP, 0);
@@ -1059,6 +1068,8 @@ void SoapyUSDR::closeStream(SoapySDR::Stream *stream)
         ring_circbuf_destroy(ustr->rxcbuf);
         ustr->rxcbuf = NULL;
     }
+
+    ustr->setup = false;
 }
 
 size_t SoapyUSDR::getStreamMTU(SoapySDR::Stream *stream) const

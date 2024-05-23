@@ -302,6 +302,7 @@ private:
 
         unsigned chmsk = 0;
 
+        bool setup = false;
         std::atomic<bool> active;
 
         ring_circbuf_t* rxcbuf  = nullptr;
