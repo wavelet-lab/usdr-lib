@@ -13,6 +13,14 @@ tasks:
       - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work/work -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml -v ~/.gnupg:/mnt/gnupg {{.DOCKER_IMAGE}}
       - docker exec -ti $(docker ps -lq) /bin/bash
 
+  ubuntu1804-amd64:
+    cmds:
+      - task: buildbox
+        vars:
+          PLATFORM: linux/amd64
+          DOCKER_IMAGE: buildbox-ubuntu1804-amd64
+          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu1804
+
   ubuntu2004-amd64:
     cmds:
       - task: buildbox
