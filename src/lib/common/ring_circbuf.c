@@ -29,39 +29,41 @@ void ring_circbuf_destroy(ring_circbuf_t* rb)
 
 void ring_circbuf_read(ring_circbuf_t* rb, void* ptr, size_t sz)
 {
+    char* cptr = (char*)ptr;
     size_t pos = (rb->rpos % rb->size);
     size_t p1 = rb->size - pos;
     size_t rsz = (sz > p1) ? p1 : sz;
 
-    memcpy(ptr, rb->data + pos, rsz);
+    memcpy(cptr, rb->data + pos, rsz);
     rb->rpos += rsz;
 
     assert(rb->rpos <= rb->wpos);
     if (rsz == sz)
         return;
 
-    ptr += rsz;
+    cptr += rsz;
     rsz = sz - rsz;
 
-    memcpy(ptr, rb->data, rsz);
+    memcpy(cptr, rb->data, rsz);
     rb->rpos += rsz;
     assert(rb->rpos <= rb->wpos);
 }
 
 void ring_circbuf_write(ring_circbuf_t* rb, const void* ptr, size_t sz)
 {
+    const char* cptr = (const char*)ptr;
     size_t pos = (rb->wpos % rb->size);
     size_t p1 = rb->size - pos;
     size_t rsz = (sz > p1) ? p1 : sz;
 
-    memcpy(rb->data + pos, ptr, rsz);
+    memcpy(rb->data + pos, cptr, rsz);
     rb->wpos += rsz;
     if (rsz == sz)
         return;
 
-    ptr += rsz;
+    cptr += rsz;
     rsz = sz - rsz;
 
-    memcpy(rb->data, ptr, rsz);
+    memcpy(rb->data, cptr, rsz);
     rb->wpos += rsz;
 }
