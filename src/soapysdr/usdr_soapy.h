@@ -7,10 +7,21 @@
 #include <map>
 #include <set>
 #include <memory>
+#include <atomic>
 
 #include "../lib/models/dm_all.h"
+extern "C" {
+#include "../common/ring_circbuf.h"
+}
+
 
 #include <stdio.h>
+
+enum rfic_type_t {
+    RFIC_LMS6002D,
+    RFIC_LMS7002M,
+    RFIC_UNKNOWN
+};
 
 class usdr_handle
 {
@@ -291,7 +302,10 @@ private:
 
         unsigned chmsk = 0;
 
-        bool active = false;
+        bool setup = false;
+        std::atomic<bool> active;
+
+        ring_circbuf_t* rxcbuf  = nullptr;
     };
 
     const char* get_sdr_param(int sdridx, const char* dir, const char* par, const char* subpar);
@@ -319,5 +333,13 @@ private:
     uint64_t tx_pkts;
 
     FILE* rd;
+
+    rfic_type_t type = RFIC_UNKNOWN;
+    double _actual_bandwidth[2] = { 0, 0 };
+    double _actual_frequency[2] = { 0, 0 };
+
+    double _actual_gains[10] = { 0, };
+
+    std::string _clk_source = "internal";
 };
 

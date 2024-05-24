@@ -259,7 +259,7 @@ static int usb_post_regout(usb_dev_t* dev, uint32_t *regoutbuffer, unsigned coun
 
     res = libusb_to_errno(libusb_submit_transfer(transfer));
     if (res) {
-        USDR_LOG("USBX", USDR_LOG_ERROR, "FAILED to post REGOUT %d\n", res);
+        USDR_LOG("USBX", USDR_LOG_ERROR, "FAILED to post REGOUT %d (%s)\n", res, strerror(-res));
         return res;
     }
 
@@ -706,12 +706,17 @@ void _usb_uram_stream_on_buffer(void* param, struct buffer_discriptor *rxbd)
     uint32_t* tr = _get_trailer_bursts(rxbd, d->rx_strms_extnty[0], &bursts, &skipped);
 
     if (rxbd->bno < rxb->buf_max) {
-        tr[1] += d->rx_buffer_missed[0];
+        unsigned buffers_discarded = d->rx_buffer_missed[0];
+        tr[0] += d->rx_buffer_missed[0];
         d->rx_buffer_missed[0] = 0;
         buffers_ready_post(rxb);
+
+        if (buffers_discarded > 0) {
+            USDR_LOG("USBX", USDR_LOG_WARNING, "%d buffers were discarded due to slow processing in the application\n", buffers_discarded);
+        }
     } else {
         d->app_drops[0]++;
-        d->rx_buffer_missed[0] += 1 + skipped;
+        d->rx_buffer_missed[0] += 1 + (skipped & 0xffffff);
     }
 }
 
@@ -824,7 +829,7 @@ int usb_uram_recv_dma_wait(lldev_t dev, subdev_t subdev, stream_t channel, void*
 
     res = buffers_ready_wait(rxb, timeout * 1000);
     if (res) {
-         USDR_LOG("USBX", USDR_LOG_ERROR, "Error == %d\n", res);
+        USDR_LOG("USBX", USDR_LOG_ERROR, "Buffer not read: %d (%s)\n", res, strerror(-res));
         return res;
     }
 
@@ -835,8 +840,12 @@ int usb_uram_recv_dma_wait(lldev_t dev, subdev_t subdev, stream_t channel, void*
     // Parse trailer
     unsigned trailer_sz = (ext_stat) ? RX_PKT_TRAILER_EX : RX_PKT_TRAILER;
     unsigned buffer_sz = bd->buffer_sz - trailer_sz;
-    uint32_t bursts = *((uint32_t*)(tr_buffer + buffer_sz));
-    uint32_t skipped = *((uint32_t*)(tr_buffer + buffer_sz + 4));
+    uint32_t* trailer_ptr = ((uint32_t*)(tr_buffer + buffer_sz));
+    uint32_t bursts = trailer_ptr[0];
+    uint32_t skipped = trailer_ptr[1];
+
+    USDR_LOG("USBX", USDR_LOG_DEBUG, "Buffer %d Trailer %08x.%08x.%08x.%08x\n",
+             bd->buffer_sz, trailer_ptr[3], trailer_ptr[2], trailer_ptr[1], trailer_ptr[0]);
 
     USDR_LOG("USBX",
              (rxb->allocsz == bd->buffer_sz) ? USDR_LOG_DEBUG : USDR_LOG_ERROR,

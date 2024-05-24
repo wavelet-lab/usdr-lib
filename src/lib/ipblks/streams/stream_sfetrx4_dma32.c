@@ -90,10 +90,14 @@ int _sfetrx4_destroy(stream_handle_t* str)
     } else {
         res = lowlevel_reg_wr32(dev, 0,
                                 stream->cnf_base + 2, 0);
+        if (res)
+            return res;
     }
 
+    lowlevel_ops_t* dops = lowlevel_get_ops(dev);
+    res = dops->stream_deinitialize(dev, 0, stream->ll_streamo);
+
     // Cleanup device state
-    res = dev->pdev->unregister_stream(dev->pdev, str);
     free(stream);
     return res;
 }

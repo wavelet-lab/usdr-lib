@@ -18,7 +18,7 @@ struct stream_ops {
 
     int (*recv)(stream_handle_t* stream,
                 char **stream_buffs,
-                unsigned timeout,
+                unsigned timeout_ms,
                 struct usdr_dms_recv_nfo* nfo);
 
     int (*send)(stream_handle_t* stream,

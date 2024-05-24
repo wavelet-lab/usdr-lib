@@ -495,9 +495,13 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
     unsigned idpa_res = (uint64_t)idpa_den * idpa_frac / pllfreq;
 
     bool jdiv = false;
-    if (nfo->out == nfo->infreq) {
-        jdiv = true;
-        odiv = 1;
+    for (unsigned todiv = 1; todiv < 14; todiv++) {
+        int diff = (int)(nfo->out * todiv) - (int)nfo->infreq;
+
+        if (diff > -14 && diff < 14) {
+            jdiv = true;
+            odiv = todiv;
+        }
     }
 
     if (vcofreq) {

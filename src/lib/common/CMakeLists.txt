@@ -5,6 +5,7 @@ set(USDR_COMMON_LIB_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/ring_buffer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/clock_gen.c
     ${CMAKE_CURRENT_SOURCE_DIR}/parse_params.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ring_circbuf.c
 )
 
 

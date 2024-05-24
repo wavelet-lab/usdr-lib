@@ -1172,11 +1172,14 @@ int usdr_device_m2_lm7_1_unregister_stream(device_t* dev, stream_handle_t* strea
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)dev;
     if (stream == d->tx) {
+        d->tx->ops->destroy(d->tx);
         d->tx = NULL;
     } else if (stream == d->rx) {
+        d->rx->ops->destroy(d->rx);
         d->rx = NULL;
+    } else {
+        return -EINVAL;
     }
-    //return -EINVAL; TODO!!!
     return 0;
 }
 
