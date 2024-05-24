@@ -265,9 +265,8 @@ int generic_rpc_call(pdm_dev_t dmdev,
     int res = 0;
 
     sdr_type_t sdrtype;
-    res = dmdev->lldev->ops->generic_get(dmdev->lldev, LLGO_DEVICE_SDR_TYPE, (const char**)&sdrtype);
-    if(res)
-        return res;
+    if(dmdev->lldev->ops->generic_get(dmdev->lldev, LLGO_DEVICE_SDR_TYPE, (const char**)&sdrtype))
+        sdrtype = SDR_NONE;
 
     const struct sdr_call *pcall = sdrc;
     unsigned outbufsz = response_maxlen;
@@ -308,6 +307,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         case SDR_XSDR: strncpy(device_name, "xsdr",         sizeof(device_name)); break;
         case SDR_USDR: strncpy(device_name, "usdr",         sizeof(device_name)); break;
         case SDR_LIME: strncpy(device_name, "limesdr_mini", sizeof(device_name)); break;
+        case SDR_NONE: strncpy(device_name, "unknown",      sizeof(device_name)); break;
         }
         //
 

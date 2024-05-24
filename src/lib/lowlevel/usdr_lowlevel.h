@@ -19,9 +19,10 @@ enum lowlevel_ls_ops {
 };
 
 enum sdr_type {
-    SDR_USDR = 0,
-    SDR_XSDR = 1,
-    SDR_LIME = 2,
+    SDR_NONE = 0,
+    SDR_USDR = 1,
+    SDR_XSDR = 2,
+    SDR_LIME = 3,
 };
 typedef enum sdr_type sdr_type_t;
 
