@@ -28,7 +28,7 @@ tasks:
   deb-clean:
     desc: Cleans after the debian package build
     cmds:
-      - rm -f /work/*.deb /work/*.dsc /work/*.changes /work/*.tar.gz /work/*.build /work/*.buildinfo
+      - rm -f /work/*.deb /work/*.ddeb /work/*.dsc /work/*.changes /work/*.tar.gz /work/*.build /work/*.buildinfo
       - rm -rf /work/work/debian
 
   build:
@@ -46,6 +46,7 @@ tasks:
     desc: Upload the debian package to the ppa
     preconditions:
       - test -d /mnt/gnupg
+      - test -d debian/
     cmds:
       - rm -rf /root/.gnupg
       - cp -ra /mnt/gnupg /root/.gnupg 2>/dev/null | true
