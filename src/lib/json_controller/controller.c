@@ -39,10 +39,9 @@ static const struct idx_list s_method_list[] = {
     { "sdr_discover",             SDR_DISCOVER },
     { "sdr_connect",              SDR_CONNECT },
     { "sdr_disconnect",           SDR_DISCONNECT },
-    { "sdr_setup_rx_raw_stream",  SDR_RX_SETUP_RAW_STREAM },
-    { "sdr_setup_rx_sa_stream",   SDR_RX_SETUP_SA_STREAM },
-    { "sdr_setup_rx_rtsa_stream", SDR_RX_SETUP_RTSA_STREAM },
-    { "sdr_start_rx_stream",      SDR_RX_START_STREAM },
+    { "sdr_start_rx_raw_stream",  SDR_RX_START_RAW_STREAM },
+    { "sdr_start_rx_sa_stream",   SDR_RX_START_SA_STREAM },
+    { "sdr_start_rx_rtsa_stream", SDR_RX_START_RTSA_STREAM },
     { "sdr_stop_rx_stream",       SDR_RX_STOP_STREAM },
     { "sdr_control_rx_stream",    SDR_RX_CONTROL_STREAM },
 };
