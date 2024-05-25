@@ -51,8 +51,6 @@ Go to [releases page](https://github.com/wavelet-lab/usdr-lib/releases) and down
 
 Unpack the archive.
 
-```shell
-
 #### Install package
 
 ```shell
