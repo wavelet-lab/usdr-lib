@@ -22,6 +22,7 @@ SOAPY_SDR_MODULE_UTIL(
         usdr
 )
 
-add_executable(test_usdr_soapy test_usdr_soapy.c)
-target_link_libraries(test_usdr_soapy ${SoapySDR_LIBRARIES})
-
+if(ENABLE_TESTS)
+    add_executable(test_usdr_soapy test_usdr_soapy.c)
+    target_link_libraries(test_usdr_soapy ${SoapySDR_LIBRARIES})
+endif(ENABLE_TESTS)
