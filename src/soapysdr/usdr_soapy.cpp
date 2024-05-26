@@ -990,8 +990,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
             (pktSamples != 0) ? pktSamples :
             (_desired_rx_pkt != 0) ? _desired_rx_pkt : defbufsz;
     } else {
-        // TODO add discovery
-        // _streams[direction].nfo.pktsyms = 8192;
+        _streams[direction].nfo.pktsyms = 0;
     }
 
     _streams[direction].self = this;

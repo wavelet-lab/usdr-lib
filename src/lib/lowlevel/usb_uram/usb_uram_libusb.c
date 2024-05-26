@@ -792,6 +792,9 @@ int _usb_uram_init_txstream(usb_dev_t* d,
                  params->block_size);
         return -EINVAL;
     }
+    if (params->block_size == 0) {
+        params->block_size = MAX_TX_BUFFER_SZ;
+    }
 
     res = buffers_usb_init(&d->gdev, prxb, buffers_cnt, buffers_cnt,
                            params->block_size + TX_PKT_HEADER, EP_OUT_DEFSTREAM, eventtype);
@@ -799,7 +802,7 @@ int _usb_uram_init_txstream(usb_dev_t* d,
         return res;
 
     params->underlying_fd = (eventtype) ? prxb->fd_event : -1;
-    params->out_mtu_size = MAX_TX_BUFFER_SZ;
+    params->out_mtu_size = params->block_size;
     USDR_LOG("USBX", USDR_LOG_ERROR, "Stream TX prepared sz = %d, URBs = %d, evfd = %d!\n",
              prxb->allocsz_rounded, buffers_cnt, eventtype);
     *channel = DEV_TX_STREAM_NO;
