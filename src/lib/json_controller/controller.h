@@ -47,6 +47,7 @@ enum sdr_call_parameters {
     SDRC_DIVS_FOR_DB,
     SDRC_CONTRAST,
     SDRC_SATURATION,
+    SDRC_STREAM_TYPE,
 
     SDRC_PARAMS_MAX,
 };
