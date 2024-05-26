@@ -960,7 +960,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     if (args.count("bufferLength")) {
         const std::string& buffer_length = args.at("bufferLength");
         pktSamples = std::atoi(buffer_length.c_str());
-        if (pktSamples < 128) {
+        if ((pktSamples != 0) && (pktSamples < 128)) {
             throw std::runtime_error("SoapyUSDR::setupStream([bufferLength="+buffer_length+") is too small");
         }
         if (pktSamples > 128*1024) {
