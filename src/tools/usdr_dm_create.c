@@ -172,7 +172,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned dotx = 0;
     unsigned dorx = 1;
     unsigned rxflags =  DMS_FLAG_NEED_TX_STAT;
-    uint64_t temp;
+    uint64_t temp[2];
     int gen = 0;
     const char* synctype = "all";
     bool listdevs = false;
@@ -376,11 +376,11 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dme_set_uint(dev, "/debug/hw/lms7002m/0/rxlml", lmlcfg);
 
 
-        res = usdr_dme_get_uint(dev, "/dm/sensor/temp", &temp);
+        res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
         if (res) {
             fprintf(stderr, "Unable to get device temperature: errno %d\n", res);
         } else {
-            fprintf(stderr, "Temp = %.1f C\n", temp / 256.0);
+            fprintf(stderr, "Temp = %.1f C\n", temp[0] / 256.0);
         }
 
 //        res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
@@ -485,7 +485,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     */
 
     usleep(10000);
-    usdr_dme_get_uint(dev, "/dm/debug/all", &temp);
+    usdr_dme_get_uint(dev, "/dm/debug/all", temp);
     usleep(1000);
 
     if (cal_freq > 1e6) {
@@ -659,9 +659,9 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
 stop:
-    usdr_dme_get_uint(dev, "/dm/debug/rxtime", &temp);
-    usdr_dme_get_uint(dev, "/dm/debug/rxtime", &temp);
-    //usdr_dme_get_uint(dev, usdr_dmd_find_entity(dev, "/dm/debug/rxtime"), &temp);
+    usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
+    usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
+    //usdr_dme_get_uint(dev, usdr_dmd_find_entity(dev, "/dm/debug/rxtime"), temp);
 
     if (dorx) {
         res = usdr_dms_op(usds_rx, USDR_DMS_STOP, 0);
@@ -680,18 +680,18 @@ stop:
 
     thread_stop = true;
 
-    res = usdr_dme_get_uint(dev, "/dm/debug/all", &temp);
+    res = usdr_dme_get_uint(dev, "/dm/debug/all", temp);
     if (res) {
         fprintf(stderr, "Unable to get device debug data: errno %d\n", res);
         goto dev_close;
     }
 
-    res = usdr_dme_get_uint(dev, "/dm/sensor/temp", &temp);
+    res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
     if (res) {
         fprintf(stderr, "Unable to get device temperature: errno %d\n", res);
         //goto dev_close;
     } else {
-        fprintf(stderr, "Temp = %.1f C\n", temp / 256.0);
+        fprintf(stderr, "Temp = %.1f C\n", temp[0] / 256.0);
     }
 
     if (dorx) {
