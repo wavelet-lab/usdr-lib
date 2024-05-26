@@ -174,5 +174,7 @@ struct pcie_driver_woa_oob {
 #define PCIE_DRIVER_SRECV                _IOW(PCIE_DRIVER_MAGIC, 21, struct pcie_driver_srecv)
 #define PCIE_DRIVER_SSEND                _IOW(PCIE_DRIVER_MAGIC, 22, struct pcie_driver_srecv)
 
+// Request specific deriver ABI version
+#define PCIE_DRIVER_CLAIM_VERSION     _IOW(PCIE_DRIVER_MAGIC, 23, uint32_t)
 
 #endif

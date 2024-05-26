@@ -3,8 +3,11 @@
 
 #include "sfe_tx_4.h"
 #include <string.h>
+#include <usdr_logging.h>
 
-
+enum {
+    MAX_TX_FIFO_SZ = 126976
+};
 
 int sfe_tx4_check_format(const struct stream_config* psc)
 {
@@ -19,18 +22,21 @@ int sfe_tx4_check_format(const struct stream_config* psc)
     return (psc->chmsk == 0x3 || psc->chmsk == 0x1) ? 0 : -EINVAL;
 }
 
+int sfe_tx4_mtu_get(const struct stream_config* sc)
+{
+    (void)sc;
+    return MAX_TX_FIFO_SZ;
+}
+
 int sfe_tx4_push_ring_buffer(lldev_t dev,
                              subdev_t subdev,
                              unsigned cfg_base,
                              unsigned samples,
                              int64_t timestamp)
 {
-    if (samples > 8192)
-        return -EINVAL;
-
     //  13 12
     uint32_t regs[2] = {
-        ((timestamp >> 32) & 0xffff) | (((samples - 1) & 0x3fff) << 16) | ((timestamp < 0) ? 0x40000000 : 0),
+        ((timestamp >> 32) & 0x7fff) | (((samples - 1) & 0x7fff) << 15) | ((timestamp < 0) ? 0x40000000 : 0),
         timestamp,
     };
 
@@ -68,7 +74,7 @@ int sfe_tx4_ctl(lldev_t dev,
     if (res)
         return res;
 
-    cmd = (!mimo) ? ((1 << GP_PORT_TXDMA_CTRL_MODE_SISO) | (1 << GP_PORT_TXDMA_CTRL_MODE_MUTEB)) : 0;
+    cmd = (!mimo) ? ((1 << GP_PORT_TXDMA_CTRL_MODE_MUTEB)) : (1 << GP_PORT_TXDMA_CTRL_MODE_SISO);
     if (repeat)
         cmd |= (1 << GP_PORT_TXDMA_CTRL_MODE_REP);
 

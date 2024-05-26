@@ -50,7 +50,7 @@ enum lowlevel_generic_ops {
 enum llstream_flags {
     LLSF_EXACT_VALUES = 1, //Fail if requested values can't be satisfied; otherwise use closest
     LLSF_NEED_FDPOLL = 2,
-    LLSF_EXT_STAT = 4,
+    LLSF_EXT_STAT = 4, // Deprectaed, DON'T USE IT
 };
 
 struct lowlevel_stream_params {
@@ -58,7 +58,17 @@ struct lowlevel_stream_params {
     unsigned streamno;
     unsigned block_size;
     unsigned buffer_count;
+    // Aux information of wire format
+
+    /// Number of harware of channels streaming. For virtual streams ==0
+    unsigned channels;
+
+    /// Bits per sample in case of complex samples it's doubled (e.g. for ci16 == 32).
+    /// It corresponds number of bits for all channels (might be useful for compressed format)
+    unsigned bits_per_sym;
     int underlying_fd; ///< FD used for select/poll/epoll calls to get rid of blocking dma_wait/dma_get operations. Multiple streams may share same fd
+
+    size_t out_mtu_size; ///< Maximum transfer size for single transfer (return
 };
 typedef struct lowlevel_stream_params lowlevel_stream_params_t;
 

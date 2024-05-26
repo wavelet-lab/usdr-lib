@@ -905,7 +905,7 @@ SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int /*direction*/, cons
         argInfos.push_back(info);
     }
 
-    //link format
+    //buffer length
     {
         SoapySDR::ArgInfo info;
         info.key = "bufferLength";
@@ -991,7 +991,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
             (_desired_rx_pkt != 0) ? _desired_rx_pkt : defbufsz;
     } else {
         // TODO add discovery
-        _streams[direction].nfo.pktsyms = 8192;
+        // _streams[direction].nfo.pktsyms = 8192;
     }
 
     _streams[direction].self = this;

@@ -91,7 +91,7 @@ const usdr_dev_param_constant_t s_params_m2_lm7_1_rev000[] = {
     { "/ll/stx/0/base",    M2PCI_REG_WR_TXDMA_CNF_L},
     { "/ll/stx/0/cfg_base",VIRT_CFG_SFX_BASE + 512 },
     { "/ll/stx/0/irq",     M2PCI_INT_TX},
-    { "/ll/stx/0/dmacap",  0x855 },
+    { "/ll/stx/0/dmacap",  0x555 },
 
     { "/ll/dsp/atcrbs/0/core", USDR_MAKE_COREID(USDR_CS_DSP, 0x23675e) },
     { "/ll/dsp/atcrbs/0/base", M2PCI_REG_WR_LBDSP },

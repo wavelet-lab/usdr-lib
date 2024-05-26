@@ -15,7 +15,9 @@
 #include "sfe_tx_4.h"
 
 #include "../../xdsp/conv.h"
+#include "../../device/device_vfs.h"
 
+#define MINIM_FWID_COMPAT   0xd2b10c09
 
 struct stream_stats {
     uint64_t wirebytes;
@@ -275,15 +277,10 @@ int _sfetrx4_stream_send(stream_handle_t* str,
     stream->tf_data((const void**)stream_buffs, host_bytes, &buffer, wire_bytes);
     stream->rcnt++;
 
-    // TODO core operates QWORDS, working in siso 2 DWORD samples is 1 tick
-    if (stream->channels == 1) {
-        // Keep sign, since < 0 means to ignore the timestamp
-        timestamp = ((int64_t)timestamp) >> 1;
-    }
-
+    uint64_t oob[1] = { timestamp };
     res = ops->send_dma_commit(dev, 0,
                                stream->ll_streamo, buffer, wire_bytes,
-                               &timestamp, sizeof(timestamp));
+                               &oob, sizeof(oob));
     if (res)
         return res;
 
@@ -569,6 +566,9 @@ static int initialize_stream_rx_32(device_t* device,
     sparams.block_size = fc.bpb * fc.burstspblk;
     sparams.buffer_count = 32;
     sparams.flags = ((need_fd) ? LLSF_NEED_FDPOLL : 0) | (need_tx_stat ? LLSF_EXT_STAT : 0);
+    sparams.channels = 0;
+    sparams.bits_per_sym = 0;
+
     sparams.underlying_fd = -1;
     res = dops->stream_initialize(device->dev, 0, &sparams, &sid);
     if (res)
@@ -655,13 +655,21 @@ static int initialize_stream_tx_32(device_t* device,
 
     if (logicchs > 2)
         return -EINVAL;
-    if (logicchs * 4 * pktsyms > MAX_TX_BUFF) {
-        USDR_LOG("DSTR", USDR_LOG_ERROR, "TX Stream: Unsupported max block %d syms, need %d bytes buffer!\n",
-                 pktsyms, logicchs * 4 * pktsyms);
-        return -EINVAL;
+
+    uint64_t fwid;
+    res = usdr_device_vfs_obj_val_get_u64(device, "/dm/revision", &fwid);
+    if (res) {
+        USDR_LOG("DSTR", USDR_LOG_ERROR, "Unable to check comatability firmware!\n");
+    }
+    if ((fwid & 0xffffffff) < MINIM_FWID_COMPAT) {
+        USDR_LOG("DSTR", USDR_LOG_ERROR, "You're running outdated firmware, please update! CurrentID=%08x MinimalID=%08x\n",
+                 (uint32_t)(fwid & 0xffffffff),
+                 MINIM_FWID_COMPAT);
+        return -ECONNRESET;
     }
 
-
+    unsigned bits_per_single_sym = 32; // We support I/Q 16 bit for now only
+    unsigned hardware_channels = logicchs;
     if (*sc.sfmt == '&') {
         logicchs = 1;
         sc.sfmt++;
@@ -704,23 +712,42 @@ static int initialize_stream_tx_32(device_t* device,
         USDR_LOG("DSTR", USDR_LOG_INFO, "TX Stream: No transformation!\n");
     }
 
-
     lowlevel_stream_params_t sparams;
     stream_t sid;
     lowlevel_ops_t* dops = lowlevel_get_ops(device->dev);
+    unsigned max_mtu = sfe_tx4_mtu_get(&sc);
 
     sparams.streamno = 1;
     sparams.flags = 1;
-    sparams.block_size = MAX_TX_BUFF;
+    sparams.block_size = pktsyms * hardware_channels * bits_per_single_sym / 8;
     sparams.buffer_count = 32;
     sparams.flags = (need_fd) ? LLSF_NEED_FDPOLL : 0;
+    sparams.channels = hardware_channels;
+    sparams.bits_per_sym = hardware_channels * bits_per_single_sym;
+
+    if (sparams.block_size > max_mtu) {
+        USDR_LOG("DSTR", USDR_LOG_CRITICAL_WARNING, "TX Stream maximum MTU is %d bytes, we need %d to deliver %d samples blocksize!\n",
+                 max_mtu, sparams.block_size, pktsyms);
+        return -EINVAL;
+    }
+
     res = dops->stream_initialize(device->dev, 0, &sparams, &sid);
     if (res)
         return res;
 
+    if (pktsyms == 0) {
+        if (sparams.out_mtu_size > max_mtu)
+            sparams.out_mtu_size = max_mtu;
+
+        pktsyms = 8 * sparams.out_mtu_size / (hardware_channels * bits_per_single_sym);
+        USDR_LOG("DSTR", USDR_LOG_INFO, "TX Stream: No desired packetsize were set, assuminng maximum %d sps (%d blocksize)\n",
+                 pktsyms, (unsigned)sparams.out_mtu_size);
+
+        sparams.block_size = sparams.out_mtu_size;
+    }
+
     strdev = (stream_sfetrx_dma32_t*)malloc(sizeof(stream_sfetrx_dma32_t));
-    //usdr_dmo_init(&strdev->obj_stream, &s_dms_ops);
-    //strdev->parent = device;
+
     strdev->base.dev = device;
     strdev->base.ops = &s_sfetr4_dma32_ops;
 
@@ -737,11 +764,11 @@ static int initialize_stream_tx_32(device_t* device,
     strdev->pkt_bytes = sparams.block_size;
     strdev->host_bytes = funcs.sfunc(sparams.block_size, true);
 
-    strdev->bps = 32; // 16bit I/Q
+    strdev->bps = bits_per_single_sym; // 16bit I/Q
 
     strdev->tf_data = funcs.cfunc;
     strdev->tf_size = funcs.sfunc;
-    //strdev->cached_lldev = device->lldev;
+
     strdev->cached_samples = ~0u;
     strdev->rcnt = 0;
 
