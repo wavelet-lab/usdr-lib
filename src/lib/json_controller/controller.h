@@ -142,7 +142,7 @@ struct idx_list {
 
 #define MAX_JSON_OBJS 64
 
-json_t const* allocate_json(char* request, json_t* storage);
+json_t const* allocate_json(char* request, json_t storage[], unsigned qty);
 int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* parent);
 
 #endif

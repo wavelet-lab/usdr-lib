@@ -105,7 +105,7 @@ int webusb_process_rpc(
     struct sdr_call sdrc;
 
     json_t storage[MAX_JSON_OBJS];
-    json_t const* parent = allocate_json(request, storage);
+    json_t const* parent = allocate_json(request, storage, MAX_JSON_OBJS);
     if(!parent)
     {
         return -EINVAL;

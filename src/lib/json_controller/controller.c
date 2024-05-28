@@ -123,9 +123,9 @@ static int get_req_parameters(struct sdr_call *psdrc, json_t const* parent)
 }
 
 
-json_t const* allocate_json(char* request, json_t* storage)
+json_t const* allocate_json(char* request, json_t storage[], unsigned qty)
 {
-    json_t const* parent = json_create(request, storage, MAX_JSON_OBJS);
+    json_t const* parent = json_create(request, storage, qty);
     if (!parent) {
         USDR_LOG("WEBU", USDR_LOG_DEBUG, "Can't parse JSON: `%s`\n", request);
         return NULL;
