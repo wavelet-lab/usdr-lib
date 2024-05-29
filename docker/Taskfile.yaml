@@ -30,6 +30,7 @@ tasks:
     cmds:
       - rm -f /work/*.deb /work/*.ddeb /work/*.dsc /work/*.changes /work/*.tar.gz /work/*.build /work/*.buildinfo
       - rm -rf /work/work/debian
+      - rm -rf /work/work/obj-*
 
   build:
     desc: Build the project
