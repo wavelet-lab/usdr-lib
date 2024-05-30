@@ -10,7 +10,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     if ((outdatabsz * 3 / 8) < i)
         i = (outdatabsz * 3 / 8);
 
-    const uint64_t* indata = (const uint64_t*)indata_p;
+    const uint8_t* indata = (const uint8_t*)indata_p;
     float* outdata_0 = (float*)outdata_0_p;
     float* outdata_1 = (float*)outdata_1_p;
 

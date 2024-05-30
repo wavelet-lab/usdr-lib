@@ -9,6 +9,7 @@
 Suite * conv_i16_f32_suite(void);
 Suite * fftad_suite(void);
 Suite * rtsa_suite(void);
+Suite * conv_i12_f32_suite(void);
 
 int main(int argc, char** argv)
 {
@@ -22,8 +23,9 @@ int main(int argc, char** argv)
     sr = srunner_create(conv_i16_f32_suite());
     srunner_add_suite(sr, fftad_suite());
     srunner_add_suite(sr, rtsa_suite());
+    srunner_add_suite(sr, conv_i12_f32_suite());
 #else
-    sr = srunner_create(rtsa_suite());
+    sr = srunner_create(conv_i12_f32_suite());
 #endif
     srunner_set_fork_status (sr, CK_NOFORK);
     srunner_run_all(sr, (argc > 1) ? CK_VERBOSE : CK_NORMAL);

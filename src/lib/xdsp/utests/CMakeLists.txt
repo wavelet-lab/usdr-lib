@@ -4,12 +4,14 @@
 set(TEST_SUIT_SRCS
     xdsp_utest_suite.c
     conv_i16_f32_utest.c
+    conv_i12_f32_utest.c
     xfft_fftad_utest.c
     xfft_rtsa_utest.c
 
     ../fftad_functions.c
     ../rtsa_functions.c
     ../conv_i16_f32_2.c
+    ../conv_i12_f32_2.c
     ../vbase.c
 )
 
