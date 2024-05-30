@@ -833,6 +833,13 @@ int usb_uram_recv_dma_wait(lldev_t dev, subdev_t subdev, stream_t channel, void*
 
     // Parse trailer
     unsigned trailer_sz = (ext_stat) ? RX_PKT_TRAILER_EX : RX_PKT_TRAILER;
+
+    if(trailer_sz > bd->buffer_sz)
+    {
+        USDR_LOG("USBX", USDR_LOG_ERROR, "Invalid bus data, buffer_sz=%u\n", bd->buffer_sz);
+        return -EIO;
+    }
+
     unsigned buffer_sz = bd->buffer_sz - trailer_sz;
     uint32_t bursts = *((uint32_t*)(tr_buffer + buffer_sz));
     uint32_t skipped = *((uint32_t*)(tr_buffer + buffer_sz + 4));
