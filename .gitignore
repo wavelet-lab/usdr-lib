@@ -2,6 +2,7 @@
 .idea/
 obj-*/
 /debian
+/pkg
 
 # Prerequisites
 *.d
