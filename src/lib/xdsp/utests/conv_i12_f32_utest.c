@@ -120,7 +120,7 @@ START_TEST(conv_i12_f32_check_simd)
     last_fn_name = NULL;
 
     const size_t bzin  = SPEED_SIZE_BZ;
-    const size_t bzout = WORD_COUNT * sizeof(float);
+    const size_t bzout = SPEED_WORD_COUNT * sizeof(float);
 
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
 

@@ -12,7 +12,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     const uint8_t* indata = (const uint8_t*)indata_p;
     float* outdata = (float*)outdata_p;
 
-#if 1   //this algorithm is slow
+#if 0   //this algorithm is slow
     for (; i >= 3 * sizeof(uint64_t); i -= 3 * sizeof(uint64_t)) {
         /* read 64*3 = 192 bits -> 16 i32 & floats */
     	
