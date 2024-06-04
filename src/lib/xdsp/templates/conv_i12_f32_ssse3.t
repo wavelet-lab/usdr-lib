@@ -74,94 +74,94 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
      */
 
     for (; i >= 48; i -= 48) {
-        z0 = _mm_shuffle_epi8(q0, mx0); // f7f6_f5f4_f3f2_f1f0
-        z3 = _mm_shuffle_epi8(q2, mx3); // f31f30_f29f28_f27f26_f25f24
+        z0 = _mm_shuffle_epi8(q0, mx0); // f7f6_f5f4_f3f2_f1f0                      1
+        z3 = _mm_shuffle_epi8(q2, mx3); // f31f30_f29f28_f27f26_f25f24              1
 
 #ifdef IQ12_SC32_SSSE3_EX_LOGIC
-        p0 = _mm_and_si128(and_h, q0);
-        p1 = _mm_andnot_si128(and_h, q1);
-        p4 = _mm_or_si128(p0, p1);
+        p0 = _mm_and_si128(and_h, q0);                                       //     1
+        p1 = _mm_andnot_si128(and_h, q1);                                    //     1
+        p4 = _mm_or_si128(p0, p1);                                           //     1
 #else
-        p0 = _mm_shuffle_epi32(q0, _MM_SHUFFLE(1, 0, 3, 2)); //v2 v3 v0 v1
-        p4 = _mm_unpacklo_epi64(p0, q1); // f16.....f5H        v2 v3 v7 v6
+        p0 = _mm_shuffle_epi32(q0, _MM_SHUFFLE(1, 0, 3, 2)); //v2 v3 v0 v1          1
+        p4 = _mm_unpacklo_epi64(p0, q1); // f16.....f5H        v2 v3 v7 v6          1
 #endif
 
-        p2 = _mm_shuffle_epi32(q1, _MM_SHUFFLE(1, 0, 3, 2)); //v6 v7 v4 v5
-        p5 = _mm_unpacklo_epi64(p2, q2); // f26L.....f16     //v6 v7 v11 v10
+        p2 = _mm_shuffle_epi32(q1, _MM_SHUFFLE(1, 0, 3, 2)); //v6 v7 v4 v5          1
+        p5 = _mm_unpacklo_epi64(p2, q2); // f26L.....f16     //v6 v7 v11 v10        1
 
 #ifdef IQ12_SC32_SSSE3_EX_LOGIC
-        z1 = _mm_shuffle_epi8(p4, mx1); // f15.._..f8
+        z1 = _mm_shuffle_epi8(p4, mx1); // f15.._..f8                               1
 #else
         z1 = _mm_shuffle_epi8(p4, mx3); // f15.._..f8
 #endif
-        z2 = _mm_shuffle_epi8(p5, mx0); // f23.._..f16
+        z2 = _mm_shuffle_epi8(p5, mx0); // f23.._..f16                              1
 
 
-        q0 = _mm_load_si128(ld); ld++;
-        q1 = _mm_load_si128(ld); ld++;
-        q2 = _mm_load_si128(ld); ld++;
+        q0 = _mm_load_si128(ld); ld++;                                      //      6
+        q1 = _mm_load_si128(ld); ld++;                                      //      6
+        q2 = _mm_load_si128(ld); ld++;                                      //      6
 
         indata += 48;
 
-        b0 = _mm_slli_epi32(z0, 12);     // [f6;  f4;  f2;  f0]
-        b1 = _mm_and_si128(z0, ands);    // [f7;  f5;  f3;  f1]
-        b2 = _mm_slli_epi32(z1, 12);     // [f14; f12; f10; f8]
-        b3 = _mm_and_si128(z1, ands);    // [f15; f13; f11; f9]
+        b0 = _mm_slli_epi32(z0, 12);     // [f6;  f4;  f2;  f0]                     1
+        b1 = _mm_and_si128(z0, ands);    // [f7;  f5;  f3;  f1]                     1
+        b2 = _mm_slli_epi32(z1, 12);     // [f14; f12; f10; f8]                     1
+        b3 = _mm_and_si128(z1, ands);    // [f15; f13; f11; f9]                     1
 
-        s0 = _mm_unpacklo_epi32(b0, b1); // [f3;  f2;  f2;  f0]
-        s1 = _mm_unpackhi_epi32(b0, b1); // [f7;  f6;  f5;  f4]
-        s2 = _mm_unpacklo_epi32(b2, b3); // [f11; f10; f9;  f8]
-        s3 = _mm_unpackhi_epi32(b2, b3); // [f15; f14; f13; f12]
+        s0 = _mm_unpacklo_epi32(b0, b1); // [f3;  f2;  f2;  f0]                     1
+        s1 = _mm_unpackhi_epi32(b0, b1); // [f7;  f6;  f5;  f4]                     1
+        s2 = _mm_unpacklo_epi32(b2, b3); // [f11; f10; f9;  f8]                     1
+        s3 = _mm_unpackhi_epi32(b2, b3); // [f15; f14; f13; f12]                    1
 
-        t0 = _mm_cvtepi32_ps(s0);
-        t1 = _mm_cvtepi32_ps(s1);
-        t2 = _mm_cvtepi32_ps(s2);
-        t3 = _mm_cvtepi32_ps(s3);
+        t0 = _mm_cvtepi32_ps(s0);                                           //      4
+        t1 = _mm_cvtepi32_ps(s1);                                           //      4
+        t2 = _mm_cvtepi32_ps(s2);                                           //      4
+        t3 = _mm_cvtepi32_ps(s3);                                           //      4
 
-        t0 = _mm_mul_ps(t0, scale);
-        t1 = _mm_mul_ps(t1, scale);
-        t2 = _mm_mul_ps(t2, scale);
-        t3 = _mm_mul_ps(t3, scale);
+        t0 = _mm_mul_ps(t0, scale);                                         //      4
+        t1 = _mm_mul_ps(t1, scale);                                         //      4
+        t2 = _mm_mul_ps(t2, scale);                                         //      4
+        t3 = _mm_mul_ps(t3, scale);                                         //      4
 
-        _MM_STOREX_PS(outdata, t0);
+        _MM_STOREX_PS(outdata, t0);                                         //      1
         outdata += 4;
-        _MM_STOREX_PS(outdata, t1);
+        _MM_STOREX_PS(outdata, t1);                                         //      1
         outdata += 4;
-        _MM_STOREX_PS(outdata, t2);
+        _MM_STOREX_PS(outdata, t2);                                         //      1
         outdata += 4;
-        _MM_STOREX_PS(outdata, t3);
+        _MM_STOREX_PS(outdata, t3);                                         //      1
         outdata += 4;
 
 
-        b0 = _mm_slli_epi32(z2, 12);     // [f6;  f4;  f2;  f0]
-        b1 = _mm_and_si128(z2, ands);    // [f7;  f5;  f3;  f1]
-        b2 = _mm_slli_epi32(z3, 12);     // [f14; f12; f10; f8]
-        b3 = _mm_and_si128(z3, ands);    // [f15; f13; f11; f9]
+        b0 = _mm_slli_epi32(z2, 12);     // [f6;  f4;  f2;  f0]                     1
+        b1 = _mm_and_si128(z2, ands);    // [f7;  f5;  f3;  f1]                     1
+        b2 = _mm_slli_epi32(z3, 12);     // [f14; f12; f10; f8]                     1
+        b3 = _mm_and_si128(z3, ands);    // [f15; f13; f11; f9]                     1
 
-        s0 = _mm_unpacklo_epi32(b0, b1); // [f3;  f2;  f2;  f0]
-        s1 = _mm_unpackhi_epi32(b0, b1); // [f7;  f6;  f5;  f4]
-        s2 = _mm_unpacklo_epi32(b2, b3); // [f11; f10; f9;  f8]
-        s3 = _mm_unpackhi_epi32(b2, b3); // [f15; f14; f13; f12]
+        s0 = _mm_unpacklo_epi32(b0, b1); // [f3;  f2;  f2;  f0]                     1
+        s1 = _mm_unpackhi_epi32(b0, b1); // [f7;  f6;  f5;  f4]                     1
+        s2 = _mm_unpacklo_epi32(b2, b3); // [f11; f10; f9;  f8]                     1
+        s3 = _mm_unpackhi_epi32(b2, b3); // [f15; f14; f13; f12]                    1
 
-        t0 = _mm_cvtepi32_ps(s0);
-        t1 = _mm_cvtepi32_ps(s1);
-        t2 = _mm_cvtepi32_ps(s2);
-        t3 = _mm_cvtepi32_ps(s3);
+        t0 = _mm_cvtepi32_ps(s0);                                           //      4
+        t1 = _mm_cvtepi32_ps(s1);                                           //      4
+        t2 = _mm_cvtepi32_ps(s2);                                           //      4
+        t3 = _mm_cvtepi32_ps(s3);                                           //      4
 
-        t0 = _mm_mul_ps(t0, scale);
-        t1 = _mm_mul_ps(t1, scale);
-        t2 = _mm_mul_ps(t2, scale);
-        t3 = _mm_mul_ps(t3, scale);
+        t0 = _mm_mul_ps(t0, scale);                                         //      4
+        t1 = _mm_mul_ps(t1, scale);                                         //      4
+        t2 = _mm_mul_ps(t2, scale);                                         //      4
+        t3 = _mm_mul_ps(t3, scale);                                         //      4
 
-        _MM_STOREX_PS(outdata, t0);
+        _MM_STOREX_PS(outdata, t0);                                         //      1
         outdata += 4;
-        _MM_STOREX_PS(outdata, t1);
+        _MM_STOREX_PS(outdata, t1);                                         //      1
         outdata += 4;
-        _MM_STOREX_PS(outdata, t2);
+        _MM_STOREX_PS(outdata, t2);                                         //      1
         outdata += 4;
-        _MM_STOREX_PS(outdata, t3);
+        _MM_STOREX_PS(outdata, t3);                                         //      1
         outdata += 4;
-    }
+    }                                                           // lat = 123 = 3.84 per f32
 
     while(i >= 3)
     {
