@@ -1,16 +1,3 @@
-#define IQ12_SC32_SSSE3_EX_LOGIC
-#define UNALIGN_STORE
-
-#ifdef UNALIGN_STORE
-#define _MM_STOREX_PS    _mm_storeu_ps
-#define _MM256_STOREX_PS _mm256_storeu_ps
-#else
-#define _MM_STOREX_PS    _mm_store_ps
-#define _MM256_STOREX_PS _mm256_store_ps
-#endif
-
-#define SCALE2    (CONV_SCALE / 65536)
-
 static inline
 void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
                         unsigned indatabsz,
@@ -95,12 +82,12 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         p1 = _mm_andnot_si128(and_h, q1);
         p4 = _mm_or_si128(p0, p1);
 #else
-        p0 = _mm_shuffle_epi32(q0, _MM_SHUFFLE(1, 0, 3, 2));
-        p4 = _mm_unpacklo_epi64(p0, q1); // f16.....f5H
+        p0 = _mm_shuffle_epi32(q0, _MM_SHUFFLE(1, 0, 3, 2)); //v2 v3 v0 v1
+        p4 = _mm_unpacklo_epi64(p0, q1); // f16.....f5H        v2 v3 v7 v6
 #endif
 
-        p2 = _mm_shuffle_epi32(q1, _MM_SHUFFLE(1, 0, 3, 2));
-        p5 = _mm_unpacklo_epi64(p2, q2); // f26L.....f16
+        p2 = _mm_shuffle_epi32(q1, _MM_SHUFFLE(1, 0, 3, 2)); //v6 v7 v4 v5
+        p5 = _mm_unpacklo_epi64(p2, q2); // f26L.....f16     //v6 v7 v11 v10
 
 #ifdef IQ12_SC32_SSSE3_EX_LOGIC
         z1 = _mm_shuffle_epi8(p4, mx1); // f15.._..f8

@@ -12,8 +12,8 @@
 
 #undef DEBUG_PRINT
 
-#define IN_STREAM_SIZE_BZ 3*11u                     // (6 + 3 + 2)*3 = 33 bytes
-#define WORD_COUNT (IN_STREAM_SIZE_BZ * 8u / 12u)   // 22 i12 words
+#define IN_STREAM_SIZE_BZ (132u)                    // (6 + 3 + 2)*12 = 132 bytes
+#define WORD_COUNT (IN_STREAM_SIZE_BZ * 8u / 12u)   // 88 i12 words
 
 #define SPEED_WORD_COUNT (8192u)
 #define SPEED_SIZE_BZ (SPEED_WORD_COUNT * 12u / 8u)
@@ -51,7 +51,7 @@ static void setup()
         pin[j-1-1] = ((v0 << 4) & 0xf0) | ((v1 >> 8) & 0x0f);
         pin[j-2-1] = (v1 & 0xff);
     }
-#if 1
+#if 0
     for(unsigned i = 0; i < WORD_COUNT; ++i)
     {
         fprintf(stderr, "%x\n", pin[i]);
