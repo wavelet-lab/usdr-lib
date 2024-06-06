@@ -30,13 +30,11 @@ VWLT_ATTRIBUTE(optimize("-O3"), target("ssse3"))
 DECLARE_TR_FUNC_1_2(conv_ci12_2cf32_ssse3)
 #endif
 
-#if 0
-#ifdef WVLT_AVX
-#define TEMPLATE_FUNC_NAME conv_ci12_2cf32_avx
-VWLT_ATTRIBUTE(optimize("-O3"), target("avx"))
-#include "templates/conv_ci12_2cf32_generic.t"
-DECLARE_TR_FUNC_1_2(conv_ci12_2cf32_avx)
-#endif
+#ifdef WVLT_AVX2
+#define TEMPLATE_FUNC_NAME conv_ci12_2cf32_avx2
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
+#include "templates/conv_ci12_2cf32_avx2.t"
+DECLARE_TR_FUNC_1_2(conv_ci12_2cf32_avx2)
 #endif
 
 
@@ -47,9 +45,8 @@ conv_function_t conv_get_ci12_2cf32_c(generic_opts_t cpu_cap, const char** sfunc
 
     SELECT_GENERIC_FN(fn, fname, tr_conv_ci12_2cf32_generic, cpu_cap);
     SELECT_SSSE3_FN(fn, fname, tr_conv_ci12_2cf32_ssse3, cpu_cap);
-#if 0
-    SELECT_AVX_FN(fn, fname, tr_conv_ci12_2cf32_avx, cpu_cap);
-#endif
+    SELECT_AVX_FN(fn, fname, tr_conv_ci12_2cf32_avx2, cpu_cap);
+
     if (sfunc) *sfunc = fname;
     return fn;
 }
