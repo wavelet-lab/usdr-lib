@@ -135,6 +135,14 @@ START_TEST(conv_i12_f32_check_simd)
         {
             memset(out, 0, bzout);
             (*fn)(&pin, bzin, &pout, bzout);
+#if 0
+            fprintf(stderr, "\n");
+            for(uint16_t i = 0; i < 16; ++i)
+            {
+                fprintf(stderr, "%.6f ", out[i]);
+            }
+            fprintf(stderr, "\n");
+#endif
             int res = memcmp(out, out_etalon, bzout);
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
