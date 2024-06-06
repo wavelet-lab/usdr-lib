@@ -60,12 +60,29 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 
     __m256i y0, y1, y2, y3;
 
-    for (; i >= 96; i -= 96, in += 12)
+    if(i >= 96)
     {
         y0 = _mm256_maskload_epi64((const long long*)(in + 0), load_mask);   // 8 1/3
         y1 = _mm256_maskload_epi64((const long long*)(in + 3), load_mask);   // 8 1/3
         y2 = _mm256_maskload_epi64((const long long*)(in + 6), load_mask);   // 8 1/3
         y3 = _mm256_maskload_epi64((const long long*)(in + 9), load_mask);   // 8 1/3
+        in += 12;
+
+        for (; i >= 2*96; i -= 96)
+        {
+            CONVERT_I12_F32_BLOCK(y0);
+            CONVERT_I12_F32_BLOCK(y1);
+            CONVERT_I12_F32_BLOCK(y2);
+            CONVERT_I12_F32_BLOCK(y3);
+
+            y0 = _mm256_maskload_epi64((const long long*)(in + 0), load_mask);   // 8 1/3
+            y1 = _mm256_maskload_epi64((const long long*)(in + 3), load_mask);   // 8 1/3
+            y2 = _mm256_maskload_epi64((const long long*)(in + 6), load_mask);   // 8 1/3
+            y3 = _mm256_maskload_epi64((const long long*)(in + 9), load_mask);   // 8 1/3
+            in += 12;
+        }
+
+        i -= 96;
 
         CONVERT_I12_F32_BLOCK(y0);
         CONVERT_I12_F32_BLOCK(y1);

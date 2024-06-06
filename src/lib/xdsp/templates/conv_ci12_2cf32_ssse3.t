@@ -1,7 +1,8 @@
 static inline
 void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
                         unsigned indatabsz,
-                        void *__restrict outdata_p,
+                        void *__restrict outdata_0_p,
+                        void *__restrict outdata_1_p,
                         unsigned outdatabsz)
 {
     unsigned i = indatabsz;
@@ -11,8 +12,8 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         i = (outdatabsz * 3 / 8);
 
     const uint8_t* indata = (const uint8_t*)indata_p;
-
-    float* outdata = (float*)outdata_p;
+    float* outdata_0 = (float*)outdata_0_p;
+    float* outdata_1 = (float*)outdata_1_p;
 
     const __m128i* ld = (const __m128i*)indata_p;
 
@@ -38,6 +39,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
                                0x6, 0x5, 0x4, 0x80);
     __m128i q0, q1, q2;
     __m128i b0, b1, b2, b3, s0, s1, s2, s3, z0, z1, z2, z3;
+    __m128i c0, c1, c2, c3;
     __m128i p0, p2, p4, p5;
     __m128 t0, t1, t2, t3;
 
@@ -108,10 +110,15 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         b2 = _mm_slli_epi32(z1, 12);     // [f14; f12; f10; f8]                     1
         b3 = _mm_and_si128(z1, ands);    // [f15; f13; f11; f9]                     1
 
-        s0 = _mm_unpacklo_epi32(b0, b1); // [f3;  f2;  f1;  f0]                     1
-        s1 = _mm_unpackhi_epi32(b0, b1); // [f7;  f6;  f5;  f4]                     1
-        s2 = _mm_unpacklo_epi32(b2, b3); // [f11; f10; f9;  f8]                     1
-        s3 = _mm_unpackhi_epi32(b2, b3); // [f15; f14; f13; f12]                    1
+        c0 = _mm_shuffle_epi32(b0, _MM_SHUFFLE(3, 1, 2, 0));
+        c1 = _mm_shuffle_epi32(b1, _MM_SHUFFLE(3, 1, 2, 0));
+        c2 = _mm_shuffle_epi32(b2, _MM_SHUFFLE(3, 1, 2, 0));
+        c3 = _mm_shuffle_epi32(b3, _MM_SHUFFLE(3, 1, 2, 0));
+
+        s0 = _mm_unpacklo_epi32(c0, c1); // [f3;  f2;  f1;  f0]                     1
+        s1 = _mm_unpackhi_epi32(c0, c1); // [f7;  f6;  f5;  f4]                     1
+        s2 = _mm_unpacklo_epi32(c2, c3); // [f11; f10; f9;  f8]                     1
+        s3 = _mm_unpackhi_epi32(c2, c3); // [f15; f14; f13; f12]                    1
 
         t0 = _mm_cvtepi32_ps(s0);                                           //      4
         t1 = _mm_cvtepi32_ps(s1);                                           //      4
@@ -123,25 +130,29 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         t2 = _mm_mul_ps(t2, scale);                                         //      4
         t3 = _mm_mul_ps(t3, scale);                                         //      4
 
-        _MM_STOREX_PS(outdata, t0);                                         //      1
-        outdata += 4;
-        _MM_STOREX_PS(outdata, t1);                                         //      1
-        outdata += 4;
-        _MM_STOREX_PS(outdata, t2);                                         //      1
-        outdata += 4;
-        _MM_STOREX_PS(outdata, t3);                                         //      1
-        outdata += 4;
-
+        _MM_STOREX_PS(outdata_0, t0);                                         //      1
+        outdata_0 += 4;
+        _MM_STOREX_PS(outdata_1, t1);                                         //      1
+        outdata_1 += 4;
+        _MM_STOREX_PS(outdata_0, t2);                                         //      1
+        outdata_0 += 4;
+        _MM_STOREX_PS(outdata_1, t3);                                         //      1
+        outdata_1 += 4;
 
         b0 = _mm_slli_epi32(z2, 12);     // [f6;  f4;  f2;  f0]                     1
         b1 = _mm_and_si128(z2, ands);    // [f7;  f5;  f3;  f1]                     1
         b2 = _mm_slli_epi32(z3, 12);     // [f14; f12; f10; f8]                     1
         b3 = _mm_and_si128(z3, ands);    // [f15; f13; f11; f9]                     1
 
-        s0 = _mm_unpacklo_epi32(b0, b1); // [f3;  f2;  f2;  f0]                     1
-        s1 = _mm_unpackhi_epi32(b0, b1); // [f7;  f6;  f5;  f4]                     1
-        s2 = _mm_unpacklo_epi32(b2, b3); // [f11; f10; f9;  f8]                     1
-        s3 = _mm_unpackhi_epi32(b2, b3); // [f15; f14; f13; f12]                    1
+        c0 = _mm_shuffle_epi32(b0, _MM_SHUFFLE(3, 1, 2, 0));
+        c1 = _mm_shuffle_epi32(b1, _MM_SHUFFLE(3, 1, 2, 0));
+        c2 = _mm_shuffle_epi32(b2, _MM_SHUFFLE(3, 1, 2, 0));
+        c3 = _mm_shuffle_epi32(b3, _MM_SHUFFLE(3, 1, 2, 0));
+
+        s0 = _mm_unpacklo_epi32(c0, c1); // [f3;  f2;  f2;  f0]                     1
+        s1 = _mm_unpackhi_epi32(c0, c1); // [f7;  f6;  f5;  f4]                     1
+        s2 = _mm_unpacklo_epi32(c2, c3); // [f11; f10; f9;  f8]                     1
+        s3 = _mm_unpackhi_epi32(c2, c3); // [f15; f14; f13; f12]                    1
 
         t0 = _mm_cvtepi32_ps(s0);                                           //      4
         t1 = _mm_cvtepi32_ps(s1);                                           //      4
@@ -153,15 +164,17 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         t2 = _mm_mul_ps(t2, scale);                                         //      4
         t3 = _mm_mul_ps(t3, scale);                                         //      4
 
-        _MM_STOREX_PS(outdata, t0);                                         //      1
-        outdata += 4;
-        _MM_STOREX_PS(outdata, t1);                                         //      1
-        outdata += 4;
-        _MM_STOREX_PS(outdata, t2);                                         //      1
-        outdata += 4;
-        _MM_STOREX_PS(outdata, t3);                                         //      1
-        outdata += 4;
+        _MM_STOREX_PS(outdata_0, t0);                                         //      1
+        outdata_0 += 4;
+        _MM_STOREX_PS(outdata_1, t1);                                         //      1
+        outdata_1 += 4;
+        _MM_STOREX_PS(outdata_0, t2);                                         //      1
+        outdata_0 += 4;
+        _MM_STOREX_PS(outdata_1, t3);                                         //      1
+        outdata_1 += 4;
     }                                                           // lat = 123 = 3.84 per f32
+
+    float **dest = &outdata_0;
 
     while(i >= 3)
     {
@@ -173,21 +186,18 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         float a = (int16_t) (((uint16_t)v0 << 4) | ((uint16_t)v1 << 12));
         float b = (int16_t) (((uint16_t)v2 << 8) | (v1 & 0xf0));
 
-        *(outdata++) = a * CONV_SCALE;
-        *(outdata++) = b * CONV_SCALE;
+        *((*dest)++) = a * CONV_SCALE;
+        *((*dest)++) = b * CONV_SCALE;
+
+        dest = (*dest == outdata_0) ? &outdata_1 : &outdata_0;
     }
 
     if(i >= 2)
     {
         uint16_t v = *(const uint16_t*)indata;
         float a = (int16_t)(v << 4);
-        *(outdata++) = a * CONV_SCALE;
+        *((*dest)++) = a * CONV_SCALE;
         i -= 2;
-    }
-
-    if(i)
-    {
-        *outdata = 0;
     }
 }
 
