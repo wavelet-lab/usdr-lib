@@ -12,14 +12,13 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     const uint64_t *in = (const uint64_t*)indata_p;
     float* out = (float*)outdata_p;
 
-    const __m256i zeros = _mm256_setzero_si256();
     const __m256i shl_ctrl = _mm256_set_epi64x(64,32,16,0);
     const __m256i shr_ctrl = _mm256_set_epi64x(0,16,32,48);
     const __m256i mask0 = _mm256_set1_epi64x(0xfff0000000000000);
     const __m256i mask1 = _mm256_set1_epi64x(0x0000fff000000000);
     const __m256i mask2 = _mm256_set1_epi64x(0x00000000fff00000);
     const __m256i mask3 = _mm256_set1_epi64x(0x000000000000fff0);
-    const __m256  scale = _mm256_set1_ps(SCALE2);
+    const __m256  scale = _mm256_set1_ps(CONV_SCALE);
     const __m256i load_mask = _mm256_set_epi64x(0, -1, -1, -1);
 
 #define CONVERT_I12_F32_BLOCK(reg) \
@@ -43,12 +42,11 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         __m256i r1 = _mm256_or_si256(cc, dd);                                    /* 1 1|3 */ \
         __m256i result = _mm256_or_si256(r0, r1);                                /* 1 1|3 */ \
         \
-        __m256i d0 = _mm256_permute4x64_epi64(result, _MM_SHUFFLE(3, 1, 2, 0));  /* 3   1 */ \
-        __m256i i0 = _mm256_unpacklo_epi16(zeros,d0);                            /* 1 1|2 */ \
-        __m256i i1 = _mm256_unpackhi_epi16(zeros,d0);                            /* 1 1|2 */ \
+        __m256i d0 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(result)); \
+        __m256i d1 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(result, 1)); \
         \
-        __m256 f0 = _mm256_cvtepi32_ps(i0);                                      /* 4 1|2 */ \
-        __m256 f1 = _mm256_cvtepi32_ps(i1);                                      /* 4 1|2 */ \
+        __m256 f0 = _mm256_cvtepi32_ps(d0);                                      /* 4 1|2 */ \
+        __m256 f1 = _mm256_cvtepi32_ps(d1);                                      /* 4 1|2 */ \
         \
         f0 = _mm256_mul_ps(f0, scale);                                           /* 4 1|2 */ \
         f1 = _mm256_mul_ps(f1, scale);                                           /* 4 1|2 */ \
