@@ -162,11 +162,6 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         *(outdata++) = a * CONV_SCALE;
         i -= 2;
     }
-
-    if(i)
-    {
-        *outdata = 0;
-    }
 }
 
 #undef TEMPLATE_FUNC_NAME
