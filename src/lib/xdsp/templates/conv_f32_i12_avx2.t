@@ -73,6 +73,9 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 
 #undef CONVERT_F32_I12_BLOCK
 
+#undef I16RND
+#define I16RND(x) x > 0 ? (int16_t)(x + 0.5f) : (int16_t)(x - 0.5f)
+
     uint8_t* outdata = (uint8_t*)out64;
 
     for (; i >= 8; i -= 8) {

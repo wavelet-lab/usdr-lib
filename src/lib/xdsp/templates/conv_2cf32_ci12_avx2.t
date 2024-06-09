@@ -27,7 +27,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
     const __m256i storemask = _mm256_set_epi64x(0, -1, -1, -1);
 
 
-    #define CONVERT_F32_I12_BLOCK(v0, v1) \
+#define CONVERT_F32_I12_BLOCK(v0, v1) \
     { \
         v0 = _mm256_mul_ps(v0, scale); \
         v1 = _mm256_mul_ps(v1, scale); \
@@ -75,7 +75,10 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
         CONVERT_F32_I12_BLOCK(v0, v1);
     }
 
-    #undef CONVERT_F32_I12_BLOCK
+#undef CONVERT_F32_I12_BLOCK
+
+#undef I16RND
+#define I16RND(x) x > 0 ? (int16_t)(x + 0.5f) : (int16_t)(x - 0.5f)
 
     uint8_t* outdata = (uint8_t*)out64;
 

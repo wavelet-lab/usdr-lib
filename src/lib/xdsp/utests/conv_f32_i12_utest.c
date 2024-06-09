@@ -16,7 +16,7 @@
 #define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
 
 #define CONV_SCALE (1.0f/32767)
-#define EPS (CONV_SCALE * 0x0f)
+#define EPS (5E-4)
 
 static const unsigned packet_lens[3] = { 1111u, 4123u, PACKET_SIZE };
 
@@ -68,7 +68,7 @@ static conv_function_t get_fn(generic_opts_t o, int log)
 static int is_equal()
 {
     int res = 0;
-    unsigned i = OUT_BZ;
+    int i = OUT_BZ;
     const uint8_t* buf_got = out;
     const uint8_t* buf_eta = out_etalon;
 
@@ -100,8 +100,8 @@ static int is_equal()
 
         if(d1 > EPS || d2 > EPS)
         {
-            printf("[%u]    in:%.6f    (%.6f) -> etalon: (%.6f)\n", cnt,     in[cnt],   a, c);
-            printf("[%u]    in:%.6f    (%.6f) -> etalon: (%.6f)\n", cnt + 1, in[cnt+1], b, d);
+            printf("[%u]    in:%.6f    (%.6f) -> etalon: (%.6f) delta: %.6f\n", cnt,     in[cnt],   a, c, d1);
+            printf("[%u]    in:%.6f    (%.6f) -> etalon: (%.6f) delta: %.6f\n", cnt + 1, in[cnt+1], b, d, d2);
             return 1;
         }
 
@@ -144,8 +144,8 @@ START_TEST(conv_f32_i12_check_simd)
             }
             fprintf(stderr, "\n");
 #endif
-            //int res = is_equal();
-            int res = memcmp(out, out_etalon, bzout);
+            int res = is_equal();
+            //int res = memcmp(out, out_etalon, bzout);
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
             for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)

@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include "vbase.h"
 
-#define I16RND(x) x > 0 ? (int16_t)(x + 0.5f) : (int16_t)(x - 0.5f)
+#define I16RND(x) (int16_t)(x)
 
 union wu_u32b {uint32_t i; uint8_t b[4];};
 typedef union wu_u32b wu_u32b_t;

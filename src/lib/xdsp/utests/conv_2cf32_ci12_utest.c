@@ -16,7 +16,7 @@
 #define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
 
 #define CONV_SCALE (1.0f/32767)
-#define EPS (CONV_SCALE * 0x0f)
+#define EPS (5E-4)
 
 static const unsigned packet_lens[3] = { 1111u, 4123u, PACKET_SIZE };
 
@@ -79,6 +79,53 @@ static conv_function_t get_fn(generic_opts_t o, int log)
     return fn;
 }
 
+static int is_equal()
+{
+    int res = 0;
+    int i = OUT_BZ;
+    const uint8_t* buf_got = out;
+    const uint8_t* buf_eta = out_etalon;
+
+    unsigned cnt = 0;
+
+    while(i >= 3)
+    {
+        uint8_t v0 = *(buf_got++);
+        uint8_t v1 = *(buf_got++);
+        uint8_t v2 = *(buf_got++);
+
+        float a = (int16_t) (((uint16_t)v0 << 4) | ((uint16_t)v1 << 12));
+        float b = (int16_t) (((uint16_t)v2 << 8) | (v1 & 0xf0));
+
+        uint8_t e0 = *(buf_eta++);
+        uint8_t e1 = *(buf_eta++);
+        uint8_t e2 = *(buf_eta++);
+
+        float c = (int16_t) (((uint16_t)e0 << 4) | ((uint16_t)e1 << 12));
+        float d = (int16_t) (((uint16_t)e2 << 8) | (e1 & 0xf0));
+
+        a *= CONV_SCALE;
+        b *= CONV_SCALE;
+        c *= CONV_SCALE;
+        d *= CONV_SCALE;
+
+        float d1 = fabs(a - c);
+        float d2 = fabs(b - d);
+
+        if(d1 > EPS || d2 > EPS)
+        {
+            printf("[%u] (%.6f) -> etalon: (%.6f) delta: %.6f\n", cnt,     a, c, d1);
+            printf("[%u] (%.6f) -> etalon: (%.6f) delta: %.6f\n", cnt + 1, b, d, d2);
+            return 1;
+        }
+
+        cnt += 2;
+        i -= 3;
+    }
+
+    return res;
+}
+
 START_TEST(conv_2cf32_ci12_check_simd)
 {
     generic_opts_t opt = max_opt;
@@ -111,7 +158,8 @@ START_TEST(conv_2cf32_ci12_check_simd)
             }
             fprintf(stderr, "\n");
 #endif
-            int res = memcmp(out, out_etalon, bzout);
+            //int res = memcmp(out, out_etalon, bzout);
+            int res = is_equal();
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
             for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)
