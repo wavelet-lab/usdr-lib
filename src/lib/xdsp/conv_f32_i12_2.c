@@ -11,7 +11,7 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/conv_f32_i12_generic.t"
 DECLARE_TR_FUNC_1_1(conv_f32_i12_generic)
 
-#ifdef WVLT_AVX
+#ifdef WVLT_AVX2
 #define TEMPLATE_FUNC_NAME conv_f32_i12_avx2
 VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 #include "templates/conv_f32_i12_avx2.t"

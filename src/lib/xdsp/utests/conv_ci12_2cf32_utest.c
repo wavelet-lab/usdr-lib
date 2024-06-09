@@ -138,7 +138,7 @@ START_TEST(conv_ci12_2cf32_check_simd)
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
     const void* pin = (const void*)in;
-    void* pout = (void*)out;
+    void** pout = (void**)out;
     last_fn_name = NULL;
 
     const size_t bzin  = SPEED_SIZE_BZ;
@@ -192,7 +192,7 @@ START_TEST(conv_ci12_2cf32_speed)
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
     const void* pin = (const void*)in;
-    void* pout = (void*)out;
+    void** pout = (void**)out;
     last_fn_name = NULL;
 
     const size_t bzin  = packet_lens[_i];
