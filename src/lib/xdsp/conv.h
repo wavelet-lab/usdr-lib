@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include "vbase.h"
 
+#define I16RND(x) x > 0 ? (int16_t)(x + 0.5f) : (int16_t)(x - 0.5f)
+
 typedef void (*conv_function_t)(const void *__restrict *__restrict indata,
                                 unsigned indatabsz,
                                 void *__restrict *__restrict outdata,

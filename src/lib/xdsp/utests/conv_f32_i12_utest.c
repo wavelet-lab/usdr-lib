@@ -14,7 +14,9 @@
 
 #define PACKET_SIZE (8192u)
 #define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
-#define EPS (1E-3)
+
+#define CONV_SCALE (1.0f/32767)
+#define EPS (CONV_SCALE * 0x0f)
 
 static const unsigned packet_lens[3] = { 1111u, 4123u, PACKET_SIZE };
 
@@ -88,10 +90,10 @@ static int is_equal()
         float c = (int16_t) (((uint16_t)e0 << 4) | ((uint16_t)e1 << 12));
         float d = (int16_t) (((uint16_t)e2 << 8) | (e1 & 0xf0));
 
-        a /= 32767.0f;
-        b /= 32767.0f;
-        c /= 32767.0f;
-        d /= 32767.0f;
+        a *= CONV_SCALE;
+        b *= CONV_SCALE;
+        c *= CONV_SCALE;
+        d *= CONV_SCALE;
 
         float d1 = fabs(a - c);
         float d2 = fabs(b - d);
@@ -142,7 +144,8 @@ START_TEST(conv_f32_i12_check_simd)
             }
             fprintf(stderr, "\n");
 #endif
-            int res = is_equal();
+            //int res = is_equal();
+            int res = memcmp(out, out_etalon, bzout);
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
             for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)

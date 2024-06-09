@@ -20,14 +20,13 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     union i16u32 {int16_t i[2]; uint32_t u;};
     typedef union i16u32 i16u32_t;
 
-
     for (; i >= 8; i -= 8) {
 
-        i16u32_t a;
-        a.i[0] = (int16_t)(*(indata++) / CONV_SCALE);
-        a.i[1] = (int16_t)(*(indata++) / CONV_SCALE);
+        float f0 = *(indata++) / CONV_SCALE;
+        float f1 = *(indata++) / CONV_SCALE;
 
-        u32b_t  c = {(a.u & 0xfff00000) | ((a.u << 4) & 0x000fff00)};
+        i16u32_t a = {I16RND(f0), I16RND(f1)};
+        u32b_t   c = {(a.u & 0xfff00000) | ((a.u << 4) & 0x000fff00)};
 
         *(outdata++) = c.b[1];
         *(outdata++) = c.b[2];
@@ -36,7 +35,8 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 
     if(i >= 4)
     {
-        i16b_t c = {(int16_t)((*indata / CONV_SCALE))};
+        float f = *indata / CONV_SCALE;
+        i16b_t c = {I16RND(f)};
 
         *(outdata++) = c.b[0];
         *(outdata++) = c.b[1] >> 4;

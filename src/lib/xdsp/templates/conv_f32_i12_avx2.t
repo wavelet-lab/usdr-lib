@@ -11,7 +11,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     const float *indata = (const float*)indata_p;
     uint64_t *out64 = (uint64_t*)outdata_p;
 
-    const __m256  scale = _mm256_set1_ps((float)SCALE_FACTOR);
+    const __m256  scale = _mm256_set1_ps(1.0f / CONV_SCALE);
     const __m256i maske = _mm256_set1_epi64x(0x0000fff00000fff0);
     const __m256i masko = _mm256_set1_epi64x(0xfff00000fff00000);
 
@@ -86,11 +86,11 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 
     for (; i >= 8; i -= 8) {
 
-        i16u32_t a;
-        a.i[0] = (int16_t)(*(indata++) / CONV_SCALE);
-        a.i[1] = (int16_t)(*(indata++) / CONV_SCALE);
+        float f0 = *(indata++) / CONV_SCALE;
+        float f1 = *(indata++) / CONV_SCALE;
 
-        u32b_t  c = {(a.u & 0xfff00000) | ((a.u << 4) & 0x000fff00)};
+        i16u32_t a = {I16RND(f0), I16RND(f1)};
+        u32b_t   c = {(a.u & 0xfff00000) | ((a.u << 4) & 0x000fff00)};
 
         *(outdata++) = c.b[1];
         *(outdata++) = c.b[2];
@@ -99,7 +99,8 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 
     if(i >= 4)
     {
-        i16b_t c = {(int16_t)((*indata / CONV_SCALE))};
+        float f = *indata / CONV_SCALE;
+        i16b_t c = {I16RND(f)};
 
         *(outdata++) = c.b[0];
         *(outdata++) = c.b[1] >> 4;

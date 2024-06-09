@@ -4,10 +4,7 @@
 #include "conv_f32_i12_2.h"
 #include "attribute_switch.h"
 
-#define SCALE_FACTOR (32767u)
-#define CONV_SCALE   (1.0f/SCALE_FACTOR)
-#define SCALE2       ((float)SCALE_FACTOR * 65536)
-
+#define CONV_SCALE (1.0f/32767)
 
 #define TEMPLATE_FUNC_NAME conv_f32_i12_generic
 VWLT_ATTRIBUTE(optimize("-O3"))
