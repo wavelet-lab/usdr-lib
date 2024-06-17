@@ -13,6 +13,7 @@ int device_fe_probe(device_t* base, const char* compat, const char* hint,
 
 int device_fe_destroy(struct dev_fe* obj);
 
+void* device_fe_to(struct dev_fe* obj, const char* type);
 
 #endif
 
