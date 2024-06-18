@@ -1,3 +1,6 @@
+// Copyright (c) 2023-2024 Wavelet Lab
+// SPDX-License-Identifier: MIT
+
 #include "ext_fe_100_5000.h"
 #include "../ipblks/gpio.h"
 
