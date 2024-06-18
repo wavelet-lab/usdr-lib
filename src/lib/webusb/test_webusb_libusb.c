@@ -159,6 +159,7 @@ char s_rpc_set_freq[] =
             "\"frequency\":306200000"
             "}"
         "}";
+//{"req_method":"sdr_set_rx_frequency", "req_params":{"param_type":"rf", "frequency":433000000}}
 
 int libusb_websdr_run(struct libusb_websdr* d, unsigned samplerate)
 {

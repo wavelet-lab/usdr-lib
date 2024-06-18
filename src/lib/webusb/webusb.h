@@ -5,13 +5,7 @@
 #define WEBUSB_H
 
 #include <stdint.h>
-#include <../device/device.h>
-#include <usdr_lowlevel.h>
-
-#include <../models/dm_dev.h>
-#include <../models/dm_rate.h>
-#include <../models/dm_stream.h>
-#include <../models/dm_dev_impl.h>
+#include "controller.h"
 #include "../ipblks/lms64c_proto.h"
 
 struct sdr_call;
@@ -19,11 +13,6 @@ struct sdr_call;
 struct webusb_device;
 typedef struct webusb_device webusb_device_t;
 
-typedef int (*rpc_call_fn)(pdm_dev_t dmdev,
-                           struct sdr_call* sdrc,
-                           unsigned response_maxlen,
-                           char* response,
-                           char* request);
 typedef int (*dif_set_uint_fn)(webusb_device_t* dev, const char* entity, uint64_t val);
 typedef int (*dif_get_uint_fn)(webusb_device_t* dev, const char* entity, uint64_t *oval);
 
@@ -87,12 +76,12 @@ typedef struct webusb_ops webusb_ops_t;
 static inline
     int webusb_ll_generic_get(lldev_t dev, int generic_op, const char** pout)
 {
+    webusb_device_t* d = (webusb_device_t*)dev;
+
     switch(generic_op)
     {
-    case LLGO_DEVICE_NAME: {
-        *pout = "webusb";
-        return 0;
-    }
+    case LLGO_DEVICE_NAME: *pout = "webusb"; return 0;
+    case LLGO_DEVICE_SDR_TYPE: *pout = (const char*)d->type_sdr; return 0;
     }
 
     return -EINVAL;

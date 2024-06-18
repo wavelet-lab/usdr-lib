@@ -19,7 +19,7 @@ static const unsigned packet_lens[3] = { 256, 4096, STREAM_SIZE };
 
 #define SPEED_MEASURE_ITERS 1000000
 
-#define EPSILON 5E-6
+#define EPSILON 1E-4
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
@@ -27,23 +27,25 @@ static generic_opts_t max_opt = OPT_GENERIC;
 static wvlt_fftwf_complex* in = NULL;
 static float* f_mant = NULL;
 static int32_t* f_pwr = NULL;
-static double* out = NULL;
-static double* out_etalon = NULL;
+static float* out = NULL;
+static float* out_etalon = NULL;
 static struct fft_accumulate_data acc;
 
 static void setup(void)
 {
+    srand( time(0) );
+
     posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE);
     posix_memalign((void**)&f_mant,     ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
     posix_memalign((void**)&f_pwr,      ALIGN_BYTES, sizeof(int32_t)       * STREAM_SIZE);
-    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(double)        * STREAM_SIZE);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(double)        * STREAM_SIZE);
+    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
 
     //init input data
     for(unsigned i = 0; i < STREAM_SIZE; ++i)
     {
-        in[i][0] = (float)(i);
-        in[i][1] = (float)(STREAM_SIZE - i - 1);
+        in[i][0] =  100.0f * (float)(rand()) / (float)RAND_MAX;
+        in[i][1] = -100.0f * (float)(rand()) / (float)RAND_MAX;
     }
 
     //init acc

@@ -6,7 +6,6 @@
 #include "usb_uram_generic.h"
 #include "libusb_vidpid_map.h"
 #include "webusb_generic.h"
-#include "../../webusb/controller.h"
 #include "../../device/generic_usdr/generic_regs.h"
 #include "../../ipblks/si2c.h"
 

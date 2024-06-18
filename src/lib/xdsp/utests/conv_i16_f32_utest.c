@@ -30,6 +30,12 @@ static void setup()
     posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE);
     posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)   * STREAM_SIZE);
     posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)   * STREAM_SIZE);
+
+    for(unsigned i = 0; i < STREAM_SIZE; ++i)
+    {
+        int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
+        in[i] = sign * 100u * (float)(rand()) / (float)RAND_MAX;
+    }
 }
 
 static void teardown()

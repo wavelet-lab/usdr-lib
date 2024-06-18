@@ -9,11 +9,11 @@
 Suite * conv_i16_f32_suite(void);
 Suite * fftad_suite(void);
 Suite * rtsa_suite(void);
+Suite * fft_window_cf32_suite(void);
 Suite * conv_i12_f32_suite(void);
 Suite * conv_ci12_2cf32_suite(void);
 Suite * conv_f32_i12_suite(void);
 Suite * conv_2cf32_ci12_suite(void);
-
 
 int main(int argc, char** argv)
 {
@@ -23,10 +23,11 @@ int main(int argc, char** argv)
 
     int number_failed;
     SRunner *sr;
-#if 0
+#if 1
     sr = srunner_create(conv_i16_f32_suite());
     srunner_add_suite(sr, fftad_suite());
     srunner_add_suite(sr, rtsa_suite());
+    srunner_add_suite(sr, fft_window_cf32_suite());
     srunner_add_suite(sr, conv_i12_f32_suite());
     srunner_add_suite(sr, conv_ci12_2cf32_suite());
     srunner_add_suite(sr, conv_f32_i12_suite());

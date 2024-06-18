@@ -19,9 +19,10 @@ enum lowlevel_ls_ops {
 };
 
 enum sdr_type {
-    SDR_USDR = 0,
-    SDR_XSDR = 1,
-    SDR_LIME = 2,
+    SDR_NONE = 0,
+    SDR_USDR = 1,
+    SDR_XSDR = 2,
+    SDR_LIME = 3,
 };
 typedef enum sdr_type sdr_type_t;
 
@@ -45,6 +46,7 @@ typedef struct device device_t;
 enum lowlevel_generic_ops {
     LLGO_DEVICE_NAME,
     LLGO_DEVICE_UUID,
+    LLGO_DEVICE_SDR_TYPE,
 };
 
 enum llstream_flags {

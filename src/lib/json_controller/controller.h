@@ -6,7 +6,18 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "webusb.h"
+
+#include <../device/device.h>
+#include <usdr_lowlevel.h>
+
+#include <../models/dm_dev.h>
+#include <../models/dm_rate.h>
+#include <../models/dm_stream.h>
+#include <../models/dm_dev_impl.h>
+
+#include "tiny-json.h"
+
+#include "usdr_logging.h"
 
 enum sdr_call_parameters {
     SDRC_CHANS,
@@ -23,6 +34,21 @@ enum sdr_call_parameters {
     SDRC_PARAM,
     SDRC_THROTTLE_ON,
     SDRC_MODE,
+    //
+    // daemon request params
+    //
+    SDRC_CONNECT_STRING,
+    SDRC_FPS,
+    SDRC_FFT_SIZE,
+    SDRC_FFT_WINDOW_TYPE,
+    SDRC_FFT_AVG,
+    SDRC_UPPER_PWR_BOUND,
+    SDRC_LOWER_PWR_BOUND,
+    SDRC_DIVS_FOR_DB,
+    SDRC_CONTRAST,
+    SDRC_SATURATION,
+    SDRC_STREAM_TYPE,
+
     SDRC_PARAMS_MAX,
 };
 
@@ -36,6 +62,7 @@ enum {
 struct sdr_call_paramteters {
     uintptr_t parameters_uint[SDRC_PARAMS_MAX];
     uint8_t  parameters_type[SDRC_PARAMS_MAX];
+    unsigned parameters_len[SDRC_PARAMS_MAX];
 };
 
 
@@ -56,6 +83,17 @@ enum sdr_call_type {
     SDR_CRTL_STREAMING,
     SDR_GET_REVISION,
     SDR_CALIBRATE,
+    //
+    // daemon requests
+    //
+    SDR_DISCOVER,
+    SDR_CONNECT,
+    SDR_DISCONNECT,
+    SDR_RX_START_RAW_STREAM,
+    SDR_RX_START_SA_STREAM,
+    SDR_RX_START_RTSA_STREAM,
+    SDR_RX_STOP_STREAM,
+    SDR_RX_CONTROL_STREAM,
 };
 
 enum {
@@ -77,15 +115,34 @@ struct sdr_call {
     unsigned call_data_ptr;
     unsigned call_data_size;
 };
+typedef struct sdr_call sdr_call_t;
 
 enum sdr_param_call {
     SDR_PC_SET_SAMPLERATE,
 };
 
+typedef int (*rpc_call_fn)(pdm_dev_t dmdev,
+                           pusdr_dms_t* usds,
+                           struct sdr_call* sdrc,
+                           unsigned response_maxlen,
+                           char* response,
+                           char* request);
+
 int generic_rpc_call(pdm_dev_t dmdev,
+                     pusdr_dms_t* usds,
                      struct sdr_call* sdrc,
                      unsigned response_maxlen,
                      char* response,
                      char* request);
+
+struct idx_list {
+    const char *param;
+    unsigned idx;
+};
+
+#define MAX_JSON_OBJS 64
+
+json_t const* allocate_json(char* request, json_t storage[], unsigned qty);
+int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* parent);
 
 #endif

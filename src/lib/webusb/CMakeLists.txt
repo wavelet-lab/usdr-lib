@@ -35,6 +35,7 @@ list(APPEND USDR_DEPEND_TARGETS "")
 include_directories(sysroot/include)
 include_directories(../port)
 include_directories(../lowlevel)
+include_directories(../json_controller)
 
 add_subdirectory(../port port)
 add_subdirectory(../common common)
@@ -44,22 +45,13 @@ add_subdirectory(../device device)
 add_subdirectory(../models models)
 add_subdirectory(../xdsp xdsp)
 add_subdirectory(../cal cal)
+add_subdirectory(../json_controller json_controller)
 
 set(WEBUSB_TEST_LIB_FILES
     "../lowlevel/usb_uram/usb_uram_webusb.c"
     "../lowlevel/usb_ft601/usb_ft601_webusb.c"
     "../lowlevel/usdr_lowlevel.c"
-    "controller_xsdr.c"
-    "controller_usdr.c"
-    "controller_ugen.c"
-    "controller_lime.c"
-    "controller.c"
     "webusb.c"
-    )
-
-set(EXTRA_FILES
-    "tiny-json.c"
-    "base64.c"
     )
 
 include_directories(${USDR_INCLUDE_FILES})
@@ -71,7 +63,7 @@ elseif(WVLT_ARCH_ARM64)
     #set_source_files_properties(${XDSPLIB_FILES} PROPERTIES COMPILE_FLAGS "-mfpu=neon")
 endif()
 
-add_library(webusb_test SHARED ${USDR_LIBRARY_FILES} ${WEBUSB_TEST_LIB_FILES} ${EXTRA_FILES} ${XDSPLIB_FILES})
+add_library(webusb_test SHARED ${USDR_LIBRARY_FILES} ${WEBUSB_TEST_LIB_FILES} ${JSON_CONTROLLER_FILES} ${XDSPLIB_FILES})
 target_link_libraries(webusb_test m pthread rt)
 add_dependencies(webusb_test ${USDR_DEPEND_TARGETS})
 target_compile_options(webusb_test PRIVATE "-Wall" "-Werror=implicit-function-declaration")

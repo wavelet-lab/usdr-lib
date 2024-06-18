@@ -27,6 +27,7 @@ set(xdsplib_conv_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_filter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/fftad_functions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/rtsa_functions.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/fft_window_functions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/fmquad.c
 )
 
