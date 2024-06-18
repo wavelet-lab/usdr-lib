@@ -583,7 +583,7 @@ int dev_m2_d09_4_ad45_2_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
     int offset = value;
 
     if ((f = device_fe_to(d->fe, "fe1005000"))) {
-        unsigned fr = (value / 10000) * 10000;
+        unsigned fr = (value / 1000) * 1000;
         if (fr < 2000000)
             fr = 2000000;
 
