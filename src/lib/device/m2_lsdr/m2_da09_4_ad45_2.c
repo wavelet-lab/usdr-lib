@@ -13,6 +13,7 @@
 #include "../device_vfs.h"
 #include "../device_names.h"
 #include "../device_cores.h"
+#include "../device_fe.h"
 
 #include "../hw/tps6594/tps6594.h"
 #include "../hw/si549/si549.h"
@@ -25,6 +26,8 @@
 #include "../ipblks/fgearbox.h"
 
 #include "../generic_usdr/generic_regs.h"
+
+#include "../device/ext_fe_100_5000/ext_fe_100_5000.h"
 
 
 // single ADC, no DAC
@@ -48,12 +51,13 @@ enum BUSIDX_m2_da09_4_ad45_2_rev000 {
     SPI_ADS42LBX9_1 = 1,
     SPI_LMK04832 = 2,
     SPI_DAC = 3,
+    SPI_EXTERNAL = 4,
 };
 
 // dual ADC, and DAC
 static
 const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
-    { DNLL_SPI_COUNT, 4 },
+    { DNLL_SPI_COUNT, 5 },
     { DNLL_I2C_COUNT, 1 },
     { DNLL_SRX_COUNT, 1 },
     { DNLL_STX_COUNT, 0 },
@@ -65,6 +69,7 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
     // low level buses
     { "/ll/irq/0/core", USDR_MAKE_COREID(USDR_CS_AUX, USDR_AC_PIC32_PCI) },
     { "/ll/irq/0/base", M2PCI_REG_INT },
+
     { "/ll/spi/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE) },
     { "/ll/spi/0/base", M2PCI_REG_SPI0 },
     { "/ll/spi/0/irq",  M2PCI_INT_SPI_0 },
@@ -77,9 +82,14 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
     { "/ll/spi/3/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE) },
     { "/ll/spi/3/base", M2PCI_REG_SPI3 },
     { "/ll/spi/3/irq",  M2PCI_INT_SPI_3 },
+    { "/ll/spi/4/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE) },
+    { "/ll/spi/4/base", REG_SPI_EXT_DATA },
+    { "/ll/spi/4/irq",  M2PCI_INT_SPI_EXT },
+
     { "/ll/i2c/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE) },
     { "/ll/i2c/0/base", M2PCI_REG_I2C },
     { "/ll/i2c/0/irq",  M2PCI_INT_I2C_0 },
+
     { "/ll/qspi_flash/base", M2PCI_REG_QSPI_FLASH },
 
     // Indexed area map
@@ -108,7 +118,13 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
 };
 
 static int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_d09_4_ad45_2_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int dev_m2_d09_4_ad45_2_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
+static int dev_m2_d09_4_ad45_2_gainpga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_d09_4_ad45_2_gainvga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_d09_4_ad45_2_gainlna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_d09_4_ad45_2_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 static int dev_m2_d09_4_ad45_2_debug_all_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
@@ -120,6 +136,7 @@ static int dev_m2_d09_4_ad45_2_debug_lldev_get(pdevice_t ud, pusdr_vfs_obj_t obj
 static int dev_m2_d09_4_ad45_2_debug_clk_info(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_d09_4_ad45_2_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_d09_4_ad45_2_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_d09_4_ad45_2_dummy(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -129,8 +146,15 @@ static int dev_m2_d09_4_ad45_2_dummy(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
 static
 const usdr_dev_param_func_t s_fparams_m2_da09_4_ad45_2_rev000[] = {
     { "/dm/rate/master",        { dev_m2_d09_4_ad45_2_rate_set, NULL }},
+    { "/dm/rate/rxtxadcdac",    { dev_m2_d09_4_ad45_2_rate_m_set, NULL }},
     { "/dm/sdr/0/rx/gain",      { dev_m2_d09_4_ad45_2_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga",  { dev_m2_d09_4_ad45_2_gainpga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/vga",  { dev_m2_d09_4_ad45_2_gainvga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna",  { dev_m2_d09_4_ad45_2_gainlna_set, NULL }},
+
     { "/dm/sdr/0/rx/freqency",  { dev_m2_d09_4_ad45_2_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/bandwidth", { dev_m2_d09_4_ad45_2_sdr_rx_bandwidth_set, NULL }},
+
 
     { "/dm/sensor/temp",  { NULL, dev_m2_d09_4_ad45_2_senstemp_get }},
     { "/dm/debug/all",    { NULL, dev_m2_d09_4_ad45_2_debug_all_get }},
@@ -148,6 +172,8 @@ struct dev_m2_d09_4_ad45_2 {
     usdr_vfs_obj_base_t vfs_cfg_obj[SIZEOF_ARRAY(s_fparams_m2_da09_4_ad45_2_rev000)];
 
     uint32_t adc_rate;
+    unsigned rxbb_rate;
+    unsigned rxbb_decim;
 
     bool lmk04832_present;
     bool dac38rf_present;
@@ -155,14 +181,16 @@ struct dev_m2_d09_4_ad45_2 {
 
     unsigned decim;
 
+    struct dev_fe* fe;
+
     uint8_t active_adc; //Enabled ADCs
     stream_handle_t* rx;
     stream_handle_t* tx;
 };
 
 enum dev_gpi {
-    IGPI_BANK_ADC_CLK_HI = 0,
-    IGPI_BANK_ADC_CLK_LO = 1,
+    IGPI_BANK_ADC_CLK_HI = 24 + 0,
+    IGPI_BANK_ADC_CLK_LO = 24 + 1,
 
     IGPI_BANK_ADC_STAT   = 4,
     IGPI_BANK_ADC_PBRSHI = 5,
@@ -510,11 +538,69 @@ int dev_m2_d09_4_ad45_2_stat(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value)
     return 0;
 }
 
+static int set_nco(struct dev_m2_d09_4_ad45_2 *d, unsigned chans, int offset)
+{
+    lldev_t dev = d->base.dev;
+    int res;
+
+    res = dev_gpo_set(dev, IGPO_BANK_ADC_CHMSK, chans);
+    if (res)
+        return res;
+
+    if (d->adc_rate == 0)
+        return -EINVAL;
+
+    while (offset > d->adc_rate)
+        offset -= d->adc_rate;
+
+    int32_t v = offset;
+    v -= d->adc_rate / 4;
+
+    int32_t freq = ((int64_t)v << 33) /  d->adc_rate / 2;
+
+    res = dev_gpo_set(dev, IGPO_BANK_ADC_DSP_MIX2, 0 /*reverse_spec ? 0 : 3*/);
+
+    for (unsigned p = 0; p < 4; p++) {
+        res = dev_gpo_set(dev, IGPO_BANK_ADC_NCO_0 + p, (freq >> (8*p)) & 0xff);
+        if (res)
+            return res;
+    }
+
+    return res;
+}
+
+int dev_m2_d09_4_ad45_2_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return 0;
+}
+
 int dev_m2_d09_4_ad45_2_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
     lldev_t dev = d->base.dev;
     int res;
+    ext_fe_100_5000_t* f;
+    int offset = value;
+
+    if ((f = device_fe_to(d->fe, "fe1005000"))) {
+        unsigned fr = (value / 10000) * 10000;
+        if (fr < 2000000)
+            fr = 2000000;
+
+
+        res = ext_fe_100_5000_set_frequency(f, fr);
+        if (res)
+            return res;
+
+        offset = value - fr;
+    }
+
+    res = set_nco(d, 0xf, offset);
+    if (res)
+        return res;
+
+
+#if 0
     //int reverse_spec = 0;
 
     res = dev_gpo_set(dev, IGPO_BANK_ADC_CHMSK, 0xf);
@@ -534,7 +620,7 @@ int dev_m2_d09_4_ad45_2_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
         reverse_spec = 1;
     }
 */
-    int32_t freq = ((int64_t)v << 33) /  d->adc_rate;
+    int32_t freq = ((int64_t)v << 33) /  d->adc_rate / 2;
 
     res = dev_gpo_set(dev, IGPO_BANK_ADC_DSP_MIX2, 0 /*reverse_spec ? 0 : 3*/);
 
@@ -543,15 +629,12 @@ int dev_m2_d09_4_ad45_2_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
         if (res)
             return res;
     }
-
+#endif
     return 0;
 }
 
-
-
-int dev_m2_d09_4_ad45_2_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+static int dev_m2_d09_4_ad45_2_pga(struct dev_m2_d09_4_ad45_2 *d, unsigned value)
 {
-    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
     lldev_t dev = d->base.dev;
     int res;
 
@@ -569,8 +652,71 @@ int dev_m2_d09_4_ad45_2_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint6
     res = dev_gpo_set(dev, IGPO_BANK_PGA_LE, 0);
     if (res)
         return res;
+
     return 0;
 }
+
+
+int dev_m2_d09_4_ad45_2_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+    ext_fe_100_5000_t* f;
+    if ((f = device_fe_to(d->fe, "fe1005000"))) {
+
+        USDR_LOG("LSDR", USDR_LOG_ERROR, "Gain: %d\n", (unsigned)value);
+        return ext_fe_100_5000_set_attenuator(f, 127 - value * 4);
+
+    } else {
+        return dev_m2_d09_4_ad45_2_pga(d, value);
+    }
+}
+
+int dev_m2_d09_4_ad45_2_gainpga_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+    return dev_m2_d09_4_ad45_2_pga(d, value);
+}
+
+int dev_m2_d09_4_ad45_2_gainvga_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+    ext_fe_100_5000_t* f;
+    if ((f = device_fe_to(d->fe, "fe1005000"))) {
+
+        USDR_LOG("LSDR", USDR_LOG_ERROR, "GainVGA: %d\n", (unsigned)value);
+        return ext_fe_100_5000_set_attenuator(f, 127 - value * 4);
+    } else {
+        return -EINVAL;
+    }
+}
+
+int dev_m2_d09_4_ad45_2_gainlna_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+    ext_fe_100_5000_t* f;
+    if ((f = device_fe_to(d->fe, "fe1005000"))) {
+        return ext_fe_100_5000_set_lna(f, value);
+    } else {
+        return -EINVAL;
+    }
+}
+
+int dev_m2_d09_4_ad45_2_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+
+    uint32_t *rates = (uint32_t *)(uintptr_t)value;
+
+    uint32_t rx_rate = rates[0];
+    uint32_t tx_rate = rates[1];
+
+    uint32_t adc_rate = rates[2];
+    uint32_t dac_rate = rates[3];
+
+    return dev_m2_d09_4_ad45_2_rate_set(ud, obj, rx_rate);
+}
+
+#define MAX_RATE 260e6
 
 int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -578,11 +724,31 @@ int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
     lldev_t dev = d->base.dev;
     int res;
 
-    res = si549_set_freq(dev, 0, I2C_BUS_SI549, value);
-    if (res)
-        return res;
+    unsigned rx_decims[] = { 2, 3, 4, 5, 6, 8, 16, 32, 64, 128 };
+    unsigned i = 0;
+    unsigned ii;
 
-    d->adc_rate = value;
+    for (ii = 0; ii < SIZEOF_ARRAY(rx_decims); ii++) {
+        if (value * rx_decims[ii] < MAX_RATE)
+            i = ii;
+        else
+            break;
+    }
+
+    d->adc_rate = value * rx_decims[i];
+    d->rxbb_rate = value;
+    d->rxbb_decim = rx_decims[i];
+
+    res = si549_set_freq(dev, 0, I2C_BUS_SI549, d->adc_rate);
+    if (res) {
+        USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to set %d freq on si549!\n", d->adc_rate);
+        return res;
+    }
+
+    USDR_LOG("LSDR", USDR_LOG_ERROR, "Decimation set to %d, ADC %d\n", d->rxbb_decim, d->adc_rate);
+
+    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0x0f);
+    fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, d->rxbb_decim); //(fgearbox_firs_t)d->decim);
 
     if (d->lmk04832_present) {
         //Turn on bypass mode
@@ -648,12 +814,24 @@ int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
     res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0xf);
     res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSP_MIX2, 3);
 
-    unsigned step = (value >= 320e6) ? 2 : (value >= 300e6) ? 3 : (value >= 290e6) ? 4 : (value >= 275e6) ? 5 : 0;
+    unsigned step =
+         (value >= 320e6) ? 2 :
+         (value >= 300e6) ? 3 :
+         (value >= 290e6) ? 4 :
+         (value >= 275e6) ? 5 :
+         (value >= 160e6) ? 0 :
+         (value >= 110e6) ? 6 :  0;
     res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_PHY_CTL_0, (1 << PHY_LVDS_CLK_LD_OFF) | step);
     if (res)
         return res;
     //res = ads42lbx9_set_pbrs(dev, 0, SPI_ADS42LBX9_0);
     //res = ads42lbx9_set_pbrs(dev, 0, SPI_ADS42LBX9_1);
+
+
+
+    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
+    usleep(10);
+    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
 
     return 0;
 }
@@ -783,6 +961,7 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)udev;
     lldev_t dev = d->base.dev;
     int res;
+    const char* fe = NULL;
     bool try_lmk = false;
     d->decim = 2;
 
@@ -797,6 +976,9 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
 
             d->decim = dv;
         }
+        if (strcmp(devparam[i], "fe") == 0) {
+            fe = devval[i];
+        }
     }
 
     d->lmk04832_present = false;
@@ -804,6 +986,10 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
     d->adc_present[0] = false;
     d->adc_present[1] = false;
 
+    if (getenv("USDR_BARE_DEV")) {
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "USDR_BARE_DEV is set, skipping initialization!\n");
+        return 0;
+    }
 
     res = lowlevel_reg_wr32(dev, 0, M2PCI_REG_STAT_CTRL, (1u << 31) | (0x4bu << 24) | 0x67 | (0x48u << 8) |  (0x4bu << 16));
     if (res)
@@ -891,6 +1077,14 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
         return res;
 
     // FIXUP END
+
+
+    // Init FE
+    res = device_fe_probe(udev, "m2m", fe, &d->fe);
+    if (res) {
+        return res;
+    }
+
     return 0;
 }
 
@@ -920,16 +1114,22 @@ int usdr_device_m2_d09_4_ad45_2_create_stream(device_t* dev, const char* sid, co
 
         // res = dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0x0);
 
-        res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
-        usleep(1000);
-        res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
-
+   //     res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
+        //usleep(1000);
+      //  res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
         // TODO: NCO / real selector
 
 
         // gearbox initialization
-        res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0x0f);
-        fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, (fgearbox_firs_t)d->decim);
+        // res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0x0f);
+        // fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, d->rxbb_decim); //(fgearbox_firs_t)d->decim);
+
+
+       // res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
+
+        res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
+        usleep(1000);
+        res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
 
 
         res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels, pktsyms,
@@ -938,6 +1138,11 @@ int usdr_device_m2_d09_4_ad45_2_create_stream(device_t* dev, const char* sid, co
         if (res) {
             return res;
         }
+
+        // res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
+        // usleep(1000);
+        // res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
+
         *out_handle = d->rx;
     }
     return res;
