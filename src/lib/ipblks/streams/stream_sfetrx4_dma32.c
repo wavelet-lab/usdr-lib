@@ -17,6 +17,8 @@
 #include "../../xdsp/conv.h"
 #include "../../device/device_vfs.h"
 
+#include "../xlnx_bitstream.h"
+
 #define MINIM_FWID_COMPAT   0xd2b10c09
 
 struct stream_stats {
@@ -626,6 +628,8 @@ enum {
     MAX_TX_BUFF = 32768
 };
 
+
+
 static int initialize_stream_tx_32(device_t* device,
                                    logical_ch_msk_t channels,
                                    unsigned pktsyms,
@@ -661,7 +665,7 @@ static int initialize_stream_tx_32(device_t* device,
     if (res) {
         USDR_LOG("DSTR", USDR_LOG_ERROR, "Unable to check comatability firmware!\n");
     }
-    if ((fwid & 0xffffffff) < MINIM_FWID_COMPAT) {
+    if (get_xilinx_rev_h(fwid & 0xffffffff) < get_xilinx_rev_h(MINIM_FWID_COMPAT)) {
         USDR_LOG("DSTR", USDR_LOG_ERROR, "You're running outdated firmware, please update! CurrentID=%08x MinimalID=%08x\n",
                  (uint32_t)(fwid & 0xffffffff),
                  MINIM_FWID_COMPAT);
