@@ -1,0 +1,80 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         LP875484
+desc:         RFIC
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: I2C
+    wr_mask: 0x8000
+    usdr_path: /debug/hw/lp875484/0/reg
+addr_width:   8
+data_width:   8
+# page_prefix:  True
+# field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+  - name: Top
+    regs:
+      - addr: 0x00
+        name: VSET_B0
+        fields:
+          - bits: "7"
+            name: EN_DIS_B0
+            desc: DC/DC converter Buck0 Enable/Disable. The Enable of the master Buck0 controls the operation of the slave bucks.; 0 = Converter disabled; 1 = Converter enabled; Note When a disable request is received the converter is disabled immediately.
+          - bits: "6:0"
+            name: VSET_B0
+            desc: Sets the output voltage. Defined by; VOUT = 0.5 V + 10 mV * VSET_B0; VOUT range = 0.6 V to 1.67 V; NOTE Do not use VSET_B0 values < 0001010 (10 dec) = 0.6 V.; NOTE Register settings starting from 1110110 up to 1111111 are clamped to 1.67 V.
+
+      - addr: 0x06
+        name: FPWM
+        fields:
+          - bits: "7:1"
+            name: RESERVED
+            desc: Default to 0b0011111
+          - bits: "0"
+            name: FPWM_B0
+            desc: This bit shows the status of the power-good comparator. This bit is cleared if the STATUS register is read when the power-not-good condition no longer exists; 0 - Powergood; 1 - A power-not-good event was detected
+
+      - addr: 0x0D
+        name: FLAGS
+        fields:
+          - bits: "2"
+            name: N_PG_B0
+            desc: Power good fault flag for VOUT rail; 1 = Power fault detected; 0 = Power good
+          - bits: "1:0"
+            name: TEMP
+            desc: indicates the die temperature as follows; 00 = die temperature lower than 85ºC; 01 = 85ºC ≤ die temperature < 120ºC; 10 = 120ºC ≤ die temperature < 150ºC;  11 = die temperature 150ºC or higher
+
+      - addr: 0x11
+        name: RESET
+        
+      - addr: 0x18
+        name: CHIP_ID
+
+      - addr: 0x21
+        name: SEL_I_LOAD
+        fields:
+          - bits: "6:4"
+            name: BUCK_LOAD_CURR_HI
+            desc: This register reports 3 MSB bits of the magnitude of the average load current of the selected Buck Converter
+          - name: LOAD_CURRENT_SOURCE
+            bits: "2:0"
+            desc: These bits are used for choosing the Buck Converter whose load current will be measured
+            opts:
+                0b000: CONV_0
+                0b001: CONV_1
+                0b010: CONV_2
+                0b011: CONV_3
+                0b100: CONV_4
+                0b101: CONV_5
+                0b110: CONV_ALL
+                0b111: CONV_RESERVED
+
+      - addr: 0x22
+        name: LOAD_CURR_LO
+
+
