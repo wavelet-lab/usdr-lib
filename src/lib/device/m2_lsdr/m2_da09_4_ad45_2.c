@@ -670,10 +670,7 @@ int dev_m2_d09_4_ad45_2_gainlna_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, ui
 
 int dev_m2_d09_4_ad45_2_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
-
     uint32_t *rates = (uint32_t *)(uintptr_t)value;
-
     uint32_t rx_rate = rates[0];
     // uint32_t tx_rate = rates[1];
 

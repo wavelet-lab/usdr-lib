@@ -273,6 +273,7 @@ int max2871_init(ext_fe_100_5000_t* ob, unsigned addr, unsigned long int freq_kh
     return res;
 }
 
+#if 0
 // LOAD SYNTESIZER WITH FREQ RELATED CODES ONLY (MAX2871 in fractional N mode)
 static
 int max2871_update(ext_fe_100_5000_t* ob, unsigned addr, unsigned long int freq_khz)
@@ -285,6 +286,7 @@ int max2871_update(ext_fe_100_5000_t* ob, unsigned addr, unsigned long int freq_
     res = (res) ? res : max2871_wr_dat(ob, addr, c.reg0);     // Reg0 N Value = intgr and Frac Value = fract
     return res;
 }
+#endif
 
 // Check freq and select and return proper band
 int tune_rf_path(ext_fe_100_5000_t* ob, uint64_t freq_khz)
