@@ -14,7 +14,9 @@
 
 #define STREAM_SIZE (8192 + 16 + 8 + 7)
 #define STREAM_SIZE_CHECK STREAM_SIZE
-#define STREAM_SIZE_SPEED 8192
+#define STREAM_SIZE_SPEED 32768
+
+static const unsigned packet_lens[3] = { 2048, 8192, STREAM_SIZE_SPEED };
 
 #define SPEED_MEASURE_ITERS 1000000
 
@@ -27,11 +29,11 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE);
-    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)   * STREAM_SIZE);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)   * STREAM_SIZE);
+    posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
+    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
+    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
 
-    for(unsigned i = 0; i < STREAM_SIZE; ++i)
+    for(unsigned i = 0; i < STREAM_SIZE_SPEED; ++i)
     {
         int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
         in[i] = sign * 100u * (float)(rand()) / (float)RAND_MAX;
@@ -107,8 +109,8 @@ START_TEST(conv_i16_f32_speed)
     void* pout = (void*)out;
     last_fn_name = NULL;
 
-    const size_t bzin  = STREAM_SIZE_SPEED * sizeof(int16_t);
-    const size_t bzout = STREAM_SIZE_SPEED * sizeof(float);
+    const size_t bzin  = packet_lens[_i] * sizeof(int16_t);
+    const size_t bzout = packet_lens[_i] * sizeof(float);
 
     fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
     fprintf(stderr,   "**** packet: %lu bytes, iters: %u ***\n", bzin, SPEED_MEASURE_ITERS);
@@ -145,7 +147,7 @@ Suite * conv_i16_f32_suite(void)
     tcase_set_timeout(tc_core, 60);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
     tcase_add_test(tc_core, conv_i16_f32_check);
-    tcase_add_test(tc_core, conv_i16_f32_speed);
+    tcase_add_loop_test(tc_core, conv_i16_f32_speed, 0, 3);
     suite_add_tcase(s, tc_core);
     return s;
 }
