@@ -444,7 +444,6 @@ int dev_m2_d09_4_ad45_2_stat(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value)
         }
     }
 
-    //bad[0] = 26;unsigned cfgchs
     bad[0]++;
     bad[1]++;
 
@@ -577,7 +576,6 @@ int dev_m2_d09_4_ad45_2_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, 
 int dev_m2_d09_4_ad45_2_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
-    lldev_t dev = d->base.dev;
     int res;
     ext_fe_100_5000_t* f;
     int offset = value;
@@ -599,37 +597,6 @@ int dev_m2_d09_4_ad45_2_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
     if (res)
         return res;
 
-
-#if 0
-    //int reverse_spec = 0;
-
-    res = dev_gpo_set(dev, IGPO_BANK_ADC_CHMSK, 0xf);
-    if (res)
-        return res;
-    if (d->adc_rate == 0)
-        return -EINVAL;
-
-    while (value > d->adc_rate)
-        value -= d->adc_rate;
-
-    int32_t v = value;
-    v -= d->adc_rate / 4;
-/*
-    if (v > d->adc_rate / 4) {
-        v = 3 * d->adc_rate / 4  - v;
-        reverse_spec = 1;
-    }
-*/
-    int32_t freq = ((int64_t)v << 33) /  d->adc_rate / 2;
-
-    res = dev_gpo_set(dev, IGPO_BANK_ADC_DSP_MIX2, 0 /*reverse_spec ? 0 : 3*/);
-
-    for (unsigned p = 0; p < 4; p++) {
-        res = dev_gpo_set(dev, IGPO_BANK_ADC_NCO_0 + p, (freq >> (8*p)) & 0xff);
-        if (res)
-            return res;
-    }
-#endif
     return 0;
 }
 
@@ -708,10 +675,10 @@ int dev_m2_d09_4_ad45_2_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
     uint32_t *rates = (uint32_t *)(uintptr_t)value;
 
     uint32_t rx_rate = rates[0];
-    uint32_t tx_rate = rates[1];
+    // uint32_t tx_rate = rates[1];
 
-    uint32_t adc_rate = rates[2];
-    uint32_t dac_rate = rates[3];
+    // uint32_t adc_rate = rates[2];
+    // uint32_t dac_rate = rates[3];
 
     return dev_m2_d09_4_ad45_2_rate_set(ud, obj, rx_rate);
 }
@@ -747,8 +714,12 @@ int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
 
     USDR_LOG("LSDR", USDR_LOG_ERROR, "Decimation set to %d, ADC %d\n", d->rxbb_decim, d->adc_rate);
 
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0x0f);
-    fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, d->rxbb_decim); //(fgearbox_firs_t)d->decim);
+    res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0x0f);
+    res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, d->rxbb_decim);
+    if (res) {
+        USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize FIR gearbox, error = %d!\n", res);
+        return res;
+    }
 
     if (d->lmk04832_present) {
         //Turn on bypass mode
@@ -790,29 +761,19 @@ int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
             return res;
 
         res = lmk04832_check_lock(dev, 0, 2, &locked);
+        if (res)
+            return res;
 
         USDR_LOG("0944", USDR_LOG_ERROR, "LMK_STAT: %08x, locked=%d\n", stat, locked);
     }
 
     // Reset Bitslip logic after changing frequency
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0xf0);
-    if (res)
-        return res;
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0x00);
-    if (res)
-        return res;
-
-    res = ads42lbx9_set_normal(dev, 0, SPI_ADS42LBX9_0, true, false);
-    if (res) {
-        return res;
-    }
-    res = ads42lbx9_set_normal(dev, 0, SPI_ADS42LBX9_1, false, false);
-    if (res) {
-        return res;
-    }
-
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0xf);
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSP_MIX2, 3);
+    res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0xf0);
+    res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0x00);
+    res = (res) ? res : ads42lbx9_set_normal(dev, 0, SPI_ADS42LBX9_0, true, false);
+    res = (res) ? res : ads42lbx9_set_normal(dev, 0, SPI_ADS42LBX9_1, false, false);
+    res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0xf);
+    res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSP_MIX2, 3);
 
     unsigned step =
          (value >= 320e6) ? 2 :
@@ -821,19 +782,14 @@ int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
          (value >= 275e6) ? 5 :
          (value >= 160e6) ? 0 :
          (value >= 110e6) ? 6 :  0;
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_PHY_CTL_0, (1 << PHY_LVDS_CLK_LD_OFF) | step);
-    if (res)
-        return res;
-    //res = ads42lbx9_set_pbrs(dev, 0, SPI_ADS42LBX9_0);
-    //res = ads42lbx9_set_pbrs(dev, 0, SPI_ADS42LBX9_1);
-
-
-
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
+    res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_PHY_CTL_0, (1 << PHY_LVDS_CLK_LD_OFF) | step);
+    //res = (res) ? res : ads42lbx9_set_pbrs(dev, 0, SPI_ADS42LBX9_0);
+    //res = (res) ? res : ads42lbx9_set_pbrs(dev, 0, SPI_ADS42LBX9_1);
+    res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
     usleep(10);
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
+    res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
 
-    return 0;
+    return res;
 }
 
 int dev_m2_d09_4_ad45_2_debug_lldev_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue)
@@ -907,21 +863,6 @@ static int _lsdr_adc_activate(struct dev_m2_d09_4_ad45_2 *d, unsigned msk)
 int dev_m2_d09_4_ad45_2_pwren_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
- /*   int res;
-
-    res = tps6594_vout_ctrl(d->base.dev, 0, 1, TPS6594_LDO4, (value) ? true : false);
-    if (res)
-        return res;
-
-    // ADC Reset
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0x03);
-    if (res)
-        return res;
-
-    res = dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0x0);
-    if (res)
-        return res;
-    */
     return _lsdr_adc_activate(d, value ? 3 : 0);
 }
 
@@ -939,10 +880,6 @@ static int dev_m2_d09_4_ad45_2_debug_rxtime_get(pdevice_t ud, pusdr_vfs_obj_t ob
     res = lowlevel_reg_rd32(d->base.dev, 0, 9, &tmp);
     if (res)
         return res;
-
-    //res = lowlevel_reg_rd32(d->base.dev, 0, 0, &tmp);
-    //if (res)
-    //    return res;
 
     *ovalue = tmp;
     return 0;
@@ -1057,7 +994,7 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
     usleep(1000);
     res = dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0);
     usleep(10000);
-*/
+    */
 
     for (unsigned j = 0; j < SIZEOF_ARRAY(devs); j++) {
         res = ads42lbx9_reset_and_check(dev, 0, devs[j]);
@@ -1075,7 +1012,6 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
     res = tps6594_vout_ctrl(dev, 0, I2C_BUS_TPS6594, TPS6594_LDO4, false);
     if (res)
         return res;
-
     // FIXUP END
 
 
@@ -1112,36 +1048,17 @@ int usdr_device_m2_d09_4_ad45_2_create_stream(device_t* dev, const char* sid, co
         // TODO: acticate/deactivate ADC
         _lsdr_adc_activate(d, 3);
 
-        // res = dev_gpo_set(d->base.dev, IGPO_BANK_CFG_ADC, 0x0);
-
-   //     res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
-        //usleep(1000);
-      //  res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
-        // TODO: NCO / real selector
-
-
-        // gearbox initialization
-        // res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0x0f);
-        // fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, d->rxbb_decim); //(fgearbox_firs_t)d->decim);
-
-
-       // res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
-
-        res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
         usleep(1000);
-        res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
 
 
-        res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels, pktsyms,
+        res = (res) ? res : create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels, pktsyms,
                                     flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
         if (res) {
             return res;
         }
-
-        // res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x1);
-        // usleep(1000);
-        // res = dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
 
         *out_handle = d->rx;
     }
