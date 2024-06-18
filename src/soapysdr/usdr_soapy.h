@@ -20,6 +20,7 @@ extern "C" {
 enum rfic_type_t {
     RFIC_LMS6002D,
     RFIC_LMS7002M,
+    RFIC_AD45LB49,
     RFIC_UNKNOWN
 };
 
