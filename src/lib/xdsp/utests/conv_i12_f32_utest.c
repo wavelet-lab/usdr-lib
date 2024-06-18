@@ -105,7 +105,11 @@ START_TEST(conv_i12_f32_check)
         v = (i % 4) ? v : -v;
 
         fprintf(stderr, "\ni=%u\tout=%.6f\texpected=%.6f", i, out[i], v);
+#ifdef ck_assert_float_eq
         ck_assert_float_eq(v, out[i]);
+#else
+        ck_assert(v == out[i]);
+#endif
     }
     fprintf(stderr, "\n");
 }

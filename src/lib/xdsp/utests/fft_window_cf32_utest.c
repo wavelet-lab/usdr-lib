@@ -121,6 +121,7 @@ START_TEST(wnd_check)
         --opt;
     }
 }
+END_TEST
 
 START_TEST(wnd_speed)
 {
@@ -160,6 +161,7 @@ START_TEST(wnd_speed)
         --opt;
     }
 }
+END_TEST
 
 Suite * fft_window_cf32_suite(void)
 {

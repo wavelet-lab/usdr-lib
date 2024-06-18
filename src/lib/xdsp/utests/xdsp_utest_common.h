@@ -6,6 +6,7 @@
 
 #include <time.h>
 #include <inttypes.h>
+#include <math.h>
 
 #define ALIGN_BYTES (size_t)64
 
