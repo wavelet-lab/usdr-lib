@@ -17,4 +17,4 @@ include_directories(../lib/xdsp)
 include_directories(../lib/common)
 
 add_executable(usdr_testsuit ${TEST_SUIT_SRCS})
-target_link_libraries(usdr_testsuit usdr mock_lowlevel xdsplib check subunit m rt pthread)
+target_link_libraries(usdr_testsuit usdr mock_lowlevel usdr-dsp check subunit m rt pthread)

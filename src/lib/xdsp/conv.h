@@ -8,6 +8,18 @@
 #include <stdbool.h>
 #include "vbase.h"
 
+#define I16RND(x) (int16_t)(x)
+
+union wu_u32b {uint32_t i; uint8_t b[4];};
+typedef union wu_u32b wu_u32b_t;
+
+union wu_i16b {int16_t i; uint8_t b[2];};
+typedef union wu_i16b wu_i16b_t;
+
+union wu_i16u32 {int16_t i[2]; uint32_t u;};
+typedef union wu_i16u32 wu_i16u32_t;
+
+
 typedef void (*conv_function_t)(const void *__restrict *__restrict indata,
                                 unsigned indatabsz,
                                 void *__restrict *__restrict outdata,
