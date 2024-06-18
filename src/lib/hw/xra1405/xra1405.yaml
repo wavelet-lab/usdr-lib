@@ -1,0 +1,87 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         XRA1405
+desc:         GPIO
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: SPI
+    rd_mask: 0x8000
+    usdr_path: /debug/hw/xra1405/0/reg
+addr_width:   8
+data_width:   8
+# page_prefix:  True
+# field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+  - name: Top
+    regs:
+      - addr: 0x00
+        name: GSR1
+        
+      - addr: 0x02
+        name: GSR2
+
+      - addr: 0x04
+        name: OCR1
+        
+      - addr: 0x06
+        name: OCR2
+
+      - addr: 0x08
+        name: PIR1
+        
+      - addr: 0x0A
+        name: PIR2
+        
+      - addr: 0x0C
+        name: GCR1
+        
+      - addr: 0x0E
+        name: GCR2
+
+      - addr: 0x10
+        name: PUR1
+        
+      - addr: 0x12
+        name: PUR2
+
+      - addr: 0x14
+        name: IER1
+        
+      - addr: 0x16
+        name: IER2
+        
+      - addr: 0x18
+        name: TSCR1
+        
+      - addr: 0x1A
+        name: TSCR2
+
+      - addr: 0x1C
+        name: ISR1
+        
+      - addr: 0x1D
+        name: ISR2
+        
+      - addr: 0x20
+        name: REIR1
+        
+      - addr: 0x22
+        name: REIR2
+
+      - addr: 0x24
+        name: FEIR1
+        
+      - addr: 0x26
+        name: FEIR2
+
+      - addr: 0x28
+        name: IFR1
+        
+      - addr: 0x2A
+        name: IFR2
+

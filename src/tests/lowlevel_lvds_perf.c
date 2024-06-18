@@ -33,8 +33,8 @@ enum {
 };
 
 enum dev_gpi {
-    IGPI_BANK_ADC_CLK_HI = 0,
-    IGPI_BANK_ADC_CLK_LO = 1,
+    IGPI_BANK_ADC_CLK_HI = 24 + 0,
+    IGPI_BANK_ADC_CLK_LO = 24 + 1,
 
     IGPI_BANK_ADC_STAT   = 4,
     IGPI_BANK_ADC_PBRSHI = 5,
@@ -135,7 +135,7 @@ int check_adc_clk(lldev_t dev, unsigned fmean[4], unsigned fdiv[4])
             unsigned gen = masked >> 24;
             uint64_t freq = ((masked & 0xffffff) * 100000000ul) / (1u<<20);
 
-            USDR_LOG("0944", USDR_LOG_NOTE, "ADC_CLK[%d] = %08d (%08x %08x)\n", adc, (unsigned)freq, stat, masked);
+            USDR_LOG("0944", USDR_LOG_ERROR, "ADC_CLK[%d] = %08d (%08x %08x)\n", adc, (unsigned)freq, stat, masked);
             if (k > 4) {
                 if (prev[adc] != gen && m[adc] < 100) {
                     fmeas[m[adc]++][adc] = freq;

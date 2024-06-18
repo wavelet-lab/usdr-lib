@@ -27,7 +27,7 @@
 #include "../ipblks/streams/sfe_tx_4.h"
 
 // ABI version should be synced with the driver
-#define USDR_DRIVER_ABI_VERSION 1
+#define USDR_DRIVER_ABI_VERSION 2
 
 struct stream_cache_data {
     unsigned flags;

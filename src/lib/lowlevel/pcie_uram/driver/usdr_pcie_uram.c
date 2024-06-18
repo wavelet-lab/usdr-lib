@@ -65,7 +65,7 @@ static int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
 #endif
 
 // Change anytime when extra parameter or meaning is changed in pcie_uram_driver_if.h
-#define USDR_DRIVER_ABI_VERSION 1
+#define USDR_DRIVER_ABI_VERSION 2
 
 enum device_flags {
     DEV_VALID = 1,

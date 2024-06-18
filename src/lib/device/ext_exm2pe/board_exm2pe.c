@@ -31,6 +31,7 @@ int board_exm2pe_init(lldev_t dev,
                       unsigned subdev,
                       unsigned gpio_base,
                       const char* params,
+                      const char* compat,
                       ext_i2c_func_t func,
                       board_exm2pe_t* ob)
 {
@@ -38,6 +39,10 @@ int board_exm2pe_init(lldev_t dev,
     uint8_t gps_en = 0;
     uint8_t osc_en = 0;
     long dac_val = 0;
+
+    // This breakout is compatible wi M.2 key A/E or A+E boards
+    if ((strcmp(compat, "m2a+e") != 0) && (strcmp(compat, "m2e") != 0) && (strcmp(compat, "m2a") != 0))
+        return -ENODEV;
 
     ob->dev = dev;
     ob->subdev = subdev;

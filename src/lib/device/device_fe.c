@@ -9,6 +9,7 @@
 #include "ext_pciefe/ext_pciefe.h"
 #include "ext_supersync/ext_supersync.h"
 #include "ext_simplesync/ext_simplesync.h"
+#include "ext_fe_100_5000/ext_fe_100_5000.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +20,9 @@ static int _debug_pciefe_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ov
 
 static int _debug_pciefe_cmd_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int _debug_pciefe_cmd_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
+static int _debug_ext_fe_100_5000_cmd_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int _debug_ext_fe_100_5000_cmd_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 
 static int _debug_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -56,11 +60,18 @@ const usdr_dev_param_func_t s_lmk5c33216_params[] = {
 };
 
 
+static
+const usdr_dev_param_func_t s_ext_fe_100_5000_params[] = {
+    { "/debug/hw/fe_100_5000_cmd/0/reg", { _debug_ext_fe_100_5000_cmd_set, _debug_ext_fe_100_5000_cmd_get }},
+};
+
+
 enum fe_type {
     FET_PCIE_DEVBOARD,
     FET_PCIE_SUPER_SYNC,
     FET_PCIE_SIMPLE_SYNC,
     FET_PICE_BREAKOUT,
+    FET_PCIE_FE1005000,
 
     FET_COUNT
 };
@@ -71,6 +82,7 @@ static const char* s_fe_names[] = {
     "supersync",
     "simplesync",
     "exm2pe",
+    "fe1005000",
 };
 
 
@@ -83,10 +95,12 @@ struct dev_fe {
         board_ext_pciefe_t devboard;
         board_ext_simplesync_t simplesync;
         board_ext_supersync_t supersync;
+        ext_fe_100_5000_t fe_100_5000;
     } fe;
 
     uint32_t debug_pciefe_last;
     uint32_t debug_pciefe_cmd_last;
+    uint32_t debug_ext_fe_100_5000_cmd_last;
 
     // TODO: check for a proper storage
     usdr_vfs_obj_base_t vfs_cfg_obj[SIZEOF_ARRAY(s_fe_params) + SIZEOF_ARRAY(s_fe_pcie_params) + SIZEOF_ARRAY(s_lmk05318_params) + SIZEOF_ARRAY(s_lmk5c33216_params)];
@@ -176,10 +190,11 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, dev_
         }
 
         switch (i) {
-        case FET_PICE_BREAKOUT: res = board_exm2pe_init(dev, 0, gpiobase, hint_strip, &_usdr_ext_i2c, &dfe.fe.exm2pe); break;
+        case FET_PICE_BREAKOUT: res = board_exm2pe_init(dev, 0, gpiobase, hint_strip, compat, &_usdr_ext_i2c, &dfe.fe.exm2pe); break;
         case FET_PCIE_DEVBOARD: res = board_ext_pciefe_init(dev, 0, gpiobase, hint_strip, &_usdr_ext_i2c, &dfe.fe.devboard); break;
         case FET_PCIE_SUPER_SYNC: res = board_ext_supersync_init(dev, 0, gpiobase, &_usdr_ext_i2c, &dfe.fe.supersync); break;
         case FET_PCIE_SIMPLE_SYNC: res = board_ext_simplesync_init(dev, 0, gpiobase, &_usdr_ext_i2c, &dfe.fe.simplesync); break;
+        case FET_PCIE_FE1005000: res = ext_fe_100_5000_init(dev, 0, gpiobase, 58, 4, hint_strip, &dfe.fe.fe_100_5000); break;
         default: return -EIO;
         }
 
@@ -235,7 +250,6 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, dev_
                                                   (void*)n,
                                                   s_lmk05318_params,
                                                   SIZEOF_ARRAY(s_lmk05318_params));
-
         break;
     case FET_PCIE_SUPER_SYNC:
         res = usdr_vfs_obj_param_init_array_param(base,
@@ -244,12 +258,30 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, dev_
                                                   (void*)n,
                                                   s_lmk5c33216_params,
                                                   SIZEOF_ARRAY(s_lmk5c33216_params));
+        break;
+    case FET_PCIE_FE1005000:
+        res = usdr_vfs_obj_param_init_array_param(base,
+                                                  base->impl->objcount,
+                                                  &n->vfs_cfg_obj[vfidx],
+                                                  (void*)n,
+                                                  s_ext_fe_100_5000_params,
+                                                  SIZEOF_ARRAY(s_ext_fe_100_5000_params));
+        break;
     default:
         break;
     }
 
     *out = n;
     return res;
+}
+
+void* device_fe_to(struct dev_fe* obj, const char* type)
+{
+    if (strcmp(s_fe_names[obj->type], type) != 0) {
+        return NULL;
+    }
+
+    return (void*)&obj->fe;
 }
 
 int _debug_typefe_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
@@ -287,12 +319,10 @@ int _debug_pciefe_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 
     if (value & 0x800000) {
         res = board_ext_pciefe_ereg_wr(&o->fe.devboard, addr, data);
-
         USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug PCIEFE WR REG %04x => %04x\n",
                  lowlevel_get_devname(ud->dev), (unsigned)addr, data);
     } else {
         res = board_ext_pciefe_ereg_rd(&o->fe.devboard, addr, &o->debug_pciefe_last);
-
         USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug PCIEFE RD REG %04x <= %04x\n",
                  lowlevel_get_devname(ud->dev), (unsigned)addr,
                  o->debug_pciefe_last);
@@ -301,6 +331,34 @@ int _debug_pciefe_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     return res;
 }
 
+int _debug_ext_fe_100_5000_cmd_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dev_fe_t* o = (dev_fe_t* )((usdr_vfs_obj_base_t*)obj)->param;
+    *ovalue = o->debug_ext_fe_100_5000_cmd_last;
+    return 0;
+}
+
+int _debug_ext_fe_100_5000_cmd_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dev_fe_t* o = (dev_fe_t* )((usdr_vfs_obj_base_t*)obj)->param;
+    int res;
+    unsigned addr = (value >> 24) & 0x7f;
+    unsigned data = value & 0xffffff;
+
+    o->debug_ext_fe_100_5000_cmd_last = ~0u;
+
+    if (value & 0x80000000) {
+        res = ext_fe_100_5000_cmd_wr(&o->fe.fe_100_5000, addr, data);
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug FE_100_5000 WR CMD %04x => %06x\n",
+                 lowlevel_get_devname(ud->dev), (unsigned)addr, data);
+    } else {
+        res = ext_fe_100_5000_cmd_rd(&o->fe.fe_100_5000, addr, &o->debug_ext_fe_100_5000_cmd_last);
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug FE_100_5000 RD CMD %04x <= %06x\n",
+                 lowlevel_get_devname(ud->dev), (unsigned)addr,
+                 o->debug_ext_fe_100_5000_cmd_last);
+    }
+    return res;
+}
 
 int _debug_pciefe_cmd_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
