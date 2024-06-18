@@ -9,6 +9,15 @@
 
 enum fgearbox_firs {
     FGBOX_X2 = 2,
+    FGBOX_X3 = 3,
+    FGBOX_X4 = 4,
+    FGBOX_X5 = 5,
+    FGBOX_X6 = 6,
+
+    FGBOX_X8 = 8,
+    FGBOX_X16 = 16,
+    FGBOX_X32 = 32,
+    FGBOX_X64 = 64,
     FGBOX_X128 = 128,
 
 };
