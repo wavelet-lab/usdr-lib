@@ -7,7 +7,7 @@
 #include "device.h"
 
 enum {
-    DBMAX_SPI_BUSES = 4,
+    DBMAX_SPI_BUSES = 8,
     DBMAX_I2C_BUSES = 4,
     DBMAX_IDXREG_MAPS = 2,
     DBMAX_SRX = 16,

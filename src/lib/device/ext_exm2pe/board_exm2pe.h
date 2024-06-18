@@ -30,6 +30,7 @@ int board_exm2pe_init(lldev_t dev,
                       unsigned subdev,
                       unsigned gpio_base,
                       const char *params,
+                      const char *compat,
                       ext_i2c_func_t func,
                       board_exm2pe_t* ob);
 

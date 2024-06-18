@@ -3,7 +3,7 @@
 
 set(HW_FILES si549 si5332 ads42lbx9 tps6594 tmp108 tmp114 lms6002d lms7002m lp8758 lmk05318 lmk5c33216 tps6381x dac80501 lmk04832)
 # YAML registers generators
-set(HW_FILES_YAML lmk05318 lmk5c33216 lms6002d lms7002m tps6381x dac80501 lmk04832)
+set(HW_FILES_YAML lmk05318 lmk5c33216 lms6002d lms7002m tps6381x dac80501 lmk04832 xra1405)
 
 foreach(I ${HW_FILES})
     aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/${I} HW_DIR_FILES)

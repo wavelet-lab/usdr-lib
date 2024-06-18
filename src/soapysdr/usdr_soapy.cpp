@@ -71,6 +71,13 @@ const rfic_gain_descriptor lms6_gains[] {
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr }
 };
 
+const rfic_gain_descriptor ad45lb49_gains[] {
+    { SOAPY_SDR_RX, SoapySDR::Range(0, 4),        "LNA",  "SEL",   "/dm/sdr/0/rx/gain/lna" },
+    { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "VGA",  "ATTN",  "/dm/sdr/0/rx/gain/vga" },
+    { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "PGA",  nullptr, "/dm/sdr/0/rx/gain/pga" },
+    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr }
+};
+
 const rfic_gain_descriptor unk_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(-99, 99),   "GRX", nullptr, "/dm/sdr/0/rx/gain" },
     { SOAPY_SDR_TX, SoapySDR::Range(-99, 99),   "GTX", nullptr, "/dm/sdr/0/tx/gain" },
@@ -81,6 +88,7 @@ static inline const rfic_gain_descriptor* get_gains(rfic_type_t t) {
     switch (t) {
     case RFIC_LMS6002D: return lms6_gains;
     case RFIC_LMS7002M: return lms7_gains;
+    case RFIC_AD45LB49: return ad45lb49_gains;
     default: return unk_gains;
     }
 }
@@ -169,6 +177,8 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
             type = RFIC_LMS6002D;
         else if (strcmp(rfic, "lms7002m") == 0)
             type = RFIC_LMS7002M;
+        else if (strcmp(rfic, "ad45lb49") == 0)
+            type = RFIC_AD45LB49;
     }
 
     _streams[0].active = false;
@@ -535,7 +545,7 @@ double SoapyUSDR::getSampleRate(const int direction, const size_t /*channel*/) c
 SoapySDR::RangeList SoapyUSDR::getSampleRateRange(const int /*direction*/, const size_t /*channel*/) const
 {
     SoapySDR::RangeList ranges;
-    ranges.push_back(SoapySDR::Range(0.1e6, 80e6));
+    ranges.push_back(SoapySDR::Range(0.1e6, (type == RFIC_AD45LB49) ? 130e6 : 80e6));
     return ranges;
 }
 
@@ -905,7 +915,7 @@ SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int /*direction*/, cons
         argInfos.push_back(info);
     }
 
-    //link format
+    //buffer length
     {
         SoapySDR::ArgInfo info;
         info.key = "bufferLength";
@@ -960,7 +970,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     if (args.count("bufferLength")) {
         const std::string& buffer_length = args.at("bufferLength");
         pktSamples = std::atoi(buffer_length.c_str());
-        if (pktSamples < 128) {
+        if ((pktSamples != 0) && (pktSamples < 128)) {
             throw std::runtime_error("SoapyUSDR::setupStream([bufferLength="+buffer_length+") is too small");
         }
         if (pktSamples > 128*1024) {
@@ -990,8 +1000,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
             (pktSamples != 0) ? pktSamples :
             (_desired_rx_pkt != 0) ? _desired_rx_pkt : defbufsz;
     } else {
-        // TODO add discovery
-        _streams[direction].nfo.pktsyms = 8192;
+        _streams[direction].nfo.pktsyms = 0;
     }
 
     _streams[direction].self = this;

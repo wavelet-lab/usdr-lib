@@ -11,29 +11,12 @@ enum REGS_generic_usdr_r000 {
     M2PCI_REG_STAT_CTRL = 0,
     M2PCI_REG_I2C = 1,
     M2PCI_REG_SPI0 = 2,
-
-    // Either SPI1 or GPIO
-    M2PCI_REG_SPI1 = 3,
     M2PCI_WR_GPIO_CB = 3,
-
-    M2PCI_REG_QSPI_FLASH = 10,
-    M2PCI_REG_INT = 15,
 
     M2PCI_REG_WR_RXDMA_CONFIRM = 4,
     M2PCI_REG_WR_RXDMA_CONTROL = 5,
     M2PCI_REG_WR_BADDR = 6,
     M2PCI_REG_WR_BDATA = 7,
-
-    // Either TX or SPI 2/3
-    M2PCI_REG_WR_TXDMA_CNF_L  = 12, //Burst len
-    M2PCI_REG_WR_TXDMA_CNF_T  = 13, //Burst timing
-    M2PCI_REG_WR_TXDMA_COMB   = 14, //Control
-
-    M2PCI_REG_SPI2 = 13,
-    M2PCI_REG_SPI3 = 14,
-
-    M2PCI_REG_WR_LBDSP = 16,
-    M2PCI_REG_RD_LBDSP = 12,
 
     M2PCI_REG_RD_FBUFFS = 4,
     M2PCI_REG_RD_FBURSTS = 5,
@@ -41,13 +24,37 @@ enum REGS_generic_usdr_r000 {
     M2PCI_REG_RD_AVGIDC = 7,
     M2PCI_REG_RD_AVGQDC = 8,
 
-    REG_CFG_PHY_0       = 24,
-    REG_CFG_PHY_1       = 25,
+    M2PCI_REG_WR_PNTFY_CFG    = 8,
+    M2PCI_REG_WR_PNTFY_ACK    = 9,
 
+    M2PCI_REG_QSPI_FLASH      = 10,
+    M2PCI_REG_QSPI_FLASH_ADDR = 11,
+
+    M2PCI_REG_WR_TXDMA_CNF_L  = 12, //Burst len
+    M2PCI_REG_WR_TXDMA_CNF_T  = 13, //Burst timing
+    M2PCI_REG_WR_TXDMA_COMB   = 14, //Control
+
+    M2PCI_REG_INT = 15,
+
+    // Ranges [16-31]
     M2PCI_REG_RD_TXDMA_STAT     = 28,
     M2PCI_REG_RD_TXDMA_STATM    = 29,
     M2PCI_REG_RD_TXDMA_STATTS   = 30,
     M2PCI_REG_RD_TXDMA_STAT_CPL = 31,
+
+    // Ranges [32-47]
+
+    // Ranges [38-63]
+    M2PCI_REG_SPI1      = 48,
+    M2PCI_REG_SPI2      = 49,
+    M2PCI_REG_SPI3      = 50,
+    M2PCI_REG_WR_LBDSP  = 52,
+    M2PCI_REG_RD_LBDSP  = 52,
+    REG_UART_TRX        = 54,
+    REG_CFG_PHY_0       = 56,
+    REG_CFG_PHY_1       = 57,
+    REG_SPI_EXT_CFG     = 58,
+    REG_SPI_EXT_DATA    = 59,
 };
 
 // New register layout
@@ -62,6 +69,7 @@ enum INTS_generic {
     M2PCI_INT_SPI_2  = 4,
     M2PCI_INT_SPI_3  = 5,
     M2PCI_INT_I2C_0  = 6,
+    M2PCI_INT_SPI_EXT= 7,
 };
 
 enum VIRT_BUS_ADDRS {

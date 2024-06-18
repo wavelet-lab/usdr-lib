@@ -29,14 +29,20 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
     return lowlevel_reg_rd32(dev, 0, 16 + (bank / 4), data);
 }
 
+enum flash_action {
+    ACTION_NONE,
+    ACTION_READBACK,
+    ACTION_WRITE,
+    ACTION_INFO,
+};
 
 int main(int argc, char** argv)
 {
-    int res, opt, rdwr = 0;
+    int res, opt;
+    enum flash_action rdwr = ACTION_NONE;
     const char* filename = NULL;
     const char* busname = NULL;
     lldev_t dev;
-    bool dryrun = false;
     bool force = false;
     bool golden = false;
     bool corrupt = false;
@@ -49,7 +55,7 @@ int main(int argc, char** argv)
     usdrlog_setlevel(NULL, USDR_LOG_WARNING);
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "U:l:w:r:dFGC")) != -1) {
+    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGC")) != -1) {
         switch (opt) {
         case 'U':
             busname = optarg;
@@ -59,14 +65,15 @@ int main(int argc, char** argv)
             break;
         case 'r':
             filename = optarg;
-            rdwr = 1;
+            rdwr = ACTION_READBACK;
             break;
         case 'w':
             filename = optarg;
-            rdwr = 2;
+            rdwr = ACTION_WRITE;
             break;
-        case 'd':
-            dryrun = true;
+        case 'i':
+            filename = optarg;
+            rdwr = ACTION_INFO;
             break;
         case 'F':
             force = true;
@@ -78,7 +85,7 @@ int main(int argc, char** argv)
             corrupt = true;
             break;
         default:
-            fprintf(stderr, "Usage: %s [-U device_bus] [-l loglevel] [-r filename | -w filename] [-d] [-G]\n",
+            fprintf(stderr, "Usage: %s [-U device_bus] [-l loglevel] [-r filename | -w filename | -i filename] [-G]\n",
                     argv[0]);
             return 1;
         }
@@ -102,13 +109,15 @@ int main(int argc, char** argv)
     res = lowlevel_create((busname == NULL) ? 0 : 1, pnames, pvalue, &dev, 0, NULL, 0);
     if (res) {
         fprintf(stderr, "Unable to create: errno %d\n", res);
-        if (!dryrun)
+        if (rdwr != ACTION_INFO)
             return 1;
         no_device = true;
     }
 
     const char* name = (no_device) ? "<no_device>" : lowlevel_get_devname(dev);
-    fprintf(stderr, "Device was created: `%s`!\n", name);
+    if (!no_device) {
+        fprintf(stderr, "Device was created: `%s`!\n", name);
+    }
 
     res = (no_device) ? 0 : dev_gpi_get32(dev, 0, &curfwid);
     if (res) {
@@ -126,8 +135,9 @@ int main(int argc, char** argv)
         fprintf(stderr, "Failed to get flash ID!\n");
         return 2;
     }
-    fprintf(stderr, "Flash ID id %08x (%s)!\n", fid, fid_str);
-
+    if (!no_device) {
+        fprintf(stderr, "Flash ID id %08x (%s)!\n", fid, fid_str);
+    }
 
     //Check image
     res = (no_device) ? 0 : espi_flash_read(dev, 0, 10, 512, 0, 256, outb);
@@ -153,16 +163,18 @@ int main(int argc, char** argv)
         mp = true;
     }
 
-    fprintf(stderr, "Actual firmware in use:      FirmwareID %08x (%lld)\n",
-            curfwid, (long long)get_xilinx_rev_h(curfwid));
-    fprintf(stderr, "Golden image: DEVID %08x FirmwareID %08x (%lld)\n",
-            image.devid, image.usr_access2, (long long)get_xilinx_rev_h(image.usr_access2));
-    fprintf(stderr, "Master image: DEVID %08x FirmwareID %08x (%lld)\n",
-            image_master.devid, image_master.usr_access2, (long long)get_xilinx_rev_h(image_master.usr_access2));
+    if (!no_device) {
+        fprintf(stderr, "Actual firmware in use:      FirmwareID %08x (%lld)\n",
+                curfwid, (long long)get_xilinx_rev_h(curfwid));
+        fprintf(stderr, "Golden image: DEVID %08x FirmwareID %08x (%lld)\n",
+                image.devid, image.usr_access2, (long long)get_xilinx_rev_h(image.usr_access2));
+        fprintf(stderr, "Master image: DEVID %08x FirmwareID %08x (%lld)\n",
+                image_master.devid, image_master.usr_access2, (long long)get_xilinx_rev_h(image_master.usr_access2));
+    }
 
     uint32_t off = (golden) ? 0 : MASTER_IMAGE_OFF;
     unsigned total_length = SIZEOF_ARRAY(outa);
-    if (rdwr == 2) {
+    if (rdwr == ACTION_WRITE || rdwr == ACTION_INFO) {
         FILE* w = fopen(filename, "rb");
         if (w == NULL) {
             fprintf(stderr, "Unabe to read file '%s': %s\n", filename, strerror(errno));
@@ -191,7 +203,7 @@ int main(int argc, char** argv)
             fprintf(stderr, "It looks like the file is corrupted! res=%d\n", res);
             return 4;
         }
-        res = xlnx_btstrm_iprgcheck(&image, &file, MASTER_IMAGE_OFF, golden);
+        res = (no_device) ? 0 : xlnx_btstrm_iprgcheck(&image, &file, MASTER_IMAGE_OFF, golden);
         if (res) {
             fprintf(stderr, "Image check failed! res=%d, file revision=%12ld\n", res, get_xilinx_rev_h(file.usr_access2));
             return 4;
@@ -203,20 +215,20 @@ int main(int argc, char** argv)
             total_length &= 0xffff0000;
         }
 
-        if (golden)
-            fprintf(stderr, "DANGER: You're updating the golden image!\n");
+        fprintf(stderr, "File image:   DEVID %08x FirmwareID %08x (%lld)\n",
+                file.devid, file.usr_access2, (long long)get_xilinx_rev_h(file.usr_access2));
 
-        fprintf(stderr, "Writing %d bytes at %08x; flash(G/M) = %08x/%08x [%d] new = %08x current = %08x { flash(G/M) = %12ld/%12ld new = %12ld current = %12ld } !\n",
-                total_length, off, image.usr_access2, image_master.usr_access2, mp, file.usr_access2, curfwid,
-                get_xilinx_rev_h(image.usr_access2), get_xilinx_rev_h(image_master.usr_access2), get_xilinx_rev_h(file.usr_access2), get_xilinx_rev_h(curfwid));
+        if (rdwr == ACTION_INFO) {
+            return 0;
+        }
+        if (golden) {
+            fprintf(stderr, "DANGER: You're updating the golden image!\n");
+        }
+        fprintf(stderr, "Writing %d bytes at %08x\n", total_length, off);
 
         if (file.usr_access2 == curfwid && image_master.usr_access2 == file.usr_access2 && !force) {
             fprintf(stderr, "Looks like you're using latest firmware already\n");
             return 9;
-        }
-        if (dryrun) {
-            fprintf(stderr, "Everything looks good! In dry-run exiting...\n");
-            return 10;
         }
         if (corrupt) {
             memset(outa + 512*1024, -1, 512*1024);
@@ -256,7 +268,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if (rdwr == 2 || rdwr == 1) {
+    if (rdwr == ACTION_WRITE || rdwr == ACTION_READBACK) {
         fprintf(stderr, "Reading %d bytes!\n", total_length);
         res = espi_flash_read(dev, 0, 10, 512, off, total_length, outb);
         if (res) {
@@ -265,7 +277,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if (rdwr == 2) {
+    if (rdwr == ACTION_WRITE) {
         int errors = 0;
         for (unsigned off = 0; off < total_length; off += 256) {
             unsigned rem = total_length - off;
@@ -282,7 +294,7 @@ int main(int argc, char** argv)
         } else {
             fprintf(stderr, "Write FAILED; errors: %d!\n", errors);
         }
-    } else if (rdwr == 1) {
+    } else if (rdwr == ACTION_READBACK) {
         FILE* w = fopen(filename, "wb");
         if (w == NULL) {
             fprintf(stderr, "Unabe to create file '%s': %s\n", filename, strerror(errno));

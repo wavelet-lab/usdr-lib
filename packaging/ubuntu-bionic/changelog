@@ -1,8 +1,14 @@
-usdr (0.9.6~bionic0) noble; urgency=low
+usdr (0.9.7~bionic0) noble; urgency=low
 
   * Fixes and improvements
 
- -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Thu, 23 May 2024 00:00:00 +0000
+ -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Thu, 27 May 2024 00:00:00 +0000
+
+ usdr (0.9.6~bionic0) noble; urgency=low
+
+  * Fixes and improvements
+
+ -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Thu, 24 May 2024 00:00:00 +0000
 
 
 usdr (0.9.5~bionic0) noble; urgency=low

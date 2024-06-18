@@ -40,6 +40,9 @@ enum {
 
 enum {
     TXSTRM_META_SZ = 16,
+
+    // TODO Get rid of duplication constant, use DMA caps to calculate actual size
+    MAX_TX_BUFFER_SZ = 126976, // (4k * 31)
 };
 
 enum {
@@ -104,6 +107,10 @@ enum {
     STREAM_MAX_SLOTS = 64,
 };
 
+struct stream_params {
+    unsigned channels;
+    unsigned bits_per_all_chs;
+};
 
 struct usb_dev
 {
@@ -141,6 +148,7 @@ struct usb_dev
 
     struct buffers rx_strms[1];
     struct buffers tx_strms[1];
+    struct stream_params tx_strms_params[1];
 
     bool rx_strms_extnty[1];
     unsigned app_drops[1];
@@ -752,6 +760,7 @@ int _usb_uram_init_rxstream(usb_dev_t* d,
     }
 
     params->underlying_fd = (eventtype) ? prxb->fd_event : -1;
+    params->out_mtu_size = params->block_size;
     USDR_LOG("USBX", USDR_LOG_ERROR, "Stream RX prepared sz = %d, URBs = %d, evfd = %d!\n",
              prxb->allocsz_rounded, transfers, eventtype);
     *channel = DEV_RX_STREAM_NO;
@@ -766,10 +775,27 @@ int _usb_uram_init_txstream(usb_dev_t* d,
 {
     int res;
     struct buffers *prxb = &d->tx_strms[0];
+    struct stream_params *sp = &d->tx_strms_params[0];
+
     bool eventtype = (params->flags & LLSF_NEED_FDPOLL) == LLSF_NEED_FDPOLL;
     unsigned buffers_cnt = params->buffer_count;
     if (buffers_cnt > MAX_OUT_STRM_REQS)
         buffers_cnt = MAX_OUT_STRM_REQS;
+
+    if (params->block_size > MAX_TX_BUFFER_SZ) {
+        USDR_LOG("USBX", USDR_LOG_WARNING, "Requested blocksize %d bytes is too big, maximum is %d!",
+                 params->block_size, MAX_TX_BUFFER_SZ);
+        return -EINVAL;
+    }
+
+    if (params->block_size > 0 && params->block_size < 64) {
+        USDR_LOG("USBX", USDR_LOG_WARNING, "Requested blocksize %d bytes is too small, looks line an error!",
+                 params->block_size);
+        return -EINVAL;
+    }
+    if (params->block_size == 0) {
+        params->block_size = MAX_TX_BUFFER_SZ;
+    }
 
     res = buffers_usb_init(&d->gdev, prxb, buffers_cnt, buffers_cnt,
                            params->block_size + TX_PKT_HEADER, EP_OUT_DEFSTREAM, eventtype);
@@ -777,10 +803,12 @@ int _usb_uram_init_txstream(usb_dev_t* d,
         return res;
 
     params->underlying_fd = (eventtype) ? prxb->fd_event : -1;
+    params->out_mtu_size = params->block_size;
     USDR_LOG("USBX", USDR_LOG_ERROR, "Stream TX prepared sz = %d, URBs = %d, evfd = %d!\n",
              prxb->allocsz_rounded, buffers_cnt, eventtype);
     *channel = DEV_TX_STREAM_NO;
-
+    sp->channels = params->channels;
+    sp->bits_per_all_chs = params->bits_per_sym;
     return 0;
 }
 
@@ -839,6 +867,13 @@ int usb_uram_recv_dma_wait(lldev_t dev, subdev_t subdev, stream_t channel, void*
 
     // Parse trailer
     unsigned trailer_sz = (ext_stat) ? RX_PKT_TRAILER_EX : RX_PKT_TRAILER;
+
+    if(trailer_sz > bd->buffer_sz)
+    {
+        USDR_LOG("USBX", USDR_LOG_ERROR, "Invalid bus data, buffer_sz=%u\n", bd->buffer_sz);
+        return -EIO;
+    }
+
     unsigned buffer_sz = bd->buffer_sz - trailer_sz;
     uint32_t* trailer_ptr = ((uint32_t*)(tr_buffer + buffer_sz));
     uint32_t bursts = trailer_ptr[0];
@@ -926,8 +961,14 @@ int usb_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, voi
 {
     usb_dev_t* d = (usb_dev_t*)dev;
     int res;
+    int64_t timestamp = -1;
     if (channel != DEV_TX_STREAM_NO) {
         USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX Commit incorrect stream number\n");
+        return -EINVAL;
+    }
+    if (oob_size == 8) {
+        timestamp = ((int64_t*)(oob_ptr))[0];
+    } else if (oob_size != 0) {
         return -EINVAL;
     }
 
@@ -945,23 +986,16 @@ int usb_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, voi
         return -EINVAL;
     }
 
-    int64_t timestamp = -1;
-    if (oob_size == 8) {
-        timestamp = *((int64_t*)(oob_ptr));
-    }
+    uint64_t rsamples = sz * 8 / d->tx_strms_params[0].bits_per_all_chs;
+    unsigned samples = rsamples - 1;
 
-    // SZ in bytes!
-    unsigned samples = (sz / 4) - 1;
-
-    // Fill metadata
-    // oob_size = 0;
     uint32_t* header = (uint32_t*)bx;
     header[0] = timestamp;
     header[1] = ((timestamp >> 32) & 0xffff) | ((samples & 0x7fff) << 16) | (timestamp < 0 ? 0x80000000 : 0);
-    header[2] = (samples >> 15) & 0x3;
+    header[2] = 0; // (samples >> 15) & 0x3;
     header[3] = 0;
 
-    USDR_LOG("USBX", USDR_LOG_NOTE, "TX post buffer %d: %08x.%08x.%08x.%08x -> %d bytes\n",
+    USDR_LOG("USBX", USDR_LOG_DEBUG, "TX post buffer %d: %08x.%08x.%08x.%08x -> %d bytes\n",
              bno, header[0], header[1], header[2], header[3], sz);
 
     // Add to senq

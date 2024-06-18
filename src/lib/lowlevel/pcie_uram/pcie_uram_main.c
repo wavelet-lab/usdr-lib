@@ -26,6 +26,9 @@
 #include "../ipblks/si2c.h"
 #include "../ipblks/streams/sfe_tx_4.h"
 
+// ABI version should be synced with the driver
+#define USDR_DRIVER_ABI_VERSION 2
+
 struct stream_cache_data {
     unsigned flags;
     unsigned bufavail;
@@ -61,6 +64,9 @@ struct pcie_uram_dev
     char devid_str[36];
     device_id_t devid;
     device_bus_t db;
+
+    unsigned tx_channels;
+    unsigned tx_bit_per_all_sym;
 
     struct stream_cache_data scache[DBMAX_SRX + DBMAX_STX];
 };
@@ -420,8 +426,11 @@ int pcie_uram_stream_initialize(lldev_t dev, subdev_t subdev,
         sc->mmaped_area = NULL;
     }
 
+    d->tx_channels = params->channels;
+    d->tx_bit_per_all_sym = params->bits_per_sym;
     params->underlying_fd = d->fd;
-    USDR_LOG("PCIE", USDR_LOG_NOTE, "Configured stream%d: %d X %d (vma_off=%08lx vma_len=%08lx)\n",
+    params->out_mtu_size = pdsc.dma_buf_sz;
+    USDR_LOG("PCIE", USDR_LOG_INFO, "Configured stream%d: %d X %d (vma_off=%08lx vma_len=%08lx)\n",
              pdsc.sno, pdsc.dma_buf_sz, pdsc.dma_bufs, pdsc.out_vma_off, pdsc.out_vma_length);
     return 0;
 
@@ -598,10 +607,16 @@ int pcie_uram_send_dma_get(lldev_t dev, subdev_t subdev, stream_t channel, void*
 static
 int pcie_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, void* buffer, unsigned sz, const void* oob_ptr, unsigned oob_size)
 {
-    uint32_t samples = sz >> 3;
+    struct pcie_uram_dev* d = (struct pcie_uram_dev*)dev;
+    uint32_t samples = sz * 8 / d->tx_bit_per_all_sym;
     uint64_t timestamp = (oob_ptr) ? (*(uint64_t*)oob_ptr) : ~0ul;
     unsigned cnf_base = 12; //REG_WR_TXDMA_CNF_L;
 
+    if (d->scache[channel].cfg_bufsize < sz) {
+        USDR_LOG("PCIE", USDR_LOG_CRITICAL_WARNING, "Stream was configured with %d DMA buffer but tried to write %d!\n",
+                 d->scache[channel].cfg_bufsize, sz);
+        return -EINVAL;
+    }
 
     return sfe_tx4_push_ring_buffer(dev, subdev,
                                     cnf_base, samples, timestamp);
@@ -858,6 +873,15 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
                  "Unable to get device uuid, error %d\n", err);
         goto remove_dev;
     }
+
+    err = ioctl(fd, PCIE_DRIVER_CLAIM_VERSION, USDR_DRIVER_ABI_VERSION);
+    if (err) {
+        err = -errno;
+        USDR_LOG("PCIE", USDR_LOG_ERROR,
+                 "ABI verification failed %d, you need to update the driver or host libraries!\n", err);
+        goto remove_dev;
+    }
+
     dev->devid = did;
     strncpy(dev->devid_str, usdr_device_id_to_str(did), sizeof(dev->devid_str) - 1);
 

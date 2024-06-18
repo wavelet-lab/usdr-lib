@@ -1,0 +1,39 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         PCIEFECMD
+desc:         FrontEndCmd
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: VIRTUAL
+    usdr_path: /debug/hw/fe_100_5000_cmd/0/reg
+addr_width:   8
+data_width:   24
+page_prefix:  True
+# field_prefix: [ Page, RegName ]
+# field_macros: True
+
+pages:
+  - name: FE
+    regs:
+      - addr: 0x00
+        name: FREQ
+        fields:
+          - bits: "23:0"
+            name: KHZ
+            desc: KHZ lo
+      - addr: 0x01
+        name: ATTN
+        fields:
+          - bits: "6:0"
+            name: DB
+            desc: Attenuation in 0.25dB
+      - addr: 0x02
+        name: PRESEL
+        fields:
+          - bits: "1:0"
+            name: BAND
+            desc: Band preselector
+

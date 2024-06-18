@@ -11,6 +11,7 @@
 #include "streams.h"
 
 int sfe_tx4_check_format(const struct stream_config* psc);
+int sfe_tx4_mtu_get(const struct stream_config* psc);
 
 // TX only supports 16 bit for now
 int sfe_tx4_ctl(lldev_t dev,

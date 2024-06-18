@@ -16,7 +16,7 @@ struct pcie_driver_uuid {
     unsigned char id[16];
 };
 
-#define MAX_SPI_COUNT      4
+#define MAX_SPI_COUNT      8
 #define MAX_I2C_COUNT      4
 #define MAX_INDEXED_SPACES 4
 #define MAX_STREAM_COUNT   16
@@ -66,7 +66,7 @@ struct pcie_driver_devlayout {
     unsigned intfifo_length[MAX_MEMORY_COUNT];
     unsigned intfifo_flags[MAX_MEMORY_COUNT];
 
-    unsigned bucket_core;    
+    unsigned bucket_core;
     unsigned bucket_base;
     unsigned bucket_count;
 
@@ -174,5 +174,7 @@ struct pcie_driver_woa_oob {
 #define PCIE_DRIVER_SRECV                _IOW(PCIE_DRIVER_MAGIC, 21, struct pcie_driver_srecv)
 #define PCIE_DRIVER_SSEND                _IOW(PCIE_DRIVER_MAGIC, 22, struct pcie_driver_srecv)
 
+// Request specific deriver ABI version
+#define PCIE_DRIVER_CLAIM_VERSION     _IOW(PCIE_DRIVER_MAGIC, 23, uint32_t)
 
 #endif

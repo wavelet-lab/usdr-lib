@@ -500,6 +500,8 @@ int create_limesdr_stream(device_t* device,
     sparams.block_size = burst_size * burst_count;
     sparams.buffer_count = 16;                     // TODO: parameter
     sparams.flags = ((need_fd) ? LLSF_NEED_FDPOLL : 0);
+    sparams.channels = 0;
+    sparams.bits_per_sym = 0;
 
     res = dops->stream_initialize(device->dev, 0, &sparams, &sid);
     if (res)

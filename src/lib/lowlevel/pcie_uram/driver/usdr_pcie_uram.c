@@ -64,6 +64,9 @@ static int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
 }
 #endif
 
+// Change anytime when extra parameter or meaning is changed in pcie_uram_driver_if.h
+#define USDR_DRIVER_ABI_VERSION 2
+
 enum device_flags {
     DEV_VALID = 1,
     DEV_INITIALIZED = 2,
@@ -576,6 +579,39 @@ static __poll_t usdrfd_poll(struct file *filp, poll_table *wait)
 	return events;
 }
 
+static int usdr_stream_free(struct usdr_dev *usdrdev, unsigned sno)
+{
+    unsigned i;
+    struct stream_state* s;
+    if (sno >= usdrdev->dl.streams_count)
+        return -EINVAL;
+
+    s = usdrdev->streams[sno];
+    if (!s)
+        return 0;
+
+    // Release DMA buffers
+    // Check that mapping is invalid
+
+    for (i = s->dma_buffs; i > 0; i--) {
+        dma_free_attrs(&usdrdev->pdev->dev,
+                       s->dma_buff_size,
+                       s->dmab[i - 1].kvirt,
+                       s->dmab[i - 1].phys,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+                       &s->dma_attr);
+#else
+                       s->dma_buffer_flags);
+#endif
+
+    }
+
+    kfree(s);
+
+    usdrdev->streams[sno] = 0;
+    return 0;
+}
+
 static int usdr_device_initialie(struct usdr_dev *usdrdev)
 {
     unsigned i, irq, directirqs, mxsps;
@@ -803,8 +839,21 @@ static int usdr_stream_initialize(struct usdr_dev *usdrdev,
     if (sno >= usdrdev->dl.streams_count)
         return -EBADSLT;
 
+    min_bufs = 1u << ((usdrdev->dl.stream_cap[sno] >> STREAM_CAP_MINBUFS_OFF) & STREAM_CAP_SZ_MSK);
+    max_bufs = 1u << ((usdrdev->dl.stream_cap[sno] >> STREAM_CAP_MAXBUFS_OFF) & STREAM_CAP_SZ_MSK);
+    max_bufsz = 4096u << ((usdrdev->dl.stream_cap[sno] >> STREAM_CAP_MAXBUFSZ_OFF) & STREAM_CAP_SZ_MSK);
+
+    if (sdma->dma_buf_sz == 0) {
+        // Use maximum available
+        sdma->dma_buf_sz = max_bufsz;
+    }
+
+    if (sdma->dma_bufs < min_bufs || sdma->dma_bufs > max_bufs || sdma->dma_buf_sz > max_bufsz)
+        return -EINVAL;
+
     newsz = (sdma->dma_buf_sz + PAGE_SIZE - 1) & (~(PAGE_SIZE - 1));
     flags = 0;
+
     if ((s = usdrdev->streams[sno])) {
         if ((s->dma_buffs == sdma->dma_bufs) &&
                 (s->dma_buff_size >= newsz) &&
@@ -812,15 +861,10 @@ static int usdr_stream_initialize(struct usdr_dev *usdrdev,
 
             goto exit_success;
         }
-        return -EBUSY;
+
+        // Reinitialize buffers
+        usdr_stream_free(usdrdev, sno);
     }
-
-    min_bufs = 1u << ((usdrdev->dl.stream_cap[sno] >> STREAM_CAP_MINBUFS_OFF) & STREAM_CAP_SZ_MSK);
-    max_bufs = 1u << ((usdrdev->dl.stream_cap[sno] >> STREAM_CAP_MAXBUFS_OFF) & STREAM_CAP_SZ_MSK);
-    max_bufsz = 4096u << ((usdrdev->dl.stream_cap[sno] >> STREAM_CAP_MAXBUFSZ_OFF) & STREAM_CAP_SZ_MSK);
-
-    if (sdma->dma_bufs < min_bufs || sdma->dma_bufs > max_bufs || sdma->dma_buf_sz > max_bufsz)
-        return -EINVAL;
 
     s = (struct stream_state*)kzalloc(sizeof(*s) + (sdma->dma_bufs * sizeof(struct usdr_dmabuf)), GFP_KERNEL);
     if (!s)
@@ -848,8 +892,8 @@ static int usdr_stream_initialize(struct usdr_dev *usdrdev,
                     goto failed_alloc;
             }
             s->dmab[i].uvirt = NULL;
-            dev_notice(&usdrdev->pdev->dev, "buf[%d]=%lx [virt %p]\n", i,
-                       (unsigned long)s->dmab[i].phys, s->dmab[i].kvirt);
+            //dev_notice(&usdrdev->pdev->dev, "buf[%d]=%lx [virt %p]\n", i,
+            //           (unsigned long)s->dmab[i].phys, s->dmab[i].kvirt);
     }
 
     // Initialize dma buffer pointer in the dev
@@ -859,7 +903,7 @@ static int usdr_stream_initialize(struct usdr_dev *usdrdev,
             usdr_reg_wr32(usdrdev,
                           usdrdev->dl.stream_cfg_base[sno] + i,
                           s->dmab[i].phys);
-            dev_notice(&usdrdev->pdev->dev, "cfg=%08x\n", usdrdev->dl.stream_cfg_base[sno] + i);
+            // dev_notice(&usdrdev->pdev->dev, "cfg=%08x\n", usdrdev->dl.stream_cfg_base[sno] + i);
         }
     } else {
         dev_err(&usdrdev->pdev->dev, "Unknown stream core: %08x\n",
@@ -880,6 +924,12 @@ exit_success:
     if (usdrdev->dl.stream_core[sno] == USDR_MAKE_COREID(USDR_CS_STREAM, USDR_SC_TXDMA_OLD)) {
     	// Put all available buffers, no OOB data for the first N buffs
     	atomic_xchg(&usdrdev->irq_ev_cnt[usdrdev->dl.stream_int_number[sno]], sdma->dma_bufs);
+
+        // Set DMA engine maximum buffer limit
+        usdr_reg_wr32(usdrdev,
+                      usdrdev->dl.stream_cfg_base[sno] + sdma->dma_bufs,
+                      sdma->dma_buf_sz - 1);
+        dev_notice(&usdrdev->pdev->dev, "TX stream is limited to %d bytes\n", sdma->dma_buf_sz);
     } else {
     	// Clear spurious interrupts
     	atomic_xchg(&usdrdev->irq_ev_cnt[usdrdev->dl.stream_int_number[sno]], 0);
@@ -900,39 +950,6 @@ failed_alloc:
     }
     kfree(s);
     return -ENOMEM;
-}
-
-static int usdr_stream_free(struct usdr_dev *usdrdev, unsigned sno)
-{
-    unsigned i;
-    struct stream_state* s;
-    if (sno >= usdrdev->dl.streams_count)
-        return -EINVAL;
-
-    s = usdrdev->streams[sno];
-    if (!s)
-        return 0;
-
-    // Release DMA buffers
-    // Check that mapping is invalid
-
-    for (i = s->dma_buffs; i > 0; i--) {
-        dma_free_attrs(&usdrdev->pdev->dev,
-                       s->dma_buff_size,
-                       s->dmab[i - 1].kvirt,
-                       s->dmab[i - 1].phys,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
-                       &s->dma_attr);
-#else
-                       s->dma_buffer_flags);
-#endif
-
-    }
-
-    kfree(s);
-
-    usdrdev->streams[sno] = 0;
-    return 0;
 }
 
 static int validate_snoto(struct usdr_dev *usdrdev, unsigned long snomskto, unsigned* to, unsigned* sno)
@@ -1098,7 +1115,8 @@ static long usdrfd_ioctl(struct file *filp,
     if (!(usdrdev->dev_mask & DEV_INITIALIZED)) {
         if (ioctl_num != PCIE_DRIVER_GET_UUID &&
                 ioctl_num != PCIE_DRIVER_CLAIM &&
-                ioctl_num != PCIE_DRIVER_SET_DEVLAYOUT) {
+                ioctl_num != PCIE_DRIVER_SET_DEVLAYOUT &&
+                ioctl_num != PCIE_DRIVER_CLAIM_VERSION) {
 
             dev_notice(&usdrdev->pdev->dev, "Device not ready!");
             return -EINVAL;
@@ -1106,14 +1124,21 @@ static long usdrfd_ioctl(struct file *filp,
     }
 
     switch (ioctl_num) {
+    case PCIE_DRIVER_CLAIM_VERSION:
+        if (ioctl_param != USDR_DRIVER_ABI_VERSION)
+            return -EOPNOTSUPP;
+        return 0;
+
     case PCIE_DRIVER_GET_UUID:
         if (usdrdev->device_data >= (sizeof(s_uuid) / sizeof(s_uuid[0])))
 		return -EFAULT;
         if (copy_to_user(uptr, &s_uuid[usdrdev->device_data], sizeof(s_uuid[usdrdev->device_data])))
                 return -EFAULT;
         return 0;
+
     case PCIE_DRIVER_CLAIM:
         return 0;
+
     case PCIE_DRIVER_SET_DEVLAYOUT:
         if (!(usdrdev->dev_mask & DEV_INITIALIZED)) {
 
@@ -1298,6 +1323,9 @@ static long usdrfd_ioctl(struct file *filp,
         if (res)
             return res;
 
+        if (copy_to_user(uptr + offsetof(struct pcie_driver_sdma_conf, dma_buf_sz),
+                         &sdma.dma_buf_sz, sizeof(sdma.dma_buf_sz)))
+            return -EFAULT;
         if (copy_to_user(uptr + offsetof(struct pcie_driver_sdma_conf, out_vma_off),
                          &sdma.out_vma_off,
                          sizeof(sdma.out_vma_off) + sizeof(sdma.out_vma_length)))
@@ -1343,8 +1371,7 @@ static void usdrfd_vma_open(struct vm_area_struct *vma)
 
 static void usdrfd_vma_close(struct vm_area_struct *vma)
 {
-    printk(KERN_NOTICE PFX "VMA close virt %lx\n",
-           vma->vm_start);
+    // printk(KERN_NOTICE PFX "VMA close virt %lx\n", vma->vm_start);
 }
 
 static struct vm_operations_struct usdrfd_remap_vm_ops = {
@@ -1432,8 +1459,8 @@ static int usdrfd_mmap(struct file *filp, struct vm_area_struct *vma)
         vma->vm_pgoff = vm_pgoff;
         //vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-        dev_notice(&usdrdev->pdev->dev, "Mapping str%db%d to %lx\n",
-                   streamno, bno, vma->vm_start);
+        //dev_notice(&usdrdev->pdev->dev, "Mapping str%db%d to %lx\n",
+        //           streamno, bno, vma->vm_start);
 
         vma->vm_ops = &usdrfd_remap_vm_ops;
 	return err;

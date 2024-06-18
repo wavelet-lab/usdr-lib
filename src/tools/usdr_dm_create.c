@@ -14,10 +14,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
-
 #include <unistd.h>
-
 #include <math.h>
+#include <string.h>
 
 #include "../common/ring_buffer.h"
 
@@ -96,10 +95,10 @@ void* disk_read_thread(void* obj)
 }
 
 double start_phase[8] = { 0, 0.5, 0.25, 0.125 };
-double start_dphase[8] = { 0.125, 0.02, 0.03, 0.04 };
+double start_dphase[8] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
 unsigned tx_get_samples;
 // Sine generator
-void* freq_gen_thread(void* obj)
+void* freq_gen_thread_ci16(void* obj)
 {
     unsigned p = (intptr_t)obj;
     double phase = start_phase[p];
@@ -118,6 +117,34 @@ void* freq_gen_thread(void* obj)
             iqp[2 * i + 0] = -30000 * (ii) + 0.5;
             iqp[2 * i + 1] = 30000 * (qq) + 0.5;
 
+            phase += start_dphase[p];
+            if (phase > 1.0)
+                phase -= 1.0;
+
+        }
+
+        ring_buffer_ppost(tbuff[p]);
+    }
+
+    return NULL;
+}
+
+void* freq_gen_thread_cf32(void* obj)
+{
+    unsigned p = (intptr_t)obj;
+    double phase = start_phase[p];
+
+    while (!s_stop && !thread_stop) {
+        unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
+        if (idx == IDX_TIMEDOUT)
+            continue;
+
+        char* data = ring_buffer_at(tbuff[p], idx);
+        float *iqp = (float *)data;
+
+        for (unsigned i = 0; i < tx_get_samples; i++) {
+            //float ii, qq; (but we use trick to not do invertion however it leads to incorrect phase)
+            sincosf(2 * M_PI * phase, &iqp[2 * i + 1], &iqp[2 * i + 0]);
             phase += start_dphase[p];
             if (phase > 1.0)
                 phase -= 1.0;
@@ -172,7 +199,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned dotx = 0;
     unsigned dorx = 1;
     unsigned rxflags =  DMS_FLAG_NEED_TX_STAT;
-    uint64_t temp;
+    uint64_t temp[2];
     int gen = 0;
     const char* synctype = "all";
     bool listdevs = false;
@@ -183,7 +210,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned devices = 1;
     const char* refclkpath = NULL;
     uint32_t cal_freq = 0;
-    bool stop_on_error = false;
+    bool stop_on_error = true;
 
     struct dme_findsetv_data dev_data[] = {
         [DD_RX_FREQ] = { "rx/freqency", 900e6, true, true },
@@ -204,7 +231,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     };
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:C:F:f:c:r:i:XtTNA:a:D:s:p:P:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:C:F:f:c:r:i:XtTNA:a:D:s:p:P:z")) != -1) {
         switch (opt) {
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
         case 'e': dev_data[DD_RX_FREQ].value = atof(optarg); dev_data[DD_RX_FREQ].ignore = false; break;
@@ -275,6 +302,9 @@ int main(UNUSED int argc, UNUSED char** argv)
             break;
         case 'A':
             antennacfg = atoi(optarg);
+            break;
+        case 'z':
+            stop_on_error = false;
             break;
         default:
             fprintf(stderr, "Usage: %s '[-D device] [-f filename] [-c count] [-r samplerate] [-F format] [-C chmsk] [-S samples_per_blk] [-l loglevel] "
@@ -376,18 +406,12 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dme_set_uint(dev, "/debug/hw/lms7002m/0/rxlml", lmlcfg);
 
 
-        res = usdr_dme_get_uint(dev, "/dm/sensor/temp", &temp);
+        res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
         if (res) {
             fprintf(stderr, "Unable to get device temperature: errno %d\n", res);
         } else {
-            fprintf(stderr, "Temp = %.1f C\n", temp / 256.0);
+            fprintf(stderr, "Temp = %.1f C\n", temp[0] / 256.0);
         }
-
-//        res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
-//        if (res) {
-//            fprintf(stderr, "Unable to set device parameters: errno %d\n", res);
-//            goto dev_close;
-//        }
     }
 
     if (dorx) {
@@ -412,7 +436,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
     if (dotx) {
-        res = usdr_dms_create(dev, "/ll/stx/0", fmt, chmsk, samples, &usds_tx);
+        res = usdr_dms_create(dev, "/ll/stx/0", fmt, chmsk, 0 * samples, &usds_tx);
         if (res) {
             fprintf(stderr, "Unable to initialize TX data stream: errno %d\n", res);
             if (stop_on_error) goto dev_close;
@@ -425,7 +449,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             snfo_tx.channels = 0;
             snfo_tx.pktsyms = 0;
         } else {
-            //s_tx_blksz = snfo_tx.pktbszie;
+            s_tx_blksz = snfo_tx.pktbszie;
             s_tx_blksampl = snfo_tx.pktsyms;
             tx_bufcnt = snfo_tx.channels;
         }
@@ -446,7 +470,9 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dotx) {
         for (unsigned i = 0; i < tx_bufcnt; i++) {
             tbuff[i] = ring_buffer_create(256, snfo_tx.pktbszie);
-            res = pthread_create(&rthread[i], NULL, freq_gen_thread /*disk_read_thread*/, (void*)(intptr_t)i);
+            res = pthread_create(&rthread[i], NULL,
+                                 (strcmp(fmt, "ci16") == 0) ? freq_gen_thread_ci16 : freq_gen_thread_cf32,
+                                 (void*)(intptr_t)i);
             if (res) {
                 fprintf(stderr, "Unable start disk in thread %d: errno %d\n", i, res);
                 goto dev_close;
@@ -485,7 +511,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     */
 
     usleep(10000);
-    usdr_dme_get_uint(dev, "/dm/debug/all", &temp);
+    usdr_dme_get_uint(dev, "/dm/debug/all", temp);
     usleep(1000);
 
     if (cal_freq > 1e6) {
@@ -659,9 +685,9 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
 stop:
-    usdr_dme_get_uint(dev, "/dm/debug/rxtime", &temp);
-    usdr_dme_get_uint(dev, "/dm/debug/rxtime", &temp);
-    //usdr_dme_get_uint(dev, usdr_dmd_find_entity(dev, "/dm/debug/rxtime"), &temp);
+    usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
+    usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
+    //usdr_dme_get_uint(dev, usdr_dmd_find_entity(dev, "/dm/debug/rxtime"), temp);
 
     if (dorx) {
         res = usdr_dms_op(usds_rx, USDR_DMS_STOP, 0);
@@ -680,18 +706,18 @@ stop:
 
     thread_stop = true;
 
-    res = usdr_dme_get_uint(dev, "/dm/debug/all", &temp);
+    res = usdr_dme_get_uint(dev, "/dm/debug/all", temp);
     if (res) {
         fprintf(stderr, "Unable to get device debug data: errno %d\n", res);
         goto dev_close;
     }
 
-    res = usdr_dme_get_uint(dev, "/dm/sensor/temp", &temp);
+    res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
     if (res) {
         fprintf(stderr, "Unable to get device temperature: errno %d\n", res);
         //goto dev_close;
     } else {
-        fprintf(stderr, "Temp = %.1f C\n", temp / 256.0);
+        fprintf(stderr, "Temp = %.1f C\n", temp[0] / 256.0);
     }
 
     if (dorx) {

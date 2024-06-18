@@ -22,7 +22,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     }
 
     for (; i >= 4; i -= 4) {
-        *(outdata++) = *(indata++) * CONV_SCALE;
+        *(outdata++) = *(indata++) / CONV_SCALE;
     }
 }
 

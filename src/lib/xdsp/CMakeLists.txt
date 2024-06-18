@@ -22,6 +22,8 @@ set(xdsplib_conv_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_2ci16_ci16_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_i12_f32_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci12_2cf32_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_f32_i12_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_2cf32_ci12_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_filter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/fftad_functions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/rtsa_functions.c
