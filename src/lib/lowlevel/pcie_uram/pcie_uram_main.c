@@ -65,8 +65,8 @@ struct pcie_uram_dev
     device_id_t devid;
     device_bus_t db;
 
-    unsigned tx_channels;
-    unsigned tx_bit_per_all_sym;
+    unsigned channels[DBMAX_SRX + DBMAX_STX];
+    unsigned bit_per_all_sym[DBMAX_SRX + DBMAX_STX];
 
     struct stream_cache_data scache[DBMAX_SRX + DBMAX_STX];
 };
@@ -394,6 +394,10 @@ int pcie_uram_stream_initialize(lldev_t dev, subdev_t subdev,
         USDR_LOG("PCIE", USDR_LOG_ERROR, "Unable to initialize driver DMA configuration, error %d\n", res);
         return res;
     }
+    if (pdsc.sno >= SIZEOF_ARRAY(d->scache)) {
+        USDR_LOG("PCIE", USDR_LOG_ERROR, "ioctl(PCIE_DRIVER_DMA_CONF) returned incorrect stream index! idx=%d\n", pdsc.sno);
+        return -EINVAL;
+    }
 
     *channel = pdsc.sno;
     sc = &d->scache[pdsc.sno];
@@ -426,8 +430,8 @@ int pcie_uram_stream_initialize(lldev_t dev, subdev_t subdev,
         sc->mmaped_area = NULL;
     }
 
-    d->tx_channels = params->channels;
-    d->tx_bit_per_all_sym = params->bits_per_sym;
+    d->channels[pdsc.sno] = params->channels;
+    d->bit_per_all_sym[pdsc.sno] = params->bits_per_sym;
     params->underlying_fd = d->fd;
     params->out_mtu_size = pdsc.dma_buf_sz;
     USDR_LOG("PCIE", USDR_LOG_INFO, "Configured stream%d: %d X %d (vma_off=%08lx vma_len=%08lx)\n",
@@ -608,7 +612,7 @@ static
 int pcie_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, void* buffer, unsigned sz, const void* oob_ptr, unsigned oob_size)
 {
     struct pcie_uram_dev* d = (struct pcie_uram_dev*)dev;
-    uint32_t samples = sz * 8 / d->tx_bit_per_all_sym;
+    uint32_t samples = sz * 8 / d->bit_per_all_sym[channel];
     uint64_t timestamp = (oob_ptr) ? (*(uint64_t*)oob_ptr) : ~0ul;
     unsigned cnf_base = 12; //REG_WR_TXDMA_CNF_L;
 
