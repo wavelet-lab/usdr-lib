@@ -31,8 +31,8 @@ void TEMPLATE_FUNC_NAME(fft_acc_t* __restrict p, wvlt_fftwf_complex* __restrict 
         float32x4_t z0 = vreinterpretq_f32_u32(vorrq_u32(zClearExp0, fexp0));
         float32x4_t z1 = vreinterpretq_f32_u32(vorrq_u32(zClearExp1, fexp0));
 
-        int32x4_t az0 = vshrq_n_s32(zmpy0, 23);
-        int32x4_t az1 = vshrq_n_s32(zmpy1, 23);
+        int32x4_t az0 = vreinterpretq_s32_u32(vshrq_n_u32(zmpy0, 23));
+        int32x4_t az1 = vreinterpretq_s32_u32(vshrq_n_u32(zmpy1, 23));
 
         int32x4_t azsum0 = vaddq_s32(az0, acc_p0);
         int32x4_t azsum1 = vaddq_s32(az1, acc_p1);
