@@ -1132,7 +1132,7 @@ int lms7002m_trf_path(lms7002m_state_t* m,lms7002m_trf_path_t path, lms7002m_trf
     regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac);
     regs[j++] = MAKE_LMS7002M_TRF_0x0103(
         (path == TRF_B1) ? 1u : 0,
-        (path == TRF_B2) ? 0 : 1u,
+        (path == TRF_B2) ? 1u : 0,
         16, 18);
 
     return lms7002m_spi_post(m, regs, j);
