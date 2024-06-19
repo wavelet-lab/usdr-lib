@@ -13,8 +13,11 @@ void TEMPLATE_FUNC_NAME(fft_acc_t* __restrict p, wvlt_fftwf_complex* __restrict 
         float32x4x2_t e0 = vld2q_f32(&d[i + 0][0]);
         float32x4x2_t e1 = vld2q_f32(&d[i + 4][0]);
 
-        float32x4_t enz0 = vmlaq_f32(vmlaq_f32(mine, e0.val[0], e0.val[0]), e0.val[1], e0.val[1]);
-        float32x4_t enz1 = vmlaq_f32(vmlaq_f32(mine, e1.val[0], e1.val[0]), e1.val[1], e1.val[1]);
+        float32x4_t q0 = vfmaq_f32(mine, e0.val[0], e0.val[0]);
+        float32x4_t q1 = vfmaq_f32(mine, e1.val[0], e1.val[0]);
+
+        float32x4_t enz0 = vfmaq_f32(q0, e0.val[1], e0.val[1]);
+        float32x4_t enz1 = vfmaq_f32(q1, e1.val[1], e1.val[1]);
 
         float32x4_t acc_m0 = vld1q_f32(&p->f_mant[i + 0]);
         float32x4_t acc_m1 = vld1q_f32(&p->f_mant[i + 4]);
