@@ -54,7 +54,7 @@ DECLARE_TR_FUNC_FFTAD_ADD(fftad_add_neon)
 
 #define TEMPLATE_FUNC_NAME fftad_norm_neon
 VWLT_ATTRIBUTE(optimize("-O3"))
-#include "templates/fftad_norm_generic.t"
+#include "templates/fftad_norm_neon.t"
 DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_neon)
 #endif
 
