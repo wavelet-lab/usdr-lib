@@ -22,17 +22,17 @@ void TEMPLATE_FUNC_NAME(fft_acc_t* __restrict p, wvlt_fftwf_complex* __restrict 
         int32x4_t acc_p0 = vld1q_s32(&p->f_pwr[i + 0]);
         int32x4_t acc_p1 = vld1q_s32(&p->f_pwr[i + 4]);
 
-        float32x4_t zmpy0 = vmulq_f32(enz0, acc_m0);
-        float32x4_t zmpy1 = vmulq_f32(enz1, acc_m1);
+        uint32x4_t zmpy0 = vreinterpretq_u32_f32(vmulq_f32(enz0, acc_m0));
+        uint32x4_t zmpy1 = vreinterpretq_u32_f32(vmulq_f32(enz1, acc_m1));
 
-        uint32x4_t zClearExp0 = vandq_u32(fnoexp, vreinterpretq_u32_f32(zmpy0));
-        uint32x4_t zClearExp1 = vandq_u32(fnoexp, vreinterpretq_u32_f32(zmpy1));
+        uint32x4_t zClearExp0 = vandq_u32(fnoexp, zmpy0);
+        uint32x4_t zClearExp1 = vandq_u32(fnoexp, zmpy1);
 
         float32x4_t z0 = vreinterpretq_f32_u32(vorrq_u32(zClearExp0, fexp0));
         float32x4_t z1 = vreinterpretq_f32_u32(vorrq_u32(zClearExp1, fexp0));
 
-        int32x4_t az0 = vshrq_n_s32(vreinterpretq_s32_f32(zmpy0), 23);
-        int32x4_t az1 = vshrq_n_s32(vreinterpretq_s32_f32(zmpy1), 23);
+        int32x4_t az0 = vshrq_n_s32(zmpy0, 23);
+        int32x4_t az1 = vshrq_n_s32(zmpy1, 23);
 
         int32x4_t azsum0 = vaddq_s32(az0, acc_p0);
         int32x4_t azsum1 = vaddq_s32(az1, acc_p1);
