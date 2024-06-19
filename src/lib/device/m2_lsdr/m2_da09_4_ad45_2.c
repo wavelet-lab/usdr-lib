@@ -110,10 +110,10 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
 
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"ad45lb49" },
-    { "/ll/sdr/max_hw_rx_chans",  4 },
+    { "/ll/sdr/max_hw_rx_chans",  1 },
     { "/ll/sdr/max_hw_tx_chans",  0 },
 
-    { "/ll/sdr/max_sw_rx_chans",  4 },
+    { "/ll/sdr/max_sw_rx_chans",  1 },
     { "/ll/sdr/max_sw_tx_chans",  0 },
 };
 
@@ -155,6 +155,7 @@ const usdr_dev_param_func_t s_fparams_m2_da09_4_ad45_2_rev000[] = {
     { "/dm/sdr/0/rx/freqency",  { dev_m2_d09_4_ad45_2_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/bandwidth", { dev_m2_d09_4_ad45_2_sdr_rx_bandwidth_set, NULL }},
 
+    { "/dm/sdr/channels",       { NULL, NULL }},
 
     { "/dm/sensor/temp",  { NULL, dev_m2_d09_4_ad45_2_senstemp_get }},
     { "/dm/debug/all",    { NULL, dev_m2_d09_4_ad45_2_debug_all_get }},
@@ -580,7 +581,7 @@ int dev_m2_d09_4_ad45_2_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
     ext_fe_100_5000_t* f;
     int offset = value;
 
-    if ((f = device_fe_to(d->fe, "fe1005000"))) {
+    if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
         unsigned fr = (value / 1000) * 1000;
         if (fr < 2000000)
             fr = 2000000;
@@ -628,7 +629,7 @@ int dev_m2_d09_4_ad45_2_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint6
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
     ext_fe_100_5000_t* f;
-    if ((f = device_fe_to(d->fe, "fe1005000"))) {
+    if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
 
         USDR_LOG("LSDR", USDR_LOG_ERROR, "Gain: %d\n", (unsigned)value);
         return ext_fe_100_5000_set_attenuator(f, 127 - value * 4);
@@ -648,7 +649,7 @@ int dev_m2_d09_4_ad45_2_gainvga_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, ui
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
     ext_fe_100_5000_t* f;
-    if ((f = device_fe_to(d->fe, "fe1005000"))) {
+    if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
 
         USDR_LOG("LSDR", USDR_LOG_ERROR, "GainVGA: %d\n", (unsigned)value);
         return ext_fe_100_5000_set_attenuator(f, 127 - value * 4);
@@ -661,7 +662,7 @@ int dev_m2_d09_4_ad45_2_gainlna_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, ui
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
     ext_fe_100_5000_t* f;
-    if ((f = device_fe_to(d->fe, "fe1005000"))) {
+    if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
         return ext_fe_100_5000_set_lna(f, value);
     } else {
         return -EINVAL;
@@ -712,7 +713,7 @@ int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
     USDR_LOG("LSDR", USDR_LOG_ERROR, "Decimation set to %d, ADC %d\n", d->rxbb_decim, d->adc_rate);
 
     res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0x0f);
-    res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, d->rxbb_decim);
+    res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim);
     if (res) {
         USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize FIR gearbox, error = %d!\n", res);
         return res;

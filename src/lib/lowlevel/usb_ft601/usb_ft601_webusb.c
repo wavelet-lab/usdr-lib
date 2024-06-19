@@ -10,6 +10,12 @@
 
 limesdr_dev_t* get_limesdr_dev(pdevice_t udev);
 
+
+enum {
+    DEV_RX_STREAM_NO = 0,
+    DEV_TX_STREAM_NO = 1,
+};
+
 enum {
     EP_OUT_CONFIG      = 0 | 1,
     EP_OUT_CTRL        = 0 | 2,
@@ -18,6 +24,10 @@ enum {
     EP_IN_CONFIG       = 0x80 | 1,
     EP_IN_CTRL         = 0x80 | 2,
     EP_IN_DEFSTREAM    = 0x80 | 3,
+};
+
+enum {
+    DATA_PACKET_SIZE = 4096,
 };
 
 enum {
@@ -211,8 +221,15 @@ static
 static
     int webusb_ll_stream_initialize(lldev_t dev, subdev_t subdev, lowlevel_stream_params_t* params, stream_t* channel)
 {
+    int res = 0;
+    const unsigned data_endpoint = (params->streamno == DEV_RX_STREAM_NO) ? EP_IN_DEFSTREAM : EP_OUT_DEFSTREAM;
+
+    res = res ? res : ft601_flush_pipe(dev, data_endpoint);
+    res = res ? res : ft601_set_stream_pipe(dev, data_endpoint, DATA_PACKET_SIZE);
+
+    USDR_LOG("USBX", USDR_LOG_ERROR, "webusb_ll_stream_initialize(streamno=%d)\n", params->streamno);
     *channel = params->streamno;
-    return 0;
+    return res;
 }
 
 static

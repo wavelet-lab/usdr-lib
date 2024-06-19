@@ -92,9 +92,10 @@ int mdev_generic_destroy(lldev_t dev)
 {
     dev_multi_t* obj =  container_of(dev, dev_multi_t, lldev);
 
-    for (unsigned i = 0; i < STREAMS_MAX; i++) {
-        _mdev_unregister_stream(&obj->virt_dev, &obj->streams[i].base);
-    }
+    // Causes double free
+    //for (unsigned i = 0; i < STREAMS_MAX; i++) {
+    //    _mdev_unregister_stream(&obj->virt_dev, &obj->streams[i].base);
+    //}
 
     // Destroy underlying lldevs
     for (unsigned i = 0; i < obj->cnt; i++) {
@@ -506,6 +507,7 @@ int _mdev_unregister_stream(device_t* dev, stream_handle_t* stream)
     for (i = 0; i < str->dev_cnt; i++) {
         idx = str->dev_idx[i];
         real_str[idx]->ops->destroy(real_str[idx]);
+        real_str[idx] = NULL;
     }
 
     return 0;

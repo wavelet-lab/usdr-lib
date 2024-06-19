@@ -41,6 +41,23 @@ DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_avx2)
 
 #endif //WVLT_AVX2
 
+#ifdef WVLT_NEON
+#define TEMPLATE_FUNC_NAME fftad_init_neon
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_init_neon.t"
+DECLARE_TR_FUNC_FFTAD_INIT(fftad_init_neon)
+
+#define TEMPLATE_FUNC_NAME fftad_add_neon
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_add_neon.t"
+DECLARE_TR_FUNC_FFTAD_ADD(fftad_add_neon)
+
+#define TEMPLATE_FUNC_NAME fftad_norm_neon
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_norm_neon.t"
+DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_neon)
+#endif
+
 // Bin(0) = SUM(x0 .. xn) = (A/2) * N
 // valueDBFS = 20*log10(abs(value))
 
@@ -51,6 +68,7 @@ fftad_init_function_t fftad_init_c(generic_opts_t cpu_cap, const char** sfunc)
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_init_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_fftad_init_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_fftad_init_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
@@ -63,6 +81,7 @@ fftad_add_function_t fftad_add_c(generic_opts_t cpu_cap, const char** sfunc)
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_add_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_fftad_add_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_fftad_add_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
@@ -75,6 +94,7 @@ fftad_norm_function_t fftad_norm_c(generic_opts_t cpu_cap, const char** sfunc)
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_norm_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_fftad_norm_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_fftad_norm_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
