@@ -29,8 +29,8 @@ void TEMPLATE_FUNC_NAME(const int16_t *__restrict indata,
           d2 = _mm256_unpacklo_epi16(_mm256_set1_epi16(0), t1);
           d3 = _mm256_unpackhi_epi16(_mm256_set1_epi16(0), t1);
 
-          t0 = _mm256_load_si256(vp++);   // Latency 7
-          t1 = _mm256_load_si256(vp++);   // Latency 7
+          t0 = _mm256_loadu_si256(vp++);   // Latency 7
+          t1 = _mm256_loadu_si256(vp++);   // Latency 7
 
           f0 = _mm256_cvtepi32_ps(d0);    // Latency 3-4
           f1 = _mm256_cvtepi32_ps(d1);    // Latency 3-4
