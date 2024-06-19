@@ -482,6 +482,9 @@ int create_limesdr_stream(device_t* device,
     if (core_id == LIMESDR_RX) {
         burst_count = (pktsyms % burst_smpl) ? (2 * pktsyms / burst_smpl / 5) : (pktsyms / burst_smpl);
     } else {
+        if (pktsyms < 4096)
+            pktsyms = 4096;
+
         burst_count = (pktsyms + burst_smpl - 1) /  burst_smpl;
 
         // rem 16 bytes for 16 bits and 48 bytes for 12 bits
