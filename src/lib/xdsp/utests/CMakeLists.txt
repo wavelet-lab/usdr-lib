@@ -5,6 +5,8 @@ set(TEST_SUIT_SRCS
     xdsp_utest_suite.c
     conv_i16_f32_utest.c
     conv_f32_i16_utest.c
+    conv_ci16_2cf32_utest.c
+    conv_2cf32_ci16_utest.c
     conv_i12_f32_utest.c
     conv_ci12_2cf32_utest.c
     conv_f32_i12_utest.c
@@ -18,6 +20,8 @@ set(TEST_SUIT_SRCS
     ../rtsa_functions.c
     ../conv_i16_f32_2.c
     ../conv_f32_i16_2.c
+    ../conv_ci16_2cf32_2.c
+    ../conv_2cf32_ci16_2.c
     ../conv_i12_f32_2.c
     ../conv_ci12_2cf32_2.c
     ../conv_f32_i12_2.c
