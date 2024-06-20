@@ -5,124 +5,91 @@ void TEMPLATE_FUNC_NAME(const int16_t *__restrict indata,
                         float *__restrict outb,
                         unsigned outdatabsz)
 {
-#define inscale      CONV_SCALE
-#define SCALE2(x)    ((x)/65536)
-    const __m256i* vp = (const __m256i* )indata;
     size_t i = indatabsz;
     if ((outdatabsz / 2) < i) {
         i = (outdatabsz / 2);
     }
 
-    __m256i d0, d1, d2, d3;
-    __m256 f0, f1, f2, f3;
-    __m256 z0, z1, z2, z3;
-    __m256 scale = _mm256_set_ps(SCALE2(inscale), SCALE2(inscale), SCALE2(inscale), SCALE2(inscale), SCALE2(inscale), SCALE2(inscale), SCALE2(inscale), SCALE2(inscale));
-    __m256i ands = _mm256_set_epi32(0xffff0000, 0xffff0000, 0xffff0000, 0xffff0000, 0xffff0000, 0xffff0000, 0xffff0000, 0xffff0000);
-    __m256i t0;
-    __m256i t1;
+    const __m256i* vp = (const __m256i* )indata;
+    float* outdata_0 = (float*)outa;
+    float* outdata_1 = (float*)outb;
 
-  if (i >= 64) {
-      t0 = _mm256_loadu_si256(vp++);
-      t1 = _mm256_loadu_si256(vp++);
+    const __m256  scale = _mm256_set1_ps(CONV_SCALE);
+    const __m256i permmask = _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0);
 
-      for (; i >= 128; i -= 64) {
-          d0 = _mm256_and_si256(t0, ands); // B7..B0
-          d1 = _mm256_slli_si256(t0, 2);
-          d2 = _mm256_and_si256(t1, ands); // B15..B8
-          d3 = _mm256_slli_si256(t1, 2);
+/*
+*  reg:
+*  |              (3)              |              (2)              |              (1)              |              (0)              |
+*  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+*  | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 | 8 |
+*  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+*  |  f15  |  f14  |  f13  |  f12  |  f11  |  f10  |  f9   |  f8   |  f7   |  f6   |  f5   |  f4   |  f3   |  f2   |  f1   |  f0   |
+*
+*  _mm256_permutevar8x32_epi32:
+*  |               |               |               |               |               |               |               |               |
+*  |  f15  |  f14  |  f11  |  f10  |  f7   |  f6   |  f3   |  f2   |  f13  |  f12  |  f9   |  f8   |  f5   |  f4   |  f1   |  f0   |
+*/
 
-          t0 = _mm256_load_si256(vp++);
-          t1 = _mm256_load_si256(vp++);
+#define CONVERT_CI16_2F32_BLOCK(reg) \
+    {   \
+        reg = _mm256_permutevar8x32_epi32(reg, permmask); \
+        \
+        __m256i d0 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(reg)); \
+        __m256i d1 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(reg, 1)); \
+        \
+        __m256 f0 = _mm256_cvtepi32_ps(d0);                                      /* 4 1|2 */ \
+        __m256 f1 = _mm256_cvtepi32_ps(d1);                                      /* 4 1|2 */ \
+        \
+        f0 = _mm256_mul_ps(f0, scale);                                           /* 4 1|2 */ \
+        f1 = _mm256_mul_ps(f1, scale);                                           /* 4 1|2 */ \
+        \
+        _mm256_storeu_ps(outdata_0, f0); outdata_0 += 8;                         /* 1 1|2 */ \
+        _mm256_storeu_ps(outdata_1, f1); outdata_1 += 8;                         /* 1 1|2 */ \
+    }
+// CONVERT_CI16_2F32_BLOCK end
 
-          d1 = _mm256_and_si256(d1, ands); // A7..A0
-          f1 = _mm256_cvtepi32_ps(d0);     // Latency 3
-          d3 = _mm256_and_si256(d3, ands); // A15..A8
+    __m256i t0, t1, t2;
 
-          f0 = _mm256_cvtepi32_ps(d1);    // Latency 3
+    for(; i >= 96; i -= 96)
+    {
+        t0 = _mm256_loadu_si256(vp++);
+        t1 = _mm256_loadu_si256(vp++);
+        t2 = _mm256_loadu_si256(vp++);
 
-          f2 = _mm256_cvtepi32_ps(d3);    // Latency 3
-          f3 = _mm256_cvtepi32_ps(d2);    // Latency 3
+        CONVERT_CI16_2F32_BLOCK(t0);
+        CONVERT_CI16_2F32_BLOCK(t1);
+        CONVERT_CI16_2F32_BLOCK(t2);
+    }
 
-          z0 = _mm256_mul_ps(f0, scale);  // Latency 5
-          _mm256_storeu_ps(outa, z0); outa += 8;
-          z1 = _mm256_mul_ps(f1, scale);
-          _mm256_storeu_ps(outb, z1); outb += 8;
-          z2 = _mm256_mul_ps(f2, scale);  // Latency 5
-          _mm256_storeu_ps(outa, z2); outa += 8;
-          z3 = _mm256_mul_ps(f3, scale);
-          _mm256_storeu_ps(outb, z3); outb += 8;
-      }
+    for(; i >= 64; i -= 64)
+    {
+        t0 = _mm256_loadu_si256(vp++);
+        t1 = _mm256_loadu_si256(vp++);
 
-      i -= 64;
+        CONVERT_CI16_2F32_BLOCK(t0);
+        CONVERT_CI16_2F32_BLOCK(t1);
+    }
 
-        d0 = _mm256_and_si256(t0, ands); // B7..B0
-        d1 = _mm256_slli_si256(t0, 2);
-        d2 = _mm256_and_si256(t1, ands); // B15..B8
-        d3 = _mm256_slli_si256(t1, 2);
+    for(; i >= 32; i -= 32)
+    {
+        t0 = _mm256_loadu_si256(vp++);
+        CONVERT_CI16_2F32_BLOCK(t0);
+    }
 
-        if (i >= 32) {
-           t0 = _mm256_loadu_si256(vp++);
-        }
+    const uint64_t *ld = (const uint64_t *)vp;
 
-        d1 = _mm256_and_si256(d1, ands); // A7..A0
-        f1 = _mm256_cvtepi32_ps(d0);     // Latency 3
-        d3 = _mm256_and_si256(d3, ands); // A15..A8
+    for (; i >= 8; i -= 8) {
+        uint64_t v = *(ld++);
+        float a = (int16_t)(v);
+        float b = (int16_t)(v>>16);
+        float c = (int16_t)(v>>32);
+        float d = (int16_t)(v>>48);
 
-        f0 = _mm256_cvtepi32_ps(d1);    // Latency 3
-
-        f2 = _mm256_cvtepi32_ps(d3);    // Latency 3
-        f3 = _mm256_cvtepi32_ps(d2);    // Latency 3
-
-        z0 = _mm256_mul_ps(f0, scale);  // Latency 5
-        _mm256_storeu_ps(outa, z0); outa += 8;
-        z1 = _mm256_mul_ps(f1, scale);
-        _mm256_storeu_ps(outb, z1); outb += 8;
-        z2 = _mm256_mul_ps(f2, scale);  // Latency 5
-        _mm256_storeu_ps(outa, z2); outa += 8;
-        z3 = _mm256_mul_ps(f3, scale);
-        _mm256_storeu_ps(outb, z3); outb += 8;
-
-      if (i == 0)
-          return;
-  } else if (i >= 32) {
-      t0 = _mm256_loadu_si256(vp++);
-      i -= 32;
-
-        // Last portion of 64 + bytes % 64
-        d0 = _mm256_and_si256(t0, ands); // B7..B0
-        d1 = _mm256_slli_si256(t0, 2);
-        d1 = _mm256_and_si256(d1, ands);
-
-        f0 = _mm256_cvtepi32_ps(d1);    // Latency 3
-        f1 = _mm256_cvtepi32_ps(d0);    // Latency 3
-
-        f0 = _mm256_mul_ps(f0, scale);  // Latency 5
-        f1 = _mm256_mul_ps(f1, scale);
-
-        _mm256_storeu_ps(outa, f0); outa += 8;
-        _mm256_storeu_ps(outb, f1); outb += 8;
-  }
-
-  // Tail {IA QA IB QB} 64bit operations
-  for (unsigned k = 0; i > 7; i -= 8, k++) {
-      __m128i ld0, ld1;
-      __m128 lf0, lf1;
-      __m128 lz0, lz1;
-      __m128 lscale = _mm_set_ps(SCALE2(inscale), SCALE2(inscale), SCALE2(inscale), SCALE2(inscale));
-      __m128i lands = _mm_set_epi32(0xffff0000, 0xffff0000, 0xffff0000, 0xffff0000);
-      __m128i lt0;
-
-      lt0 = _mm_loadl_epi64((const __m128i* )( (uint64_t*)vp + k )); //ldw += 4;
-      ld0 = _mm_and_si128(lt0, lands); // B3..B0
-      ld1 = _mm_slli_si128(lt0, 2);
-      lf1 = _mm_cvtepi32_ps(ld0);      // Latency 3
-      ld1 = _mm_and_si128(ld1, lands); // A3..A0
-      lf0 = _mm_cvtepi32_ps(ld1);      // Latency 3
-      lz0 = _mm_mul_ps(lf0, lscale);   // Latency 5
-      _mm_storel_epi64(( __m128i* )outa, _mm_castps_si128(lz0)); outa += 2;
-      lz1 = _mm_mul_ps(lf1, lscale);
-      _mm_storel_epi64(( __m128i* )outb, _mm_castps_si128(lz1)); outb += 2;
-  }
+        *(outdata_0++) = a * CONV_SCALE;
+        *(outdata_0++) = b * CONV_SCALE;
+        *(outdata_1++) = c * CONV_SCALE;
+        *(outdata_1++) = d * CONV_SCALE;
+    }
 }
 
 #undef TEMPLATE_FUNC_NAME
