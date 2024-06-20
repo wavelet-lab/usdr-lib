@@ -224,9 +224,6 @@ static
     int res = 0;
     const unsigned data_endpoint = (params->streamno == DEV_RX_STREAM_NO) ? EP_IN_DEFSTREAM : EP_OUT_DEFSTREAM;
 
-    res = res ? res : ft601_flush_pipe(dev, data_endpoint);
-    res = res ? res : ft601_set_stream_pipe(dev, data_endpoint, DATA_PACKET_SIZE);
-
     USDR_LOG("USBX", USDR_LOG_ERROR, "webusb_ll_stream_initialize(streamno=%d)\n", params->streamno);
     *channel = params->streamno;
     return res;
@@ -370,6 +367,11 @@ static
                  "Unable to initialize device, error %d\n", res);
         goto usbinit_fail;
     }
+
+    res = res ? res : ft601_flush_pipe(lldev, EP_IN_DEFSTREAM);
+    res = res ? res : ft601_set_stream_pipe(lldev, EP_IN_DEFSTREAM, DATA_PACKET_SIZE);
+    res = res ? res : ft601_flush_pipe(lldev, EP_OUT_DEFSTREAM);
+    res = res ? res : ft601_set_stream_pipe(lldev, EP_OUT_DEFSTREAM, DATA_PACKET_SIZE);
 
     *odev = (lldev_t)d;
     return 0;
