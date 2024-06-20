@@ -677,6 +677,8 @@ int usbft601_uram_plugin_create(unsigned pcount, const char** devparam,
     }
 
     memset(dev, 0, sizeof(usbft601_dev_t));
+    dev->rx_strms[0].fd_event = -101;
+    dev->tx_strms[0].fd_event = -101;
     dev->lld.ops = &dev->ops;
     dev->ops = s_usbft601_uram_ops;
 
