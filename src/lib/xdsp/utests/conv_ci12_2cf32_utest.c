@@ -227,7 +227,7 @@ Suite * conv_ci12_2cf32_suite(void)
 
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_i12_f32");
+    s = suite_create("conv_ci12_2cf32");
     tc_core = tcase_create("XDSP");
     tcase_set_timeout(tc_core, 60);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
