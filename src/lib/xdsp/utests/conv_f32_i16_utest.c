@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_i16_f32_2.h"
+#include "../conv_f32_i16_2.h"
 
 #undef DEBUG_PRINT
 
@@ -16,27 +16,29 @@
 #define STREAM_SIZE_CHECK STREAM_SIZE
 #define STREAM_SIZE_SPEED 32768
 
+#define CONV_SCALE (1.0f/32767)
+#define EPS (5E-5)
+
 static const unsigned packet_lens[3] = { 2048, 8192, STREAM_SIZE_SPEED };
 
 #define SPEED_MEASURE_ITERS 1000000
 
-static int16_t* in = NULL;
-static float* out = NULL;
-static float* out_etalon = NULL;
+static float* in = NULL;
+static int16_t* out = NULL;
+static int16_t* out_etalon = NULL;
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
-    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
+    posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
+    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
+    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
 
     for(unsigned i = 0; i < STREAM_SIZE_SPEED; ++i)
     {
-        int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
-        in[i] = sign * 100u * (float)(rand()) / (float)RAND_MAX;
+        in[i] = ((float)i / STREAM_SIZE_SPEED) - 0.5;
     }
 }
 
@@ -47,10 +49,30 @@ static void teardown()
     free(out_etalon);
 }
 
+static int is_equal()
+{
+    for(unsigned i = 0; i < STREAM_SIZE_CHECK; ++i)
+    {
+        float a = out[i];
+        float b = out_etalon[i];
+
+        a *= CONV_SCALE;
+        b *= CONV_SCALE;
+
+        float delta = fabs(a-b);
+        if(delta > EPS)
+        {
+            fprintf(stderr, "i = %d : in = %.6f, out = %d, etalon = %d, delta = %.6f\n", i, in[i], out[i], out_etalon[i], delta);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
     const char* fn_name = NULL;
-    conv_function_t fn = conv_get_i16_f32_c(o, &fn_name);
+    conv_function_t fn = conv_get_f32_i16_c(o, &fn_name);
 
     //ignore dups
     if(last_fn_name && !strcmp(last_fn_name, fn_name))
@@ -63,7 +85,7 @@ static conv_function_t get_fn(generic_opts_t o, int log)
     return fn;
 }
 
-START_TEST(conv_i16_f32_check)
+START_TEST(conv_f32_i16_check)
 {
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
@@ -71,8 +93,8 @@ START_TEST(conv_i16_f32_check)
           void* pout = (void*)out;
     last_fn_name = NULL;
 
-    const size_t bzin  = STREAM_SIZE_CHECK * sizeof(int16_t);
-    const size_t bzout = STREAM_SIZE_CHECK * sizeof(float);
+    const size_t bzin  = STREAM_SIZE_CHECK * sizeof(float);
+    const size_t bzout = STREAM_SIZE_CHECK * sizeof(int16_t);
 
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
 
@@ -87,12 +109,12 @@ START_TEST(conv_i16_f32_check)
         {
             memset(out, 0, bzout);
             (*fn)(&pin, bzin, &pout, bzout);
-            int res = memcmp(out, out_etalon, bzout);
+            int res = is_equal();
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
             for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)
             {
-                fprintf(stderr, "i = %d : in = %d, out = %.6f, etalon = %.6f\n", i, in[i], out[i], out_etalon[i]);
+                fprintf(stderr, "i = %d : in = %.6f, out = %d, etalon = %d\n", i, in[i], out[i], out_etalon[i]);
             }
 #endif
             ck_assert_int_eq( res, 0 );
@@ -101,7 +123,7 @@ START_TEST(conv_i16_f32_check)
 }
 END_TEST
 
-START_TEST(conv_i16_f32_speed)
+START_TEST(conv_f32_i16_speed)
 {
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
@@ -109,8 +131,8 @@ START_TEST(conv_i16_f32_speed)
     void* pout = (void*)out;
     last_fn_name = NULL;
 
-    const size_t bzin  = packet_lens[_i] * sizeof(int16_t);
-    const size_t bzout = packet_lens[_i] * sizeof(float);
+    const size_t bzin  = packet_lens[_i] * sizeof(float);
+    const size_t bzout = packet_lens[_i] * sizeof(int16_t);
 
     fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
     fprintf(stderr,   "**** packet: %lu bytes, iters: %u ***\n", bzin, SPEED_MEASURE_ITERS);
@@ -135,19 +157,19 @@ START_TEST(conv_i16_f32_speed)
 END_TEST
 
 
-Suite * conv_i16_f32_suite(void)
+Suite * conv_f32_i16_suite(void)
 {
     Suite *s;
     TCase *tc_core;
 
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_i16_f32");
+    s = suite_create("conv_f32_i16");
     tc_core = tcase_create("XDSP");
     tcase_set_timeout(tc_core, 60);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_i16_f32_check);
-    tcase_add_loop_test(tc_core, conv_i16_f32_speed, 0, 3);
+    tcase_add_test(tc_core, conv_f32_i16_check);
+    tcase_add_loop_test(tc_core, conv_f32_i16_speed, 0, 3);
     suite_add_tcase(s, tc_core);
     return s;
 }
