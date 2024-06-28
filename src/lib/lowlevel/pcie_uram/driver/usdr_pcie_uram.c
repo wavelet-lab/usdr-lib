@@ -409,7 +409,8 @@ static void deinit_bucket(struct usdr_dev *dev)
         struct notification_bucket* b = &dev->buckets[i];
         
         //TODO block interrupt queue
-        dma_free_coherent(&dev->pdev->dev, PAGE_SIZE, b->db.kvirt, b->db.phys);
+        if(b->db.kvirt)
+            dma_free_coherent(&dev->pdev->dev, PAGE_SIZE, b->db.kvirt, b->db.phys);
     }
 }
 
@@ -1590,6 +1591,7 @@ static int usdr_probe(struct pci_dev *pdev,
     if (err)
     {
         printk(KERN_NOTICE PFX "Error %d initializing bucket\n", err);
+        deinit_bucket(usdrdev);
         goto failed_cdev;
     }
 
