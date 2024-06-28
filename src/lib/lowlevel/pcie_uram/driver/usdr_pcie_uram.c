@@ -379,7 +379,7 @@ static int init_bucket(struct usdr_dev *dev)
                                          GFP_KERNEL);
         if(!b->db.kvirt)
         {
-            printk(KERN_INFO PFX "Failed to allocate consistent memory (%d bytes), dma_alloc_coherent() retuns NULL!\n", PAGE_SIZE);
+            printk(KERN_INFO PFX "Failed to allocate consistent memory (%d bytes), dma_alloc_coherent() returns NULL!\n", PAGE_SIZE);
             return -ENOMEM;
         }
 
