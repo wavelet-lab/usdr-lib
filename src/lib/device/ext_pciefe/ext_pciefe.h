@@ -86,6 +86,7 @@ int board_ext_pciefe_init(lldev_t dev,
                           unsigned subdev,
                           unsigned gpio_base,
                           const char *params,
+                          const char *compat,
                           ext_i2c_func_t func,
                           board_ext_pciefe_t* ob);
 

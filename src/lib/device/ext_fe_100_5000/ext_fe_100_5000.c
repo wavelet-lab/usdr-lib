@@ -5,6 +5,7 @@
 #include "../ipblks/gpio.h"
 
 #include <usdr_logging.h>
+#include <string.h>
 
 #include <def_xra1405.h>
 #include <def_ext_fe_100_5000.h>
@@ -399,10 +400,15 @@ int ext_fe_100_5000_init(lldev_t dev,
                          unsigned spi_cfg_base,
                          unsigned spi_bus,
                          const char *params,
+                         const char *compat,
                          ext_fe_100_5000_t* ob)
 {
     int res = 0;
     uint8_t vals[2] = { 0xcc, 0xcc };
+
+    if (strcmp(compat, "lsdr") != 0) {
+        return -ENODEV;
+    }
 
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_SCK, GPIO_CFG_ALT0);
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_MOSI, GPIO_CFG_ALT0);

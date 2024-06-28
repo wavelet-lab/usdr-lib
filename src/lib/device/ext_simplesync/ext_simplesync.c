@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <usdr_logging.h>
+#include <string.h>
 
 //
 // lmk05318 layout
@@ -48,12 +49,17 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
 #endif
 
 int board_ext_simplesync_init(lldev_t dev,
-                             unsigned subdev,
-                             unsigned gpio_base,
-                             ext_i2c_func_t func,
-                             board_ext_simplesync_t* ob)
+                              unsigned subdev,
+                              unsigned gpio_base,
+                              const char* compat,
+                              ext_i2c_func_t func,
+                              board_ext_simplesync_t* ob)
 {
     int res = 0;
+
+    // This breakout is compatible with M.2 key A/E or A+E boards
+    if ((strcmp(compat, "m2a+e") != 0) && (strcmp(compat, "m2e") != 0) && (strcmp(compat, "m2a") != 0))
+        return -ENODEV;
 
     // Configure external SDA/SCL
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_SDA, GPIO_CFG_ALT0);

@@ -191,10 +191,10 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, dev_
 
         switch (i) {
         case FET_PICE_BREAKOUT: res = board_exm2pe_init(dev, 0, gpiobase, hint_strip, compat, &_usdr_ext_i2c, &dfe.fe.exm2pe); break;
-        case FET_PCIE_DEVBOARD: res = board_ext_pciefe_init(dev, 0, gpiobase, hint_strip, &_usdr_ext_i2c, &dfe.fe.devboard); break;
+        case FET_PCIE_DEVBOARD: res = board_ext_pciefe_init(dev, 0, gpiobase, hint_strip, compat, &_usdr_ext_i2c, &dfe.fe.devboard); break;
         case FET_PCIE_SUPER_SYNC: res = board_ext_supersync_init(dev, 0, gpiobase, &_usdr_ext_i2c, &dfe.fe.supersync); break;
-        case FET_PCIE_SIMPLE_SYNC: res = board_ext_simplesync_init(dev, 0, gpiobase, &_usdr_ext_i2c, &dfe.fe.simplesync); break;
-        case FET_PCIE_FE1005000: res = ext_fe_100_5000_init(dev, 0, gpiobase, 58, 4, hint_strip, &dfe.fe.fe_100_5000); break;
+        case FET_PCIE_SIMPLE_SYNC: res = board_ext_simplesync_init(dev, 0, gpiobase, compat, &_usdr_ext_i2c, &dfe.fe.simplesync); break;
+        case FET_PCIE_FE1005000: res = ext_fe_100_5000_init(dev, 0, gpiobase, 58, 4, hint_strip, compat, &dfe.fe.fe_100_5000); break;
         default: return -EIO;
         }
 

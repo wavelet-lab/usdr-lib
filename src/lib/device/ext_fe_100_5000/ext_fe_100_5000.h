@@ -47,6 +47,7 @@ int ext_fe_100_5000_init(lldev_t dev,
                          unsigned spi_cfg_base,
                          unsigned spi_bus,
                          const char *params,
+                         const char *compat,
                          ext_fe_100_5000_t* ob);
 
 int ext_fe_100_5000_set_frequency(ext_fe_100_5000_t* ob, uint64_t freq_hz);
