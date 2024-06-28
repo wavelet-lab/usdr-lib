@@ -393,7 +393,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
 
         bool stream_start = (param & 8) ? false : true;
         unsigned sync_type = 7 - (param & 7);
-        unsigned ctrl_flags = (param & 16) ? CTLXSDR_RXEXTSTATTX : 0;
+        unsigned ctrl_flags = ((param & 32) ? DMS_FLAG_NEED_FD : 0) | ((param & 16) ? CTLXSDR_RXEXTSTATTX : 0);
         unsigned chmsk = (chans == 1) ? 0x1 : (chans == 2) ? 0x3 : 0;
         usdr_dms_nfo_t rx_stream_info;
         unsigned blocksize = 0, bursts = 0;
