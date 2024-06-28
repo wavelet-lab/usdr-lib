@@ -72,7 +72,7 @@ struct lms7002m_lpf_params
 typedef struct lms7002m_lpf_params lms7002m_lpf_params_t;
 
 
-int lms7002m_create(lldev_t dev, unsigned subdev, unsigned lsaddr, uint32_t lms_ldo_mask, lms7002m_state_t *out);
+int lms7002m_create(lldev_t dev, unsigned subdev, unsigned lsaddr, uint32_t lms_ldo_mask, bool txrx_clk, lms7002m_state_t *out);
 int lms7002m_destroy(lms7002m_state_t* m);
 
 // Helpers

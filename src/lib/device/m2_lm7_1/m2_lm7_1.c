@@ -136,6 +136,10 @@ static int dev_m2_lm7_1_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
 static int dev_m2_lm7_1_debug_lms7002m_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_debug_lms7002m_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
+static int dev_m2_lm7_1_debug_lms8001_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_debug_lms8001_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
+
 static int dev_m2_lm7_1_sdr_rx_dccorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_dccorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -175,7 +179,6 @@ static int dev_m2_lm7_1_calibrate_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
 static int dev_m2_lm7_1_dev_atcrbs_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_dev_atcrbs_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value);
 
-static int dev_m2_lm7_1_sdr_tx_bbloopbackm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_dev_dac_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_phyrxlm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -249,10 +252,10 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/0/rfe/nco/freqency",{ dev_m2_lm7_1_rfe_nco_enable_frequency, NULL }},
     { "/dm/sdr/0/rfe/pwrdc",       { NULL, dev_m2_lm7_1_rfe_nco_pwrdc_get }},
 
-    { "/dm/sdr/0/tx/bbloopbackm",  { dev_m2_lm7_1_sdr_tx_bbloopbackm_set, NULL }},
-
     // Debug interface
     { "/debug/hw/lms7002m/0/reg",  { dev_m2_lm7_1_debug_lms7002m_reg_set, dev_m2_lm7_1_debug_lms7002m_reg_get }},
+    { "/debug/hw/lms8001/0/reg" ,  { dev_m2_lm7_1_debug_lms8001_reg_set, dev_m2_lm7_1_debug_lms8001_reg_get }},
+
 
     // USB debug interface
     { "/dm/usb",                   { NULL, dev_m2_lm7_1_usb_get }},
@@ -281,6 +284,7 @@ struct dev_m2_lm7_1_gps {
     usdr_vfs_obj_base_t vfs_cfg_obj[SIZEOF_ARRAY(s_fparams_m2_lm7_1_rev000)];
 
     uint32_t debug_lms7002m_last;
+    uint32_t debug_lms8001_last;
     // Cached device data
 
     struct xsdr_dev xdev;
@@ -340,18 +344,6 @@ int dev_m2_lm7_1_dev_atcrbs_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* val
     return res;
 }
 
-static int dev_m2_lm7_1_sdr_tx_bbloopbackm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
-{
-    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    int res;
-
-    res = sfe_tx4_ctl(d->base.dev, 0, M2PCI_REG_WR_TXDMA_CNF_L,
-                      value > 1 ? true : false,
-                      true, true);
-    return res;
-}
-
-
 
 int dev_m2_lm7_1_debug_lms7002m_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -368,6 +360,17 @@ int dev_m2_lm7_1_debug_lms7002m_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
              d->debug_lms7002m_last);
     return res;
 }
+
+int dev_m2_lm7_1_debug_lms8001_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    int res = xsdr_trspi_lms8(&d->xdev, value & 0xffffffff, &d->debug_lms8001_last);
+    USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug LMS8 REG %08x => %08x\n",
+             lowlevel_get_devname(d->base.dev), (unsigned)value,
+             d->debug_lms8001_last);
+    return res;
+}
+
 
 int dev_m2_lm7_1_sdr_rx_dccorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -518,6 +521,13 @@ int dev_m2_lm7_1_debug_lms7002m_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
     *ovalue = d->debug_lms7002m_last;
+    return 0;
+}
+
+int dev_m2_lm7_1_debug_lms8001_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    *ovalue = d->debug_lms8001_last;
     return 0;
 }
 
@@ -951,33 +961,6 @@ int usdr_device_m2_lm7_1_stream_deinitialize(lldev_t dev, subdev_t subdev, strea
     return d->p_original_ops->stream_deinitialize(dev, subdev, channel);
 }
 
-static
-int usdr_enable_usb(lldev_t dev)
-{
-    dev_gpo_set(dev, IGPO_USB_CLK_EN, 0);
-    usleep(100000);
-
-    dev_gpo_set(dev, IGPO_USB_CLK_EN, 1);
-    usleep(100000);
-
-    //Disable USB HS
-    unsigned usb2_en = getenv("USDR_NO_USB2") ? 0 : 4;
-
-    dev_gpo_set(dev, IGPO_USB2_CFG, usb2_en+1);
-    usleep(100000);
-    dev_gpo_set(dev, IGPO_USB2_CFG, usb2_en+3);
-    usleep(100000);
-    dev_gpo_set(dev, IGPO_USB2_CFG, usb2_en+2);
-    {
-        uint32_t tmpdd;
-        dev_gpi_get32(dev, IGPI_USBS, &tmpdd);
-        USDR_LOG("UDEV", USDR_LOG_ERROR, "m2_lm7_1_gps: USB STAT0 %08x\n", tmpdd);
-        dev_gpi_get32(dev, IGPI_USBS2, &tmpdd);
-        USDR_LOG("UDEV", USDR_LOG_ERROR, "m2_lm7_1_gps: USB STAT4 %08x\n", tmpdd);
-    }
-    return 0;
-}
-
 xsdr_dev_t* get_xsdr_dev(pdevice_t udev)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)udev;
@@ -1011,15 +994,9 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
     if (res)
         return res;
 
-#if USBEN
-    if (getenv("USDR_USB_DEV")) {
-        usdr_enable_usb(dev);
-    }
-#endif
-
     if (d->xdev.new_rev) {
         // Init FE
-        res = device_fe_probe(udev, "m2a+e", fe, &d->fe);
+        res = device_fe_probe(udev, d->xdev.ssdr ? "m2b+m" : "m2a+e", fe, &d->fe);
         if (res) {
             return res;
         }
@@ -1048,14 +1025,6 @@ int dev_m2_lm7_1_usb_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
     lldev_t dev = d->base.dev;
-
-    uint32_t tmpdd;
-    dev_gpi_get32(dev, IGPI_USBS, &tmpdd);
-    USDR_LOG("UDEV", USDR_LOG_ERROR, "m2_lm7_1_gps: USB STAT0 %08x\n", tmpdd);
-    dev_gpi_get32(dev, IGPI_USBS2, &tmpdd);
-    USDR_LOG("UDEV", USDR_LOG_ERROR, "m2_lm7_1_gps: USB STAT4 %08x\n", tmpdd);
-    dev_gpi_get32(dev, IGPI_USBC, &tmpdd);
-    USDR_LOG("UDEV", USDR_LOG_ERROR, "m2_lm7_1_gps: USB STAT_ %08x\n", tmpdd);
 
     *ovalue = 0;
     return 0;

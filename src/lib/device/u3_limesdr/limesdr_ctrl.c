@@ -193,7 +193,7 @@ int limesdr_init(limesdr_dev_t *d)
         return -EIO;
     }
 
-    res = lms7002m_create(d->base.lmsstate.dev, d->base.lmsstate.subdev, LMS7_BUS_ADDR, 0,
+    res = lms7002m_create(d->base.lmsstate.dev, d->base.lmsstate.subdev, LMS7_BUS_ADDR, 0, 0,
                           &d->base.lmsstate);
     if (res)
         return res;

@@ -78,6 +78,7 @@ static int lms7002m_spi_rd(lms7002m_state_t* obj, uint16_t addr, uint16_t* data)
 
 int lms7002m_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
                     uint32_t lms_ldo_mask,
+                    bool txrx_clk,
                     lms7002m_state_t* out)
 {
     int res;
@@ -96,7 +97,8 @@ int lms7002m_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
         MAKE_LMS7002M_LDO_0x0095( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
         MAKE_LMS7002M_LDO_0x0096( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
         MAKE_LMS7002M_LDO_0x00A6( 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1),
-        MAKE_LMS7002M_XBUF_0x0085( 1, 1, 0, 0, 1, 1, 0, 0, 1 ),
+//        MAKE_LMS7002M_XBUF_0x0085( 1, 1, 0, 0, 1, 1, 0, 0, 1 ),
+        MAKE_LMS7002M_XBUF_0x0085( 1, 1, 0, 0, txrx_clk ? 1 : 0, txrx_clk ? 1 : 0, 0, 0, 1 ),
 
         // Disable RF
         MAKE_LMS7002M_AFE_0x0082(0, AFE_0X0082_MODE_INTERLEAVE_AFE_2ADCS, AFE_0X0082_MUX_AFE_1_MUXOFF, AFE_0X0082_MUX_AFE_2_MUXOFF,

@@ -11,10 +11,12 @@
 #include "../dev_param.h"
 #include "../generic_usdr/generic_regs.h"
 #include "lms7002m_ctrl.h"
+#include "../hw/lms8001/lms8001.h"
 
 #define RFIC_CHANS 2
 
 enum xsdr_devices {
+    SSDR_DEV = 0x31,
     XSDR_DEV = 0x30,
     XTRX_DEV = 0x2e,
 };
@@ -29,6 +31,7 @@ enum xsdr_devices {
 struct xsdr_dev
 {
     lms7002_dev_t base;
+    lms8001_state_t lms8;
 
     uint32_t hwid; // Standard harware feature bits
 
@@ -44,10 +47,14 @@ struct xsdr_dev
     unsigned s_dacclk;
     unsigned s_flags;
 
+    unsigned lms7_lob;
+
+    bool afe_active;
     bool siso_sdr_active_rx;
     bool siso_sdr_active_tx;
     bool pwr_en;
     bool new_rev;
+    bool ssdr;
     union {
         bool pmic_ch145_valid;
         bool dac_old_r5;
@@ -163,6 +170,8 @@ enum {
 
 int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray);
 
+int xsdr_trspi_lms8(xsdr_dev_t *d, uint32_t out, uint32_t* in);
+
 #ifndef NO_IGPO
 
 enum {
@@ -177,18 +186,15 @@ enum {
     IGPO_CLK_CFG    = 1,
     IGPO_TXSW       = 2,
     IGPO_RXSW       = 3,
-    IGPO_DSP_RX_CFG = 4,
-    IGPO_DSP_TX_CFG = 5,
+
+    IGPO_CLKMEAS    = 5,
     IGPO_USB2_CFG   = 6,
     IGPO_GPS        = 7,
     IGPO_IOVCCSEL   = 8,
     IGPO_SMSIGIO    = 9,
-    IGPO_UGPIO_DIR0 = 10,
-    IGPO_UGPIO_DIR1 = 11,
-    IGPO_UGPIO_OUT0 = 12,
-    IGPO_UGPIO_OUT1 = 13,
     IGPO_DSP_RST    = 14,
-    IGPO_FRONT      = 15,
+    IGPO_LMS8_CTRL  = 15,
+
     IGPO_USB_CLK_EN = 16,
     IGPO_LDOLMS_EN  = 17,
     IGPO_LED        = 18,
@@ -197,10 +203,9 @@ enum {
 
 enum {
     // 0 through 15 are generic
-    IGPI_USBS        = 16,
-    IGPI_USBS2       = 20,
-    IGPI_USBC        = 24,
-    IGPI_CLK1PPS     = 28,
+    IGPI_MEAS_RXCLK  = 16,
+    IGPI_MEAS_TXCLK  = 20,
+    IGPI_CLK1PPS     = 24,
 };
 
 #endif
