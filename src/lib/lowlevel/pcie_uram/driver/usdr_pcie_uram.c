@@ -369,7 +369,7 @@ static void usdr_freedma(struct usdr_dev *d, struct usdr_dmabuf *pbufs, unsigned
 }
 #endif
 
-static void init_bucket(struct usdr_dev *dev)
+static int init_bucket(struct usdr_dev *dev)
 {
     unsigned i;
     for (i = 0; i < dev->dl.bucket_count; i++) {
@@ -377,6 +377,12 @@ static void init_bucket(struct usdr_dev *dev)
         
         b->db.kvirt = dma_alloc_coherent(&dev->pdev->dev, PAGE_SIZE, &b->db.phys,
                                          GFP_KERNEL);
+        if(!b->db.kvirt)
+        {
+            printk(KERN_INFO PFX "Failed to allocate consistent memory (%d bytes), dma_alloc_coherent() returns NULL!\n", PAGE_SIZE);
+            return -ENOMEM;
+        }
+
         b->db.uvirt = 0;
         b->rptr = 0;
         
@@ -393,6 +399,7 @@ static void init_bucket(struct usdr_dev *dev)
         dev_notice(&dev->pdev->dev, "Bucket %d: DMA at %px to %llx\n", i, b->db.kvirt, b->db.phys);
         
     }
+    return 0;
 }
 
 static void deinit_bucket(struct usdr_dev *dev)
@@ -402,7 +409,8 @@ static void deinit_bucket(struct usdr_dev *dev)
         struct notification_bucket* b = &dev->buckets[i];
         
         //TODO block interrupt queue
-        dma_free_coherent(&dev->pdev->dev, PAGE_SIZE, b->db.kvirt, b->db.phys);
+        if(b->db.kvirt)
+            dma_free_coherent(&dev->pdev->dev, PAGE_SIZE, b->db.kvirt, b->db.phys);
     }
 }
 
@@ -1579,7 +1587,14 @@ static int usdr_probe(struct pci_dev *pdev,
     
     usdrdev->dl.bucket_count = 1;
     usdrdev->dl.bucket_base = 8;
-    init_bucket(usdrdev);
+    err = init_bucket(usdrdev);
+    if (err)
+    {
+        printk(KERN_NOTICE PFX "Error %d initializing bucket\n", err);
+        deinit_bucket(usdrdev);
+        goto failed_cdev;
+    }
+
 
 	devices++;
         usdrdev->next = usdr_list;
