@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_ci16_2cf32_2.h"
+#include "../conv_ci16_2ci16_2.h"
 
 #undef DEBUG_PRINT
 
@@ -23,11 +23,11 @@ static const unsigned packet_lens[3] = { 1024, 16384, SPEED_SIZE_BZ };
 #define SPEED_MEASURE_ITERS 1000000
 
 static int16_t* in = NULL;
-static float* out1 = NULL;
-static float* out1_etalon = NULL;
-static float* out2 = NULL;
-static float* out2_etalon = NULL;
-static float* out[2] = {NULL, NULL};
+static int16_t* out1 = NULL;
+static int16_t* out1_etalon = NULL;
+static int16_t* out2 = NULL;
+static int16_t* out2_etalon = NULL;
+static int16_t* out[2] = {NULL, NULL};
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
@@ -35,10 +35,10 @@ static generic_opts_t max_opt = OPT_GENERIC;
 static void setup()
 {
     posix_memalign((void**)&in,          ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&out1,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/2);
-    posix_memalign((void**)&out1_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/2);
-    posix_memalign((void**)&out2,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/2);
-    posix_memalign((void**)&out2_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/2);
+    posix_memalign((void**)&out1,        ALIGN_BYTES, SPEED_SIZE_BZ/2);
+    posix_memalign((void**)&out1_etalon, ALIGN_BYTES, SPEED_SIZE_BZ/2);
+    posix_memalign((void**)&out2,        ALIGN_BYTES, SPEED_SIZE_BZ/2);
+    posix_memalign((void**)&out2_etalon, ALIGN_BYTES, SPEED_SIZE_BZ/2);
 
     out[0] = out1;
     out[1] = out2;
@@ -69,7 +69,7 @@ static void teardown()
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
     const char* fn_name = NULL;
-    conv_function_t fn = conv_get_ci16_2cf32_c(o, &fn_name);
+    conv_function_t fn = conv_get_ci16_2ci16_c(o, &fn_name);
 
     //ignore dups
     if(last_fn_name && !strcmp(last_fn_name, fn_name))
@@ -84,7 +84,7 @@ static conv_function_t get_fn(generic_opts_t o, int log)
 
 #define CONV_SCALE (1.0f/32767)
 
-START_TEST(conv_ci16_2cf32_check_simd)
+START_TEST(conv_ci16_2ci16_check_simd)
 {
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
@@ -93,7 +93,7 @@ START_TEST(conv_ci16_2cf32_check_simd)
     last_fn_name = NULL;
 
     const size_t bzin  = SPEED_SIZE_BZ;
-    const size_t bzout = SPEED_WORD_COUNT * sizeof(float);
+    const size_t bzout = SPEED_SIZE_BZ;
 
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
 
@@ -138,7 +138,7 @@ START_TEST(conv_ci16_2cf32_check_simd)
 END_TEST
 
 
-START_TEST(conv_ci16_2cf32_speed)
+START_TEST(conv_ci16_2ci16_speed)
 {
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
@@ -171,19 +171,19 @@ START_TEST(conv_ci16_2cf32_speed)
 }
 END_TEST
 
-Suite * conv_ci16_2cf32_suite(void)
+Suite * conv_ci16_2ci16_suite(void)
 {
     Suite *s;
     TCase *tc_core;
 
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_ci16_2cf32");
+    s = suite_create("conv_ci16_2ci16");
     tc_core = tcase_create("XDSP");
     tcase_set_timeout(tc_core, 60);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_ci16_2cf32_check_simd);
-    tcase_add_loop_test(tc_core, conv_ci16_2cf32_speed, 0, 3);
+    tcase_add_test(tc_core, conv_ci16_2ci16_check_simd);
+    tcase_add_loop_test(tc_core, conv_ci16_2ci16_speed, 0, 3);
 
     suite_add_tcase(s, tc_core);
     return s;

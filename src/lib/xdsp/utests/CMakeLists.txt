@@ -7,6 +7,8 @@ set(TEST_SUIT_SRCS
     conv_f32_i16_utest.c
     conv_ci16_2cf32_utest.c
     conv_2cf32_ci16_utest.c
+    conv_ci16_2ci16_utest.c
+    conv_2ci16_ci16_utest.c
     conv_i12_f32_utest.c
     conv_ci12_2cf32_utest.c
     conv_f32_i12_utest.c
@@ -22,6 +24,8 @@ set(TEST_SUIT_SRCS
     ../conv_f32_i16_2.c
     ../conv_ci16_2cf32_2.c
     ../conv_2cf32_ci16_2.c
+    ../conv_ci16_2ci16_2.c
+    ../conv_2ci16_ci16_2.c
     ../conv_i12_f32_2.c
     ../conv_ci12_2cf32_2.c
     ../conv_f32_i12_2.c
