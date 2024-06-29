@@ -123,7 +123,7 @@ START_TEST(conv_ci16_2ci16_check_simd)
             }
             fprintf(stderr, "\n\n");
 #endif
-            int res = memcmp(out[0], out1_etalon, bzout / 2) && memcmp(out[1], out2_etalon, bzout / 2);
+            int res = memcmp(out[0], out1_etalon, bzout / 2) || memcmp(out[1], out2_etalon, bzout / 2);
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
             for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)
