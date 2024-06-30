@@ -43,27 +43,29 @@ int usdr_dif_process_cmd(struct usdr_debug_ctx* ctx, char *cmd, unsigned len,
         pptr[j] = token;
     }
 
-    // CMD,PATH,VALUE
-    // CMD,PATH
-    //dm_dev_entity_t entity;
+
     if (strcasecmp(pptr[0], "SETU64") == 0 && j == 3) {
-//        entity = usdr_dmd_find_entity(ctx->dev, pptr[1]);
-//        res = usdr_dme_check(entity);
-//        if (res) {
-//            USDR_LOG("DBGS", USDR_LOG_WARNING, "usdr_dme_check return %d\n", res);
-//            goto incorrect_format;
-//        }
-//        res = usdr_dme_set_uint(ctx->dev, entity, strtoul(pptr[2], NULL, 16));
         res = usdr_dme_set_uint(ctx->dev, pptr[1], strtoul(pptr[2], NULL, 16));
     } else if (strcasecmp(pptr[0], "GETU64") == 0 && j == 2) {
-//        entity = usdr_dmd_find_entity(ctx->dev, pptr[1]);
-//        res = usdr_dme_check(entity);
-//        if (res) {
-//            USDR_LOG("DBGS", USDR_LOG_WARNING, "usdr_dme_check return %d\n", res);
-//            goto incorrect_format;
-//        }
-//        res = usdr_dme_get_uint(ctx->dev, entity, &oval);
         res = usdr_dme_get_uint(ctx->dev, pptr[1], &oval);
+    } else if (strcasecmp(pptr[0], "LS") == 0 && (j == 1 || j == 2)) {
+        const char* pattern = j == 1 ? "*" : pptr[1];
+        dme_param_t params[1024];
+        res = usdr_dme_filter(ctx->dev, pattern, SIZEOF_ARRAY(params), params);
+
+        int off = 0;
+        int q = snprintf(reply, rlen, "OK,%d", res);
+        off += q;
+
+        for (j = 0; j < res; j++) {
+            q = snprintf(reply + off, rlen - off, ",%s", params[j].fullpath);
+            if (q < rlen - off)
+                off += q;
+            else
+                break;
+        }
+        reply[rlen - 1] = 0;
+        return off;
     }
 
 //incorrect_format:
@@ -130,7 +132,7 @@ static void* usdr_dif_thread(void* param)
 
         unsigned p = 0;
         char buffer[4096];
-        char reply[4096];
+        char reply[16*4096];
         int replen;
 
         for (;;) {

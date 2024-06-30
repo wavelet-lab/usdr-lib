@@ -45,8 +45,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         ST_CLOCK = 2,
     };
     enum sensor_type type = 0;
+    const char *list_pattern = NULL;
 
-    while ((opt = getopt(argc, argv, "d:i:l:s:S:r:c:t:")) != -1) {
+    while ((opt = getopt(argc, argv, "d:i:l:s:S:r:c:t:L:")) != -1) {
         switch (opt) {
         case 't':
             if (strcmp(optarg, "temp") == 0)
@@ -83,6 +84,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'c':
             count = atoi(optarg);
             break;
+        case 'L':
+            list_pattern = optarg;
+            break;
         }
     }
 
@@ -90,6 +94,15 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (res) {
         fprintf(stderr, "Unable to create device: errno %d\n", res);
         return 1;
+    }
+
+    if (list_pattern) {
+        dme_param_t params[16384];
+        res = usdr_dme_filter(dev, list_pattern, SIZEOF_ARRAY(params), params);
+        for (i = 0; i < res; i++) {
+            fprintf(stderr, "Param[%4d] `%s`\n", i, params[i].fullpath);
+        }
+        fprintf(stderr, "-------\nTotal number of params: %d\n\n", res);
     }
 
     for (sc = 0, st = sensors; sc < MAX_SENSORS; st = NULL) {
