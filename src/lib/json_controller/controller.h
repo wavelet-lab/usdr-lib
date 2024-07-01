@@ -111,6 +111,7 @@ typedef int (*fn_callback_t)(void* obj, int type, unsigned parameter);
 
 struct sdr_call {
     unsigned call_type;
+    const char* call_req_ref;
     struct sdr_call_paramteters params;
     unsigned call_data_ptr;
     unsigned call_data_size;
@@ -123,14 +124,14 @@ enum sdr_param_call {
 
 typedef int (*rpc_call_fn)(pdm_dev_t dmdev,
                            pusdr_dms_t* usds,
-                           struct sdr_call* sdrc,
+                           const struct sdr_call* sdrc,
                            unsigned response_maxlen,
                            char* response,
                            char* request);
 
 int generic_rpc_call(pdm_dev_t dmdev,
                      pusdr_dms_t* usds,
-                     struct sdr_call* sdrc,
+                     const struct sdr_call* sdrc,
                      unsigned response_maxlen,
                      char* response,
                      char* request);
@@ -144,5 +145,12 @@ struct idx_list {
 
 json_t const* allocate_json(char* request, json_t storage[], unsigned qty);
 int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* parent);
+
+void print_rpc_reply(const struct sdr_call* sdrc,
+                     char* response,
+                     unsigned response_maxlen,
+                     int res,
+                     const char* details_format,
+                     ...);
 
 #endif

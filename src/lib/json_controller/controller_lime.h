@@ -7,7 +7,7 @@
 #include "controller.h"
 
 int lime_call(pdm_dev_t pmdev,
-              struct sdr_call* pcall,
+              const struct sdr_call* pcall,
               unsigned outbufsz, char *outbuffer, char *inbuffer);
 
 #endif
