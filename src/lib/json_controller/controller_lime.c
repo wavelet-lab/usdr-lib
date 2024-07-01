@@ -4,7 +4,7 @@
 #include "controller_lime.h"
 
 int lime_call(pdm_dev_t pdev,
-              struct sdr_call* pcall,
+              const struct sdr_call* pcall,
               unsigned outbufsz, char *outbuffer, char *inbuffer)
 {
     switch (pcall->call_type) {
