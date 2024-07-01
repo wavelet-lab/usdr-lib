@@ -43,6 +43,7 @@ int usdr_device_base_create(pdevice_t dev, lldev_t lldev)
     dev->unregister_stream = NULL;
     dev->timer_op = NULL;
     dev->vfs_get_single_object = &_obj_get_single_object_impl;
+    dev->vfs_filter = &usdr_device_vfs_filter;
     return 0;
 }
 

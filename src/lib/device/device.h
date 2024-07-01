@@ -28,6 +28,9 @@ struct usdr_vfs_obj;
 typedef struct usdr_vfs_obj usdr_vfs_obj_t;
 typedef usdr_vfs_obj_t* pusdr_vfs_obj_t;
 
+struct vfs_filter_obj;
+typedef struct vfs_filter_obj vfs_filter_obj_t;
+
 struct device {
     device_impl_base_t* impl; ///< General basic device data
     lldev_t dev; ///< Underlying lowlevel device
@@ -50,7 +53,7 @@ struct device {
 
     // VFS filter operation
     int (*vfs_get_single_object)(device_t* dev, const char* fullpath, usdr_vfs_obj_t** obj);
-
+    int (*vfs_filter)(device_t* dev, const char* filter, unsigned max_objects, vfs_filter_obj_t* objs);
 };
 
 typedef struct device device_t;

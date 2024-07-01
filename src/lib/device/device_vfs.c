@@ -163,3 +163,19 @@ int usdr_vfs_obj_param_init_array_param(pdevice_t dev,
 
     return 0;
 }
+
+
+int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objects, vfs_filter_obj_t* objs)
+{
+    device_impl_base_t *base = dev->impl;
+
+    unsigned i, cnt;
+    for (i = 0, cnt = 0; cnt < max_objects && i < base->objcount; i++) {
+        if (fnmatch(filter, base->objlist[i]->fullpath, FNM_NOESCAPE) == 0) {
+            objs[cnt].fullpath = base->objlist[i]->fullpath;
+            cnt++;
+        }
+    }
+
+    return cnt;
+}

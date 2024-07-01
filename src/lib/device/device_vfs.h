@@ -87,4 +87,12 @@ int usdr_device_vfs_obj_val_get_u32(pdevice_t dev, const char* fullpath, uint32_
 int usdr_device_vfs_obj_val_get_u64(pdevice_t dev, const char* fullpath, uint64_t *ovalue);
 int usdr_device_vfs_obj_val_set_by_path(pdevice_t dev, const char* fullpath, uint64_t ovalue);
 
+struct vfs_filter_obj {
+    const char* fullpath;
+};
+typedef struct vfs_filter_obj vfs_filter_obj_t;
+
+int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objects, vfs_filter_obj_t* objs);
+
+
 #endif

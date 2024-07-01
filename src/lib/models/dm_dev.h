@@ -19,6 +19,12 @@ int usdr_dmd_close(pdm_dev_t dev);
 int usdr_dmd_discovery(const char* filer_string, unsigned max_buf, char* devlist);
 int usdr_dmd_create_webusb(unsigned vidpid, void* webops, uintptr_t param, pdm_dev_t* odev);
 
+struct dme_param {
+    const char* fullpath;
+};
+typedef struct dme_param dme_param_t;
+
+int usdr_dme_filter(pdm_dev_t dev, const char* pattern, unsigned count, dme_param_t* objs);
 
 int usdr_dme_get_u32(pdm_dev_t dev, const char* path, uint32_t *oval);
 int usdr_dme_get_uint(pdm_dev_t dev, const char* path, uint64_t *oval);

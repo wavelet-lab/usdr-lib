@@ -281,6 +281,18 @@ int usdr_dme_set_string(pdm_dev_t dev, const char* path, const char* val)
     return usdr_dme_set_uint(dev, path, (uintptr_t)val);
 }
 
+int usdr_dme_filter(pdm_dev_t dev, const char* pattern, const unsigned count, dme_param_t* objs)
+{
+    vfs_filter_obj_t ostor[count];
+    pdevice_t udev = lowlevel_get_device(dev->lldev);
+    int res = udev->vfs_filter(udev, pattern, count, ostor);
+
+    for (int i = 0; i < res; i++) {
+        objs[i].fullpath = ostor[i].fullpath;
+    }
+    return res;
+}
+
 #if 0
 struct notify_data {
     usdr_dm_obj_t base;
