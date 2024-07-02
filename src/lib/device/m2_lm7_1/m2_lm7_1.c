@@ -28,7 +28,7 @@
 
 #define USBEN 1
 
-static int dev_gpo_set(lldev_t dev, unsigned bank, unsigned data)
+static inline int dev_gpo_set(lldev_t dev, unsigned bank, unsigned data)
 {
     return lowlevel_reg_wr32(dev, 0, 0, ((bank & 0x7f) << 24) | (data & 0xff));
 }
@@ -277,11 +277,9 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
 
 struct dev_m2_lm7_1_gps {
     device_t base;
+
     lowlevel_ops_t my_ops;
     lowlevel_ops_t* p_original_ops;
-
-    usdr_vfs_obj_constant_t vfs_const_objs[SIZEOF_ARRAY(s_params_m2_lm7_1_rev000)];
-    usdr_vfs_obj_base_t vfs_cfg_obj[SIZEOF_ARRAY(s_fparams_m2_lm7_1_rev000)];
 
     uint32_t debug_lms7002m_last;
     uint32_t debug_lms8001_last;
@@ -1023,9 +1021,6 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
 
 int dev_m2_lm7_1_usb_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
-    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    lldev_t dev = d->base.dev;
-
     *ovalue = 0;
     return 0;
 }
@@ -1157,7 +1152,7 @@ static
 int usdr_device_m2_lm7_1_create(lldev_t dev, device_id_t devid)
 {
     int res;
-    unsigned uid = 0;
+
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)malloc(sizeof(struct dev_m2_lm7_1_gps));
     res = xsdr_ctor(dev, &d->xdev);
     if (res){
@@ -1169,14 +1164,13 @@ int usdr_device_m2_lm7_1_create(lldev_t dev, device_id_t devid)
         goto failed_free;
     }
 
-    res = usdr_vfs_obj_const_init_array(&d->base, uid, d->vfs_const_objs,
-                                        s_params_m2_lm7_1_rev000,
-                                        SIZEOF_ARRAY(s_params_m2_lm7_1_rev000));
+    res = vfs_add_const_i64_vec(&d->base.rootfs,
+                                s_params_m2_lm7_1_rev000,
+                                SIZEOF_ARRAY(s_params_m2_lm7_1_rev000));
     if (res)
         goto failed_tree_creation;
 
-    uid += SIZEOF_ARRAY(s_params_m2_lm7_1_rev000);
-    res = usdr_vfs_obj_param_init_array(&d->base, uid, d->vfs_cfg_obj,
+    res = usdr_vfs_obj_param_init_array(&d->base,
                                         s_fparams_m2_lm7_1_rev000,
                                         SIZEOF_ARRAY(s_fparams_m2_lm7_1_rev000));
     if (res)

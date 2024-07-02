@@ -7,49 +7,26 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include "device_impl.h"
 #include "device_vfs.h"
 #include <fnmatch.h>
 
-static int _usdr_device_vfs_get_by_path(struct device_impl_base *base, const char* fullpath, pusdr_vfs_obj_t *obj)
-{
-    for (unsigned i = 0; i < base->objcount; i++) {
-        if (fnmatch(base->objlist[i]->fullpath, fullpath, 0) == 0) {
-            *obj = (pusdr_vfs_obj_t)base->objlist[i];
-            return 0;
-        }
-    }
-
-    USDR_LOG("UDEV", USDR_LOG_NOTE, "vfs '%s' not found!\n", fullpath);
-    return -ENOENT;
-}
-
-static int _obj_get_single_object_impl(device_t* dev, const char* fullpath, usdr_vfs_obj_t** obj)
-{
-    return _usdr_device_vfs_get_by_path(dev->impl, fullpath, obj);
-}
-
+static int _usdr_device_vfs_get_by_path(device_t *base, const char* fullpath, pusdr_vfs_obj_t *obj);
 int usdr_device_base_create(pdevice_t dev, lldev_t lldev)
 {
-    device_impl_base_t *b = (device_impl_base_t *)malloc(sizeof(device_impl_base_t) + MAX_OBJECTS_DEF * sizeof(usdr_vfs_obj_base_t*));
-    b->objmax = MAX_OBJECTS_DEF;
-    b->objcount = 0;
-
-    dev->impl = b;
     dev->dev = lldev;
     dev->initialize = NULL;
     dev->destroy = NULL;
     dev->create_stream = NULL;
     dev->unregister_stream = NULL;
     dev->timer_op = NULL;
-    dev->vfs_get_single_object = &_obj_get_single_object_impl;
+    dev->vfs_get_single_object = &_usdr_device_vfs_get_by_path;
     dev->vfs_filter = &usdr_device_vfs_filter;
-    return 0;
+    return vfs_folder_init(&dev->rootfs, "", dev);
 }
 
 int usdr_device_base_destroy(pdevice_t dev)
 {
-    free(dev->impl);
+    vfs_folder_destroy(&dev->rootfs);
     return 0;
 }
 
@@ -135,7 +112,6 @@ int usdr_device_create(lldev_t dev, device_id_t devid)
 int usdr_device_destroy(pdevice_t udev)
 {
    udev->destroy(udev);
-   //USDR_LOG("UDEV", USDR_LOG_ERROR, "usdr_device_destroy() not implimented!");
    return 0;
 }
 
@@ -144,3 +120,94 @@ void __attribute__ ((constructor(120))) setup_dev(void) {
     usdr_device_init();
 }
 
+
+
+// Device VFS operations
+// TODO: Move away
+int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objects, vfs_filter_obj_t* objs)
+{
+    vfs_object_t *root = &dev->rootfs;
+    vfs_object_t *nodes = (vfs_object_t *)root->data.obj;
+
+    unsigned i, cnt;
+    for (i = 0, cnt = 0; cnt < max_objects && i < root->eparam[1]; i++) {
+        if (fnmatch(filter, nodes[i].full_path, FNM_NOESCAPE) == 0) {
+            objs[cnt].fullpath = nodes[i].full_path;
+            cnt++;
+        }
+    }
+
+    return cnt;
+}
+
+int _usdr_device_vfs_get_by_path(device_t *base, const char* filter, pusdr_vfs_obj_t *obj)
+{
+    vfs_object_t *root = &base->rootfs;
+    vfs_object_t *nodes = (vfs_object_t *)root->data.obj;
+
+    for (unsigned i = 0; i < base->rootfs.eparam[1]; i++) {
+        if (fnmatch(filter, nodes[i].full_path, FNM_NOESCAPE) == 0) {
+            *obj = &nodes[i];
+            return 0;
+        }
+    }
+
+    USDR_LOG("UDEV", USDR_LOG_NOTE, "vfs '%s' not found!\n", filter);
+    return -ENOENT;
+}
+
+
+int usdr_device_vfs_obj_val_set_by_path(pdevice_t dev, const char* fullpath, uint64_t value)
+{
+    pusdr_vfs_obj_t pobj;
+    int res = dev->vfs_get_single_object(dev, fullpath, &pobj);
+    if (res)
+        return res;
+
+    return usdr_device_vfs_obj_val_set(dev, pobj, value);
+}
+
+int usdr_device_vfs_obj_val_get_u64(pdevice_t dev, const char* fullpath, uint64_t *ovalue)
+{
+    pusdr_vfs_obj_t pobj;
+    int res = dev->vfs_get_single_object(dev, fullpath, &pobj);
+    if (res)
+        return res;
+
+    return usdr_device_vfs_obj_val_get(dev, pobj, ovalue);
+}
+
+
+int _oapi_vfs_set_i64_func(vfs_object_t* obj, uint64_t value)
+{
+    usdr_vfs_obj_ops_t* ops = (usdr_vfs_obj_ops_t* )obj->data.obj;
+    return ops->val_set(obj->object, obj, value);
+}
+
+int _oapi_vfs_get_i64_func(vfs_object_t* obj, uint64_t* ovalue)
+{
+    usdr_vfs_obj_ops_t* ops = (usdr_vfs_obj_ops_t* )obj->data.obj;
+    return ops->val_get(obj->object, obj, ovalue);
+}
+
+int usdr_vfs_obj_param_init_array_param(pdevice_t dev,
+                                        void *param,
+                                        const usdr_dev_param_func_t* params,
+                                        unsigned count)
+{
+    unsigned i;
+    int res;
+
+    for (i = 0; i < count; i++) {
+        res = vfs_add_obj_i64(&dev->rootfs,
+                              params[i].fullpath,
+                              param == NULL ? dev : param,
+                              (intptr_t)&params[i].ops,
+                              &_oapi_vfs_set_i64_func,
+                              &_oapi_vfs_get_i64_func);
+        if (res)
+            return res;
+    }
+
+    return 0;
+}

@@ -115,10 +115,6 @@ struct dev_limesdr {
 
     stream_handle_t* rx;
     stream_handle_t* tx;
-
-
-    usdr_vfs_obj_constant_t vfs_const_objs[SIZEOF_ARRAY(s_params_u3_limesdr_0)];
-    usdr_vfs_obj_base_t vfs_cfg_obj[SIZEOF_ARRAY(s_fparams_u3_limesdr_0)];
 };
 
 
@@ -415,7 +411,6 @@ static
 int limesdr_device_create(lldev_t dev, device_id_t devid)
 {
     int res;
-    unsigned uid = 0;
     struct dev_limesdr *d = (struct dev_limesdr *)malloc(sizeof(struct dev_limesdr));
     res = limesdr_ctor(dev, &d->limedev);
     if (res){
@@ -427,14 +422,13 @@ int limesdr_device_create(lldev_t dev, device_id_t devid)
         goto failed_free;
     }
 
-    res = usdr_vfs_obj_const_init_array(&d->base, uid, d->vfs_const_objs,
-                                        s_params_u3_limesdr_0,
-                                        SIZEOF_ARRAY(s_params_u3_limesdr_0));
+    res = vfs_add_const_i64_vec(&d->base.rootfs,
+                                s_params_u3_limesdr_0,
+                                SIZEOF_ARRAY(s_params_u3_limesdr_0));
     if (res)
         goto failed_tree_creation;
 
-    uid += SIZEOF_ARRAY(s_params_u3_limesdr_0);
-    res = usdr_vfs_obj_param_init_array(&d->base, uid, d->vfs_cfg_obj,
+    res = usdr_vfs_obj_param_init_array(&d->base,
                                         s_fparams_u3_limesdr_0,
                                         SIZEOF_ARRAY(s_fparams_u3_limesdr_0));
     if (res)

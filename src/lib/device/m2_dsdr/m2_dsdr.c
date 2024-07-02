@@ -149,8 +149,6 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
 
 struct dev_m2_dsdr {
     device_t base;
-    usdr_vfs_obj_constant_t vfs_const_objs[SIZEOF_ARRAY(s_params_m2_dsdr_rev000)];
-    usdr_vfs_obj_base_t vfs_cfg_obj[SIZEOF_ARRAY(s_fparams_m2_dsdr_rev000)];
 
     lmk05318_state_t lmk;
 
@@ -388,21 +386,20 @@ static
 int usdr_device_m2_dsdr_create(lldev_t dev, device_id_t devid)
 {
     int res;
-    unsigned uid = 0;
+
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)malloc(sizeof(struct dev_m2_dsdr));
     res = usdr_device_base_create(&d->base, dev);
     if (res) {
         goto failed_free;
     }
 
-    res = usdr_vfs_obj_const_init_array(&d->base, uid, d->vfs_const_objs,
-                                        s_params_m2_dsdr_rev000,
-                                        SIZEOF_ARRAY(s_params_m2_dsdr_rev000));
+    res = vfs_add_const_i64_vec(&d->base.rootfs,
+                                s_params_m2_dsdr_rev000,
+                                SIZEOF_ARRAY(s_params_m2_dsdr_rev000));
     if (res)
         goto failed_tree_creation;
 
-    uid += SIZEOF_ARRAY(s_params_m2_dsdr_rev000);
-    res = usdr_vfs_obj_param_init_array(&d->base, uid, d->vfs_cfg_obj,
+    res = usdr_vfs_obj_param_init_array(&d->base,
                                         s_fparams_m2_dsdr_rev000,
                                         SIZEOF_ARRAY(s_fparams_m2_dsdr_rev000));
     if (res)

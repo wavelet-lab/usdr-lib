@@ -66,8 +66,8 @@ struct dev_multi {
     stream_handle_t* real_str_tx[DEV_MAX];
 
     // Tmp
-    usdr_vfs_obj_base_t sobj;
-    usdr_vfs_obj_ops_t sops;
+    // usdr_vfs_obj_base_t sobj;
+    // usdr_vfs_obj_ops_t sops;
 };
 typedef struct dev_multi dev_multi_t;
 
@@ -143,60 +143,37 @@ struct lowlevel_ops s_mdev_ops = {
 static int _mdev_obj_set(pdevice_t ud, pusdr_vfs_obj_t vfsobj, uint64_t value)
 {
     dev_multi_t* obj = container_of(ud, dev_multi_t, virt_dev);
-    usdr_vfs_obj_base_t* robj = (usdr_vfs_obj_base_t*)vfsobj;
-//    pusdr_vfs_obj_t child;
     int res;
 
     for (unsigned i = 0; i < obj->cnt; i++) {
         pdevice_t child_dev = obj->real[i]->pdev;
-        res = usdr_device_vfs_obj_val_set_by_path(child_dev, robj->fullpath, value);
+        res = usdr_device_vfs_obj_val_set_by_path(child_dev, vfsobj->full_path, value);
+        abort();
         if (res) {
             return res;
         }
-
-//        res = usdr_device_vfs_get_by_path(child_dev, robj->fullpath, &child);
-//        if (res) {
-//            return res;
-//        }
-
-//        res = usdr_device_vfs_obj_val_set(child_dev, child, value);
-//        if (res) {
-//            return res;
-//        }
     }
 
     USDR_LOG("DSTR", USDR_LOG_TRACE, "MDEV VFS %s set to %lld\n",
-             robj->fullpath, (long long)value);
+             vfsobj->full_path, (long long)value);
     return 0;
 }
 
 static int _mdev_obj_get(pdevice_t ud, pusdr_vfs_obj_t vfsobj, uint64_t* ovalue)
 {
     dev_multi_t* obj = container_of(ud, dev_multi_t, virt_dev);
-    usdr_vfs_obj_base_t* robj = (usdr_vfs_obj_base_t*)vfsobj;
     pdevice_t child_dev = obj->real[0]->pdev;
-    //pusdr_vfs_obj_t child;
     int res;
 
-    //
-    if (strcmp(robj->fullpath, "/ll/devices") == 0) {
+    if (strcmp(vfsobj->full_path, "/ll/devices") == 0) {
         *ovalue = obj->cnt;
         return 0;
     }
 
-    res = usdr_device_vfs_obj_val_get_u64(child_dev, robj->fullpath, ovalue);
+    res = usdr_device_vfs_obj_val_get_u64(child_dev, vfsobj->full_path, ovalue);
     if (res) {
         return res;
     }
-//    res = usdr_device_vfs_get_by_path(child_dev, robj->fullpath, &child);
-//    if (res) {
-//        return res;
-//    }
-
-//    res = usdr_device_vfs_obj_val_get(child_dev, child, ovalue);
-//    if (res) {
-//        return res;
-//    }
 
     return res;
 }
@@ -209,14 +186,20 @@ static usdr_vfs_obj_ops_t _mdev_vfs_obj = {
 
 int _mdev_get_obj(pdevice_t dev, const char* fullpath, pusdr_vfs_obj_t *vfsobj)
 {
+    // TODO: GET RID of it
+    // static vfs_object_t obj;
     dev_multi_t* obj =  container_of(dev, dev_multi_t, virt_dev);
 
-    obj->sobj.ops = &_mdev_vfs_obj;
-    obj->sobj.fullpath = fullpath;
-    obj->sobj.uid = 0;
-    obj->sobj.defaccesslist = 0;
+    // obj->sobj.ops = &_mdev_vfs_obj;
+    // obj->sobj.fullpath = fullpath;
+    // obj->sobj.uid = 0;
+    // obj->sobj.defaccesslist = 0;
+    //memcpy(obj, vfsobj, sizeof())
 
-    *vfsobj = (pusdr_vfs_obj_t)&obj->sobj;
+    abort();
+
+
+    //*vfsobj = &obj;
     return 0;
 }
 

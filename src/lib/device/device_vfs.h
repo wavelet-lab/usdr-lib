@@ -4,95 +4,90 @@
 #ifndef DEVICE_VFS_H
 #define DEVICE_VFS_H
 
-#include "device.h"
+#include <stdint.h>
 
-// Device has VFS based object access
-typedef int (*usdr_vfs_set_func_t)(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-typedef int (*usdr_vfs_get_func_t)(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+enum vfs_type {
+    VFST_LINK = 'l',
+    VFST_FOLDER = 'f',
 
-struct usdr_vfs_obj_ops {
-    usdr_vfs_set_func_t val_set;
-    usdr_vfs_get_func_t val_get;
+    VFST_I64 = 'i',
+    VFST_STR = 's',
+    VFST_ARR_I64 = 'a',
 };
-typedef struct usdr_vfs_obj_ops usdr_vfs_obj_ops_t;
-typedef uint32_t usdr_vfs_obj_uid_t;
 
-struct usdr_vfs_obj_base {
-    const struct usdr_vfs_obj_ops* ops;
+enum vfs_constants {
+    VFS_MAX_PATH = 128,
+};
+
+union vfs_variant {
+    int64_t i64;
+    char* str;
+    void* obj;
+};
+
+struct vfs_object;
+typedef struct vfs_object vfs_object_t;
+
+
+typedef int (*vfs_set_i64_func_t)(vfs_object_t* obj, uint64_t value);
+typedef int (*vfs_get_i64_func_t)(vfs_object_t* obj, uint64_t* ovalue);
+
+typedef int (*vfs_set_str_func_t)(vfs_object_t* obj, const char* str);
+typedef int (*vfs_get_str_func_t)(vfs_object_t* obj, unsigned max_str, char* stor);
+
+typedef int (*vfs_set_ai64_func_t)(vfs_object_t* obj, unsigned count, const uint64_t* value);
+typedef int (*vfs_get_ai64_func_t)(vfs_object_t* obj, unsigned maxcnt, uint64_t* ovalue);
+
+struct vfs_ops {
+    vfs_set_i64_func_t si64;
+    vfs_get_i64_func_t gi64;
+    vfs_set_str_func_t sstr;
+    vfs_get_str_func_t gstr;
+    vfs_set_ai64_func_t sai64;
+    vfs_get_ai64_func_t gai64;
+};
+
+
+struct vfs_object {
+    uint8_t type;
+    uint8_t amask;
+    uint16_t eparam[3]; // Object specific paramenets
+    void* object;       // User associated object with the vfs
+
+    struct vfs_ops ops;
+    union vfs_variant data;
+
+    char full_path[VFS_MAX_PATH];
+};
+typedef struct vfs_object vfs_object_t;
+
+int vfs_folder_init(vfs_object_t* o, const char* path, void* user);
+void vfs_folder_destroy(vfs_object_t* o);
+
+struct vfs_constant_i64 {
     const char* fullpath;
-    void* param;
-    usdr_vfs_obj_uid_t uid;
-    uint32_t defaccesslist;
-};
-typedef struct usdr_vfs_obj_base usdr_vfs_obj_base_t;
-
-struct usdr_vfs_obj_constant {
-    struct usdr_vfs_obj_base base;
     uint64_t value;
 };
-typedef struct usdr_vfs_obj_constant usdr_vfs_obj_constant_t;
 
-static inline
-usdr_vfs_obj_ops_t* usdr_vfs_obj_ops(pusdr_vfs_obj_t obj) {
-    return *(usdr_vfs_obj_ops_t**)obj;
+int vfs_add_const_i64_vec(vfs_object_t* root, const struct vfs_constant_i64* params, unsigned count);
+
+static inline int vfs_add_const_i64(vfs_object_t* root, const struct vfs_constant_i64* params) {
+    return vfs_add_const_i64_vec(root, params, 1);
 }
 
-int usdr_vfs_obj_const_init_add(pdevice_t dev,
-                                struct usdr_vfs_obj_constant *co,
-                                const char* path,
-                                usdr_vfs_obj_uid_t uid,
-                                uint64_t value);
-
-struct usdr_dev_param_constant {
+struct vfs_constant_str {
     const char* fullpath;
-    uint64_t value;
+    const char* value;
 };
 
-typedef struct usdr_dev_param_constant usdr_dev_param_constant_t;
-int usdr_vfs_obj_const_init_array(pdevice_t dev,
-                                  usdr_vfs_obj_uid_t uid_first,
-                                  usdr_vfs_obj_constant_t *objstorage,
-                                  const usdr_dev_param_constant_t* params,
-                                  unsigned count);
+int vfs_add_const_str_vec(vfs_object_t* root, const struct vfs_constant_str* params, unsigned count);
 
-struct usdr_dev_param_func {
-    const char* fullpath;
-    usdr_vfs_obj_ops_t ops;
-};
-typedef struct usdr_dev_param_func usdr_dev_param_func_t;
-
-int usdr_vfs_obj_param_init_array_param(pdevice_t dev,
-                                        usdr_vfs_obj_uid_t uid_first,
-                                        usdr_vfs_obj_base_t *objstorage,
-                                        void *param,
-                                        const usdr_dev_param_func_t* params,
-                                        unsigned count);
-static inline
-int usdr_vfs_obj_param_init_array(pdevice_t dev,
-                                  usdr_vfs_obj_uid_t uid_first,
-                                  usdr_vfs_obj_base_t *objstorage,
-                                  const usdr_dev_param_func_t* params,
-                                  unsigned count) {
-    return usdr_vfs_obj_param_init_array_param(dev, uid_first, objstorage, NULL, params, count);
+static inline int vfs_add_const_str(vfs_object_t* root, const struct vfs_constant_str* params) {
+    return vfs_add_const_str_vec(root, params, 1);
 }
 
-// Add object to internal global tree structure
-int usdr_device_vfs_add(pdevice_t dev, pusdr_vfs_obj_t obj);
+int vfs_add_obj_i64(vfs_object_t* root, const char* fullpath, void* obj, uint64_t defval, vfs_set_i64_func_t fs, vfs_get_i64_func_t fg);
 
-int usdr_device_vfs_obj_val_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-int usdr_device_vfs_obj_val_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
-
-
-int usdr_device_vfs_obj_val_get_u32(pdevice_t dev, const char* fullpath, uint32_t *ovalue);
-int usdr_device_vfs_obj_val_get_u64(pdevice_t dev, const char* fullpath, uint64_t *ovalue);
-int usdr_device_vfs_obj_val_set_by_path(pdevice_t dev, const char* fullpath, uint64_t ovalue);
-
-struct vfs_filter_obj {
-    const char* fullpath;
-};
-typedef struct vfs_filter_obj vfs_filter_obj_t;
-
-int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objects, vfs_filter_obj_t* objs);
 
 
 #endif

@@ -2,180 +2,245 @@
 // SPDX-License-Identifier: MIT
 
 #include "device_vfs.h"
-#include "device_impl.h"
 #include <usdr_logging.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fnmatch.h>
 
+#define STD_FOLDER_QTY 16
 
-int usdr_device_vfs_add(pdevice_t dev, pusdr_vfs_obj_t obj)
+enum {
+    RP_USED = 0,
+    RP_TOTAL = 1,
+    RP_UNUSED = 2,
+};
+
+enum {
+    MAX_PER_FOLDER = 0xffff,
+};
+
+int vfs_folder_init(vfs_object_t* o, const char* path, void* user)
 {
-    usdr_vfs_obj_base_t* o = (usdr_vfs_obj_base_t*)obj;
-    device_impl_base_t *base = dev->impl;
-    if (o->uid != base->objcount)
-        return -EINVAL;
+    o->type = VFST_FOLDER;
+    o->amask = 0;
+    o->eparam[RP_USED] = 0;
+    o->eparam[RP_TOTAL] = STD_FOLDER_QTY;
+    o->eparam[RP_UNUSED] = 0;
+    o->object = user;
 
-    if (base->objcount == base->objmax) {
-        size_t newsz = base->objcount * 3 / 2;
-        dev->impl = base = (device_impl_base_t*)realloc(base, sizeof(device_impl_base_t) + newsz * sizeof(usdr_vfs_obj_base_t*));
-        base->objmax = newsz;
+    memset(&o->ops, 0, sizeof(o->ops));
 
-        USDR_LOG("UDEV", USDR_LOG_NOTE, "vfs increasing storage to %zd\n", newsz);
-    }
+    o->data.obj = malloc(sizeof(vfs_object_t) * STD_FOLDER_QTY);
+    if (o->data.obj == NULL)
+        return -ENOMEM;
 
-    base->objlist[base->objcount] = o;
-    base->objcount++;
+    strncpy(o->full_path, path, sizeof(o->full_path));
 
-    USDR_LOG("UDEV", USDR_LOG_NOTE, "vfs '%s' @ %u was registered.",
-             o->fullpath, o->uid);
     return 0;
 }
 
-int usdr_device_vfs_obj_val_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+void vfs_folder_destroy(vfs_object_t* o)
 {
-    struct usdr_vfs_obj_base* o = (struct usdr_vfs_obj_base* )obj;
-    return o->ops->val_set ? o->ops->val_set(ud, obj, value) : -ENOENT;
+    o->eparam[RP_USED] = 0;
+    o->eparam[RP_TOTAL] = 0;
+    free(o->data.obj);
+    o->data.obj = NULL;
 }
 
-int usdr_device_vfs_obj_val_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue)
+static int _vfs_reserve(vfs_object_t* root, unsigned extra)
 {
-    struct usdr_vfs_obj_base* o = (struct usdr_vfs_obj_base* )obj;
-    return o->ops->val_get ? o->ops->val_get(ud, obj, ovalue) : -ENOENT;
+    if (root->type != VFST_FOLDER) {
+        return -EINVAL;
+    }
+
+    unsigned avail = root->eparam[RP_TOTAL] - root->eparam[RP_USED];
+    if (avail >= extra)
+        return 0;
+
+    if (root->eparam[RP_TOTAL] == MAX_PER_FOLDER) {
+        return -E2BIG;
+    }
+
+    unsigned needq = extra - avail;
+    unsigned newsz = 3 * root->eparam[RP_TOTAL] / 2;
+
+    if (needq > newsz)
+        newsz = needq;
+
+    if (newsz > MAX_PER_FOLDER)
+        newsz = MAX_PER_FOLDER;
+
+    void* nobj = realloc(root->data.obj, newsz * sizeof(vfs_object_t));
+    if (nobj == NULL)
+        return -ENOMEM;
+
+    root->eparam[RP_TOTAL] = newsz;
+    root->data.obj = nobj;
+    return 0;
 }
 
-
-static
-int usdr_vfs_obj_constant_val_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+static int _vfs_alloc_object(vfs_object_t* root, vfs_object_t** newobj, uint8_t type, const char* path)
 {
-    USDR_LOG("UVFS", USDR_LOG_ERROR, "vfs uid %d is constant!\n",
-             ((struct usdr_vfs_obj_base*)obj)->uid);
+    int res = _vfs_reserve(root, 1);
+    if (res)
+        return res;
+
+    vfs_object_t* obj = &((vfs_object_t*)root->data.obj)[root->eparam[RP_USED]++];
+    memset(obj, 0, sizeof(vfs_object_t));
+
+    obj->type = type;
+    strncpy(obj->full_path, path, sizeof(obj->full_path));
+
+    *newobj = obj;
+    return 0;
+}
+
+// constant functions
+static int _vfs_const_set_i64_func(vfs_object_t* obj, uint64_t value)
+{
     return -EPERM;
 }
 
-static
-int usdr_vfs_obj_constant_val_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+static int _vfs_const_set_str_func(vfs_object_t* obj, const char* str)
 {
-    struct usdr_vfs_obj_constant* c = (struct usdr_vfs_obj_constant*)obj;
-    *ovalue = c->value;
+    return -EPERM;
+}
 
+static int _vfs_const_set_ai64_func(vfs_object_t* obj, unsigned count, const uint64_t* value)
+{
+    return -EPERM;
+}
+
+
+int _vfs_const_i64_get_i64_func(vfs_object_t* obj, uint64_t* ovalue)
+{
+    *ovalue = obj->data.i64; return 0;
+}
+
+int _vfs_i64_get_str_func(vfs_object_t* obj, unsigned max_str, char* stor)
+{
+    uint64_t val;
+    int res = obj->ops.gi64(obj, &val);
+    if (res)
+        return res;
+    snprintf(stor, max_str, "%lld", (long long)val);
     return 0;
 }
 
-int usdr_device_vfs_obj_val_get_u64(pdevice_t dev, const char* fullpath, uint64_t *ovalue)
+int _vfs_i64_get_ai64_func(vfs_object_t* obj, unsigned maxcnt, uint64_t* ovalue)
 {
-    pusdr_vfs_obj_t pobj;
-    //int res = usdr_device_vfs_get_by_path(dev, fullpath, &pobj);
-    int res = dev->vfs_get_single_object(dev, fullpath, &pobj);
+    if (maxcnt == 0)
+        return 0;
+    int res = obj->ops.gi64(obj, ovalue);
     if (res)
         return res;
-
-    return usdr_device_vfs_obj_val_get(dev, pobj, ovalue);
+    return 1;
 }
 
-int usdr_device_vfs_obj_val_get_u32(pdevice_t dev, const char* fullpath, uint32_t *ovalue)
+int _vfs_const_str_get_str_func(vfs_object_t* obj, unsigned max_str, char* stor)
 {
-    uint64_t v;
-    int res = usdr_device_vfs_obj_val_get_u64(dev, fullpath, &v);
+    strncpy(stor, obj->data.str, max_str);
+    return 0;
+}
+
+int _vfs_str_get_i64_func(vfs_object_t* obj, uint64_t* ovalue) {
+    char data[32];
+    int res = obj->ops.gstr(obj, sizeof(data), data);
     if (res)
         return res;
-
+    data[31] = 0;
+    char *eptr = NULL;
+    long long int v = strtoll(data, &eptr, 10);
     *ovalue = v;
-    return 0;
+    return (eptr && *eptr == 0) ? 0 : -EINVAL;
 }
 
-int usdr_device_vfs_obj_val_set_by_path(pdevice_t dev, const char* fullpath, uint64_t value)
+int _vfs_str_get_ai64_func(vfs_object_t* obj, unsigned maxcnt, uint64_t* ovalue)
 {
-    pusdr_vfs_obj_t pobj;
-//    int res = usdr_device_vfs_get_by_path(dev, fullpath, &pobj);
-    int res = dev->vfs_get_single_object(dev, fullpath, &pobj);
+    return -EINVAL;
+}
+
+int _vfs_ai64_get_i64_func(vfs_object_t* obj, uint64_t* ovalue)
+{
+    return -EINVAL;
+}
+
+int _vfs_ai64_get_str_func(vfs_object_t* obj, unsigned max_str, char* stor)
+{
+    return -EINVAL;
+}
+
+
+
+int vfs_add_const_i64_vec(vfs_object_t* root, const struct vfs_constant_i64* params, unsigned count)
+{
+    int res = _vfs_reserve(root, count);
     if (res)
         return res;
 
-    return usdr_device_vfs_obj_val_set(dev, pobj, value);
-}
-
-
-static
-const struct usdr_vfs_obj_ops s_usdr_vfs_obj_constant_ops = {
-    usdr_vfs_obj_constant_val_set,
-    usdr_vfs_obj_constant_val_get,
-};
-
-
-int usdr_vfs_obj_const_init_add(pdevice_t dev,
-                                struct usdr_vfs_obj_constant *co,
-                                const char* path,
-                                usdr_vfs_obj_uid_t uid,
-                                uint64_t value)
-{
-    co->base.ops = &s_usdr_vfs_obj_constant_ops;
-    co->base.fullpath = path;
-    co->base.param = NULL;
-    co->base.uid = uid;
-    co->base.defaccesslist = ~0u;
-    co->value = value;
-
-    return usdr_device_vfs_add(dev, (pusdr_vfs_obj_t)co);
-}
-
-int usdr_vfs_obj_const_init_array(pdevice_t dev,
-                                  usdr_vfs_obj_uid_t uid_first,
-                                  usdr_vfs_obj_constant_t* objstorage,
-                                  const usdr_dev_param_constant_t* params,
-                                  unsigned count)
-{
-    unsigned i;
-    int res;
-
-    for (i = 0; i < count; i++) {
-        res = usdr_vfs_obj_const_init_add(dev, &objstorage[i], params[i].fullpath, uid_first + i, params[i].value);
+    for (unsigned j = 0; j < count; j++) {
+        vfs_object_t* no;
+        res = _vfs_alloc_object(root, &no, VFST_I64, params[j].fullpath);
         if (res)
             return res;
+
+        no->ops.si64 = &_vfs_const_set_i64_func;
+        no->ops.sstr = &_vfs_const_set_str_func;
+        no->ops.sai64 = &_vfs_const_set_ai64_func;
+
+        no->ops.gi64 = &_vfs_const_i64_get_i64_func;
+        no->ops.gstr = &_vfs_i64_get_str_func;
+        no->ops.gai64 = &_vfs_i64_get_ai64_func;
+
+        no->data.i64 = params[j].value;
     }
-
-    return 0;
-}
-
-int usdr_vfs_obj_param_init_array_param(pdevice_t dev,
-                                        usdr_vfs_obj_uid_t uid_first,
-                                        usdr_vfs_obj_base_t *objstorage,
-                                        void *param,
-                                        const usdr_dev_param_func_t* params,
-                                        unsigned count)
-{
-    unsigned i;
-    int res;
-
-    for (i = 0; i < count; i++) {
-        usdr_vfs_obj_base_t* pob = &objstorage[i];
-        pob->ops = &params[i].ops;
-        pob->fullpath = params[i].fullpath;
-        pob->param = param;
-        pob->uid = uid_first + i;
-        pob->defaccesslist = ~0u;
-
-        res = usdr_device_vfs_add(dev, (pusdr_vfs_obj_t)pob);
-        if (res)
-            return res;
-    }
-
     return 0;
 }
 
 
-int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objects, vfs_filter_obj_t* objs)
+int vfs_add_const_str_vec(vfs_object_t* root, const struct vfs_constant_str* params, unsigned count)
 {
-    device_impl_base_t *base = dev->impl;
+    int res = _vfs_reserve(root, count);
+    if (res)
+        return res;
 
-    unsigned i, cnt;
-    for (i = 0, cnt = 0; cnt < max_objects && i < base->objcount; i++) {
-        if (fnmatch(filter, base->objlist[i]->fullpath, FNM_NOESCAPE) == 0) {
-            objs[cnt].fullpath = base->objlist[i]->fullpath;
-            cnt++;
-        }
+    for (unsigned j = 0; j < count; j++) {
+        vfs_object_t* no;
+        res = _vfs_alloc_object(root, &no, VFST_I64, params[j].fullpath);
+        if (res)
+            return res;
+
+        no->ops.si64 = &_vfs_const_set_i64_func;
+        no->ops.sstr = &_vfs_const_set_str_func;
+        no->ops.sai64 = &_vfs_const_set_ai64_func;
+
+        no->ops.gi64 = &_vfs_const_i64_get_i64_func;
+        no->ops.gstr = &_vfs_i64_get_str_func;
+        no->ops.gai64 = &_vfs_i64_get_ai64_func;
+
+        no->data.str = (char*)params[j].value;
     }
+    return 0;
+}
 
-    return cnt;
+int vfs_add_obj_i64(vfs_object_t* root, const char* fullpath, void* obj, uint64_t defval, vfs_set_i64_func_t fs, vfs_get_i64_func_t fg)
+{
+    vfs_object_t* no;
+    int res = _vfs_alloc_object(root, &no, VFST_I64, fullpath);
+    if (res)
+        return res;
+
+    no->object = obj;
+    no->data.i64 = defval;
+
+    no->ops.si64 = fs;
+    no->ops.sstr = NULL;  // TODO
+    no->ops.sai64 = NULL; // TODO
+
+    no->ops.gi64 = fg;
+    no->ops.gstr = &_vfs_i64_get_str_func;
+    no->ops.gai64 = &_vfs_i64_get_ai64_func;
+
+    return 0;
 }
