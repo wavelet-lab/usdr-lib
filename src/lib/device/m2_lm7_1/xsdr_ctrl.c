@@ -310,6 +310,9 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
     if (res)
         return res;
 
+    if (rxrate == 0 && txrate == 0) {
+        rxrate = 1e6;
+    }
 
     // TODO: Check if MMCM is present
     bool mmcmrx = false;
