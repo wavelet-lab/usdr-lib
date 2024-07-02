@@ -1,0 +1,1026 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+name: si5332
+revision: 0.0.1
+processors:
+  - c
+bus:
+  type: SPI
+  wr_mask: 0x800000
+  usdr_path: /debug/hw/si5332/0/reg
+addr_width: 16
+data_width: 8
+page_prefix: true
+field_prefix:
+  - Page
+  - RegName
+field_macros: true
+
+x-opt-1: &id001
+  0b00: PLL reference clock before prescaler
+  0b01: PLL reference clock after prescaler
+  0b10: Clock from input buffer CLKIN_2
+  0b11: Clock from input buffer CLKIN_3
+x-opt-2: &id002
+  0b000: HSDIV0
+  0b001: HSDIV1
+  0b010: HSDIV2
+  0b011: HSDIV3
+  0b100: HSDIV4
+  0b101: ID0
+  0b110: ID1
+  0b111: Clock from OMUX0_SEL0
+x-opt-3: &id003
+  0b0: bank A
+  0b1: bank B
+x-opt-4: &id004
+  0b0: spread spectrum disabled
+  0b1: spread spectrum enabled
+x-opt-5: &id005
+  0b00: disabled
+  0b01: center
+  0b10: invalid
+  0b11: Down
+x-opt-6: &id006
+  0b00: disabled
+  0b01: center
+  0b10: invalid (up)
+  0b11: Down
+x-opt-7: &id007
+  0b0: low-Z
+  0b1: high-Z
+x-opt-8: &id008
+  0b0: no inversion
+  0b1: OUTb inverted
+x-opt-9: &id009
+  0b00: fastest
+  0b01: slow
+  0b10: slower
+  0b11: slowest
+x-opt-10: &id010
+  0b0: 50 Omh
+  0b1: 25 Omh
+x-opt-11: &id011
+  0b00: disabled
+  0b01: differential
+  0b10: CMOS DC
+  0b11: CMOS AC
+x-opt-12: &id012
+  0b00: Disabled
+  0b01: XOSC
+  0b10: CLKIN_2
+  0b11: Disabled
+
+pages:
+  - name: Common
+    regs:
+      - addr: 0x5
+        name: REG_0x5
+        fields:
+          - bits: '5:0'
+            name: VDDO_OK
+            mode: R
+            desc: Each bit in the VDDO_OK register field indicates that a specific VDDO supply is above 1.2 V, with bit position corresponding to a VDDO supply number. Bit 0 is VDDO0 status, Bit 1 is VDDO1 status, Bit 2 is VDDO2 status, and so on up to Bit 5 is VDDO5 status.
+          - bits: 7
+            name: VDD_XTAL_OK
+            mode: R
+            desc: Flag that VDDI is greater than its minimum level, which is about 1.5 V.
+      - addr: 0x6
+        name: REG_0x6
+        fields:
+          - bits: '7:0'
+            name: USYS_CTRL
+            mode: RW
+            desc: User System Control. Use this write-only register to command the device to transition to ACTIVE or READY state. (Use USYS_STAT to read present state.) Write 0x01 to command device to enter READY state. Write 0x02 to enter ACTIVE state.
+      - addr: 0x7
+        name: REG_0x7
+        fields:
+          - bits: '7:0'
+            name: USYS_STAT
+            mode: R
+            desc: User System Status. This read-only register indicates the present device operational state. Can be used with USYS_CTRL to confirm device has entered the commanded state (i.e., ACTIVE or READY). Reading 0x01 indicates the device is in READY state. 0x02 indicates the device is in ACTIVE state. If 0x89 is read, this indicates the device has not detected an input clock source and can't proceed to ACTIVE state.
+      - addr: 0x8
+        name: REG_0x8
+        fields:
+          - bits: 0
+            name: UDRV_OE_ENA
+            mode: RW
+            desc: User master output enable. Resets to 1. This bit controls simultaneously the driver start for all drivers.
+      - addr: 0x9
+        name: REG_0x9
+        fields:
+          - bits: '7:0'
+            name: USER_SCRATCH0
+            mode: RW
+            desc: User scratch pad registers.
+      - addr: 0xA
+        name: REG_0xA
+        fields:
+          - bits: '7:0'
+            name: USER_SCRATCH1
+            mode: RW
+            desc: User scratch pad registers.
+      - addr: 0xB
+        name: REG_0xB
+        fields:
+          - bits: '7:0'
+            name: USER_SCRATCH2
+            mode: RW
+            desc: User scratch pad registers.
+      - addr: 0xC
+        name: REG_0xC
+        fields:
+          - bits: '7:0'
+            name: USER_SCRATCH3
+            mode: RW
+            desc: User scratch pad registers.
+      - addr: 0xD
+        name: REG_0xD
+        fields:
+          - bits: '7:0'
+            name: DEVICE_PN_BASE
+            mode: R
+            desc: Device PN
+      - addr: 0xE
+        name: REG_0xE
+        fields:
+          - bits: '7:0'
+            name: DEVICE_REV
+            mode: R
+            desc: Device revision
+      - addr: 0xF
+        name: REG_0xF
+        fields:
+          - bits: '7:0'
+            name: DEVICE_GRADE
+            mode: R
+            desc: Device grade information
+      - addr: 0x10
+        name: REG_0x10
+        fields:
+          - bits: '3:0'
+            name: FACTORY_OPN_ID0
+            mode: R
+            desc: The Orderable part number identification.
+          - bits: '7:4'
+            name: FACTORY_OPN_ID1
+            mode: R
+            desc: The Orderable part number identification.
+      - addr: 0x11
+        name: REG_0x11
+        fields:
+          - bits: '3:0'
+            name: FACTORY_OPN_ID3
+            mode: R
+            desc: The Orderable part number identification.
+          - bits: '7:4'
+            name: FACTORY_OPN_ID2
+            mode: R
+            desc: The Orderable part number identification.
+      - addr: 0x12
+        name: REG_0x12
+        fields:
+          - bits: '3:0'
+            name: FACTORY_OPN_ID4
+            mode: R
+            desc: The Orderable part number identification.
+          - bits: '7:4'
+            name: FACTORY_OPN_REVISION
+            mode: R
+            desc: The Orderable part number's product revision number.
+      - addr: 0x17
+        name: REG_0x17
+        fields:
+          - bits: '7:0'
+            name: DESIGN_ID0
+            mode: R
+            desc: Design identification set by user in CBPro project file
+      - addr: 0x18
+        name: REG_0x18
+        fields:
+          - bits: '7:0'
+            name: DESIGN_ID1
+            mode: R
+            desc: Design identification set by user in CBPro project file
+      - addr: 0x19
+        name: REG_0x19
+        fields:
+          - bits: '7:0'
+            name: DESIGN_ID2
+            mode: R
+            desc: Design identification set by user in CBPro project file
+      - addr: 0x21
+        name: REG_0x21
+        fields:
+          - bits: '6:0'
+            name: I2C_ADDR
+            mode: R
+            desc: I2C mode device address. Reset value is 110_1010 binary.
+      - addr: 0x23
+        name: REG_0x23
+        fields:
+          - bits: 0
+            name: I2C_SCL_PUP_ENA
+            mode: RW
+            desc: Enable 50 kOmh pullup resistor on SCL pad.
+          - bits: 1
+            name: I2C_SDA_PUP_ENA
+            mode: RW
+            desc: Enable 50 kOmh pullup resistor on SDA pad.
+      - addr: 0x25
+        name: REG_0x25
+        fields:
+          - bits: '1:0'
+            name: OMUX0_SEL0
+            mode: RW
+            desc: Selects output mux clock source for output clocks in group G0:OUT0.
+            opts: *id001
+          - bits: '6:4'
+            name: OMUX0_SEL1
+            mode: RW
+            desc: Selects output mux clock source for output clocks in group G0:OUT0. Note that the OMUX0_SEL1 value is forced to 7 whenever the PLL is disabled.
+            opts: *id002
+      - addr: 0x26
+        name: REG_0x26
+        fields:
+          - bits: '1:0'
+            name: OMUX1_SEL0
+            mode: RW
+            desc: Selects output mux clock source for output clocks in group G1:OUT1 for GM1,GM2. OUT1,OUT2 for GM3.
+            opts: *id001
+          - bits: '6:4'
+            name: OMUX1_SEL1
+            mode: RW
+            desc: Selects output mux clock source for output clocks in group G1:OUT1 for GM1,GM2. OUT1,OUT2 for GM3. Note that the OMUX0_SEL1 value is forced to 7 whenever the PLL is disabled.
+            opts: *id002
+      - addr: 0x27
+        name: REG_0x27
+        fields:
+          - bits: '1:0'
+            name: OMUX2_SEL0
+            mode: RW
+            desc: 'Selects output mux clock source for output clocks in group G2:OUT2 for GM1. OUT2,OUT3 for GM2. OUT3,OUT4,OUT5 for GM3:'
+            opts: *id001
+          - bits: '6:4'
+            name: OMUX2_SEL1
+            mode: RW
+            desc: None
+      - addr: 0x28
+        name: REG_0x28
+        fields:
+          - bits: '1:0'
+            name: OMUX3_SEL0
+            mode: RW
+            desc: 'Selects output mux clock source for output clocks in group G3:OUT3 for GM1. OUT4,OUT5 for GM2. OUT6, OUT7, OUT8 for GM3:'
+            opts: *id001
+          - bits: '6:4'
+            name: OMUX3_SEL1
+            mode: RW
+            desc: Selects output mux clock source for output clocks in group G3:OUT3 for GM1. OUT4,OUT5 for GM2. OUT6,OUT7,OUT8 for GM3. Note that the OMUX0_SEL1 value is forced to 7 whenever the PLL is disabled.
+            opts: *id002
+      - addr: 0x29
+        name: REG_0x29
+        fields:
+          - bits: '1:0'
+            name: OMUX4_SEL0
+            mode: RW
+            desc: 'Selects output mux clock source for output clocks in group G4:OUT4 for GM1. OUT6 for GM2. OUT9 for GM3:'
+            opts: *id001
+          - bits: '6:4'
+            name: OMUX4_SEL1
+            mode: RW
+            desc: Selects output mux clock source for output clocks in group G4:OUT4 for GM1. OUT6 for GM2. OUT9 for GM3. Note that the OMUX0_SEL1 value is forced to 7 whenever the PLL is disabled.
+            opts: *id002
+      - addr: 0x2A
+        name: REG_0x2A
+        fields:
+          - bits: '1:0'
+            name: OMUX5_SEL0
+            mode: RW
+            desc: Selects output mux clock source for output clocks in group G5:OUT5 for GM1. OUT7 for GM2. OUT10,OUT11 for GM3.
+            opts: *id001
+          - bits: '6:4'
+            name: OMUX5_SEL1
+            mode: RW
+            desc: Selects output mux clock source for output clocks in group G5:OUT5 for GM1. OUT7 for GM2. OUT10,OUT11 for GM3. Note that the OMUX0_SEL1 value is forced to 7 whenever the PLL is disabled.
+            opts: *id002
+      - addr: 0x2B
+        name: REG_0x2B
+        fields:
+          - bits: '7:0'
+            name: HSDIV0A_DIV
+            mode: RW
+            desc: O0 divider value for bank A
+      - addr: 0x2C
+        name: REG_0x2C
+        fields:
+          - bits: '7:0'
+            name: HSDIV0B_DIV
+            mode: RW
+            desc: O0 divider value for bank B
+      - addr: 0x2D
+        name: REG_0x2D
+        fields:
+          - bits: '7:0'
+            name: HSDIV1A_DIV
+            mode: RW
+            desc: O1 divider value for bank A
+      - addr: 0x2E
+        name: REG_0x2E
+        fields:
+          - bits: '7:0'
+            name: HSDIV1B_DIV
+            mode: RW
+            desc: O1 divider value for bank B
+      - addr: 0x2F
+        name: REG_0x2F
+        fields:
+          - bits: '7:0'
+            name: HSDIV2A_DIV
+            mode: RW
+            desc: O2 divider value for bank A
+      - addr: 0x30
+        name: REG_0x30
+        fields:
+          - bits: '7:0'
+            name: HSDIV2B_DIV
+            mode: RW
+            desc: O2 divider value for bank B
+      - addr: 0x31
+        name: REG_0x31
+        fields:
+          - bits: '7:0'
+            name: HSDIV3A_DIV
+            mode: RW
+            desc: O3 divider value for bank A
+      - addr: 0x32
+        name: REG_0x32
+        fields:
+          - bits: '7:0'
+            name: HSDIV3B_DIV
+            mode: RW
+            desc: O3 divider value for bank B
+      - addr: 0x33
+        name: REG_0x33
+        fields:
+          - bits: '7:0'
+            name: HSDIV4A_DIV
+            mode: RW
+            desc: O4 divider value for bank A
+      - addr: 0x34
+        name: REG_0x34
+        fields:
+          - bits: '7:0'
+            name: HSDIV4B_DIV
+            mode: RW
+            desc: O4 divider value for bank B
+      - addr: 0x35
+        name: REG_0x35
+        fields:
+          - bits: 0
+            name: HSDIV0_DIV_SEL
+            mode: RW
+            desc: Selects bank A or bank B divider O0 settings. O0 supports dynamic integer divider changes through this divider select control bit.
+            opts:
+              0b0: bank A divider
+              0b1: bank B divider
+          - bits: 1
+            name: HSDIV1_DIV_SEL
+            mode: RW
+            desc: Selects bank A (0) or bank B (1) O1 divider settings.
+          - bits: 2
+            name: HSDIV2_DIV_SEL
+            mode: RW
+            desc: Selects bank A (0) or bank B (1) O2 divider settings.
+          - bits: 3
+            name: HSDIV3_DIV_SEL
+            mode: RW
+            desc: Selects bank A (0) or bank B (1) O3 divider settings.
+          - bits: 4
+            name: HSDIV4_DIV_SEL
+            mode: RW
+            desc: Selects bank A (0) or bank B (1) O4 divider settings.
+          - bits: 6
+            name: ID0_CFG_SEL
+            mode: RW
+            desc: N0 configuration bank select. The divider supports dynamically switching between two complete configurations controlled by this bit. Reconfiguration should be done on the unselected bank. If ID0_CFG=0, running based off bank A, then bank B may be freely reconfigured and once ready all changes will be applied to the ID once ID0_CFG=1 thus changing the ID from bank A to bank B. Spread spectrum enable fields ID0A_SS_ENA and ID0B_SS_ENA are the only exception and may be enabled/disabled while bank is selected.
+            opts: *id003
+          - bits: 7
+            name: ID1_CFG_SEL
+            mode: RW
+            desc: N1 configuration bank select.
+            opts: *id003
+      - addr: 0x36:0x37
+        name: REG_0x36_0x37
+        fields:
+          - bits: '14:0'
+            name: ID0A_INTG
+            mode: RW
+            desc: The terms of an a + b/c desired divider setting must be processsed into ID0A_INTG, ID0A_RES, and ID0A_DEN register terms.intg = floor(((a*c+b)*128/c)-512).
+      - addr: 0x38:0x39
+        name: REG_0x38_0x39
+        fields:
+          - bits: '14:0'
+            name: ID0A_RES
+            mode: RW
+            desc: res = mod(b*128, c)
+      - addr: 0x3A:0x3b
+        name: REG_0x3A_0x3b
+        fields:
+          - bits: '14:0'
+            name: ID0A_DEN
+            mode: RW
+            desc: den = c
+      - addr: 0x3C
+        name: REG_0x3C
+        fields:
+          - bits: 0
+            name: ID0A_SS_ENA
+            mode: RW
+            desc: Spread spectrum enable. This is the only bank configuration field which may be changed dynamically while the bank is selected as the active bank. Users may freely enable/disable spread spectrum.
+            opts: *id004
+          - bits: '2:1'
+            name: ID0A_SS_MODE
+            mode: RW
+            desc: Spread spectrum mode.
+            opts: *id005
+      - addr: 0x3D:0x3e
+        name: REG_0x3D_0x3e
+        fields:
+          - bits: '11:0'
+            name: ID0A_SS_STEP_NUM
+            mode: RW
+            desc: Number of frequency steps in one quarter SSC modulation period, allows for frequency step every output clock.
+      - addr: 0x3F
+        name: REG_0x3F
+        fields:
+          - bits: '4:0'
+            name: ID0A_SS_STEP_INTG
+            mode: RW
+            desc: Divide ratio spread step size.
+      - addr: 0x40:0x41
+        name: REG_0x40_0x41
+        fields:
+          - bits: '14:0'
+            name: ID0A_SS_STEP_RES
+            mode: RW
+            desc: Numerator of spread step size error term.
+      - addr: 0x42:0x43
+        name: REG_0x42_0x43
+        fields:
+          - bits: '14:0'
+            name: ID0B_INTG
+            mode: RW
+            desc: The terms of an a + b/c desired divider setting must be processed into ID0B_INTG, ID0B_RES, and ID0B_DEN register terms.intg = floor(((a*c+b)*128/c)-512).
+      - addr: 0x44:0x45
+        name: REG_0x44_0x45
+        fields:
+          - bits: '14:0'
+            name: ID0B_RES
+            mode: RW
+            desc: res = mod(b*128, c)
+      - addr: 0x46:0x47
+        name: REG_0x46_0x47
+        fields:
+          - bits: '14:0'
+            name: ID0B_DEN
+            mode: RW
+            desc: den = c
+      - addr: 0x48
+        name: REG_0x48
+        fields:
+          - bits: 0
+            name: ID0B_SS_ENA
+            mode: RW
+            desc: Spread spectrum enable. This is the only bank configuration field which may be changed dynamically while the bank is selected as the active bank. Users may freely enable/disable spread spectrum.
+            opts: *id004
+          - bits: '2:1'
+            name: ID0B_SS_MODE
+            mode: RW
+            desc: Spread spectrum mode.
+            opts: *id005
+      - addr: 0x49:0x4a
+        name: REG_0x49_0x4a
+        fields:
+          - bits: '11:0'
+            name: ID0B_SS_STEP_NUM
+            mode: RW
+            desc: Number of frequency steps in one quarter SSC modulation period, allows for frequency step every output clock.
+      - addr: 0x4B
+        name: REG_0x4B
+        fields:
+          - bits: '4:0'
+            name: ID0B_SS_STEP_INTG
+            mode: RW
+            desc: Divide ratio spread step size.
+      - addr: 0x4C:0x4d
+        name: REG_0x4C_0x4d
+        fields:
+          - bits: '14:0'
+            name: ID0B_SS_STEP_RES
+            mode: RW
+            desc: Numerator of spread step size error term.
+      - addr: 0x4E:0x4f
+        name: REG_0x4E_0x4f
+        fields:
+          - bits: '14:0'
+            name: ID1A_INTG
+            mode: RW
+            desc: The terms of an a + b/c desired interpolative divider setting must be processed into ID1A_INTG, ID1A_RES, and ID1A_DEN register terms.intg = floor(((a*c+b)*128/c)-512).
+      - addr: 0x50:0x51
+        name: REG_0x50_0x51
+        fields:
+          - bits: '14:0'
+            name: ID1A_RES
+            mode: RW
+            desc: res = mod(b*128, c)
+      - addr: 0x52:0x53
+        name: REG_0x52_0x53
+        fields:
+          - bits: '14:0'
+            name: ID1A_DEN
+            mode: RW
+            desc: den = c
+      - addr: 0x54
+        name: REG_0x54
+        fields:
+          - bits: 0
+            name: ID1A_SS_ENA
+            mode: RW
+            desc: Spread spectrum enable. This is the only bank configuration field which may be changed dynamically while the bank is selected as the active bank. Users may freely enable/disable spread spectrum.
+            opts: *id004
+          - bits: '2:1'
+            name: ID1A_SS_MODE
+            mode: RW
+            desc: Spread spectrum mode.
+            opts: *id006
+      - addr: 0x55:0x56
+        name: REG_0x55_0x56
+        fields:
+          - bits: '11:0'
+            name: ID1A_SS_STEP_NUM
+            mode: RW
+            desc: Number of frequency steps in one quadrate, allows for frequency step every output clock.
+      - addr: 0x57
+        name: REG_0x57
+        fields:
+          - bits: '4:0'
+            name: ID1A_SS_STEP_INTG
+            mode: RW
+            desc: Divide ratio spread step size.
+      - addr: 0x58:0x59
+        name: REG_0x58_0x59
+        fields:
+          - bits: '14:0'
+            name: ID1A_SS_STEP_RES
+            mode: RW
+            desc: Numerator of spread step size error term.
+      - addr: 0x5A:0x5b
+        name: REG_0x5A_0x5b
+        fields:
+          - bits: '14:0'
+            name: ID1B_INTG
+            mode: RW
+            desc: The terms of an a + b/c desired interpolative divider setting must be processed into ID1A_INTG, ID1A_RES, and ID1A_DEN register terms.intg = floor(((a*c+b)*128/c)-512).
+      - addr: 0x5C:0x5d
+        name: REG_0x5C_0x5d
+        fields:
+          - bits: '14:0'
+            name: ID1B_RES
+            mode: RW
+            desc: res = mod(b*128, c)
+      - addr: 0x5E:0x5f
+        name: REG_0x5E_0x5f
+        fields:
+          - bits: '14:0'
+            name: ID1B_DEN
+            mode: RW
+            desc: den = c
+      - addr: 0x60
+        name: REG_0x60
+        fields:
+          - bits: 0
+            name: ID1B_SS_ENA
+            mode: RW
+            desc: Spread spectrum enable. This is the only bank configuration field which may be changed dynamically while the bank is selected as the active bank. Users may freely enable/disable spread spectrum.
+            opts: *id004
+          - bits: '2:1'
+            name: ID1B_SS_MODE
+            mode: RW
+            desc: Spread spectrum mode.
+            opts: *id006
+      - addr: 0x61:0x62
+        name: REG_0x61_0x62
+        fields:
+          - bits: '11:0'
+            name: ID1B_SS_STEP_NUM
+            mode: RW
+            desc: Number of frequency steps in one quadrate, allows for frequency step every output clock.
+      - addr: 0x63
+        name: REG_0x63
+        fields:
+          - bits: '4:0'
+            name: ID1B_SS_STEP_INTG
+            mode: RW
+            desc: Divide ratio spread step size.
+      - addr: 0x64:0x65
+        name: REG_0x64_0x65
+        fields:
+          - bits: '14:0'
+            name: ID1B_SS_STEP_RES
+            mode: RW
+            desc: Numerator of spread step size error term.
+      - addr: 0x67:0x68
+        name: REG_0x67_0x68
+        fields:
+          - bits: '14:0'
+            name: IDPA_INTG
+            mode: RW
+            desc: The terms of an a + b/c desired divider setting must be processed into IDPA_INTG, IDPA_RES, and IDPA_DEN register terms.intg = floor(((a*c+b)*128/c)-512).
+      - addr: 0x69:0x6a
+        name: REG_0x69_0x6a
+        fields:
+          - bits: '14:0'
+            name: IDPA_RES
+            mode: RW
+            desc: res = mod(b*128, c)
+      - addr: 0x6B:0x6c
+        name: REG_0x6B_0x6c
+        fields:
+          - bits: '14:0'
+            name: IDPA_DEN
+            mode: RW
+            desc: den = c
+      - addr: 0x75
+        name: REG_0x75
+        fields:
+          - bits: '4:0'
+            name: PDIV_DIV
+            mode: RW
+            desc: Chooses the PLL prescalar divide ratio.
+      - addr: 0xB8
+        name: REG_0xB8
+        fields:
+          - bits: '7:0'
+            name: USYS_START
+            mode: RW
+            desc: User defined application startup behavior. Flags for SW what to do at the startup, for example moving to ACTIVE on its own upon startup or waiting in READY state for a command. Used only upon startup, Initialized from NVM.
+      - addr: 0xBE
+        name: REG_0xBE
+        fields:
+          - bits: '5:2'
+            name: PLL_MODE
+            mode: RW
+            desc: Sets PLL BW.
+      - addr: 0xBF
+        name: REG_0xBF
+        fields:
+          - bits: 7
+            name: XOSC_CINT_ENA
+            mode: RW
+            desc: Enables an additional fixed 8 pf loading capacitance on XA and XB.
+      - addr: 0xC0
+        name: REG_0xC0
+        fields:
+          - bits: '5:0'
+            name: XOSC_CTRIM_XA
+            mode: RW
+            desc: Load capacitance trim on XA.
+      - addr: 0xC1
+        name: REG_0xC1
+        fields:
+          - bits: '5:0'
+            name: XOSC_CTRIM_XB
+            mode: RW
+            desc: Load capacitance trim on XB.
+  - name: qfn32
+    regs:
+      - addr: 0x7A
+        name: REG_0x7A
+        fields:
+          - bits: '3:0'
+            name: OUT0_MODE
+            mode: RW
+            desc: Software interpreted driver configuration.
+      - addr: 0x7B
+        name: REG_0x7B
+        fields:
+          - bits: '5:0'
+            name: OUT0_DIV
+            mode: RW
+            desc: Driver divider ratio. 0 = disabled. 1-63 = divide value.
+      - addr: 0x7C
+        name: REG_0x7C
+        fields:
+          - bits: '2:0'
+            name: OUT0_SKEW
+            mode: RW
+            desc: Skew control. Programmed as an unsigned integer. Can add delay of 35 ps/step up to 280 ps.
+      - addr: 0x7D
+        name: REG_0x7D
+        fields:
+          - bits: 0
+            name: OUT0_STOP_HIGHZ
+            mode: RW
+            desc: Driver output state when stopped.
+            opts: *id007
+          - bits: '5:4'
+            name: OUT0_CMOS_INV
+            mode: RW
+            desc: Sets the polarity of the two outputs in dual CMOS mode.
+            opts: *id008
+      - addr: 0x7E
+        name: REG_0x7E
+        fields:
+          - bits: '1:0'
+            name: OUT0_CMOS_SLEW
+            mode: RW
+            desc: Controls CMOS slew rate from fast to slow.
+            opts: *id009
+          - bits: 2
+            name: OUT0_CMOS_STR
+            mode: RW
+            desc: CMOS output impedance control.
+            opts: *id010
+      - addr: 0x7F
+        name: REG_0x7F
+        fields:
+          - bits: '3:0'
+            name: OUT1_MODE
+            mode: RW
+            desc: Software interpreted driver configuration.
+      - addr: 0x80
+        name: REG_0x80
+        fields:
+          - bits: '5:0'
+            name: OUT1_DIV
+            mode: RW
+            desc: Driver divider ratio. 0 = disabled. 1-63 = divide value.
+      - addr: 0x81
+        name: REG_0x81
+        fields:
+          - bits: '2:0'
+            name: OUT1_SKEW
+            mode: RW
+            desc: Skew control. Programmed as an unsigned integer. Can add delay of 35 ps/step up to 280 ps.
+      - addr: 0x82
+        name: REG_0x82
+        fields:
+          - bits: '1:0'
+            name: OUT1_STOP_HIGHZ
+            mode: RW
+            desc: Driver output state when stopped.
+            opts: *id007
+          - bits: 4
+            name: OUT1_CMOS_INV
+            mode: RW
+            desc: Sets the polarity of the two outputs in dual CMOS mode.
+            opts: *id008
+      - addr: 0x83
+        name: REG_0x83
+        fields:
+          - bits: '1:0'
+            name: OUT1_CMOS_SLEW
+            mode: RW
+            desc: Controls CMOS slew rate from fast to slow.
+            opts: *id009
+          - bits: 2
+            name: OUT1_CMOS_STR
+            mode: RW
+            desc: CMOS output impedance control.
+            opts: *id010
+      - addr: 0x89
+        name: REG_0x89
+        fields:
+          - bits: '3:0'
+            name: OUT2_MODE
+            mode: RW
+            desc: Software interpreted driver configuration.
+      - addr: 0x8A
+        name: REG_0x8A
+        fields:
+          - bits: '5:0'
+            name: OUT2_DIV
+            mode: RW
+            desc: Driver divider ratio. 0 = disabled. 1-63 = divide value.
+      - addr: 0x8B
+        name: REG_0x8B
+        fields:
+          - bits: '2:0'
+            name: OUT2_SKEW
+            mode: RW
+            desc: Skew control. Programmed as an unsigned integer. Can add delay of 35 ps/step up to 280 ps.
+      - addr: 0x8C
+        name: REG_0x8C
+        fields:
+          - bits: '1:0'
+            name: OUT2_STOP_HIGHZ
+            mode: RW
+            desc: Driver output state when stopped.
+            opts: *id007
+          - bits: 4
+            name: OUT2_CMOS_INV
+            mode: RW
+            desc: Sets the polarity of the two outputs in dual CMOS mode.
+            opts: *id008
+      - addr: 0x8D
+        name: REG_0x8D
+        fields:
+          - bits: '1:0'
+            name: OUT2_CMOS_SLEW
+            mode: RW
+            desc: Controls CMOS slew rate from fast to slow.
+            opts: *id009
+          - bits: 2
+            name: OUT2_CMOS_STR
+            mode: RW
+            desc: CMOS output impedance control.
+            opts: *id010
+      - addr: 0x98
+        name: REG_0x98
+        fields:
+          - bits: '3:0'
+            name: OUT3_MODE
+            mode: RW
+            desc: Software interpreted driver configuration.
+      - addr: 0x99
+        name: REG_0x99
+        fields:
+          - bits: '5:0'
+            name: OUT3_DIV
+            mode: RW
+            desc: Driver divider ratio. 0 = disabled. 1-63 = divide value.
+      - addr: 0x9A
+        name: REG_0x9A
+        fields:
+          - bits: '2:0'
+            name: OUT3_SKEW
+            mode: RW
+            desc: Skew control. Programmed as an unsigned integer. Can add delay of 35 ps/step up to 280 ps.
+      - addr: 0x9B
+        name: REG_0x9B
+        fields:
+          - bits: 0
+            name: OUT3_STOP_HIGHZ
+            mode: RW
+            desc: Driver output state when stopped.
+            opts: *id007
+          - bits: 4
+            name: OUT3_CMOS_INV
+            mode: RW
+            desc: Sets the polarity of the two outputs in dual CMOS mode.
+            opts: *id008
+      - addr: 0x9C
+        name: REG_0x9C
+        fields:
+          - bits: '1:0'
+            name: OUT3_CMOS_SLEW
+            mode: RW
+            desc: Controls CMOS slew rate from fast to slow.
+            opts: *id009
+          - bits: 2
+            name: OUT3_CMOS_STR
+            mode: RW
+            desc: CMOS output impedance control.
+            opts: *id010
+      - addr: 0xA7
+        name: REG_0xA7
+        fields:
+          - bits: '3:0'
+            name: OUT4_MODE
+            mode: RW
+            desc: Software interpreted driver configuration.
+      - addr: 0xA8
+        name: REG_0xA8
+        fields:
+          - bits: '5:0'
+            name: OUT4_DIV
+            mode: RW
+            desc: Driver divider ratio. 0 = disabled. 1-63 = divide value.
+      - addr: 0xA9
+        name: REG_0xA9
+        fields:
+          - bits: '2:0'
+            name: OUT4_SKEW
+            mode: RW
+            desc: Skew control. Programmed as an unsigned integer. Can add delay of 35 ps/step up to 280 ps.
+      - addr: 0xAA
+        name: REG_0xAA
+        fields:
+          - bits: 0
+            name: OUT4_STOP_HIGHZ
+            mode: RW
+            desc: Driver output state when stopped.
+            opts: *id007
+          - bits: 4
+            name: OUT4_CMOS_INV
+            mode: RW
+            desc: Sets the polarity of the two outputs in dual CMOS mode.
+            opts: *id008
+      - addr: 0xAB
+        name: REG_0xAB
+        fields:
+          - bits: '1:0'
+            name: OUT4_CMOS_SLEW
+            mode: RW
+            desc: Controls CMOS slew rate from fast to slow.
+            opts: *id009
+          - bits: 2
+            name: OUT4_CMOS_STR
+            mode: RW
+            desc: CMOS output impedance control.
+            opts: *id010
+      - addr: 0xAC
+        name: REG_0xAC
+        fields:
+          - bits: '3:0'
+            name: OUT5_MODE
+            mode: RW
+            desc: Software interpreted driver configuration.
+      - addr: 0xAD
+        name: REG_0xAD
+        fields:
+          - bits: '5:0'
+            name: OUT5_DIV
+            mode: RW
+            desc: Driver divider ratio. 0 = disabled. 1-63 = divide value.
+      - addr: 0xAE
+        name: REG_0xAE
+        fields:
+          - bits: '2:0'
+            name: OUT5_SKEW
+            mode: RW
+            desc: Skew control. Programmed as an unsigned integer. Can add delay of 35 ps/step up to 280 ps.
+      - addr: 0xAF
+        name: REG_0xAF
+        fields:
+          - bits: 0
+            name: OUT5_STOP_HIGHZ
+            mode: RW
+            desc: Driver output state when stopped.
+            opts: *id007
+          - bits: 4
+            name: OUT5_CMOS_INV
+            mode: RW
+            desc: Sets the polarity of the two outputs in dual CMOS mode.
+            opts: *id008
+      - addr: 0xB0
+        name: REG_0xB0
+        fields:
+          - bits: '1:0'
+            name: OUT5_CMOS_SLEW
+            mode: RW
+            desc: Controls CMOS slew rate from fast to slow.
+            opts: *id009
+          - bits: 2
+            name: OUT5_CMOS_STR
+            mode: RW
+            desc: CMOS output impedance control.
+            opts: *id010
+      - addr: 0xB6
+        name: REG_0xB6
+        fields:
+          - bits: 0
+            name: OUT0_OE
+            mode: RW
+            desc: Output enable control for OUT0
+          - bits: 1
+            name: OUT1_OE
+            mode: RW
+            desc: Output enable control for OUT1
+          - bits: 3
+            name: OUT2_OE
+            mode: RW
+            desc: Output enable control for OUT2
+          - bits: 6
+            name: OUT3_OE
+            mode: RW
+            desc: Output enable control for OUT3
+      - addr: 0xB7
+        name: REG_0xB7
+        fields:
+          - bits: 1
+            name: OUT4_OE
+            mode: RW
+            desc: Output enable control for OUT4
+          - bits: 2
+            name: OUT5_OE
+            mode: RW
+            desc: Output enable control for OUT5
+      - addr: 0x73
+        name: REG_0x73
+        fields:
+          - bits: '1:0'
+            name: CLKIN_2_CLK_SEL
+            mode: RW
+            desc: Select the CLKIN_2 input buffer mode.
+            opts: *id011
+      - addr: 0x24
+        name: REG_0x24
+        fields:
+          - bits: '1:0'
+            name: IMUX_SEL
+            mode: RW
+            desc: Selects input mux clock source.
+            opts: *id012
