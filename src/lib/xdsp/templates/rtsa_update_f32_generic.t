@@ -27,7 +27,7 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
     for(unsigned i = 0; i < fft_size; ++i)
     {
-        float p = fcale_mpy * wvlt_fastlog2(in[i][0]*in[i][0] + in[i][1]*in[i][1] + mine) + corr;
+        float p = fcale_mpy * log2f(in[i][0]*in[i][0] + in[i][1]*in[i][1] + mine) + corr;
         p -= st->upper_pwr_bound;
         p = fabs(p);
         p *= st->divs_for_dB;

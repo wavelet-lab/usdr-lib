@@ -16,8 +16,12 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     const __m256 v_mine        = _mm256_set1_ps(mine);
     const __m256 v_corr        = _mm256_set1_ps(corr - (float)st->upper_pwr_bound);
     const __m256 divs_for_dB   = _mm256_set1_ps((float)st->divs_for_dB);
+#ifdef USE_ACCURATE_LOG2
+    WVLT_LOG2_DECL_CONSTS;
+#else
     const __m256 log2_mul      = _mm256_set1_ps(WVLT_FASTLOG2_MUL);
     const __m256 log2_sub      = _mm256_set1_ps(WVLT_FASTLOG2_SUB);
+#endif
     const __m256 sign_bit      = _mm256_set1_ps(-0.0f);
     const __m256i v_depth      = _mm256_set1_epi32((int32_t)rtsa_depth);
     const __m256 max_ind       = _mm256_set1_ps((float)(rtsa_depth - 1) - 0.5f);
@@ -66,14 +70,18 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         //
         __m256 summ0 = _mm256_add_ps(sum0s, v_mine);
         __m256 summ1 = _mm256_add_ps(sum1s, v_mine);
-
+#ifdef USE_ACCURATE_LOG2
+        __m256 l2_res0, l2_res1;
+        WVLT_LOG2F8(summ0, l2_res0);
+        WVLT_LOG2F8(summ1, l2_res1);
+#else
         // fasterlog2
         //
         __m256 summ0_ = _mm256_cvtepi32_ps(_mm256_castps_si256(summ0));
         __m256 summ1_ = _mm256_cvtepi32_ps(_mm256_castps_si256(summ1));
         __m256 l2_res0 = _mm256_fmsub_ps(summ0_, log2_mul, log2_sub);
         __m256 l2_res1 = _mm256_fmsub_ps(summ1_, log2_mul, log2_sub);
-
+#endif
         // add scale & corr
         __m256 pwr0 = _mm256_fmadd_ps(l2_res0, v_scale_mpy, v_corr);
         __m256 pwr1 = _mm256_fmadd_ps(l2_res1, v_scale_mpy, v_corr);
