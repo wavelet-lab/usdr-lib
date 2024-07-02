@@ -51,37 +51,38 @@ struct rfic_gain_descriptor
     SoapySDR::Range range;
     const char* name;
     const char* altname;
+    const char* altname2;
     const char* property_name;
 };
 
 const rfic_gain_descriptor lms7_gains[] {
-    { SOAPY_SDR_RX, SoapySDR::Range(0.0, 30.0),   "LNA", nullptr, "/dm/sdr/0/rx/gain/lna" },
-    { SOAPY_SDR_RX, SoapySDR::Range(0.0, 12.0),   "TIA", "VGA",   "/dm/sdr/0/rx/gain/vga" },
-    { SOAPY_SDR_RX, SoapySDR::Range(-12.0, 19.0), "PGA", nullptr, "/dm/sdr/0/rx/gain/pga" },
-    { SOAPY_SDR_TX, SoapySDR::Range(-52.0, 0.0),  "PAD", nullptr, "/dm/sdr/0/tx/gain" },
-    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr }
+    { SOAPY_SDR_RX, SoapySDR::Range(0.0, 30.0),   "LNA", nullptr, nullptr, "/dm/sdr/0/rx/gain/lna" },
+    { SOAPY_SDR_RX, SoapySDR::Range(0.0, 12.0),   "TIA", "VGA",   "VGA1",  "/dm/sdr/0/rx/gain/vga" },
+    { SOAPY_SDR_RX, SoapySDR::Range(-12.0, 19.0), "PGA", "VGA2",  nullptr, "/dm/sdr/0/rx/gain/pga" },
+    { SOAPY_SDR_TX, SoapySDR::Range(-52.0, 0.0),  "PAD", nullptr, nullptr, "/dm/sdr/0/tx/gain" },
+    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
 const rfic_gain_descriptor lms6_gains[] {
-    { SOAPY_SDR_RX, SoapySDR::Range(0.0, 6.0),    "LNA",  nullptr, "/dm/sdr/0/rx/gain/lna" },
-    { SOAPY_SDR_RX, SoapySDR::Range(5, 31),       "VGA1", "TIA",   "/dm/sdr/0/rx/gain/vga" },
-    { SOAPY_SDR_RX, SoapySDR::Range(0, 60.0),     "VGA2", "PGA",   "/dm/sdr/0/rx/gain/pga" },
-    { SOAPY_SDR_TX, SoapySDR::Range(-35.0, -4),   "VGA1", nullptr, "/dm/sdr/0/tx/gain/vga1" },
-    { SOAPY_SDR_TX, SoapySDR::Range(0.0, 25.0),   "VGA2", nullptr, "/dm/sdr/0/tx/gain/vga2" },
-    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr }
+    { SOAPY_SDR_RX, SoapySDR::Range(0.0, 6.0),    "LNA",  nullptr, nullptr, "/dm/sdr/0/rx/gain/lna" },
+    { SOAPY_SDR_RX, SoapySDR::Range(5, 31),       "VGA1", "TIA",   nullptr, "/dm/sdr/0/rx/gain/vga" },
+    { SOAPY_SDR_RX, SoapySDR::Range(0, 60.0),     "VGA2", "PGA",   nullptr, "/dm/sdr/0/rx/gain/pga" },
+    { SOAPY_SDR_TX, SoapySDR::Range(-35.0, -4),   "VGA1", nullptr, nullptr, "/dm/sdr/0/tx/gain/vga1" },
+    { SOAPY_SDR_TX, SoapySDR::Range(0.0, 25.0),   "VGA2", nullptr, nullptr,  "/dm/sdr/0/tx/gain/vga2" },
+    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
 const rfic_gain_descriptor ad45lb49_gains[] {
-    { SOAPY_SDR_RX, SoapySDR::Range(0, 4),        "LNA",  "SEL",   "/dm/sdr/0/rx/gain/lna" },
-    { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "VGA",  "ATTN",  "/dm/sdr/0/rx/gain/vga" },
-    { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "PGA",  nullptr, "/dm/sdr/0/rx/gain/pga" },
-    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr }
+    { SOAPY_SDR_RX, SoapySDR::Range(0, 4),        "LNA",  "SEL",   nullptr, "/dm/sdr/0/rx/gain/lna" },
+    { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "VGA",  "ATTN",  nullptr, "/dm/sdr/0/rx/gain/vga" },
+    { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "PGA",  nullptr, nullptr, "/dm/sdr/0/rx/gain/pga" },
+    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
 const rfic_gain_descriptor unk_gains[] {
-    { SOAPY_SDR_RX, SoapySDR::Range(-99, 99),   "GRX", nullptr, "/dm/sdr/0/rx/gain" },
-    { SOAPY_SDR_TX, SoapySDR::Range(-99, 99),   "GTX", nullptr, "/dm/sdr/0/tx/gain" },
-    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr }
+    { SOAPY_SDR_RX, SoapySDR::Range(-99, 99),   "GRX", nullptr, nullptr, "/dm/sdr/0/rx/gain" },
+    { SOAPY_SDR_TX, SoapySDR::Range(-99, 99),   "GTX", nullptr, nullptr, "/dm/sdr/0/tx/gain" },
+    { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
 static inline const rfic_gain_descriptor* get_gains(rfic_type_t t) {
@@ -348,21 +349,26 @@ std::vector<std::string> SoapyUSDR::listGains(const int direction, const size_t 
 
 void SoapyUSDR::setGain(const int direction, const size_t channel, const double value)
 {
-    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setGain(%d, %d, %g dB)", direction, int(channel), value);
+    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setGain(%s, %d, %g dB)",
+                   direction == SOAPY_SDR_RX ? "RX" : "TX",
+                   int(channel), value);
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
 }
 
 void SoapyUSDR::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
-    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setGain(%d, %d, %s, %g dB)", direction, int(channel), name.c_str(), value);
+    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setGain(%s, %d, %s, %g dB)",
+                   direction == SOAPY_SDR_RX ? "RX" : "TX",
+                   int(channel), name.c_str(), value);
     const rfic_gain_descriptor* gains = get_gains(type);
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     const char* defparam = get_sdr_param(0, "gain", (direction == SOAPY_SDR_TX) ? "tx" : "rx", nullptr);
     unsigned i;
 
     for (i = 0; gains[i].name != nullptr; i++) {
-        if ((gains[i].direction == direction) && (name == gains[i].name || (gains[i].altname && name == gains[i].altname))) {
+        if ((gains[i].direction == direction) && (name == gains[i].name ||
+                (gains[i].altname && (name == gains[i].altname)) || (gains[i].altname2 && (name == gains[i].altname2)))) {
             defparam = gains[i].property_name;
             break;
         }
@@ -380,12 +386,15 @@ double SoapyUSDR::getGain(const int direction, const size_t channel, const std::
     const rfic_gain_descriptor* gains = get_gains(type);
     unsigned i;
     for (i = 0; gains[i].name != nullptr; i++) {
-        if ((gains[i].direction == direction) && (name == gains[i].name || (gains[i].altname && name == gains[i].altname))) {
+        if ((gains[i].direction == direction) && (name == gains[i].name ||
+                (gains[i].altname && (name == gains[i].altname)) || (gains[i].altname2 && (name == gains[i].altname2)))) {
             break;
         }
     }
 
-    SoapySDR::logf(SOAPY_SDR_DEBUG, "SoapyUSDR::getGain(%d, %d, %s) => %g dB", direction, int(channel), name.c_str(), _actual_gains[i]);
+    SoapySDR::logf(SOAPY_SDR_DEBUG, "SoapyUSDR::getGain(%s, %d, %s) => %g dB",
+                   direction == SOAPY_SDR_RX ? "RX" : "TX",
+                   int(channel), name.c_str(), _actual_gains[i]);
     return _actual_gains[i];
 }
 
@@ -431,7 +440,9 @@ SoapySDR::ArgInfoList SoapyUSDR::getFrequencyArgsInfo(const int direction, const
 void SoapyUSDR::setFrequency(const int direction, const size_t channel, const std::string &name, const double frequency, const SoapySDR::Kwargs &/*args*/)
 {
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setFrequency(%d, %s, %g MHz)", int(channel), name.c_str(), frequency/1e6);
+    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setFrequency(%s, %d, %s, %g MHz)",
+                   direction == SOAPY_SDR_RX ? "RX" : "TX",
+                   int(channel), name.c_str(), frequency/1e6);
     int res;
 
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
