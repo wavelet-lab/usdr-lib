@@ -306,7 +306,7 @@ private:
         bool setup = false;
         std::atomic<bool> active;
 
-        ring_circbuf_t* rxcbuf  = nullptr;
+        std::vector<ring_circbuf_t*> rxcbuf;
     };
 
     const char* get_sdr_param(int sdridx, const char* dir, const char* par, const char* subpar);
@@ -315,6 +315,9 @@ private:
 
     std::shared_ptr<usdr_handle> _dev;
     char _param_name[128];
+
+    unsigned _rx_log_chans = 0;
+    unsigned _tx_log_chans = 0;
 
     unsigned _actual_tx_rate;
     unsigned _actual_rx_rate;

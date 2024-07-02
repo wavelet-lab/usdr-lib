@@ -1079,6 +1079,11 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     //     res = usdr_dms_sync(_dev->dev(), "rx", 2, pstr);
     // }
 
+    if (direction == SOAPY_SDR_RX) {
+        _rx_log_chans = num_channels;
+    } else {
+        _tx_log_chans = num_channels;
+    }
 
     return (SoapySDR::Stream *)&_streams[direction];
 }
@@ -1096,9 +1101,11 @@ void SoapyUSDR::closeStream(SoapySDR::Stream *stream)
         ustr->strm = NULL;
     }
 
-    if (ustr->rxcbuf) {
-        ring_circbuf_destroy(ustr->rxcbuf);
-        ustr->rxcbuf = NULL;
+    if (ustr->rxcbuf.size() > 0) {
+        for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
+            ring_circbuf_destroy(ustr->rxcbuf[i]);
+        }
+        ustr->rxcbuf.resize(0);
     }
 
     ustr->setup = false;
@@ -1181,7 +1188,7 @@ int SoapyUSDR::readStream(
         numElems = std::min(numElems, (size_t)ustr->nfo.pktsyms);
     }
 
-    if (ustr->rxcbuf) {
+    if (ustr->rxcbuf.size() > 0) {
         // Single channel mode only atm
         size_t req_bytes = numElems * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
         do {
@@ -1190,8 +1197,10 @@ int SoapyUSDR::readStream(
             //         (long long)ustr->rxcbuf->rpos,
             //         (long long)req_bytes);
 
-            if (ring_circbuf_rspace(ustr->rxcbuf) >= req_bytes) {
-                ring_circbuf_read(ustr->rxcbuf, buffs[0], req_bytes);
+            if (ring_circbuf_rspace(ustr->rxcbuf[0]) >= req_bytes) {
+                for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
+                    ring_circbuf_read(ustr->rxcbuf[i], buffs[i], req_bytes);
+                }
 
                 flags &= ~SOAPY_SDR_HAS_TIME;
                 timeNs = 0;
@@ -1199,10 +1208,16 @@ int SoapyUSDR::readStream(
             }
 
             // We don't have enough data here
-            void* chans[2] = { ring_circbuf_wptr(ustr->rxcbuf), ring_circbuf_wptr(ustr->rxcbuf) };
+            void* chans[64];
+            for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
+                chans[i] = ring_circbuf_wptr(ustr->rxcbuf[i]);
+            }
+
             res = usdr_dms_recv(ustr->strm, chans, timeoutUs / 1000, &nfo);
             if (res == 0) {
-                ustr->rxcbuf->wpos += ustr->nfo.pktbszie;
+                for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
+                    ustr->rxcbuf[i]->wpos += ustr->nfo.pktbszie;
+                }
                 last_recv_pkt_time = nfo.fsymtime;
             }
         } while (res == 0);
@@ -1219,7 +1234,11 @@ int SoapyUSDR::readStream(
 
             SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::readStream(%s) requested %d but block is configured for %d, injecting jitter buffer of %d bytes. Performance will be degraded",
                            ustr->stream, numElems, ustr->nfo.pktsyms, blksz_bytes);
-            ustr->rxcbuf = ring_circbuf_create(blksz_bytes);
+
+            ustr->rxcbuf.resize(_rx_log_chans);
+            for (unsigned i = 0; i < _rx_log_chans; i++) {
+                ustr->rxcbuf[i] = ring_circbuf_create(blksz_bytes);
+            }
 
             // Reenter
             return readStream(stream, buffs, numElems, flags, timeNs, timeoutUs);
