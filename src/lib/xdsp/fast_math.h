@@ -132,7 +132,7 @@ static inline
 #define WVLT_POLYLOG2F8(in, out) \
 { \
         int32x4_t   i = vreinterpretq_s32_f32(in); \
-        float32x4_t e = vcvtq_f32_s32(vsraq_s32(wvlt_log2_v127, vandq_s32(i, wvlt_log2_exp), 23)); \
+        float32x4_t e = vcvtq_f32_s32(vsraq_n_s32(wvlt_log2_v127, vandq_s32(i, wvlt_log2_exp), 23)); \
         float32x4_t m = vreinterpretq_f32_s32(vorrq_s32(vandq_s32(i, wvlt_log2_mant), wvlt_log2_i_one)); \
   \
         /* Minimax polynomial fit of log2(x)/(x - 1), for x in range [1, 2[ */ \
