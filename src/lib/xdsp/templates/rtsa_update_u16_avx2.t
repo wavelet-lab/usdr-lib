@@ -16,8 +16,8 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     const __m256 v_mine        = _mm256_set1_ps(mine);
     const __m256 v_corr        = _mm256_set1_ps(corr - (float)st->upper_pwr_bound);
     const __m256 divs_for_dB   = _mm256_set1_ps((float)st->divs_for_dB);
-#ifdef USE_ACCURATE_LOG2
-    WVLT_LOG2_DECL_CONSTS;
+#ifdef USE_POLYLOG2
+    WVLT_POLYLOG2_DECL_CONSTS;
 #else
     const __m256 log2_mul      = _mm256_set1_ps(WVLT_FASTLOG2_MUL);
     const __m256 log2_sub      = _mm256_set1_ps(WVLT_FASTLOG2_SUB);
@@ -70,10 +70,11 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         //
         __m256 summ0 = _mm256_add_ps(sum0s, v_mine);
         __m256 summ1 = _mm256_add_ps(sum1s, v_mine);
-#ifdef USE_ACCURATE_LOG2
+
+#ifdef USE_POLYLOG2
         __m256 l2_res0, l2_res1;
-        WVLT_LOG2F8(summ0, l2_res0);
-        WVLT_LOG2F8(summ1, l2_res1);
+        WVLT_POLYLOG2F8(summ0, l2_res0);
+        WVLT_POLYLOG2F8(summ1, l2_res1);
 #else
         // fasterlog2
         //

@@ -10,7 +10,7 @@
 #include "fast_math.h"
 
 
-#define USE_ACCURATE_LOG2
+#define USE_POLYLOG2
 
 VWLT_ATTRIBUTE(optimize("-O3"))
 void rtsa_init(fft_rtsa_data_t* rtsa_data, unsigned fft_size)
