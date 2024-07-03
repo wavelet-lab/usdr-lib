@@ -6,6 +6,7 @@
 #include "attribute_switch.h"
 #include "fast_math.h"
 
+#define USE_POLYLOG2
 
 #define TEMPLATE_FUNC_NAME fftad_init_generic
 VWLT_ATTRIBUTE(optimize("-O3"))
