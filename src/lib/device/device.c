@@ -130,7 +130,7 @@ int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objec
     vfs_object_t *nodes = (vfs_object_t *)root->data.obj;
 
     unsigned i, cnt;
-    for (i = 0, cnt = 0; cnt < max_objects && i < root->eparam[1]; i++) {
+    for (i = 0, cnt = 0; cnt < max_objects && i < root->eparam[0]; i++) {
         if (fnmatch(filter, nodes[i].full_path, FNM_NOESCAPE) == 0) {
             objs[cnt].fullpath = nodes[i].full_path;
             cnt++;
@@ -145,7 +145,7 @@ int _usdr_device_vfs_get_by_path(device_t *base, const char* filter, pusdr_vfs_o
     vfs_object_t *root = &base->rootfs;
     vfs_object_t *nodes = (vfs_object_t *)root->data.obj;
 
-    for (unsigned i = 0; i < base->rootfs.eparam[1]; i++) {
+    for (unsigned i = 0; i < base->rootfs.eparam[0]; i++) {
         if (fnmatch(filter, nodes[i].full_path, FNM_NOESCAPE) == 0) {
             *obj = &nodes[i];
             return 0;
