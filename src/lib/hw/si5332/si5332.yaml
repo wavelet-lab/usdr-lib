@@ -6,7 +6,7 @@ revision: 0.0.1
 processors:
   - c
 bus:
-  type: SPI
+  type: I2C
   wr_mask: 0x800000
   usdr_path: /debug/hw/si5332/0/reg
 addr_width: 16
