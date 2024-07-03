@@ -100,6 +100,8 @@ struct dev_fe {
     uint32_t debug_pciefe_last;
     uint32_t debug_pciefe_cmd_last;
     uint32_t debug_ext_fe_100_5000_cmd_last;
+    uint32_t debug_lmk05318_last;
+    uint32_t debug_lmk5c33216_last;
 };
 typedef struct dev_fe dev_fe_t;
 
@@ -306,11 +308,11 @@ int _debug_pciefe_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
     if (value & 0x800000) {
         res = board_ext_pciefe_ereg_wr(&o->fe.devboard, addr, data);
         USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug PCIEFE WR REG %04x => %04x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr, data);
+                 lowlevel_get_devname(o->fe.devboard.dev), (unsigned)addr, data);
     } else {
         res = board_ext_pciefe_ereg_rd(&o->fe.devboard, addr, &o->debug_pciefe_last);
         USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug PCIEFE RD REG %04x <= %04x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr,
+                 lowlevel_get_devname(o->fe.devboard.dev), (unsigned)addr,
                  o->debug_pciefe_last);
     }
 
@@ -336,11 +338,11 @@ int _debug_ext_fe_100_5000_cmd_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t
     if (value & 0x80000000) {
         res = ext_fe_100_5000_cmd_wr(&o->fe.fe_100_5000, addr, data);
         USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug FE_100_5000 WR CMD %04x => %06x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr, data);
+                 lowlevel_get_devname(o->fe.fe_100_5000.dev), (unsigned)addr, data);
     } else {
         res = ext_fe_100_5000_cmd_rd(&o->fe.fe_100_5000, addr, &o->debug_ext_fe_100_5000_cmd_last);
         USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug FE_100_5000 RD CMD %04x <= %06x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr,
+                 lowlevel_get_devname(o->fe.fe_100_5000.dev), (unsigned)addr,
                  o->debug_ext_fe_100_5000_cmd_last);
     }
     return res;
@@ -367,12 +369,12 @@ int _debug_pciefe_cmd_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
         res = board_ext_pciefe_cmd_wr(&o->fe.devboard, addr, data);
 
         USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug PCIEFE WR CMD %04x => %04x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr, data);
+                 lowlevel_get_devname(o->fe.devboard.dev), (unsigned)addr, data);
     } else {
         res = board_ext_pciefe_cmd_rd(&o->fe.devboard, addr, &o->debug_pciefe_cmd_last);
 
         USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug PCIEFE RD CMD %04x <= %04x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr,
+                 lowlevel_get_devname(o->fe.devboard.dev), (unsigned)addr,
                  o->debug_pciefe_cmd_last);
     }
 
@@ -383,7 +385,7 @@ int _debug_pciefe_cmd_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
 int _debug_lmk05318_reg_get(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     dev_fe_t* o = (dev_fe_t*)obj->object;
-    *ovalue = o->debug_pciefe_last;
+    *ovalue = o->debug_lmk05318_last;
     return 0;
 }
 
@@ -396,23 +398,21 @@ int _debug_lmk05318_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
     unsigned data = value & 0xff;
     uint8_t d;
 
-    o->debug_pciefe_last = ~0u;
+    o->debug_lmk05318_last = ~0u;
 
     if (value & 0x800000) {
-        //res = lmk05318_reg_wr(&_usdr_ext_i2c, ud->dev, 0, 0x65 << 16, addr, data);
         res = lmk05318_reg_wr(&o->fe.simplesync.lmk, addr, data);
 
-        USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: LMK05318 WR REG %04x => %04x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr, data);
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK05318 WR REG %04x => %04x\n",
+                (unsigned)addr, data);
     } else {
         d = 0xff;
-        //res = lmk_05318b_reg_rd(&_usdr_ext_i2c, ud->dev, 0, 0x65 << 16, addr, &d);
         res = lmk05318_reg_rd(&o->fe.simplesync.lmk, addr, &d);
-        o->debug_pciefe_last = d;
+        o->debug_lmk05318_last = d;
 
-        USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: LMK05318 RD REG %04x <= %04x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr,
-                 o->debug_pciefe_last);
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK05318 RD REG %04x <= %04x\n",
+                 (unsigned)addr,
+                 o->debug_lmk05318_last);
     }
 
     return res;
@@ -428,7 +428,7 @@ int _debug_lmk05318_calfreq_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t va
 int _debug_lmk5c33216_reg_get(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     dev_fe_t* o = (dev_fe_t*)obj->object;
-    *ovalue = o->debug_pciefe_last;
+    *ovalue = o->debug_lmk5c33216_last;
     return 0;
 }
 
@@ -441,21 +441,21 @@ int _debug_lmk5c33216_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t valu
     unsigned data = value & 0xff;
     uint8_t d;
 
-    o->debug_pciefe_last = ~0u;
+    o->debug_lmk5c33216_last = ~0u;
 
     if (value & 0x800000) {
         res = lmk_5c33216_reg_wr(&o->fe.supersync.lmk, addr, data);
 
-        USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: LMK5C33216 WR REG %04x => %04x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr, data);
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK5C33216 WR REG %04x => %04x\n",
+                 (unsigned)addr, data);
     } else {
         d = 0xff;
         res = lmk_5c33216_reg_rd(&o->fe.supersync.lmk, addr, &d);
-        o->debug_pciefe_last = d;
+        o->debug_lmk5c33216_last = d;
 
-        USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: 5C33216 RD REG %04x <= %04x\n",
-                 lowlevel_get_devname(o->parent_dev), (unsigned)addr,
-                 o->debug_pciefe_last);
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "5C33216 RD REG %04x <= %04x\n",
+                 (unsigned)addr,
+                 o->debug_lmk5c33216_last);
     }
 
     return res;
