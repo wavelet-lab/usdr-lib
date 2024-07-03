@@ -101,4 +101,49 @@ static inline
 
 #endif
 
+#ifdef WVLT_NEON
+
+#define WVLT_LOG2_POLY0(x, c0) vdupq_n_f32(c0)
+#define WVLT_LOG2_POLY1(x, c0, c1) vmlaq_f32(vdupq_n_f32(c0), WVLT_LOG2_POLY0(x, c1), x)
+#define WVLT_LOG2_POLY2(x, c0, c1, c2) vmlaq_f32(vdupq_n_f32(c0), WVLT_LOG2_POLY1(x, c1, c2), x)
+#define WVLT_LOG2_POLY3(x, c0, c1, c2, c3) vmlaq_f32(vdupq_n_f32(c0), WVLT_LOG2_POLY2(x, c1, c2, c3), x)
+#define WVLT_LOG2_POLY4(x, c0, c1, c2, c3, c4) vmlaq_f32(vdupq_n_f32(c0), WVLT_LOG2_POLY3(x, c1, c2, c3, c4), x)
+#define WVLT_LOG2_POLY5(x, c0, c1, c2, c3, c4, c5) vmlaq_f32(vdupq_n_f32(c0), WVLT_LOG2_POLY4(x, c1, c2, c3, c4, c5), x)
+
+#define WVLT_POLYLOG2_DECL_CONSTS \
+    const int32x4_t   wvlt_log2_exp   = vdupq_n_s32(0x7F800000); \
+    const int32x4_t   wvlt_log2_mant  = vdupq_n_s32(0x007FFFFF); \
+    const float32x4_t wvlt_log2_f_one = vdupq_n_f32(1.0f); \
+    const int32x4_t   wvlt_log2_i_one = vreinterpretq_s32_f32(wvlt_log2_f_one); \
+    const int32x4_t   wvlt_log2_v127  = vdupq_n_s32(-127);
+
+#if   LOG_POLY_DEGREE == 3
+#define WVLT_LOG2_POLY_APPROX(x) WVLT_LOG2_POLY2(x, 2.28330284476918490682f, -1.04913055217340124191f, 0.204446009836232697516f)
+#elif LOG_POLY_DEGREE == 4
+#define WVLT_LOG2_POLY_APPROX(x) WVLT_LOG2_POLY3(x, 2.61761038894603480148f, -1.75647175389045657003f, 0.688243882994381274313f, -0.107254423828329604454f)
+#elif LOG_POLY_DEGREE == 5
+#define WVLT_LOG2_POLY_APPROX(x) WVLT_LOG2_POLY4(x, 2.8882704548164776201f, -2.52074962577807006663f, 1.48116647521213171641f, -0.465725644288844778798f, 0.0596515482674574969533f)
+#elif LOG_POLY_DEGREE == 6
+#define WVLT_LOG2_POLY_APPROX(x) WVLT_LOG2_POLY5(x, 3.1157899f, -3.3241990f, 2.5988452f, -1.2315303f,  3.1821337e-1f, -3.4436006e-2f)
+#else
+#error
+#endif
+
+#define WVLT_POLYLOG2F8(in, out) \
+{ \
+        int32x4_t   i = vreinterpretq_s32_f32(in); \
+        float32x4_t e = vcvtq_f32_s32(vsraq_s32(wvlt_log2_v127, vandq_s32(i, wvlt_log2_exp), 23)); \
+        float32x4_t m = vreinterpretq_f32_s32(vorrq_s32(vandq_s32(i, wvlt_log2_mant), wvlt_log2_i_one)); \
+  \
+        /* Minimax polynomial fit of log2(x)/(x - 1), for x in range [1, 2[ */ \
+        float32x4_t p = WVLT_LOG2_POLY_APPROX(m); \
+  \
+        /* This effectively increases the polynomial degree by one, but ensures that log2(1) == 0*/ \
+        p = vmulq_f32(p, vsubq_f32(m, wvlt_log2_f_one)); \
+  \
+        out = vaddq_f32(p, e); \
+}
+
+#endif
+
 #endif // FAST_MATH_H
