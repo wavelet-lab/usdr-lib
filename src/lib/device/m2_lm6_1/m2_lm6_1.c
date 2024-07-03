@@ -146,6 +146,12 @@ static int dev_m2_lm6_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, u
 static int dev_m2_lm6_1_debug_lms6002d_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_debug_lms6002d_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
+static int dev_m2_lm6_1_debug_si5332_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_debug_si5332_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
+static int dev_m2_lm6_1_debug_tps6381x_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_debug_tps6381x_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
 static int dev_m2_lm6_1_i2c_addr_ext_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm6_1_sdr_atcrbs_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -208,6 +214,9 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/tx/waveform_gen", { dev_m2_lm6_1_sdr_tx_waveform_gen_set, NULL}},
 
     { "/debug/hw/lms6002d/0/reg",  { dev_m2_lm6_1_debug_lms6002d_reg_set, dev_m2_lm6_1_debug_lms6002d_reg_get }},
+    { "/debug/hw/si5332/0/reg",    { dev_m2_lm6_1_debug_si5332_reg_set, dev_m2_lm6_1_debug_si5332_reg_get }},
+    { "/debug/hw/tps6381x/0/reg",  { dev_m2_lm6_1_debug_tps6381x_reg_set, dev_m2_lm6_1_debug_tps6381x_reg_get }},
+
 
     { "/dm/sdr/0/tx/enable",      { dev_m2_lm6_1_sdr_tx_enable_set, NULL }},
 
@@ -230,6 +239,9 @@ struct dev_m2_lm6_1 {
     struct dev_fe* fe;
 
     uint32_t debug_lms6002d_last;
+    uint32_t debug_si5332_last;
+    uint32_t debug_tps6381x_last;
+    uint32_t debug_lp8758_last;
 
     stream_handle_t* rx;
     stream_handle_t* tx;
@@ -326,6 +338,57 @@ int dev_m2_lm6_1_debug_lms6002d_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
     *ovalue = d->debug_lms6002d_last;
     return 0;
 }
+
+int dev_m2_lm6_1_debug_si5332_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    uint8_t data[2] = { value >> 8, value};
+    uint8_t out = ~0;
+    bool wr = (value & 0x800000);
+    int res = lowlevel_get_ops(d->base.dev)->ls_op(d->base.dev, 0,
+                                                   USDR_LSOP_I2C_DEV, I2C_BUS_SI5332A,
+                                                   wr ? 0 : 1, &out,
+                                                   wr ? 2 : 1, data);
+
+    USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug SI5322 REG %02x => %02x\n",
+             lowlevel_get_devname(d->base.dev), (unsigned)value, out);
+
+    d->debug_si5332_last = out;
+    return res;
+}
+
+int dev_m2_lm6_1_debug_si5332_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    *ovalue = d->debug_si5332_last;
+    return 0;
+}
+
+int dev_m2_lm6_1_debug_tps6381x_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    uint8_t data[2] = { value >> 8, value};
+    uint8_t out = ~0;
+    bool wr = (value & 0x8000);
+    int res = lowlevel_get_ops(d->base.dev)->ls_op(d->base.dev, 0,
+                                                   USDR_LSOP_I2C_DEV, I2C_BUS_TPS63811,
+                                                   wr ? 0 : 1, &out,
+                                                   wr ? 2 : 1, data);
+
+    USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug TPS6381X REG %02x => %02x\n",
+             lowlevel_get_devname(d->base.dev), (unsigned)value, out);
+
+    d->debug_tps6381x_last = out;
+    return res;
+}
+
+int dev_m2_lm6_1_debug_tps6381x_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    *ovalue = d->debug_tps6381x_last;
+    return 0;
+}
+
 
 int dev_m2_lm6_1_sdr_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue)
 {
