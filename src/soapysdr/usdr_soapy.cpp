@@ -120,7 +120,7 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
 {
     SoapySDR::logf(SOAPY_SDR_ERROR, "Make connection: '%s'", args.count("dev") ? args.at("dev").c_str() : "*");
 
-    for (auto i: args) {
+    for (auto& i: args) {
         SoapySDR::logf(SOAPY_SDR_ERROR, "Param %s => %s", i.first.c_str(), i.second.c_str());
     }
 
@@ -132,6 +132,7 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
     }
 #endif
     std::string dev = (args.count("dev")) ? args.at("dev") : "";
+    //std::string bus = (args.count("bus")) ? args.at("bus") : "";
 
     if (args.count("loglevel")) {
         loglevel = std::stoi(args.at("loglevel"));
@@ -142,6 +143,13 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
         }
         dev += "fe=";
         dev += args.at("fe").c_str();
+    }
+    if (args.count("bus")) {
+        if (dev.length() > 0) {
+            dev += ",";
+        }
+        dev += "bus=";
+        dev += args.at("bus").c_str();
     }
 
     usdrlog_setlevel(NULL, loglevel);
@@ -950,18 +958,26 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
         const std::vector<size_t> &channels,
         const SoapySDR::Kwargs &args)
 {
-    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setupStream(%s, %s, %d)\n",
-                   direction == SOAPY_SDR_RX ? "RX" : "TX", format.c_str(), (unsigned)channels.size());
-
-    //TODO: multi stream
     size_t num_channels = channels.size();
-    if (num_channels < 1)
+    size_t chmsk = 0;
+    if (num_channels < 1) {
         num_channels = 1;
-    size_t chmsk = (num_channels == 1) ? 0x1 : 0x3;
+        chmsk = 1;
+    } else {
+        for (size_t ch: channels) {
+            if (chmsk & (1 << ch)) {
+                throw std::runtime_error(std::string("SoapyUSDR::setupStream channel ") + std::to_string(ch) + " is already in channels mask!");
+            }
+            chmsk |= 1 << ch;
+        }
+    }
+
     unsigned pktSamples = 0;
     const char* uformat = (format == SOAPY_SDR_CF32) ? "cf32" :
                           (format == SOAPY_SDR_CS16) ? "ci16" : NULL;
 
+    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setupStream(%s, %s, Chans %d [0x%02x])\n",
+                   direction == SOAPY_SDR_RX ? "RX" : "TX", format.c_str(), (unsigned)channels.size(), chmsk);
 
     if (args.count("linkFormat")) {
         const std::string& link_fmt = args.at("linkFormat");

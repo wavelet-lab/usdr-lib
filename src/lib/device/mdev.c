@@ -65,9 +65,8 @@ struct dev_multi {
     stream_handle_t* real_str_rx[DEV_MAX];
     stream_handle_t* real_str_tx[DEV_MAX];
 
-    // Tmp
-    // usdr_vfs_obj_base_t sobj;
-    // usdr_vfs_obj_ops_t sops;
+    // FIXUP! Remove me after fixing vfs operations
+    vfs_object_t vfs_obj;
 };
 typedef struct dev_multi dev_multi_t;
 
@@ -137,18 +136,15 @@ struct lowlevel_ops s_mdev_ops = {
 
 
 
-
-
-
-static int _mdev_obj_set(pdevice_t ud, pusdr_vfs_obj_t vfsobj, uint64_t value)
+static int _mdev_obj_set_i64(pusdr_vfs_obj_t vfsobj, uint64_t value)
 {
-    dev_multi_t* obj = container_of(ud, dev_multi_t, virt_dev);
+    dev_multi_t* obj = (dev_multi_t*)vfsobj->object;
     int res;
 
     for (unsigned i = 0; i < obj->cnt; i++) {
         pdevice_t child_dev = obj->real[i]->pdev;
         res = usdr_device_vfs_obj_val_set_by_path(child_dev, vfsobj->full_path, value);
-        abort();
+
         if (res) {
             return res;
         }
@@ -159,9 +155,9 @@ static int _mdev_obj_set(pdevice_t ud, pusdr_vfs_obj_t vfsobj, uint64_t value)
     return 0;
 }
 
-static int _mdev_obj_get(pdevice_t ud, pusdr_vfs_obj_t vfsobj, uint64_t* ovalue)
+static int _mdev_obj_get_i64(pusdr_vfs_obj_t vfsobj, uint64_t* ovalue)
 {
-    dev_multi_t* obj = container_of(ud, dev_multi_t, virt_dev);
+    dev_multi_t* obj = (dev_multi_t*)vfsobj->object;
     pdevice_t child_dev = obj->real[0]->pdev;
     int res;
 
@@ -178,28 +174,28 @@ static int _mdev_obj_get(pdevice_t ud, pusdr_vfs_obj_t vfsobj, uint64_t* ovalue)
     return res;
 }
 
-static usdr_vfs_obj_ops_t _mdev_vfs_obj = {
-    _mdev_obj_set,
-    _mdev_obj_get,
-};
-
 
 int _mdev_get_obj(pdevice_t dev, const char* fullpath, pusdr_vfs_obj_t *vfsobj)
 {
-    // TODO: GET RID of it
-    // static vfs_object_t obj;
-    dev_multi_t* obj =  container_of(dev, dev_multi_t, virt_dev);
+    dev_multi_t* obj = container_of(dev, dev_multi_t, virt_dev);
+    vfs_object_t *vfso = &obj->vfs_obj;
 
-    // obj->sobj.ops = &_mdev_vfs_obj;
-    // obj->sobj.fullpath = fullpath;
-    // obj->sobj.uid = 0;
-    // obj->sobj.defaccesslist = 0;
-    //memcpy(obj, vfsobj, sizeof())
+    vfso->type = VFST_I64;
+    vfso->amask = 0;
+    vfso->eparam[0] = 0;
+    vfso->eparam[1] = 0;
+    vfso->eparam[2] = 0;
+    vfso->object = obj;
+    vfso->ops.si64 = &_mdev_obj_set_i64;
+    vfso->ops.gi64 = &_mdev_obj_get_i64;
+    vfso->ops.sstr = NULL;
+    vfso->ops.gstr = NULL;
+    vfso->ops.sai64 = NULL;
+    vfso->ops.gai64 = NULL;
+    vfso->data.i64 = 0;
+    strncpy(vfso->full_path, fullpath, sizeof(vfso->full_path));
 
-    abort();
-
-
-    //*vfsobj = &obj;
+    *vfsobj = vfso;
     return 0;
 }
 
@@ -363,24 +359,25 @@ int _mdev_create_stream(device_t* dev, const char* sid, const char* dformat,
     int res;
 
     // Bifurcate to children
-    uint64_t m = channels;
     unsigned pcnt = 0;
-    for (unsigned i = 0; i < obj->cnt; i++, m >>= choff) {
-        uint64_t child_msk = (m & chmsk);
+    for (unsigned i = 0; i < obj->cnt; i++) {
+        uint64_t child_msk = ((channels >> (choff * i)) & chmsk);
         mstr->dev_mask[i] = false;
         if (child_msk == 0) {
-            USDR_LOG("DSTR", USDR_LOG_TRACE, "Device %d ignored\n", i);
+            USDR_LOG("MDEV", USDR_LOG_TRACE, "Device %d ignored\n", i);
             continue;
         }
 
         if (real_str[i]) {
-            USDR_LOG("DSTR", USDR_LOG_WARNING, "Device %d stream is already in use!\n", i);
+            USDR_LOG("MDEV", USDR_LOG_WARNING, "Device %d stream is already in use!\n", i);
             return -EBUSY;
         }
 
+        USDR_LOG("MDEV", USDR_LOG_ERROR, "Creating stream for dev %d with %x mask (child chans %d)\n",
+                 i, (unsigned)child_msk, choff);
         pdevice_t child_dev = obj->real[i]->pdev;
         res = child_dev->create_stream(child_dev, sid, dformat, child_msk, pktsyms, flags,
-                                           &real_str[i]);
+                                       &real_str[i]);
         if (res)
             return res;
 
@@ -488,8 +485,10 @@ int _mdev_unregister_stream(device_t* dev, stream_handle_t* stream)
 
     int i, idx;
     for (i = 0; i < str->dev_cnt; i++) {
+        pdevice_t child_dev = obj->real[i]->pdev;
         idx = str->dev_idx[i];
-        real_str[idx]->ops->destroy(real_str[idx]);
+
+        child_dev->unregister_stream(child_dev, real_str[idx]);
         real_str[idx] = NULL;
     }
 
@@ -499,9 +498,6 @@ int _mdev_unregister_stream(device_t* dev, stream_handle_t* stream)
 static
 void _mdev_destroy(device_t *udev)
 {
-    // dev_multi_t* obj =  container_of(udev, dev_multi_t, virt_dev);
-
-
     USDR_LOG("MDEV", USDR_LOG_INFO, "MDevice destroy\n");
     usdr_device_base_destroy(udev);
 }

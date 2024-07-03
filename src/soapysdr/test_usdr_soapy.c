@@ -7,9 +7,35 @@
 #include <stdio.h> //printf
 #include <stdlib.h> //free
 #include <complex.h>
+#include <unistd.h>
 
-int main(void)
+#define MAX_CHANS       16
+#define MAX_PACKETSIZE  4096
+
+int main(int argc, char** argv)
 {
+    int opt;
+    const char* device = "";
+    unsigned channels = 1;
+
+    size_t act_channels[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+
+    while ((opt = getopt(argc, argv, "d:c:")) != -1) {
+        switch (opt) {
+        case 'd':
+            device = optarg;
+            break;
+        case 'c':
+            channels = atoi(optarg);
+            break;
+        }
+    }
+
+    if (channels == 0 || channels > MAX_CHANS) {
+        printf("Number of channels should be in range [1;%d]!\n", MAX_CHANS);
+        exit(1);
+    }
+
     size_t length;
 
     //enumerate devices
@@ -35,6 +61,9 @@ int main(void)
     SoapySDRKwargs args = {};
     SoapySDRKwargs_set(&args, "driver", "usdr");
     SoapySDRKwargs_set(&args, "loglvl", "2");
+    if (*device != 0) {
+        SoapySDRKwargs_set(&args, "bus", device);
+    }
     SoapySDRDevice *sdr = SoapySDRDevice_make(&args);
     SoapySDRKwargs_clear(&args);
 
@@ -83,23 +112,26 @@ int main(void)
     //setup a stream (complex floats)
     SoapySDRStream *rxStream;
 #if (SOAPY_SDR_API_VERSION < 0x00080000)
-    if (SoapySDRDevice_setupStream(sdr, &rxStream, SOAPY_SDR_RX, SOAPY_SDR_CF32, NULL, 0, NULL) != 0) {
+    if (SoapySDRDevice_setupStream(sdr, &rxStream, SOAPY_SDR_RX, SOAPY_SDR_CF32, act_channels, channels, NULL) != 0) {
 #else
-    if ((rxStream = SoapySDRDevice_setupStream(sdr, SOAPY_SDR_RX, SOAPY_SDR_CF32, NULL, 0, NULL)) != NULL) {
+    if ((rxStream = SoapySDRDevice_setupStream(sdr, SOAPY_SDR_RX, SOAPY_SDR_CF32, act_channels, channels, NULL)) != NULL) {
 #endif
         printf("setupStream fail: %s\n", SoapySDRDevice_lastError());
     }
     SoapySDRDevice_activateStream(sdr, rxStream, 0, 0, 0); //start streaming
 
     //create a re-usable buffer for rx samples
-    complex float buff[4096];
+    float buff[2 * MAX_CHANS * MAX_PACKETSIZE];
+    void* buffs[MAX_CHANS];
+    for (unsigned j = 0; j < MAX_CHANS; j++) {
+        buffs[j] = &buff[2 * j * MAX_PACKETSIZE];
+    }
 
     //receive some samples
     for (size_t i = 0; i < 10; i++) {
-        void* buffs[] = {buff}; //array of buffers
         int flags; //flags set by receive operation
         long long timeNs; //timestamp for receive buffer
-        int ret = SoapySDRDevice_readStream(sdr, rxStream, buffs, 4096, &flags, &timeNs, 100000);
+        int ret = SoapySDRDevice_readStream(sdr, rxStream, buffs, MAX_PACKETSIZE, &flags, &timeNs, 100000);
         printf("ret=%d, flags=%d, timeNs=%lld\n", ret, flags, timeNs);
     }
 
