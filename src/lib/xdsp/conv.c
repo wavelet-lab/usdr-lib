@@ -10,7 +10,9 @@
 #include "conv_2ci16_ci16_2.h"
 #include "conv_ci16_2ci16_2.h"
 #include "conv_i12_f32_2.h"
+#include "conv_f32_i12_2.h"
 #include "conv_ci12_2cf32_2.h"
+#include "conv_2cf32_ci12_2.h"
 
 #include <strings.h>
 #include <string.h>
@@ -64,9 +66,14 @@ static unsigned tr_dummy_sz(unsigned inbytes, bool reverse)
 static unsigned tr_conv_i12_f32_sz(unsigned inbytes, bool reverse)
 {
     if (reverse)
-        return inbytes * 3 / 3;
-    else
         return inbytes * 3 / 8;
+    else
+        return inbytes * 8 / 3;
+}
+
+static unsigned tr_conv_f32_i12_sz(unsigned inbytes, bool reverse)
+{
+    return tr_conv_i12_f32_sz(inbytes, !reverse);
 }
 
 static unsigned tr_conv_i16_f32_sz(unsigned inbytes, bool reverse)
@@ -79,10 +86,7 @@ static unsigned tr_conv_i16_f32_sz(unsigned inbytes, bool reverse)
 
 static unsigned tr_conv_f32_i16_sz(unsigned inbytes, bool reverse)
 {
-    if (reverse)
-        return inbytes << 1;
-    else
-        return inbytes >> 1;
+    return tr_conv_i16_f32_sz(inbytes, !reverse);
 }
 
 static transform_info_t s_tr_none = { NULL, NULL };
@@ -123,6 +127,11 @@ transform_info_t get_transform_fn(const char* from,
         return l_conv_2ci16_ci16;
     }
     
+    if (inveccnt == 2 && outveccnt == 1 && isCF32(from) && isCI12(to)) {
+        transform_info_t l_conv_ci12_2f32 = { conv_get_2cf32_ci12(), tr_conv_f32_i12_sz };
+        return l_conv_ci12_2f32;
+    }
+
     if (inveccnt != 1 || outveccnt != 1)
         return s_tr_none;
 
@@ -142,6 +151,12 @@ transform_info_t get_transform_fn(const char* from,
             (isCI12(from) && isCF32(to))) {
         transform_info_t l_conv_i12_f32 = { conv_get_i12_f32(), tr_conv_i12_f32_sz };
         return l_conv_i12_f32;
+    }
+
+    if ((isF32(from) && isI12(to)) ||
+        (isCF32(from) && isCI12(to))) {
+        transform_info_t l_conv_f32_i12 = { conv_get_f32_i12(), tr_conv_f32_i12_sz };
+        return l_conv_f32_i12;
     }
 
     return s_tr_dummy;
