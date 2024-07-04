@@ -324,6 +324,8 @@ private:
 
     unsigned _desired_rx_pkt;
 
+    bool _force_rx_wire12bit = false;
+
     // Right now only 2 streams are supported
     USDRStream _streams[2];
 

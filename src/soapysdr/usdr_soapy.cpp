@@ -177,6 +177,10 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
 
         SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::SoapyUSDR() dumping recieve to %s", filename);
     }
+    if (args.count("rx12bit")) {
+        _force_rx_wire12bit = true;
+        SoapySDR::logf(SOAPY_SDR_INFO, "SoapyUSDR::SoapyUSDR() forcing RX wire format to 12bit");
+    }
 
     uint64_t val;
     int res = usdr_dme_get_uint(_dev->dev(), "/ll/sdr/0/rfic/0", &val);
@@ -930,6 +934,8 @@ SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int /*direction*/, cons
         info.type = SoapySDR::ArgInfo::STRING;
         info.options.push_back(SOAPY_SDR_CS16);
         info.optionNames.push_back("Complex int16");
+        info.options.push_back(SOAPY_SDR_CS12);
+        info.optionNames.push_back("Complex int12");
         info.value = SOAPY_SDR_CS16;
         argInfos.push_back(info);
     }
@@ -960,6 +966,8 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
 {
     size_t num_channels = channels.size();
     size_t chmsk = 0;
+    bool wire12bit = false;
+
     if (num_channels < 1) {
         num_channels = 1;
         chmsk = 1;
@@ -973,17 +981,16 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     }
 
     unsigned pktSamples = 0;
-    const char* uformat = (format == SOAPY_SDR_CF32) ? "cf32" :
-                          (format == SOAPY_SDR_CS16) ? "ci16" : NULL;
-
-    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setupStream(%s, %s, Chans %d [0x%02x])\n",
-                   direction == SOAPY_SDR_RX ? "RX" : "TX", format.c_str(), (unsigned)channels.size(), chmsk);
 
     if (args.count("linkFormat")) {
         const std::string& link_fmt = args.at("linkFormat");
-        if (link_fmt != SOAPY_SDR_CS16) {
+        if (direction == SOAPY_SDR_TX && link_fmt != SOAPY_SDR_CS16) {
             throw std::runtime_error("SoapyUSDR::setupStream([linkFormat="+link_fmt+"]) unsupported link format");
         }
+        if (format == SOAPY_SDR_CS16 && link_fmt == SOAPY_SDR_CS12) {
+            throw std::runtime_error("SoapyUSDR::setupStream([linkFormat="+link_fmt+"]) is only supported for complex float32 output format");
+        }
+        wire12bit = (link_fmt == SOAPY_SDR_CS12);
     }
 
     if (args.count("floatScale")) {
@@ -1004,6 +1011,15 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
             throw std::runtime_error("SoapyUSDR::setupStream([bufferLength="+buffer_length+") is too large");
         }
     }
+
+    if (direction == SOAPY_SDR_RX && _force_rx_wire12bit) {
+        wire12bit = true;
+    }
+    const char* uformat = (format == SOAPY_SDR_CF32) ? (wire12bit ? "cf32@ci12" : "cf32" ):
+                          (format == SOAPY_SDR_CS16) ? "ci16" : NULL;
+
+    SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setupStream(%s, %s, Chans %d [0x%02x] format `%s`)\n",
+                   direction == SOAPY_SDR_RX ? "RX" : "TX", format.c_str(), (unsigned)channels.size(), chmsk, uformat);
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
 
