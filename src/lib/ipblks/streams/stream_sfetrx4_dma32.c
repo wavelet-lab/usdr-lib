@@ -559,6 +559,10 @@ static int initialize_stream_rx_32(device_t* device,
     if (res)
         return res;
 
+    res = sfetrx4_stream_sync(device, NULL, 0, "off");
+    if (res)
+        return res;
+
     lowlevel_stream_params_t sparams;
     stream_t sid;
     lowlevel_ops_t* dops = lowlevel_get_ops(device->dev);
@@ -575,11 +579,6 @@ static int initialize_stream_rx_32(device_t* device,
     res = dops->stream_initialize(device->dev, 0, &sparams, &sid);
     if (res)
         return res;
-
-    // start DMA earlier
-    //res = lowlevel_reg_wr32(device->lldev, 0, sx_base + 1, 1);
-    //if (res)
-    //    return res;
 
     strdev = (stream_sfetrx_dma32_t*)malloc(sizeof(stream_sfetrx_dma32_t));
     //usdr_dmo_init(&strdev->obj_stream, &s_dms_ops);
@@ -604,7 +603,7 @@ static int initialize_stream_rx_32(device_t* device,
 
     strdev->tf_data = funcs.cfunc;
     strdev->tf_size = funcs.sfunc;
-    // strdev->cached_lldev = device->lldev;
+
     strdev->cached_samples = ~0u;
     strdev->rcnt = 0;
     strdev->r_ts = 0; // Start timestamp
@@ -616,7 +615,6 @@ static int initialize_stream_rx_32(device_t* device,
 
     strdev->fd = sparams.underlying_fd;
     strdev->stream_cfg = need_tx_stat;
-    //usdr_dmo_append(&device->obj_head, &strdev->obj_stream);
 
     strdev->burst_mask = ((((uint64_t)1U) << fc.burstspblk) - 1) << (32 - fc.burstspblk);
     strdev->burst_count = fc.burstspblk;
@@ -716,6 +714,10 @@ static int initialize_stream_tx_32(device_t* device,
         USDR_LOG("DSTR", USDR_LOG_INFO, "TX Stream: No transformation!\n");
     }
 
+    res = sfetrx4_stream_sync(device, NULL, 0, "off");
+    if (res)
+        return res;
+
     lowlevel_stream_params_t sparams;
     stream_t sid;
     lowlevel_ops_t* dops = lowlevel_get_ops(device->dev);
@@ -782,7 +784,6 @@ static int initialize_stream_tx_32(device_t* device,
     strdev->stats.dropped = 0;
 
     strdev->fd = sparams.underlying_fd;
-    //usdr_dmo_append(&device->obj_head, &strdev->obj_stream);
 
     strdev->burst_count = 0;
     *outu = strdev;
@@ -856,11 +857,8 @@ int sfetrx4_stream_sync(device_t* device,
                         stream_handle_t** pstr, unsigned scount, const char* synctype)
 {
     int res;
-    //struct device* udev = lowlevel_get_device(device->lldev);
     int retimer_base = 14; //TODO: get from device
     stream_sfetrx_dma32_t** pstream = (stream_sfetrx_dma32_t**)pstr;
-
-    res = lowlevel_reg_wr32(device->dev, 0, retimer_base, (1u << 31) | (ST_STOP << 16));
 
     if (synctype == NULL || !strcmp(synctype, "none")) {
         res = lowlevel_reg_wr32(device->dev, 0, retimer_base, (1u << 31) | (ST_FREERUN << 16));
@@ -898,9 +896,9 @@ int sfetrx4_stream_sync(device_t* device,
 
         res = lowlevel_reg_wr32(device->dev, 0, retimer_base, (1u << 31) | (cmd << 16));
     } else if (!strcmp(synctype, "off")) {
-        return res;
+        res = lowlevel_reg_wr32(device->dev, 0, retimer_base, (1u << 31) | (ST_STOP << 16));
     } else {
-        return -EINVAL;
+        res = -EINVAL;
     }
 
     return res;
