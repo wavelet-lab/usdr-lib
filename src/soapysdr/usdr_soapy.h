@@ -346,6 +346,8 @@ private:
 
     double _actual_gains[10] = { 0, };
 
+    int _txcorr = 0;
+
     std::string _clk_source = "internal";
 };
 

@@ -151,6 +151,9 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
         dev += "bus=";
         dev += args.at("bus").c_str();
     }
+    if (args.count("txcorr")) {
+        _txcorr = atoi(args.at("txcorr").c_str());
+    }
 
     usdrlog_setlevel(NULL, loglevel);
 
@@ -1297,7 +1300,7 @@ int SoapyUSDR::writeStream(
 {
     USDRStream* ustr = (USDRStream*)(stream);
     long long ts = (flags & SOAPY_SDR_HAS_TIME) ?
-                    SoapySDR::timeNsToTicks(timeNs, _actual_tx_rate) : -1;
+                    SoapySDR::timeNsToTicks(timeNs, _actual_tx_rate) + _txcorr : -1;
 
     int64_t lag = ts - last_recv_pkt_time;
     if (tx_pkts == 0) {
