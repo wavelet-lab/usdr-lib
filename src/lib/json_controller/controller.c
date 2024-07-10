@@ -220,18 +220,19 @@ static
     return res;
 }
 
+#undef CTRL_GET_ACTUAL_PARAM
+
 static
-    int set_endpoint_uint_param(pdm_dev_t dmdev, const char* endpoint, uint64_t chans,
+    int set_endpoint_uint_param(pdm_dev_t dmdev, const char* endpoint,
                             uint64_t param, uint64_t * actual_param)
 {
-    int res = usdr_dme_set_uint(dmdev, "/dm/sdr/channels", chans);
-    res = (res == -ENOENT) ? 0 : res;
-
-    res = res ? res : usdr_dme_set_uint(dmdev, endpoint, param);
+    int res = usdr_dme_set_uint(dmdev, endpoint, param);
 
     if(!res)
     {
+#ifdef CTRL_GET_ACTUAL_PARAM
         if( (res = usdr_dme_get_uint(dmdev, endpoint, actual_param)) == -ENOENT)
+#endif
         {
             *actual_param = param;
             res = 0;
@@ -272,9 +273,6 @@ int generic_rpc_call(pdm_dev_t dmdev,
     const struct sdr_call *pcall = sdrc;
     unsigned outbufsz = response_maxlen;
     char* outbuffer = response;
-
-    unsigned long chans = (pcall->params.parameters_type[SDRC_CHANS] == SDRC_PARAM_TYPE_INT) ?
-                              pcall->params.parameters_uint[SDRC_CHANS] : 0;
 
     //common calls
     switch (pcall->call_type) {
@@ -325,7 +323,6 @@ int generic_rpc_call(pdm_dev_t dmdev,
 
         res = set_endpoint_uint_param(dmdev,
                                       (pcall->call_type == SDR_RX_FREQUENCY) ? "/dm/sdr/0/rx/freqency" : "/dm/sdr/0/tx/freqency",
-                                      chans,
                                       freq,
                                       &actual);
         if (res)
@@ -344,7 +341,6 @@ int generic_rpc_call(pdm_dev_t dmdev,
 
         res = set_endpoint_uint_param(dmdev,
                                       (pcall->call_type == SDR_RX_BANDWIDTH) ? "/dm/sdr/0/rx/bandwidth" : "/dm/sdr/0/tx/bandwidth",
-                                      chans,
                                       freq,
                                       &actual);
         if (res)
@@ -363,7 +359,6 @@ int generic_rpc_call(pdm_dev_t dmdev,
 
         res = set_endpoint_uint_param(dmdev,
                                       (pcall->call_type == SDR_RX_GAIN) ? "/dm/sdr/0/rx/gain" : "/dm/sdr/0/tx/gain",
-                                      chans,
                                       gain,
                                       &actual);
         if (res)
