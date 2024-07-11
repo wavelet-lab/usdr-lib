@@ -99,15 +99,14 @@ int general_call(pdm_dev_t dmdev, const struct sdr_call *pcall,
         res = espi_flash_read(lldev, 0, M2PCI_REG_QSPI_FLASH,
                               512, base + offset, 256, (uint8_t*)buf);
         if (res) {
-            snprintf(outbuffer, outbufsz, "{\"result\":%d}", res);
+            print_rpc_reply(pcall, outbuffer, outbufsz, res, "");
             return 0;
         }
-        k = snprintf(outbuffer, outbufsz,
-                     "{\"result\":0,\"details\":{\"data-length\":256,\"data\":\"");
 
-        // TODO check size
-        k += base64_encode(buf, 256, outbuffer + k);
-        snprintf(outbuffer + k, outbufsz - k, "\"}}");
+        char b64buf[512]; // base64 size = 4/3 orig size, 256 will definitely fit to 512
+        k = base64_encode(buf, 256, b64buf);
+        print_rpc_reply(pcall, outbuffer, outbufsz, res, "\"data-length\":256,\"data\":\"%.*s\"", k, b64buf);
+
         return 0;
     }
     case SDR_FLASH_WRITE_SECTOR: {
@@ -205,7 +204,7 @@ int general_call(pdm_dev_t dmdev, const struct sdr_call *pcall,
                 return res;
         }
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0}");
+        print_rpc_reply(pcall, outbuffer, outbufsz, res, "");
         return 0;
     }
     case SDR_FLASH_ERASE: {
@@ -231,7 +230,7 @@ int general_call(pdm_dev_t dmdev, const struct sdr_call *pcall,
 
         USDR_LOG("DSTR", USDR_LOG_INFO, "Flash erase commited from %d to %d\n",
                  s_op_flash_offset, s_op_flash_length);
-        snprintf(outbuffer, outbufsz, "{\"result\":0}");
+        print_rpc_reply(pcall, outbuffer, outbufsz, 0, "");
         return 0;
     }
     }

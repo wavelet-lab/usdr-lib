@@ -136,6 +136,7 @@ json_t const* allocate_json(char* request, json_t storage[], unsigned qty)
 int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* parent)
 {
     psdrc->call_type = SDR_NOP;
+    psdrc->call_req_ref = NULL;
     memset(psdrc->params.parameters_type, 0, sizeof(psdrc->params.parameters_type));
     memset(psdrc->params.parameters_len, 0, sizeof(psdrc->params.parameters_len));
 
@@ -164,7 +165,11 @@ int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* paren
 
                 psdrc->call_data_ptr = idx;
                 psdrc->call_data_size = len;
-            } else {
+            } else if (strcmp(name, "req_ref") == 0 && value != NULL && *value != 0) {
+                // request reference -> will be added to reply
+                psdrc->call_req_ref = value;
+            }
+            else {
                 USDR_LOG("WEBU", USDR_LOG_DEBUG, "JSON unknown text parameter: %s\n", name);
                 return -EINVAL;
             }
@@ -256,9 +261,29 @@ static const char* sync_type_to_str(unsigned sync_type)
     }
 }
 
+void print_rpc_reply(const struct sdr_call* sdrc,
+                     char* response,
+                     unsigned response_maxlen,
+                     int res,
+                     const char* details_format,
+                     ...)
+{
+    char wrap_format[256];
+
+    if(sdrc->call_req_ref && *sdrc->call_req_ref)
+        snprintf(wrap_format, sizeof(wrap_format), "{\"result\":%d,\"rep_ref\":\"%.64s\",\"details\":{%s}}", res, sdrc->call_req_ref, details_format);
+    else
+        snprintf(wrap_format, sizeof(wrap_format), "{\"result\":%d,\"details\":{%s}}", res, details_format);
+
+    va_list args;
+    va_start (args, details_format);
+    vsnprintf(response, response_maxlen, wrap_format, args);
+    va_end(args);
+}
+
 int generic_rpc_call(pdm_dev_t dmdev,
                      pusdr_dms_t* usds,
-                     struct sdr_call* sdrc,
+                     const struct sdr_call* sdrc,
                      unsigned response_maxlen,
                      char* response,
                      char* request)
@@ -312,8 +337,9 @@ int generic_rpc_call(pdm_dev_t dmdev,
         }
         //
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0,\"revision\":\"%04d%02d%02d%02d%02d%02d\",\"devid\":\"%d\",\"devrev\":\"%d\",\"device\":\"%s\"}",
-                 2000 + year, month, day, hour, min, sec, devid, devrev, device_name);
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res,
+                        "\"revision\":\"%04d%02d%02d%02d%02d%02d\",\"devid\":\"%d\",\"devrev\":\"%d\",\"device\":\"%s\"",
+                        2000 + year, month, day, hour, min, sec, devid, devrev, device_name);
         return 0;
     }
     case SDR_RX_FREQUENCY:
@@ -331,8 +357,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         if (res)
             return res;
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0,\"details\":{\"actual-frequency\":%" PRIu64 "}}",
-                 actual);
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"actual-frequency\":%" PRIu64 "", actual);
         return 0;
     }
     case SDR_RX_BANDWIDTH:
@@ -350,8 +375,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         if (res)
             return res;
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0,\"details\":{\"actual-frequency\":%" PRIu64 "}}",
-                 actual);
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"actual-frequency\":%" PRIu64 "", actual);
         return 0;
     }
     case SDR_RX_GAIN:
@@ -369,8 +393,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         if (res)
             return res;
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0,\"details\":{\"actual-gain\":%d}}",
-                 (int)actual);
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"actual-gain\":%" PRIu64 "", actual);
         return 0;
     }
     case SDR_INIT_STREAMING:
@@ -472,8 +495,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         if(res)
             return res;
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0,\"details\":{\"wire-block-size\":%d,\"wire-bursts\":%d}}",
-                 blocksize, bursts);
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"wire-block-size\":%d,\"wire-bursts\":%d",  blocksize, bursts);
         return 0;
     }
     case SDR_STOP_STREAMING:
@@ -489,7 +511,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         if(res)
             return res;
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0}");
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "");
         return 0;
     }
     case SDR_CRTL_STREAMING:
@@ -534,7 +556,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         if(res)
             return res;
 
-        snprintf(outbuffer, outbufsz, "{\"result\":%d}", res);
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "");
         return 0;
     }
     case SDR_DEBUG_DUMP:
@@ -551,7 +573,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         USDR_LOG("DSTR", USDR_LOG_INFO, "DUMP - %08x - %08x - %08x - %08x\n",
                  data[0].i32[0], data[0].i32[1], data[1].i32[0], data[1].i32[1]);
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0}");
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "");
         return 0;
     }
     case SDR_CALIBRATE:
@@ -568,7 +590,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         if (res)
             return res;
 
-        snprintf(outbuffer, outbufsz, "{\"result\":0}");
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "");
         return 0;
     }
     default:
