@@ -70,7 +70,21 @@ x-opt-12: &id012
   0b00: Disabled
   0b01: XOSC
   0b10: CLKIN_2
-  0b11: Disabled
+  0b11: Disabled_3
+x-opt-outx-mode: &outmode
+  0: DISABLED
+  1: CMOS_P
+  2: CMOS_N
+  3: CMOS_DUAL
+  4: LVDS25
+  5: LVDS18
+  6: LVDS25_FAST
+  7: LVDS18_FAST
+  8: HCSL_50_EXT
+  9: HCSL_50_INT
+  10: HCSL_42_EXT
+  11: HCSL_42_INT
+  12: LVPECL
 
 pages:
   - name: Common
@@ -703,6 +717,7 @@ pages:
             name: OUT0_MODE
             mode: RW
             desc: Software interpreted driver configuration.
+            opts: *outmode
       - addr: 0x7B
         name: REG_0x7B
         fields:
@@ -750,6 +765,7 @@ pages:
             name: OUT1_MODE
             mode: RW
             desc: Software interpreted driver configuration.
+            opts: *outmode
       - addr: 0x80
         name: REG_0x80
         fields:
@@ -797,6 +813,7 @@ pages:
             name: OUT2_MODE
             mode: RW
             desc: Software interpreted driver configuration.
+            opts: *outmode
       - addr: 0x8A
         name: REG_0x8A
         fields:
@@ -844,6 +861,7 @@ pages:
             name: OUT3_MODE
             mode: RW
             desc: Software interpreted driver configuration.
+            opts: *outmode
       - addr: 0x99
         name: REG_0x99
         fields:
@@ -891,6 +909,7 @@ pages:
             name: OUT4_MODE
             mode: RW
             desc: Software interpreted driver configuration.
+            opts: *outmode
       - addr: 0xA8
         name: REG_0xA8
         fields:
@@ -938,6 +957,7 @@ pages:
             name: OUT5_MODE
             mode: RW
             desc: Software interpreted driver configuration.
+            opts: *outmode
       - addr: 0xAD
         name: REG_0xAD
         fields:
@@ -1008,6 +1028,117 @@ pages:
             name: OUT5_OE
             mode: RW
             desc: Output enable control for OUT5
+      - addr: 0xB9
+        name: REG_0xB9
+        fields:
+          - bits: 0
+            name: XOSC_DIS
+            mode: RW
+            desc: Disable XOSC buffer
+          - bits: 1
+            name: IBUF0_DIS
+            mode: RW
+            desc: Disable input buffer 0
+          - bits: 3
+            name: IMUX_DIS
+            mode: RW
+            desc: Disable input mux
+          - bits: 4
+            name: PDIV_DIS
+            mode: RW
+            desc: Disable pre-div buffer
+          - bits: 5
+            name: PLL_DIS
+            mode: RW
+            desc: Disable pll
+      - addr: 0xBA
+        name: REG_0xBA
+        fields:
+          - bits: 0
+            name: HSDIV0_DIS
+            mode: RW
+            desc: Disable high-speed divider 0
+          - bits: 1
+            name: HSDIV1_DIS
+            mode: RW
+            desc: Disable high-speed divider 1
+          - bits: 2
+            name: HSDIV2_DIS
+            mode: RW
+            desc: Disable high-speed divider 2
+          - bits: 3
+            name: HSDIV3_DIS
+            mode: RW
+            desc: Disable high-speed divider 3
+          - bits: 4
+            name: HSDIV4_DIS
+            mode: RW
+            desc: Disable high-speed divider 4
+          - bits: 5
+            name: ID0_DIS
+            mode: RW
+            desc: Disable interpolative divider 0
+          - bits: 6
+            name: ID1_DIS
+            mode: RW
+            desc: Disable interpolative divider 1
+      - addr: 0xBB
+        name: REG_0xBB
+        fields:
+          - bits: 0
+            name: OMUX0_DIS
+            mode: RW
+            desc: Disable output mux 0
+          - bits: 1
+            name: OMUX1_DIS
+            mode: RW
+            desc: Disable output mux 1
+          - bits: 2
+            name: OMUX2_DIS
+            mode: RW
+            desc: Disable output mux 2
+          - bits: 3
+            name: OMUX3_DIS
+            mode: RW
+            desc: Disable output mux 3
+          - bits: 4
+            name: OMUX4_DIS
+            mode: RW
+            desc: Disable output mux 4
+          - bits: 5
+            name: OMUX5_DIS
+            mode: RW
+            desc: Disable output mux 5
+      - addr: 0xBC
+        name: REG_0xBC
+        fields:
+          - bits: 0
+            name: OUT0_DIS
+            mode: RW
+            desc: Disable buffer for OUT0
+          - bits: 1
+            name: OUT1_DIS
+            mode: RW
+            desc: Disable buffer for OUT1
+          - bits: 3
+            name: OUT2_DIS
+            mode: RW
+            desc: Disable buffer for OUT2
+          - bits: 6
+            name: OUT3_DIS
+            mode: RW
+            desc: Disable buffer for OUT3
+      - addr: 0xBD
+        name: REG_0xBD
+        fields:
+          - bits: 1
+            name: OUT4_DIS
+            mode: RW
+            desc: Disable buffer for OUT4
+          - bits: 2
+            name: OUT5_DIS
+            mode: RW
+            desc: Disable buffer for OUT5
       - addr: 0x73
         name: REG_0x73
         fields:
