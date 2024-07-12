@@ -19,22 +19,8 @@ enum {
     USDR_MAX_RX_BANDS = 3,
 };
 
-#define USDR_RX_AUTO 0
-#define USDR_TX_AUTO 0
-
-// enum rfic_lms6_rf_path_rx {
-//     USDR_RX_AUTO = 0,
-//     USDR_RX_W    = 1,
-//     USDR_RX_H    = 2,
-//     USDR_RX_EXT  = 3, // External / mixer
-// };
-
-// enum rfic_lms6_rf_path_tx {
-//     USDR_TX_AUTO = 0,
-//     USDR_TX_B1 = 1,
-//     USDR_TX_B2 = 2,
-// };
-
+#define USDR_RX_AUTO 255
+#define USDR_TX_AUTO 255
 
 enum {
     RFIC_LMS6_TX = BIT(0),
@@ -53,9 +39,13 @@ enum usdrgains {
     GAIN_RX_LNA,
     GAIN_RX_VGA1,
     GAIN_RX_VGA2,
+    GAIN_RX_VGA2A,
+    GAIN_RX_VGA2B,
+    GAIN_RX_AUTO,
 
     GAIN_TX_VGA1,
     GAIN_TX_VGA2,
+    GAIN_TX_AUTO,
 };
 
 struct usdr_dev
@@ -69,11 +59,13 @@ struct usdr_dev
     unsigned hw_board_rev;
     unsigned hw_board_hasmixer;
 
+    unsigned si_vco_div;
     unsigned si_vco_freq;
 
     lms6002d_state_t lms;
     unsigned refclkpath;
     unsigned fref;
+    unsigned rawsamplerate;
 
     uint8_t rx_cfg_path;
     uint8_t tx_cfg_path;
@@ -87,6 +79,14 @@ struct usdr_dev
 
     unsigned rx_lo;
     unsigned tx_lo;
+
+
+    // Gain settings
+    uint8_t rx_lna;
+    uint8_t rx_vga1;
+    uint8_t rx_vga2a;
+    uint8_t rx_vga2b;
+
 
     bool rx_run;
     bool tx_run;
@@ -124,6 +124,7 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
 int usdr_set_rx_port_switch(struct usdr_dev *d, unsigned path);
 int usdr_set_tx_port_switch(struct usdr_dev *d, unsigned path);
 
+int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob);
 
 int usdr_rfic_fe_set_rxlna(struct usdr_dev *d,
                            const char* lna);

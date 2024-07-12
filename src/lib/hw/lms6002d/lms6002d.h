@@ -42,6 +42,7 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq);
 int lms6002d_trf_enable(lms6002d_state_t* obj, bool en);
 int lms6002d_rfe_enable(lms6002d_state_t* obj, bool en);
 
+int lms6002d_rxvga2_enable(lms6002d_state_t* obj, bool en);
 
 int lms6002d_set_bandwidth(lms6002d_state_t* obj, bool tx, unsigned freq);
 

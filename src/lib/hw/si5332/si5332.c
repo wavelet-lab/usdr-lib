@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 #include "si5332.h"
+#include "def_si5332.h"
+
 #include <usdr_logging.h>
 #include <usdr_lowlevel.h>
 
@@ -428,7 +430,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
 
         0xBA, /*BA_HSDIV0_DIS |*/ BA_HSDIV1_DIS | BA_HSDIV2_DIS /*| BA_HSDIV3_DIS*/ | BA_HSDIV4_DIS | BA_ID0_DIS | BA_ID1_DIS,
         //0xBA, BA_HSDIV0_DIS | BA_HSDIV1_DIS | BA_HSDIV2_DIS | BA_HSDIV3_DIS | BA_HSDIV4_DIS | BA_ID0_DIS | BA_ID1_DIS,
-        0xBB, /*BB_OMUX3_DIS |*/ BB_OMUX4_DIS /*| BB_OMUX5_DIS*/,
+        0xBB, /*BB_OMUX3_DIS |*/ BB_OMUX4_DIS | BB_OMUX5_DIS,
         0xBC, /*BC_OUT3_DIS,*/ 0,
         0xBD, BD_OUT4_DIS | BD_OUT5_DIS,
 
@@ -458,7 +460,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
 // si5332 up to 3 unrelated clocks
 
 int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
-                      struct si5332_layout_info* nfo, bool old, unsigned *vcofreq)
+                      struct si5332_layout_info* nfo, bool old, unsigned lodiv, unsigned *vcofreq /*, unsigned* altref*/)
 {
     unsigned imul = (si5332_Fvco_min + nfo->out - 1) / nfo->out;
     unsigned hsdiv;
@@ -494,6 +496,8 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
     unsigned idpa_den = 32767;
     unsigned idpa_res = (uint64_t)idpa_den * idpa_frac / pllfreq;
 
+    unsigned pll_freq_div = 0;
+
     bool jdiv = false;
     for (unsigned todiv = 1; todiv < 14; todiv++) {
         int diff = (int)(nfo->out * todiv) - (int)nfo->infreq;
@@ -507,9 +511,15 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
     if (vcofreq) {
         *vcofreq = vco;
     }
+    // TODO alternative PLL ref
+    // if (altref) {
+    //     pll_freq_div = (vco + 41000000) / 41000000;
+    //     *altref = pll_freq_div;
+    // }
+
 
     USDR_LOG("5332", USDR_LOG_INFO, "VCO=%u IDPA_INTG=%u IDPA_RES=%u HSDIV=%u ODIV=%u JDIV=%d MXLO=%u\n",
-             vco, idpa_intg, idpa_res, hsdiv, odiv, jdiv, vco / 8);
+             vco, idpa_intg, idpa_res, hsdiv, odiv, jdiv, vco / lodiv);
 
         // terms of an a + b/c desired divider settingmust be processed into
         //IDPA_INTG, ID-PA_RES, and IDPA_DEN register
@@ -533,20 +543,8 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
         HSDIV0A_DIV, hsdiv,
         HSDIV0B_DIV, hsdiv,
 
-        //HSDIV1A_DIV, hsdiv,
-        //HSDIV1B_DIV, hsdiv,
-        //HSDIV2A_DIV, hsdiv,
-        //HSDIV2B_DIV, hsdiv,
-        //HSDIV3A_DIV, hsdiv,
-        //HSDIV3B_DIV, hsdiv,
-        //HSDIV4A_DIV, hsdiv,
-        //HSDIV4B_DIV, hsdiv,
-
-        //OUT2_MODE, OUTMODE_OFF,
-        //OUT0_CMOS_SLEW, 3,
-
-        // pll
-        //old ? OUT1_CMOS_SLEW : OUT0_CMOS_SLEW, 0,
+        HSDIV1A_DIV, pll_freq_div,
+        HSDIV2A_DIV, pll_freq_div,
 
         old ? OUT0_CMOS_SLEW : OUT1_CMOS_SLEW, (nfo->out > 110e6) ? 1 : (nfo->out > 50e6) ? 1 : 2,
         OUT2_CMOS_SLEW, (nfo->out > 110e6) ? 1 : (nfo->out > 50e6) ? 1 : 2,
@@ -554,18 +552,18 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
         old ? OUT0_DIV : OUT1_DIV, odiv,
         OUT2_DIV, odiv,
 
-        old ? OMUX0_SEL10 : OMUX1_SEL10, jdiv ? MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_OMUXS0) : MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_HSDIV0),
-        OMUX2_SEL10, jdiv ? MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_OMUXS0) : MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_HSDIV0),
+        old ? OMUX0_SEL10 : OMUX1_SEL10, jdiv ? MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_OMUXS0) :
+            MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_HSDIV0),
+        OMUX2_SEL10, jdiv ? MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_OMUXS0) :
+            MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_HSDIV0),
 
-
-        // OMUX1_SEL10, MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_OMUXS0),
-
-        HSDIV3A_DIV, 8,
-        HSDIV3B_DIV, 8,
+        HSDIV3A_DIV, lodiv,
+        HSDIV3B_DIV, lodiv,
 
         OMUX3_SEL10, MAKE_OUMUXX(OUMUXX_SEL0_PLL_REF, OUMUXX_SEL1_HSDIV3),
         OUT3_DIV, 1,
         OUT3_MODE, OUTMODE_HCSL_50_INT, //OUTMODE_LVPECL, //OUTMODE_HCSL_50_INT, //OUTMODE_LVDS18_FAST,
+
 
         USYS_CTRL, 0x02, //ACTIVE
     };
@@ -581,8 +579,36 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
     }
 
     return 0;
-
 }
+
+int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool loen, bool txen)
+{
+    const uint8_t program_regs_init[] = {
+        // Disable mixer LO
+        // OUT3210_OE, ~0,
+
+        OUT3210_OE, (!loen ? B6_OUT3_OE : 0) | (!txen ? B6_OUT2_OE : 0) |  B6_OUT0_OE | B6_OUT1_OE,
+
+        USYS_CTRL, 0x01, //READY
+        0xBA, (!loen ? BA_HSDIV3_DIS : 0) | BA_HSDIV1_DIS | BA_HSDIV2_DIS | BA_HSDIV4_DIS | BA_ID0_DIS | BA_ID1_DIS,
+        0xBB, (!loen ? BB_OMUX3_DIS : 0) | (!txen ? BB_OMUX2_DIS : 0) | BB_OMUX4_DIS | BB_OMUX5_DIS,
+        0xBC, (!loen ? BC_OUT3_DIS : 0) | (!txen ? BC_OUT2_DIS : 0),
+        USYS_CTRL, 0x02, //ACTIVE
+    };
+
+    for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
+        int res;
+        uint8_t addr = program_regs_init[2*i + 0];
+        uint8_t val = program_regs_init[2*i + 1];
+
+        res = si5332_reg_wr(dev, subdev, lsopaddr, addr, val);
+        if (res)
+            return res;
+    }
+
+    return 0;
+}
+
 
 #if 0
 int si5332_set_idfreq(lldev_t dev, subdev_t subdev, lsopaddr_t addr,

@@ -106,12 +106,14 @@ static int dev_m2_lm6_1_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
 static int dev_m2_lm6_1_debug_all_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 static int dev_m2_lm6_1_pwren_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
+static int dev_m2_lm6_1_sdr_rx_freq_lob_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_rx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_gain_vga1_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_gain_vga2_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_sdr_tx_gainauto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm6_1_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -119,6 +121,7 @@ static int dev_m2_lm6_1_sdr_tx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, 
 static int dev_m2_lm6_1_sdr_rx_gainpga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_rx_gainvga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_rx_gainlna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_sdr_rx_gainauto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm6_1_sdr_rx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -195,6 +198,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
 
     { "/dm/sdr/0/calibrate",    { dev_m2_lm6_1_sdr_dc_calib, NULL }},
 
+    { "/dm/sdr/0/rx/freqency/lob",{ dev_m2_lm6_1_sdr_rx_freq_lob_set, NULL }},
     { "/dm/sdr/0/rx/freqency",  { dev_m2_lm6_1_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency",  { dev_m2_lm6_1_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/rx/gain",      { dev_m2_lm6_1_sdr_rx_gain_set, NULL }},
@@ -204,6 +208,9 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/rx/gain/pga",  { dev_m2_lm6_1_sdr_rx_gainpga_set, NULL }},
     { "/dm/sdr/0/rx/gain/vga",  { dev_m2_lm6_1_sdr_rx_gainvga_set, NULL }},
     { "/dm/sdr/0/rx/gain/lna",  { dev_m2_lm6_1_sdr_rx_gainlna_set, NULL }},
+
+    { "/dm/sdr/0/rx/gain/auto",  { dev_m2_lm6_1_sdr_rx_gainauto_set, NULL }},
+    { "/dm/sdr/0/tx/gain/auto",  { dev_m2_lm6_1_sdr_tx_gainauto_set, NULL }},
 
     { "/dm/sdr/0/rx/path",      { dev_m2_lm6_1_sdr_rx_path_set, NULL }},
     { "/dm/sdr/0/tx/path",      { dev_m2_lm6_1_sdr_tx_path_set, NULL }},
@@ -563,6 +570,12 @@ int dev_m2_lm6_1_sdr_tx_enable_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
     return 0;
 }
 
+int dev_m2_lm6_1_sdr_rx_freq_lob_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    return usdr_set_lob_freq(&d->d, value);
+}
+
 int dev_m2_lm6_1_sdr_rx_freq_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
@@ -578,6 +591,13 @@ int dev_m2_lm6_1_sdr_rx_gain_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint6
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
     return usdr_rfic_set_gain(&d->d, GAIN_RX_VGA1, value, NULL);
 }
+
+int dev_m2_lm6_1_sdr_tx_gainauto_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    return usdr_rfic_set_gain(&d->d, GAIN_TX_AUTO, value, NULL);
+}
+
 int dev_m2_lm6_1_sdr_tx_gain_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
@@ -622,6 +642,11 @@ int dev_m2_lm6_1_sdr_rx_gainlna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t 
     return usdr_rfic_set_gain(&d->d, GAIN_RX_LNA, value, NULL);
 }
 
+int dev_m2_lm6_1_sdr_rx_gainauto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    return usdr_rfic_set_gain(&d->d, GAIN_RX_AUTO, value, NULL);
+}
 
 int dev_m2_lm6_1_sdr_rx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -673,6 +698,17 @@ int dev_m2_lm6_1_sdr_rx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
 
     //     value = s_rx_path_list[idx].param;
     // }
+
+    if (value > 4096) {
+        const char* param = (const char*)value;
+        if (strcasecmp("rxl", param) == 0) {
+            value = (uintptr_t)"EXT";
+        } else if (strcasecmp("rxw", param) == 0) {
+            value = (uintptr_t)"W";
+        } else if (strcasecmp("rxh", param) == 0) {
+            value = (uintptr_t)"H";
+        };
+    }
 
     return usdr_rfic_fe_set_rxlna(&d->d, (const char *)(uintptr_t)value);
 }

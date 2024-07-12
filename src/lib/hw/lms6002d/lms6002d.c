@@ -39,7 +39,7 @@ int lms6002d_spi_post(lms6002d_state_t* obj, uint16_t* regs, unsigned count)
         if (res)
             return res;
 
-        USDR_LOG("6002", USDR_LOG_INFO, "[%d/%d] reg wr %04x\n", i, count, regs[i]);
+        USDR_LOG("6002", USDR_LOG_NOTE, "[%d/%d] reg wr %04x\n", i, count, regs[i]);
     }
 
     return 0;
@@ -53,7 +53,7 @@ int lms6002d_spi_rd(lms6002d_state_t* obj, uint8_t addr, uint8_t* data)
     if (res)
         return res;
 
-    USDR_LOG("6002", USDR_LOG_INFO, "reg rd %02x => %02x\n", addr, rd & 0xff);
+    USDR_LOG("6002", USDR_LOG_NOTE, "reg rd %02x => %02x\n", addr, rd & 0xff);
     *data = (uint8_t)rd;
     return 0;
 }
@@ -356,48 +356,68 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
     return 0;
 }
 
-static
-unsigned txrx_get_bband(unsigned freq)
-{
-    unsigned bands[] = {
-        750,
-        875,
-       1250,
-       1375, 
-       1500,
-       1920,
-       2500,
-       2750,
-       3000,
-       3500,
-       4375,
-       5000, 
-       6000,
-       7000,
-      10000,
-      14000
-    };
-
-    unsigned i;
-    for (i = 0; i < SIZEOF_ARRAY(bands) - 1; i++) {
-        if ((freq / 1000) <= bands[i]) {
-            break;
-        }
-    }
-
-    USDR_LOG("6002", USDR_LOG_INFO, "FREQ %d kHz, Band %d (%d)\n",
-             freq / 1000, i, bands[i]);
-
-    return (15 - i) & 0xf;
-}
-
+// TODO proper calibration
+static struct lpf_band_lut {
+    uint16_t freq_khz;
+    uint8_t band;
+    uint8_t rc;
+} s_lpf_lut[] = {
+    { 1030, 15, 7 },
+    { 1190, 15, 6 },
+    { 1333, 15, 5 },
+    { 1500, 15, 4 },
+    { 1650, 15, 3 },
+    { 1700, 14, 4 },
+    { 1870, 14, 3 },
+    { 2250, 13, 5 }, //2210
+    { 2750, 13, 4 }, //2500
+    { 3000, 12, 4 }, //2750
+    { 3250, 11, 4 }, //3000
+    { 3650, 11, 3 }, //3300
+    { 4170, 10, 4 }, //3840
+    { 4650, 10, 3 }, //4220
+    { 5200, 10, 2 }, //4740
+    { 5500,  9, 4 }, //5000
+    { 5750,  7, 5 }, //5310
+    { 6000,  8, 4 }, //5500
+    { 6500,  7, 4 }, //6000
+    { 7250,  7, 3 }, //6590
+    { 7550,  6, 4 }, //7000
+    { 8400,  6, 3 }, //7690
+    { 9400,  5, 4 }, //8750
+    { 10400, 5, 3 }, //9620
+    { 11650, 4, 4 }, //10000
+    { 12400, 4, 3 }, //11000
+    { 14400, 3, 4 }, //12000
+    { 15200, 3, 3 }, //13200
+    { 16650, 2, 4 }, //14000
+    { 18900, 2, 3 }, //15400
+    { 21150, 1, 5 }, //17700
+    { 24000, 1, 4 }, //20000
+    { 25650, 1, 3 }, //22000
+    { 28650, 0, 5 }, //24800
+    { 31900, 0, 4 }, //28000
+    { 35400, 0, 3 }, //30800
+    { 39150, 0, 2 }, //34600
+    { 44650, 0, 1 }, //41200
+    { 47000, 0, 0 },
+};
 
 int lms6002d_set_bandwidth(lms6002d_state_t* obj, bool tx, unsigned freq)
 {
     int res;
-    unsigned band = txrx_get_bband(freq / 2);
-    unsigned b = (freq >= 40000000) ? 1 : 0;
-    unsigned lpfcal = (freq >= 37000000) ? 0 : (freq <= 500000) ? 7 : obj->rclpfcal[band];
+    unsigned band = 0;
+    unsigned b = 1;
+    unsigned lpfcal = 0;
+
+    for (unsigned i = 0; i < SIZEOF_ARRAY(s_lpf_lut); i++) {
+        if ((freq / 1000) <= s_lpf_lut[i].freq_khz) {
+            band = s_lpf_lut[i].band;
+            lpfcal = s_lpf_lut[i].rc;
+            b = 0;
+            break;
+        }
+    }
 
     // 0x30 -- TX LPF
     // 0x50 -- RX LPF
@@ -407,10 +427,8 @@ int lms6002d_set_bandwidth(lms6002d_state_t* obj, bool tx, unsigned freq)
         (tx ? 0x3600 : 0x5600) | 0x8000 | (lpfcal << 4),
     };
 
-    // TODO RCAL adaptation
-    if (!(obj->rclpfcal[band] & 0x80)) {
-        USDR_LOG("6002", USDR_LOG_WARNING, "LPF Band %d isn't calibrated!\n", band);
-    }
+    USDR_LOG("6002", USDR_LOG_INFO, "LPF %d => BAND=%d RC=%d BYPASS=%d CAL=%d\n",
+             freq / 1000, band, lpfcal, b, obj->rclpfcal[band]);
 
     res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
     if (res)
@@ -426,10 +444,8 @@ int lms6002d_set_rxlna_gain(lms6002d_state_t* obj, unsigned lnag)
     int res;
     uint16_t regs[] = {
         MAKE_LMS6002D_REG_WR(RFE_GAIN_LNA_SEL, obj->rfe_gain_lna_sel),
-        // 0x7500 | 0x8000 | (obj->rxfe_0x75 & 0x3f) | ((lnag & 0x3) << 6),
     };
 
-    //obj->rxfe_0x75 = regs[0];
     res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
     if (res)
         return res;
@@ -440,7 +456,6 @@ int lms6002d_set_rxvga1_gain(lms6002d_state_t* obj, unsigned lnag)
 {
     int res;
     uint16_t regs[] = {
-        //(0x7600) | 0x8000 | (lnag & 0x7f),
         MAKE_LMS6002D_RFE_RFB_TIA(lnag),
     };
 
@@ -451,27 +466,10 @@ int lms6002d_set_rxvga1_gain(lms6002d_state_t* obj, unsigned lnag)
     return res;
 }
 
-#if 0
-int lms6002d_set_pga_gain(lms6002d_state_t* obj, unsigned lnag)
-{
-    int res;
-    uint16_t regs[] = {
-        //(0x5600) | 0x8000 | ((lnag & 0x7) << 4) | 0x0000,
-        (0x7700) | 0x8000 | (lnag & 0x7f),
-    };
-
-    res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
-    if (res)
-        return res;
-    return res;
-}
-#endif
-
 int lms6002d_set_txvga1_gain(lms6002d_state_t* obj, unsigned vga)
 {
     int res;
     uint16_t regs[] = {
-        //(0x4100) | 0x8000 | (vga & 0x1f),
         MAKE_LMS6002D_TRF_VGA1GAIN(vga),
     };
 
@@ -486,7 +484,6 @@ int lms6002d_set_txvga2_gain(lms6002d_state_t* obj, unsigned vga)
     int res;
     uint16_t regs[] = {
         // FIXME: ENVD[2:0]: Controls envelop/peak detector analogue MUX
-        // (0x4500) | 0x8000 | ((vga & 0x1f) << 3),
         MAKE_LMS6002D_TRF_CTRL2(vga, 0, 0),
     };
 
@@ -548,9 +545,6 @@ int lms6002d_set_rx_path(lms6002d_state_t* obj, unsigned path)
 
     USDR_LOG("6002", USDR_LOG_INFO, "Set PATH %d: %04x %04x\n", path,
              regs[0], regs[1]);
-
-    //obj->rxpll_0x25 = regs[0];
-    //obj->rxfe_0x75 = regs[1];
 
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
@@ -647,6 +641,14 @@ int lms6002d_rfe_enable(lms6002d_state_t* obj, bool en)
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
 
+int lms6002d_rxvga2_enable(lms6002d_state_t* obj, bool en)
+{
+    uint16_t regs[] = {
+        MAKE_LMS6002D_RXVGA2_CTRL(7, en ? 1 : 0, 1),
+    };
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
+
 int lms6002d_cal_lpf(lms6002d_state_t* obj)
 {
     int res;
@@ -655,8 +657,6 @@ int lms6002d_cal_lpf(lms6002d_state_t* obj)
     SET_LMS6002D_TOP_ENREG_CLK_LPF_CAL(obj->top_enreg, 1);
 
     uint16_t regs_0[] = {
-        //0x8000 | 0x5F1f,
-
         MAKE_LMS6002D_AFE_MISC(0, 1, 1, 1, 1, 1),
         MAKE_LMS6002D_REG_WR(TOP_ENREG, obj->top_enreg),
     };
@@ -730,18 +730,19 @@ fail_q:
 int lms6002d_cal_vga2(lms6002d_state_t* obj)
 {
     int res;
-    uint8_t ureg_dcref, ureg_2ai, ureg_2aq, ureg_2bi, ureg_2bq;
+    uint8_t ureg_dcref = ~0, ureg_2ai = ~0, ureg_2aq = ~0, ureg_2bi = ~0, ureg_2bq = ~0;
 
     SET_LMS6002D_TOP_ENREG_CLK_RX_VGA2_DCCAL(obj->top_enreg, 1);
 
     uint16_t regs_0[] = {
         MAKE_LMS6002D_RXVGA2_PD_CALIB(0, 0),
         MAKE_LMS6002D_REG_WR(TOP_ENREG, obj->top_enreg),
-        //0x8000 | 0x6e00, //Turn on VGA2 comparators
+        // MAKE_LMS6002D_RXVGA2_CTRL(7, 1, 1),
+        MAKE_LMS6002D_RXVGA2_GAIN(0, 10),
     };
     res = lms6002d_spi_post(obj, regs_0, SIZEOF_ARRAY(regs_0));
     if (res)
-        return res;
+        goto fail_cal;
 
     res = lms6002d_calibration_loop(obj, 0x60, 0, &ureg_dcref);
     if (res)
@@ -752,6 +753,13 @@ int lms6002d_cal_vga2(lms6002d_state_t* obj)
         goto fail_cal;
 
     res = lms6002d_calibration_loop(obj, 0x60, 2, &ureg_2aq);
+    if (res)
+        goto fail_cal;
+
+    uint16_t regs_1[] = {
+        MAKE_LMS6002D_RXVGA2_GAIN(10, 0),
+    };
+    res = lms6002d_spi_post(obj, regs_1, SIZEOF_ARRAY(regs_1));
     if (res)
         goto fail_cal;
 
@@ -771,25 +779,23 @@ fail_cal:
     if (res)
         return res;
 
+    USDR_LOG("6002", USDR_LOG_INFO, "VGA2 calibration done [%d, %d, %d, %d, %d]\n",
+             ureg_dcref, ureg_2ai, ureg_2aq, ureg_2bi, ureg_2bq);
     return 0;
 }
 
 int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
 {
-    // TURN tx
-    // SET tx to 320Mhz
-    int res;
-    uint8_t rcal;
+    // TURN ON tx, SET tx to 320Mhz
+    int res = 0;
+    uint8_t rcal = ~0;
     if (bcode >= LPF_BANDS)
         return -EINVAL;
 
-    res = lms6002d_trf_enable(obj, 1);
-    if (res)
-        return res;
+    bool txen = GET_LMS6002D_TOP_ENCFG_STXEN(obj->top_encfg);
 
-    res = lms6002d_tune_pll(obj, true, 320000000);
-    if (res)
-        return res;
+    res = res ? res : lms6002d_trf_enable(obj, 1);
+    res = res ? res : lms6002d_tune_pll(obj, true, 320000000);
 
     uint16_t regs_0[] = {
         MAKE_LMS6002D_TOP_LPF_CTRL(0, 0, 0, 0),
@@ -798,16 +804,12 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
         MAKE_LMS6002D_TOP_LPF_CTRL(0, 0, 0, 1),
         MAKE_LMS6002D_TOP_LPF_CTRL(0, 0, 0, 0),
     };
-    res = lms6002d_spi_post(obj, regs_0, SIZEOF_ARRAY(regs_0));
-    if (res)
-        return res;
+    res = res ? res : lms6002d_spi_post(obj, regs_0, SIZEOF_ARRAY(regs_0));
 
     usleep(10);
 
     // read clbr_done
-    res = lms6002d_spi_rd(obj, TOP_DC_CAL, &rcal);
-    if (res)
-        return res;
+    res = res ? res : lms6002d_spi_rd(obj, TOP_DC_CAL, &rcal);
 
     USDR_LOG("6002", USDR_LOG_WARNING, "LPFBW code=%d cal=%02x val=%d\n",
              bcode, rcal, GET_LMS6002D_TOP_DC_CAL_RC_LPF(rcal));
@@ -815,17 +817,17 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
     // Update calibration code
     obj->rclpfcal[bcode] = GET_LMS6002D_TOP_DC_CAL_RC_LPF(rcal) | 0x80;
 
-    // TODO disable TX when TX is not needed
     // Store calibration value
+    if (!txen) {
+        SET_LMS6002D_TOP_ENCFG_STXEN(obj->top_encfg, 0);
+    }
     uint16_t regs_1[] = {
         MAKE_LMS6002D_TOP_LPF_CTRL(0, 1, 0, 0),
         MAKE_LMS6002D_TOP_LPF_CAL(0, 0, bcode),
+        MAKE_LMS6002D_REG_WR(TOP_ENCFG, obj->top_encfg),
     };
-    res = lms6002d_spi_post(obj, regs_1, SIZEOF_ARRAY(regs_1));
-    if (res)
-        return res;
-
-    return 0;
+    res = res ? res : lms6002d_spi_post(obj, regs_1, SIZEOF_ARRAY(regs_1));
+    return res;
 }
 
 int lms6002d_set_rxfedc(lms6002d_state_t* obj, int8_t dci, int8_t dcq)
@@ -834,9 +836,6 @@ int lms6002d_set_rxfedc(lms6002d_state_t* obj, int8_t dci, int8_t dcq)
         MAKE_LMS6002D_RFE_IN1SEL_DCI(1, dci),
         MAKE_LMS6002D_RFE_INLOAD_DCQ(1, dcq),
     };
-    // obj->rxfe_0x71 = regs[0];
-    // obj->rxfe_0x72 = regs[1];
-
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
 
