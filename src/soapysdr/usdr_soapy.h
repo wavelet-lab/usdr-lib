@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include <SoapySDR/Device.hpp>
+#include <SoapySDR/Logger.hpp>
 #include <mutex>
 #include <chrono>
 #include <map>
@@ -290,6 +291,7 @@ public:
     unsigned transactSPI(const int addr, const unsigned data, const size_t numBits);
 protected:
     void setUParam(const int direction, const char* param, const char* sub, unsigned pval);
+    SoapySDRLogLevel callLogLvl() const { return _dump_calls ? SOAPY_SDR_ERROR : SOAPY_SDR_INFO; }
 
 private:
     struct USDRStream {
@@ -325,6 +327,7 @@ private:
     unsigned _desired_rx_pkt;
 
     bool _force_rx_wire12bit = false;
+    bool _dump_calls = false;
 
     // Right now only 2 streams are supported
     USDRStream _streams[2];
