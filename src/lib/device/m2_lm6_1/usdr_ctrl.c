@@ -299,12 +299,15 @@ static int _usdr_pwr_state(usdr_dev_t *d, bool tx, bool enable)
         res = lms6002d_trf_enable(&d->lms, enable);
         d->tx_pwren = enable;
         USDR_LOG("UDEV", USDR_LOG_INFO, "TX POWER %d\n", d->tx_pwren);
+        usleep(25000);
+
     } else if ((!tx) && (d->rx_pwren != enable)) {
         res = lms6002d_rfe_enable(&d->lms, enable);
         d->rx_pwren = enable;
         USDR_LOG("UDEV", USDR_LOG_INFO, "RX POWER %d\n", d->rx_pwren);
 
         res = res ? res : lms6002d_rxvga2_enable(&d->lms, enable);
+        usleep(25000);
     }
 
     return res;
@@ -379,8 +382,10 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
     unsigned rate = (rxrate == 0) ? txrate : rxrate;
     unsigned freq = rate << 1; //Link speed x2 sample rate
     struct si5332_layout_info nfo = { d->fref, freq };
-    int res;
-    res = si5332_set_layout(dev, 0, I2C_BUS_SI5332A, &nfo, d->hw_board_rev == USDR_REV_3 ? false : true, d->si_vco_div, &d->si_vco_freq);
+    int res = 0;
+
+    res = res ? res : _usdr_pwr_state(d, false, true);
+    res = res ? res : si5332_set_layout(dev, 0, I2C_BUS_SI5332A, &nfo, d->hw_board_rev == USDR_REV_3 ? false : true, d->si_vco_div, &d->si_vco_freq);
 
     // TODO: Add ability to alter it
     d->mixer_lo = d->si_vco_freq / d->si_vco_div;
