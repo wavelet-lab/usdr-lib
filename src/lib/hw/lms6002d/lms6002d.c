@@ -811,7 +811,7 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
     // read clbr_done
     res = res ? res : lms6002d_spi_rd(obj, TOP_DC_CAL, &rcal);
 
-    USDR_LOG("6002", USDR_LOG_WARNING, "LPFBW code=%d cal=%02x val=%d\n",
+    USDR_LOG("6002", USDR_LOG_INFO, "LPFBW code=%d cal=%02x val=%d\n",
              bcode, rcal, GET_LMS6002D_TOP_DC_CAL_RC_LPF(rcal));
 
     // Update calibration code

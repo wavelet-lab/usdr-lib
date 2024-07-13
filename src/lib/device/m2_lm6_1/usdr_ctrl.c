@@ -404,21 +404,7 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
         res = res ? res : lms6002d_set_bandwidth(&d->lms, true, txrate);
     }
 
-
-    USDR_LOG("UDEV", USDR_LOG_INFO, "MXLO %3.f\n", d->mixer_lo / 1.0e6);
-    // // FIME: Remove DEBUG
-    // // check clocks
-    // for (unsigned i = 0; i < 10; i++) {
-    //     unsigned v = 0, q = 0, t = 0;
-    //     usleep(10200);
-    //     dev_gpi_get32(dev, IGPI_USBC, &q);
-    //     dev_gpi_get32(dev, IGPI_RXCLK, &v);
-    //     dev_gpi_get32(dev, IGPI_TXCLK, &t);
-
-    //     USDR_LOG("UDEV", USDR_LOG_INFO, "M2_LM6_1: MCLK=%x UCLK=%x TCLK=%x -- %d / %d / %d", v, q, t,
-    //              v & 0xfffffff, q & 0xfffffff, t & 0xfffffff);
-    // }
-
+    USDR_LOG("UDEV", USDR_LOG_INFO, "RX_RATE %.3f TX_RATE %.3f MXLO %.3f\n", rxrate / 1.0e6, txrate / 1.0e6, d->mixer_lo / 1.0e6);
     return res;
 }
 
@@ -850,7 +836,7 @@ int usdr_rfic_set_gain(struct usdr_dev *d,
         res = res ? res : lms6002d_set_rxvga1_gain(&d->lms, val);
         res = res ? res : lms6002d_set_rxvga2ab_gain(&d->lms, d->rx_vga2a, d->rx_vga2b);
 
-        USDR_LOG("UDEV", USDR_LOG_WARNING, "RX_GAIN: LNA=%d VGA1=%d VGA2A=%d  [%d / %d] ACTUAL=%d\n",
+        USDR_LOG("UDEV", USDR_LOG_INFO, "RX_GAIN: LNA=%d VGA1=%d VGA2A=%d  [%d / %d] ACTUAL=%d\n",
                  d->rx_lna, d->rx_vga1, d->rx_vga2a, dlna1, dlna2, actual);
         ngain = actual;
         break;
