@@ -74,6 +74,7 @@ static const struct idx_list s_param_list[] = {
     { "saturation",        SDRC_SATURATION },
     { "contrast",          SDRC_CONTRAST },
     { "stream_type",       SDRC_STREAM_TYPE },
+    { "fft_provider",      SDRC_FFT_PROVIDER },
 };
 
 static int parse_parameter(const char* parameter)
