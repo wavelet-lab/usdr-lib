@@ -154,13 +154,6 @@ int usdr_dtor(struct usdr_dev *d);
 int usdr_lob_set(struct usdr_dev *d, unsigned freq);
 
 
-int usdr_i2c_addr_ext_set(struct usdr_dev *d, uint8_t addr);
-
-int usdr_ext_i2c(lldev_t dev, subdev_t subdev, unsigned ls_op, lsopaddr_t ls_op_addr,
-                 size_t meminsz, void* pin, size_t memoutsz,
-                 const void* pout);
-
-
 int usdr_calib_dc(struct usdr_dev *d, bool rx);
 
 int usdr_gettemp(struct usdr_dev *d, int* temp256);

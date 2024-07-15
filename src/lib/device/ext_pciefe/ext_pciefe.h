@@ -10,11 +10,6 @@
 #include "../device.h"
 #include "../device_vfs.h"
 
-
-typedef int (*ext_i2c_func_t)(lldev_t dev, subdev_t subdev, unsigned ls_op, lsopaddr_t ls_op_addr,
-                              size_t meminsz, void* pin, size_t memoutsz,
-                              const void* pout);
-
 enum board_type {
     V0_QORVO,
     V0_MINIC,
@@ -54,9 +49,9 @@ struct board_ext_pciefe {
     lldev_t dev;
     unsigned subdev;
     unsigned gpio_base;
+    unsigned i2c_loc;
 
     board_type_t board;
-    ext_i2c_func_t func;
 
     // Configuration
     uint8_t cfg_fast_attn;
@@ -87,7 +82,7 @@ int board_ext_pciefe_init(lldev_t dev,
                           unsigned gpio_base,
                           const char *params,
                           const char *compat,
-                          ext_i2c_func_t func,
+                          unsigned i2c_loc,
                           board_ext_pciefe_t* ob);
 
 // Raw board interface

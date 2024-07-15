@@ -41,21 +41,15 @@ enum {
     I2C_ADDR_LMK = 0x65,
 };
 
-#if 0   //unused
-static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
-{
-    return lowlevel_reg_rd32(dev, 0, 16 + (bank / 4), data);
-}
-#endif
-
 int board_ext_simplesync_init(lldev_t dev,
                               unsigned subdev,
                               unsigned gpio_base,
                               const char* compat,
-                              ext_i2c_func_t func,
+                              unsigned i2c_loc,
                               board_ext_simplesync_t* ob)
 {
     int res = 0;
+    unsigned i2ca = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_LMK);
 
     // This breakout is compatible with M.2 key A/E or A+E boards
     if ((strcmp(compat, "m2a+e") != 0) && (strcmp(compat, "m2e") != 0) && (strcmp(compat, "m2a") != 0))
@@ -83,7 +77,7 @@ int board_ext_simplesync_init(lldev_t dev,
     // Wait for power up
     usleep(50000);
 
-    res = lmk05318_create(dev, subdev, I2C_ADDR_LMK << I2C_EXTERNAL_CMD_OFF, func, &ob->lmk);
+    res = lmk05318_create(dev, subdev, i2ca, &ob->lmk);
     if (res)
         return res;
 

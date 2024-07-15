@@ -6,15 +6,10 @@
 
 #include <usdr_lowlevel.h>
 
-typedef int (*ext_i2c_func_t)(lldev_t dev, subdev_t subdev, unsigned ls_op, lsopaddr_t ls_op_addr,
-                              size_t meminsz, void* pin, size_t memoutsz,
-                              const void* pout);
-
 struct lmk05318_state {
     lldev_t dev;
     unsigned subdev;
     unsigned lsaddr;
-    ext_i2c_func_t i2c_func;
 
     // Ref deviders
     unsigned fref_pll2_div_rp; // 3 to 6
@@ -34,7 +29,7 @@ enum lmk05318_type {
 
 typedef struct lmk05318_state lmk05318_state_t;
 
-int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, ext_i2c_func_t func, lmk05318_state_t* out);
+int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmk05318_state_t* out);
 
 int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div);
 int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, unsigned div);

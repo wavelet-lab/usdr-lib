@@ -78,43 +78,38 @@ int board_ext_pciefe_updpwr(board_ext_pciefe_t* ob);
 int board_ext_pciefe_updfe(board_ext_pciefe_t* ob);
 
 
-static
-int tca6416_reg_wr(ext_i2c_func_t f, lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
-                          uint8_t reg, uint8_t out)
+static int tca6416_reg_wr(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
+                   uint8_t reg, uint8_t out)
 {
     uint8_t data[2] = { reg, out };
-    return f(dev, subdev,
-             USDR_LSOP_I2C_DEV, ls_op_addr,
-             0, NULL, SIZEOF_ARRAY(data), data);
+    return lowlevel_ls_op(dev, subdev,
+                          USDR_LSOP_I2C_DEV, ls_op_addr,
+                          0, NULL, SIZEOF_ARRAY(data), data);
 }
 
-static
-int tca6416_reg_wr2(ext_i2c_func_t f, lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
-                   uint8_t reg, uint8_t out0, uint8_t out1)
+static int tca6416_reg_wr2(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
+                    uint8_t reg, uint8_t out0, uint8_t out1)
 {
     uint8_t data[3] = { reg, out0, out1 };
-    return f(dev, subdev,
-             USDR_LSOP_I2C_DEV, ls_op_addr,
-             0, NULL, SIZEOF_ARRAY(data), data);
+    return lowlevel_ls_op(dev, subdev,
+                          USDR_LSOP_I2C_DEV, ls_op_addr,
+                          0, NULL, SIZEOF_ARRAY(data), data);
 }
 
-
-static
-int tca6416_reg_rd(ext_i2c_func_t f, lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
-                   uint8_t addr, uint8_t* val)
+static int tca6416_reg_rd(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
+                          uint8_t addr, uint8_t* val)
 {
-    return f(dev, subdev,
-             USDR_LSOP_I2C_DEV, ls_op_addr,
-             1, val, 1, &addr);
+    return lowlevel_ls_op(dev, subdev,
+                          USDR_LSOP_I2C_DEV, ls_op_addr,
+                          1, val, 1, &addr);
 }
 
-static
-int tca6416_reg_rd4(ext_i2c_func_t f, lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
-                   uint8_t addr, uint32_t* val)
+static int tca6416_reg_rd4(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
+                           uint8_t addr, uint32_t* val)
 {
-    return f(dev, subdev,
-             USDR_LSOP_I2C_DEV, ls_op_addr,
-             4, (uint8_t*)val, 1, &addr);
+    return lowlevel_ls_op(dev, subdev,
+                          USDR_LSOP_I2C_DEV, ls_op_addr,
+                          4, (uint8_t*)val, 1, &addr);
 }
 
 static inline int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
@@ -184,12 +179,16 @@ int board_ext_pciefe_init(lldev_t dev,
                           unsigned gpio_base,
                           const char* params,
                           const char* compat,
-                          ext_i2c_func_t func,
+                          unsigned i2c_loc,
                           board_ext_pciefe_t* ob)
 {
     int res = 0;
     uint32_t dummy;
     long dac_val = 0, p_attn;
+    unsigned i2ca_gpio = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_GPIO);
+    unsigned i2ca_fe = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_FE);
+    unsigned i2ca_dac = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_DAC);
+
 
     // This breakout is compatible with M.2 key A/E or A+E boards
     if ((strcmp(compat, "m2a+e") != 0) && (strcmp(compat, "m2e") != 0) && (strcmp(compat, "m2a") != 0))
@@ -206,7 +205,7 @@ int board_ext_pciefe_init(lldev_t dev,
     ob->dev = dev;
     ob->subdev = subdev;
     ob->gpio_base = gpio_base;
-    ob->func = func;
+    ob->i2c_loc = i2c_loc;
     ob->board = V1_HALF;
 
     ob->rxsel = RX_LPF1200;
@@ -272,9 +271,9 @@ int board_ext_pciefe_init(lldev_t dev,
         ob->cfg_fast_lb = 1;
     }
 
-    static const uint8_t addrs[] = {I2C_ADDR_FE, I2C_ADDR_GPIO};
+    unsigned exp_addrs[] = {i2ca_fe, i2ca_gpio};
     for (unsigned i = 0; i < 2; i++) {
-        res = tca6416_reg_rd4(func, dev, subdev, addrs[i] << 16, IN_P1, &dummy);
+        res = tca6416_reg_rd4(dev, subdev, exp_addrs[i], IN_P1, &dummy);
         if (res)
             return res;
         if (dummy == 0xbaadbeef) {
@@ -285,15 +284,15 @@ int board_ext_pciefe_init(lldev_t dev,
         }
     }
 
-    res = (res) ? res : tca6416_reg_wr(func, dev, subdev, I2C_ADDR_GPIO << 16, CONFIG_P0, 0);
-    res = (res) ? res : tca6416_reg_wr(func, dev, subdev, I2C_ADDR_GPIO << 16, CONFIG_P1, 0);
-    res = (res) ? res : tca6416_reg_wr(func, dev, subdev, I2C_ADDR_GPIO << 16, OUT_P0, 0);
-    res = (res) ? res : tca6416_reg_wr(func, dev, subdev, I2C_ADDR_GPIO << 16, OUT_P1, 0);
+    res = (res) ? res : tca6416_reg_wr(dev, subdev, i2ca_gpio, CONFIG_P0, 0);
+    res = (res) ? res : tca6416_reg_wr(dev, subdev, i2ca_gpio, CONFIG_P1, 0);
+    res = (res) ? res : tca6416_reg_wr(dev, subdev, i2ca_gpio, OUT_P0, 0);
+    res = (res) ? res : tca6416_reg_wr(dev, subdev, i2ca_gpio, OUT_P1, 0);
 
-    res = (res) ? res : tca6416_reg_wr(func, dev, subdev, I2C_ADDR_FE << 16, CONFIG_P0, 0);
-    res = (res) ? res : tca6416_reg_wr(func, dev, subdev, I2C_ADDR_FE << 16, CONFIG_P1, 0);
-    res = (res) ? res : tca6416_reg_wr(func, dev, subdev, I2C_ADDR_FE << 16, OUT_P0, 0);
-    res = (res) ? res : tca6416_reg_wr(func, dev, subdev, I2C_ADDR_FE << 16, OUT_P1, 1);
+    res = (res) ? res : tca6416_reg_wr(dev, subdev, i2ca_fe, CONFIG_P0, 0);
+    res = (res) ? res : tca6416_reg_wr(dev, subdev, i2ca_fe, CONFIG_P1, 0);
+    res = (res) ? res : tca6416_reg_wr(dev, subdev, i2ca_fe, OUT_P0, 0);
+    res = (res) ? res : tca6416_reg_wr(dev, subdev, i2ca_fe, OUT_P1, 1);
 
     res = (res) ? res : board_ext_pciefe_updpwr(ob);
     if (res)
@@ -301,7 +300,7 @@ int board_ext_pciefe_init(lldev_t dev,
 
     uint16_t rdreg[2];
     for (unsigned i = 0; i < 2; i++) {
-        res = tca6416_reg_rd4(func, dev, subdev, addrs[i] << 16, IN_P0, &dummy);
+        res = tca6416_reg_rd4(dev, subdev, exp_addrs[i], IN_P0, &dummy);
         if (res)
             return res;
 
@@ -317,7 +316,7 @@ int board_ext_pciefe_init(lldev_t dev,
     // Wait for power up DAC
     usleep(10000);
 
-    res = dac80501_init(func, dev, subdev, I2C_ADDR_DAC << I2C_EXTERNAL_CMD_OFF, DAC80501_CFG_REF_DIV_GAIN_MUL);
+    res = dac80501_init(dev, subdev, i2ca_dac, DAC80501_CFG_REF_DIV_GAIN_MUL);
     if (res) {
         USDR_LOG("PCIF", USDR_LOG_ERROR, "DAC initialization error=%d\n", res);
         if (ob->board == V1_HALF || ob->board == V1_FULL) {
@@ -571,30 +570,32 @@ int board_ext_pciefe_updfe(board_ext_pciefe_t* ob)
 int board_ext_pciefe_ereg_wr(board_ext_pciefe_t* ob, uint32_t addr, uint32_t reg)
 {
     int res;
+    unsigned i2ca_gpio = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(ob->i2c_loc), LSOP_I2C_BUSNO(ob->i2c_loc), I2C_ADDR_GPIO);
+    unsigned i2ca_fe = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(ob->i2c_loc), LSOP_I2C_BUSNO(ob->i2c_loc), I2C_ADDR_FE);
+    unsigned i2ca_dac = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(ob->i2c_loc), LSOP_I2C_BUSNO(ob->i2c_loc), I2C_ADDR_DAC);
 
     switch (addr) {
     case V1_FE:
-        res = tca6416_reg_wr2(ob->func, ob->dev, ob->subdev, I2C_ADDR_FE << 16, OUT_P0, reg, reg >> 8);
+        res = tca6416_reg_wr2(ob->dev, ob->subdev, i2ca_fe, OUT_P0, reg, reg >> 8);
         break;
     case V0_FE0:
     case V0_FE0_ALT:
-        res = tca6416_reg_wr(ob->func, ob->dev, ob->subdev, I2C_ADDR_FE << 16, OUT_P0, reg);
+        res = tca6416_reg_wr(ob->dev, ob->subdev, i2ca_fe, OUT_P0, reg);
         break;
     case V0_FE1:
     case V0_AFE1_ALT:
-        res = tca6416_reg_wr(ob->func, ob->dev, ob->subdev, I2C_ADDR_FE << 16, OUT_P1, reg);
+        res = tca6416_reg_wr(ob->dev, ob->subdev, i2ca_fe, OUT_P1, reg);
         break;
     case V0_GPIO0:
     case V1_GPIO0:
-        res = tca6416_reg_wr(ob->func, ob->dev, ob->subdev, I2C_ADDR_GPIO << 16, OUT_P0, reg);
+        res = tca6416_reg_wr(ob->dev, ob->subdev, i2ca_gpio, OUT_P0, reg);
         break;
     case V0_GPIO1:
     case V1_GPIO1:
-        res = tca6416_reg_wr(ob->func, ob->dev, ob->subdev, I2C_ADDR_GPIO << 16, OUT_P1, reg);
+        res = tca6416_reg_wr(ob->dev, ob->subdev, i2ca_gpio, OUT_P1, reg);
         break;
     case GENERAL_DAC:
-        res = dac80501_dac_set(ob->func, ob->dev, ob->subdev,
-                               I2C_ADDR_DAC << I2C_EXTERNAL_CMD_OFF, reg);
+        res = dac80501_dac_set(ob->dev, ob->subdev, i2ca_dac, reg);
         break;
     default:
         return -EINVAL;
@@ -607,21 +608,23 @@ int board_ext_pciefe_ereg_rd(board_ext_pciefe_t* ob, uint32_t addr, uint32_t* pr
 {
     int res;
     uint8_t val = 0xff;
+    unsigned i2ca_gpio = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(ob->i2c_loc), LSOP_I2C_BUSNO(ob->i2c_loc), I2C_ADDR_GPIO);
+    unsigned i2ca_fe = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(ob->i2c_loc), LSOP_I2C_BUSNO(ob->i2c_loc), I2C_ADDR_FE);
+    unsigned i2ca_dac = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(ob->i2c_loc), LSOP_I2C_BUSNO(ob->i2c_loc), I2C_ADDR_DAC);
 
     switch (addr) {
     case GENERAL_DAC: {
         uint16_t dreg = 0;
-        res = dac80501_dac_get(ob->func, ob->dev, ob->subdev,
-                               I2C_ADDR_DAC << I2C_EXTERNAL_CMD_OFF, &dreg);
+        res = dac80501_dac_get(ob->dev, ob->subdev, i2ca_dac, &dreg);
         *preg = dreg;
         return res;
     }
     case V1_FE: {
         uint8_t r0, r1;
-        res = tca6416_reg_rd(ob->func, ob->dev, ob->subdev, I2C_ADDR_FE << 16, OUT_P0, &r0);
+        res = tca6416_reg_rd(ob->dev, ob->subdev, i2ca_fe, OUT_P0, &r0);
         if (res)
             return res;
-        res = tca6416_reg_rd(ob->func, ob->dev, ob->subdev, I2C_ADDR_FE << 16, OUT_P1, &r1);
+        res = tca6416_reg_rd(ob->dev, ob->subdev, i2ca_fe, OUT_P1, &r1);
         if (res)
             return res;
 
@@ -630,19 +633,19 @@ int board_ext_pciefe_ereg_rd(board_ext_pciefe_t* ob, uint32_t addr, uint32_t* pr
     }
     case V0_FE0:
     case V0_FE0_ALT:
-        res = tca6416_reg_rd(ob->func, ob->dev, ob->subdev, I2C_ADDR_FE << 16, OUT_P0, &val);
+        res = tca6416_reg_rd(ob->dev, ob->subdev, i2ca_fe, OUT_P0, &val);
         break;
     case V0_FE1:
     case V0_AFE1_ALT:
-        res = tca6416_reg_rd(ob->func, ob->dev, ob->subdev, I2C_ADDR_FE << 16, OUT_P1, &val);
+        res = tca6416_reg_rd(ob->dev, ob->subdev, i2ca_fe, OUT_P1, &val);
         break;
     case V0_GPIO0:
     case V1_GPIO0:
-        res = tca6416_reg_rd(ob->func, ob->dev, ob->subdev, I2C_ADDR_GPIO << 16, OUT_P0, &val);
+        res = tca6416_reg_rd(ob->dev, ob->subdev, i2ca_gpio, OUT_P0, &val);
         break;
     case V0_GPIO1:
     case V1_GPIO1:
-        res = tca6416_reg_rd(ob->func, ob->dev, ob->subdev, I2C_ADDR_GPIO << 16, OUT_P1, &val);
+        res = tca6416_reg_rd(ob->dev, ob->subdev, i2ca_gpio, OUT_P1, &val);
         break;
     default:
         return -EINVAL;
@@ -654,6 +657,7 @@ int board_ext_pciefe_ereg_rd(board_ext_pciefe_t* ob, uint32_t addr, uint32_t* pr
 int board_ext_pciefe_cmd_wr(board_ext_pciefe_t* ob, uint32_t addr, uint32_t reg)
 {
     int res = 0;
+    unsigned i2ca_dac = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(ob->i2c_loc), LSOP_I2C_BUSNO(ob->i2c_loc), I2C_ADDR_DAC);
 
     switch (addr) {
     case FECMD_TXSEL: ob->txsel = reg; break;
@@ -682,8 +686,7 @@ int board_ext_pciefe_cmd_wr(board_ext_pciefe_t* ob, uint32_t addr, uint32_t reg)
         break;
     case FECMD_DAC:
         ob->dac = reg;
-        return dac80501_dac_set(ob->func, ob->dev, ob->subdev,
-                                I2C_ADDR_DAC << I2C_EXTERNAL_CMD_OFF, reg);
+        return dac80501_dac_set(ob->dev, ob->subdev, i2ca_dac, reg);
     default:
         return -EINVAL;
     }
@@ -718,7 +721,6 @@ int board_ext_pciefe_cmd_rd(board_ext_pciefe_t* ob, uint32_t addr, uint32_t* pre
 }
 
 
-
 struct band_selector {
     unsigned start;
     unsigned stop;
@@ -734,9 +736,6 @@ int board_ext_pciefe_best_path_set(board_ext_pciefe_t* ob,
                                    unsigned rxlo, unsigned rxbw,
                                    unsigned txlo, unsigned txbw)
 {
-
-
-
 
     return -EINVAL;
 }

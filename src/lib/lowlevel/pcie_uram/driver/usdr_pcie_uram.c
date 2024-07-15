@@ -28,7 +28,7 @@
 #include <linux/ktime.h>
 
 #include "./pcie_uram_driver_if.h"
-#include "./si2c.h"
+#include "./si2c.c"
 #include "./device_cores.h"
 
 #define DRV_NAME		"usdr"
@@ -65,7 +65,7 @@ static int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
 #endif
 
 // Change anytime when extra parameter or meaning is changed in pcie_uram_driver_if.h
-#define USDR_DRIVER_ABI_VERSION 2
+#define USDR_DRIVER_ABI_VERSION 3
 
 enum device_flags {
     DEV_VALID = 1,
@@ -123,7 +123,8 @@ enum {
     MAX_BUCKETS = 4,
 };
 
-
+#define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
+#define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
 
 struct notification_bucket {
     struct usdr_dmabuf db;
@@ -174,6 +175,9 @@ struct usdr_dev {
         unsigned vma_off_last;
         
         struct event_data_log streaming[MAX_INT];
+
+        struct i2c_cache i2cc[4 * MAX_I2C_COUNT];
+        uint32_t i2clut[MAX_I2C_COUNT];
 };
 
 static struct usdr_dev *usdr_list = NULL;
@@ -181,6 +185,7 @@ static int devices = 0;
 static dev_t dev_first;
 static struct class* usdr_class  = NULL;
 
+// #define EXTRA_DEBUG
 
 #ifdef EXTRA_DEBUG
 #define DEBUG_DEV_OUT(dev, ...) dev_notice((dev), __VA_ARGS__)
@@ -379,7 +384,7 @@ static int init_bucket(struct usdr_dev *dev)
                                          GFP_KERNEL);
         if(!b->db.kvirt)
         {
-            printk(KERN_INFO PFX "Failed to allocate consistent memory (%d bytes), dma_alloc_coherent() returns NULL!\n", PAGE_SIZE);
+            dev_err(&dev->pdev->dev, "Failed to allocate consistent memory (%ld bytes), dma_alloc_coherent() returns NULL!\n", PAGE_SIZE);
             return -ENOMEM;
         }
 
@@ -1133,8 +1138,11 @@ static long usdrfd_ioctl(struct file *filp,
 
     switch (ioctl_num) {
     case PCIE_DRIVER_CLAIM_VERSION:
-        if (ioctl_param != USDR_DRIVER_ABI_VERSION)
+        if (ioctl_param != USDR_DRIVER_ABI_VERSION) {
+            dev_err(&usdrdev->pdev->dev, "User requested ABI ver %d, but driver is %d\n",
+                    (unsigned)ioctl_param, USDR_DRIVER_ABI_VERSION);
             return -EOPNOTSUPP;
+        }
         return 0;
 
     case PCIE_DRIVER_GET_UUID:
@@ -1214,12 +1222,19 @@ static long usdrfd_ioctl(struct file *filp,
     }
     case PCIE_DRIVER_SPI32_TRANSACT: {
         struct pcie_driver_spi32 sp;
-        unsigned base, irq, cnt;
+        unsigned core, base, irq, cnt;
 
         if (copy_from_user(&sp, uptr, sizeof(sp)))
                 return -EFAULT;
         if (sp.busno >= usdrdev->dl.spi_cnt)
             return -EINVAL;
+
+        core = usdrdev->dl.spi_core[sp.busno];
+        if (core != SPI_CORE_32W) {
+            dev_err(&usdrdev->pdev->dev, "SPI[%d] core %d isn't supported, update driver!",
+                    sp.busno, core);
+            return -EINVAL;
+        }
 
         base = usdrdev->dl.spi_base[sp.busno];
         irq = usdrdev->dl.spi_int_number[sp.busno];
@@ -1249,38 +1264,47 @@ static long usdrfd_ioctl(struct file *filp,
     }
     case PCIE_DRIVER_SI2C_TRANSACT: {
         struct pcie_driver_si2c si2c;
-        unsigned i2cbus, base, irq, wdata;
+        unsigned i2cinst, i2cbus, i2caddr, core, base, irq, idx, lut, cmd;
 
         if (copy_from_user(&si2c, uptr, sizeof(si2c)))
                 return -EFAULT;
-        i2cbus = si2c.bdevno >> 8;
-        if (i2cbus >= usdrdev->dl.i2c_cnt)
+
+        i2cinst = (si2c.addr >> 24) & 0xFF;
+        i2cbus = (si2c.addr >> 16) & 0xFF;
+        i2caddr = (si2c.addr) & 0xFFFF;
+
+        if (i2cinst >= usdrdev->dl.i2c_cnt)
             return -EINVAL;
-        if (si2c.rcnt > 4)
+
+        core = usdrdev->dl.i2c_core[i2cinst];
+
+        if (core != I2C_CORE_AUTO_LUTUPD) {
+            dev_err(&usdrdev->pdev->dev, "I2C[%d] core %d isn't supported, update driver!",
+                      i2cinst, core);
             return -EINVAL;
-        if (si2c.wcnt > 3)
-            return -EINVAL;
+        }
 
-        base = usdrdev->dl.i2c_base[i2cbus];
-        irq = usdrdev->dl.i2c_int_number[i2cbus];
+        base = usdrdev->dl.i2c_base[i2cinst];
+        irq = usdrdev->dl.i2c_int_number[i2cinst];
+        idx = si2c_update_lut_idx(&usdrdev->i2cc[4 * i2cinst], i2caddr, i2cbus);
+        lut = si2c_get_lut(&usdrdev->i2cc[4 * i2cinst]);
+        res = si2c_make_ctrl_reg(idx, si2c.wrb, si2c.wcnt, si2c.rcnt, &cmd);
+        if (res) {
+            return res;
+        }
 
-        wdata = 0;
-        if (si2c.wcnt > 0)
-            wdata = si2c.wrb[0];
-        if (si2c.wcnt > 1)
-            wdata |= ((unsigned)si2c.wrb[1]) << 8;
-        if (si2c.wcnt > 2)
-            wdata |= ((unsigned)si2c.wrb[2]) << 16;
+        DEBUG_DEV_OUT(&usdrdev->pdev->dev, "I2C[%d.%d.%02x] W:%d,R:%d,CMD:%08x,LUT:%08x\n",
+                      i2cinst, i2cbus, i2caddr, si2c.wcnt, si2c.rcnt, cmd, lut);
 
-        DEBUG_DEV_OUT(&usdrdev->pdev->dev, "I2C%d W:%d,R:%d,DATA:%08x\n",
-                      si2c.bdevno, si2c.wcnt, si2c.rcnt, wdata);
+        if (usdrdev->i2clut[i2cinst] == lut) {
+            usdr_reg_wr32(usdrdev, base, cmd);
+        } else {
+            // NOTE: usdr_reg_wr64 do cpu_to_be64() which reverse DWORD order on PCIe bus
+            __u64 cmd_lut = ((__u64)lut << 32) | cmd;
+            usdr_reg_wr64(usdrdev, base - 1, cmd_lut);
+            usdrdev->i2clut[i2cinst] = lut;
+        }
 
-        usdr_reg_wr32(usdrdev, base,
-                      MAKE_I2C_CMD(si2c.rcnt > 0 ? 1 : 0,
-                                   si2c.rcnt - 1,
-                                   si2c.wcnt,
-                                   si2c.bdevno,
-                                   wdata));
         if (si2c.rcnt > 0) {
             unsigned dout, cnt;
 
@@ -1298,16 +1322,13 @@ static long usdrfd_ioctl(struct file *filp,
 #else
             dout = usdrdev->rb_ev_data[irq];
 #endif
-            si2c.rdw = 0;
-            si2c.rdb[0] = dout;
-            if (si2c.rcnt > 1)
-                si2c.rdb[1] = dout >> 8;
-            if (si2c.rcnt > 2)
-                si2c.rdb[2] = dout >> 16;
-            if (si2c.rcnt > 3)
-                si2c.rdb[3] = dout >> 24;
 
-            if (copy_to_user(uptr + offsetof(struct pcie_driver_si2c, rdw), &si2c.rdw, sizeof(si2c.rdw)))
+            si2c.rdb[0] = dout;
+            si2c.rdb[1] = (si2c.rcnt > 1) ? (dout >> 8) : 0;
+            si2c.rdb[2] = (si2c.rcnt > 2) ? (dout >> 16) : 0;
+            si2c.rdb[3] = (si2c.rcnt > 3) ? (dout >> 24) : 0;
+
+            if (copy_to_user(uptr + offsetof(struct pcie_driver_si2c, rdb), si2c.rdb, sizeof(si2c.rdb)))
                 return -EFAULT;
         }
 

@@ -28,26 +28,26 @@ enum {
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out)
 {
     uint8_t data[3] = { reg >> 8, reg, out };
-    return d->i2c_func(d->dev, d->subdev,
-                       USDR_LSOP_I2C_DEV, d->lsaddr,
-                       0, NULL, 3, data);
+    return lowlevel_ls_op(d->dev, d->subdev,
+                          USDR_LSOP_I2C_DEV, d->lsaddr,
+                          0, NULL, 3, data);
 }
 
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val)
 {
     uint8_t addr[2] = { reg >> 8, reg };
-    return d->i2c_func(d->dev, d->subdev,
-                       USDR_LSOP_I2C_DEV, d->lsaddr,
-                       1, val, 2, addr);
+    return lowlevel_ls_op(d->dev, d->subdev,
+                          USDR_LSOP_I2C_DEV, d->lsaddr,
+                          1, val, 2, addr);
 }
 
 int lmk05318_reg_get_u32(lmk05318_state_t* d,
                          uint16_t reg, uint8_t* val)
 {
     uint8_t addr[2] = { reg >> 8, reg };
-    return d->i2c_func(d->dev, d->subdev,
-                       USDR_LSOP_I2C_DEV, d->lsaddr,
-                       4, val, 2, &addr[0]);
+    return lowlevel_ls_op(d->dev, d->subdev,
+                          USDR_LSOP_I2C_DEV, d->lsaddr,
+                          4, val, 2, &addr[0]);
 }
 
 int lmk05318_reg_wr_n(lmk05318_state_t* d, const uint32_t* regs, unsigned count)
@@ -65,7 +65,7 @@ int lmk05318_reg_wr_n(lmk05318_state_t* d, const uint32_t* regs, unsigned count)
     return 0;
 }
 
-int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, ext_i2c_func_t func, lmk05318_state_t* out)
+int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmk05318_state_t* out)
 {
     int res;
     uint8_t dummy[4];
@@ -73,7 +73,6 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, ext_i2c_func_
     out->dev = dev;
     out->subdev = subdev;
     out->lsaddr = lsaddr;
-    out->i2c_func = func;
 
     res = lmk05318_reg_get_u32(out, 0, &dummy[0]);
     if (res)

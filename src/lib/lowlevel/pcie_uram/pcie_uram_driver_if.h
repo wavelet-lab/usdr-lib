@@ -88,17 +88,13 @@ struct pcie_driver_spi_bulk {
 };
 
 struct pcie_driver_si2c {
-    unsigned bdevno;
-    unsigned char wcnt;
-    unsigned char rcnt;
-    union {
-        unsigned wrw;
-        unsigned char wrb[4];
-    };
-    union {
-        unsigned rdw;
-        unsigned char rdb[4];
-    };
+    unsigned addr;
+    unsigned wcnt;
+    unsigned rcnt;
+    unsigned char wrb[8];
+    unsigned char rdb[8];
+    void* wrb_p; // Reserved for future I2C cores
+    void* rdb_p; // Reserved for future I2C cores
 };
 
 enum sdma_stream_type {

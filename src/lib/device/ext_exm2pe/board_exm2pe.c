@@ -32,13 +32,14 @@ int board_exm2pe_init(lldev_t dev,
                       unsigned gpio_base,
                       const char* params,
                       const char* compat,
-                      ext_i2c_func_t func,
+                      unsigned i2c_loc,
                       board_exm2pe_t* ob)
 {
     int res = 0;
     uint8_t gps_en = 0;
     uint8_t osc_en = 0;
     long dac_val = 0;
+    unsigned i2ca_dac = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_DAC);
 
     // This breakout is compatible wi M.2 key A/E or A+E boards
     if ((strcmp(compat, "m2a+e") != 0) && (strcmp(compat, "m2e") != 0) && (strcmp(compat, "m2a") != 0))
@@ -47,7 +48,7 @@ int board_exm2pe_init(lldev_t dev,
     ob->dev = dev;
     ob->subdev = subdev;
     ob->gpio_base = gpio_base;
-    ob->func = func;
+    ob->i2c_loc = i2c_loc;
     ob->dac_present = true;
 
     // Configure  gpio dir
@@ -62,7 +63,7 @@ int board_exm2pe_init(lldev_t dev,
                                  (1 << GPIO_EN_OSC) | (1 << GPIO_EN_GPS));
     usleep(10000);
 
-    res = (res) ? res : dac80501_init(func, dev, subdev, I2C_ADDR_DAC << I2C_EXTERNAL_CMD_OFF, DAC80501_CFG_REF_DIV_GAIN_MUL);
+    res = (res) ? res : dac80501_init(dev, subdev, i2ca_dac, DAC80501_CFG_REF_DIV_GAIN_MUL);
     if (res) {
         USDR_LOG("M2PE", USDR_LOG_WARNING, "External DAC not recognized error=%d\n", res);
         //return -ENODEV;
@@ -94,7 +95,7 @@ int board_exm2pe_init(lldev_t dev,
             osc_en = res;
         }
         if (get_param_long(&pd[P_DAC], &dac_val) == 0) {
-            if (dac_val < 0 || dac_val > 65535) {
+            if ((dac_val < 0) || (dac_val > 65535)) {
                 USDR_LOG("M2PE", USDR_LOG_ERROR, "DAC value must be in range [0;65535]\n");
                 return -EINVAL;
             }
@@ -148,11 +149,10 @@ int board_exm2pe_enable_osc(board_exm2pe_t* brd, bool en)
 
 int board_exm2pe_set_dac(board_exm2pe_t* brd, unsigned value)
 {
+    unsigned i2ca_dac = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(brd->i2c_loc), LSOP_I2C_BUSNO(brd->i2c_loc), I2C_ADDR_DAC);
     if (!brd->dac_present)
         return -EACCES;
 
     USDR_LOG("M2PE", USDR_LOG_ERROR, "DAC set to: %d\n", value);
-    return dac80501_dac_set(brd->func, brd->dev, brd->subdev,
-                         I2C_ADDR_DAC << I2C_EXTERNAL_CMD_OFF,
-                         value);
+    return dac80501_dac_set(brd->dev, brd->subdev, i2ca_dac, value);
 }

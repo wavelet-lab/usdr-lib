@@ -10,8 +10,10 @@
 
 #if defined(__EMSCRIPTEN__)
 #include <stdint.h>
+#include <errno.h>
 #else
 #include <linux/types.h>
+#include <linux/errno.h>
 #endif
 
 #define MAKE_I2C_CMD(RD, RDZSZ, WRSZ, DEVNO, DATA)  (\
@@ -21,11 +23,20 @@
     (((DEVNO) & 3U) << 24) | \
     (((DATA) & 0xffffffu) << 0))
 
-int si2c_make_ctrl_reg(
-        uint8_t bus,
-        const uint8_t* dd,
+int si2c_make_ctrl_reg(unsigned char idx,
+        const unsigned char* dd,
         unsigned memoutsz,
         unsigned meminsz,
-        uint32_t* ctrl_w);
+        unsigned* ctrl_w);
+
+struct i2c_cache {
+    unsigned busn : 1;
+    unsigned addr : 7;
+    unsigned lrui : 8;
+};
+
+unsigned si2c_update_lut_idx(struct i2c_cache* cd, unsigned addr, unsigned busno);
+unsigned si2c_get_lut(const struct i2c_cache* cd);
+
 
 #endif

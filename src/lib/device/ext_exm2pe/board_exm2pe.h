@@ -11,15 +11,11 @@
 #include "../device_vfs.h"
 
 
-typedef int (*ext_i2c_func_t)(lldev_t dev, subdev_t subdev, unsigned ls_op, lsopaddr_t ls_op_addr,
-                              size_t meminsz, void* pin, size_t memoutsz,
-                              const void* pout);
-
 struct board_exm2pe {
     lldev_t dev;
     unsigned subdev;
     unsigned gpio_base;
-    ext_i2c_func_t func;
+    unsigned i2c_loc;
 
     bool dac_present;
 };
@@ -31,7 +27,7 @@ int board_exm2pe_init(lldev_t dev,
                       unsigned gpio_base,
                       const char *params,
                       const char *compat,
-                      ext_i2c_func_t func,
+                      unsigned i2c_loc,
                       board_exm2pe_t* ob);
 
 int board_exm2pe_enable_gps(board_exm2pe_t* brd, bool en);

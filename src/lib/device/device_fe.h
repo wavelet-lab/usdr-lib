@@ -8,9 +8,8 @@
 
 struct dev_fe;
 
-int device_fe_probe(device_t* base, const char* compat, const char* hint,
+int device_fe_probe(device_t* base, const char* compat, const char* hint, unsigned def_i2c_loc,
                     struct dev_fe** obj);
-
 int device_fe_destroy(struct dev_fe* obj);
 
 void* device_fe_to(struct dev_fe* obj, const char* type);

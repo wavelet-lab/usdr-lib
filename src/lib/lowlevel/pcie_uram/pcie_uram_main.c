@@ -27,7 +27,8 @@
 #include "../ipblks/streams/sfe_tx_4.h"
 
 // ABI version should be synced with the driver
-#define USDR_DRIVER_ABI_VERSION 2
+// Since version 3:  check SPI/I2C core compatibility
+#define USDR_DRIVER_ABI_VERSION 3
 
 struct stream_cache_data {
     unsigned flags;
@@ -299,6 +300,22 @@ int pcie_spi_transact(pcie_uram_dev_t* dev, unsigned bus, unsigned in, unsigned 
 }
 #endif
 
+#define MAX_DUMP_BUFFER 256
+static char* _dump_buffer(size_t cnt, const void* pin)
+{
+    static char lbuffer[MAX_DUMP_BUFFER * 2 + 1];
+    unsigned i;
+
+    for (i = 0; i < (cnt < MAX_DUMP_BUFFER ? cnt : MAX_DUMP_BUFFER); i++) {
+        uint8_t c = ((const uint8_t*)pin)[i];
+        uint8_t ph = c >> 4;
+        uint8_t pl = c & 0xf;
+        lbuffer[2 * i + 0] = (ph < 9) ? '0' + ph : 'a' + ph - 10;
+        lbuffer[2 * i + 1] = (pl < 9) ? '0' + pl : 'a' + pl - 10;
+    }
+    lbuffer[i] = 0;
+    return lbuffer;
+}
 
 static
 int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
@@ -339,29 +356,36 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
     }
     case USDR_LSOP_I2C_DEV: {
         struct pcie_driver_si2c ioi2c;
-        ioi2c.bdevno = ls_op_addr;
+        ioi2c.addr = ls_op_addr;
         ioi2c.wcnt = memoutsz;
         ioi2c.rcnt = meminsz;
+        ioi2c.rdb_p = NULL;
+        ioi2c.wrb_p = NULL;
 
-        if (memoutsz > 3)
-            return -EINVAL;
-        if (meminsz > 4)
-            return -EINVAL;
+        if (memoutsz > sizeof(ioi2c.wrb)) {
+            ioi2c.wrb_p = (void*)pout;
+        } else {
+            memcpy(ioi2c.wrb, pout, memoutsz);
+        }
+
+        if (meminsz > sizeof(ioi2c.rdb)) {
+            ioi2c.rdb_p = pin;
+        }
 
         usleep(1000);
 
-        memcpy(ioi2c.wrb, pout, memoutsz);
-        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d: W=%d R=%d DW=%08x\n",
-                 ls_op_addr, ioi2c.wcnt, ioi2c.rcnt, ioi2c.wrw);
+        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d: W=%d R=%d OUT=%s\n",
+                 ls_op_addr, ioi2c.wcnt, ioi2c.rcnt, _dump_buffer(memoutsz, pout));
 
         res = ioctl(d->fd, PCIE_DRIVER_SI2C_TRANSACT, &ioi2c);
         if (res)
             return -errno;
 
-        if (meminsz) {
-            USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d:         => %08x\n", ls_op_addr, ioi2c.rdw);
+        if (meminsz <= sizeof(ioi2c.rdb)) {
+            memcpy(pin, ioi2c.rdb, meminsz);
         }
-        memcpy(pin, ioi2c.rdb, meminsz);
+        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d:         => %s\n", ls_op_addr, _dump_buffer(meminsz, pin));
+
         return 0;
     }
     case USDR_LSOP_DRP: {
@@ -806,7 +830,7 @@ int pcie_uram_plugin_discovery(unsigned pcount, const char** filterparams, const
 
 static
 int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char** devval, lldev_t* odev,
-                            UNUSED unsigned vidpid, UNUSED void* webops, UNUSED uintptr_t param)
+                            unsigned vidpid, void* webops, uintptr_t param)
 {
     struct pci_filtering_params pf;
     int res = pcie_filtering_params_parse(pcount, devparam, devval, &pf);
@@ -924,12 +948,12 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
         goto remove_dev;
     }
 
-    memcpy(dl.spi_base, dev->db.spi_base, sizeof(dl.spi_base));
-    memcpy(dl.i2c_base, dev->db.i2c_base, sizeof(dl.i2c_base));
     memcpy(dl.idx_regsp_base, dev->db.idxreg_base, sizeof(dl.idx_regsp_base));
     memcpy(dl.idx_regsp_vbase, dev->db.idxreg_virt_base, sizeof(dl.idx_regsp_base));
     memcpy(dl.spi_base, dev->db.spi_base, sizeof(dl.spi_base));
     memcpy(dl.i2c_base, dev->db.i2c_base, sizeof(dl.i2c_base));
+    memcpy(dl.spi_core, dev->db.spi_core, sizeof(dl.spi_core));
+    memcpy(dl.i2c_core, dev->db.i2c_core, sizeof(dl.i2c_core));
 
     memcpy(dl.stream_cnf_base, dev->db.srx_base, dev->db.srx_count * sizeof(dl.stream_cnf_base[0]));
     memcpy(dl.stream_cnf_base + dev->db.srx_count, dev->db.stx_base, dev->db.stx_count * sizeof(dl.stream_cnf_base[0]));

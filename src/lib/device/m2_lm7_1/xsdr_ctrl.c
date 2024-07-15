@@ -34,50 +34,37 @@
 // LMS8_CHD => RXIN_B_2  => LNA_H
 
 
-
 enum {
     XSDR_INT_REFCLK = 26000000,
 };
 
-enum BUSIDX_mp_lm7_1_rev000 {
-    I2C_BUS_LP8758_FPGA = 0,
-    I2C_BUS_GENERAL_CALL = 1,
-    I2C_BUS_INTERNAL_DAC = 1,
-    I2C_BUS_TMP = 2,
-    I2C_BUS_LP8758_LMSINIT = 3,
-    I2C_BUS_EXT = 3,
-};
-
 // 1001011 - PDAC80501MDQFT
 // 1100010 - MCP4725A1T
-enum {
-    I2C_LUTX = MAKE_I2C_LUT(0x80 /*| I2C_DEV_EXTDAC*/, I2C_DEV_TMP114NB, I2C_GENERAL_CALL, I2C_DEV_PMIC_FPGA),
+enum BUSIDX_mp_lm7_1_rev000 {
+    I2C_BUS_LP8758_FPGA    = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_PMIC_FPGA),
+    I2C_BUS_LP8758_LMSINIT = MAKE_LSOP_I2C_ADDR(0, 1, I2C_DEV_PMIC_FPGA),
 
-    I2C_LUTO4 = MAKE_I2C_LUT(0x80 | I2C_DEV_PMIC_FPGA, I2C_DEV_TMP108A_A0_SDA, 0x62, I2C_DEV_PMIC_FPGA),
-    I2C_LUTO5 = MAKE_I2C_LUT(0x80 | I2C_DEV_PMIC_FPGA, I2C_DEV_TMP108A_A0_SDA, I2C_DEV_DAC80501M_A0_SCL, I2C_DEV_PMIC_FPGA),
+    I2C_BUS_TMP_108        = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_TMP108A_A0_SDA),
+    I2C_BUS_TMP_114        = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_TMP114NB),
+
+    I2C_BUS_DAC_MCP4725    = MAKE_LSOP_I2C_ADDR(0, 0, 0x62),
+    I2C_BUS_DAC80501       = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_DAC80501M_A0_SCL),
+
+    I2C_BUS_FRONTEND       = MAKE_LSOP_I2C_ADDR(0, 1, 0),
 };
-
-static inline
-int i2c_general_call_reset(lldev_t dev, subdev_t subdev)
-{
-    uint8_t data[1] = { 0x06 };
-    return lowlevel_get_ops(dev)->ls_op(dev, subdev,
-                                        USDR_LSOP_I2C_DEV, I2C_BUS_GENERAL_CALL,
-                                        0, NULL, 1, data);
-}
 
 static int _dac_mcp4725_set_vout(lldev_t dev, subdev_t subdev, unsigned val)
 {
     uint8_t data[2] = { ((val >> 12) & 0x0f), ((val >> 4) & 0xff) };
     return lowlevel_get_ops(dev)->ls_op(dev, subdev,
-                                        USDR_LSOP_I2C_DEV, I2C_BUS_INTERNAL_DAC,
+                                        USDR_LSOP_I2C_DEV, I2C_BUS_DAC_MCP4725,
                                         0, NULL, 2, data);
 }
 
 static int _dac_mcp4725_get_vout(lldev_t dev, subdev_t subdev, uint32_t *val)
 {
     return lowlevel_get_ops(dev)->ls_op(dev, subdev,
-                                        USDR_LSOP_I2C_DEV, I2C_BUS_INTERNAL_DAC,
+                                        USDR_LSOP_I2C_DEV, I2C_BUS_DAC_MCP4725,
                                         4, val, 0, NULL);
 }
 
@@ -97,14 +84,14 @@ static int _dac_x0501_set_reg(lldev_t dev, subdev_t subdev, uint8_t reg, uint16_
 {
     uint8_t data[3] = { reg, (val >> 8), (val) };
     return lowlevel_get_ops(dev)->ls_op(dev, subdev,
-                                        USDR_LSOP_I2C_DEV, I2C_BUS_INTERNAL_DAC,
+                                        USDR_LSOP_I2C_DEV, I2C_BUS_DAC80501,
                                         0, NULL, 3, data);
 }
 
 static int _dac_x0501_get_reg(lldev_t dev, subdev_t subdev, uint8_t reg, uint16_t* oval)
 {
     return lowlevel_get_ops(dev)->ls_op(dev, subdev,
-                                        USDR_LSOP_I2C_DEV, I2C_BUS_INTERNAL_DAC,
+                                        USDR_LSOP_I2C_DEV, I2C_BUS_DAC80501,
                                         2, oval, 1, &reg);
 }
 
@@ -127,21 +114,6 @@ static int _xsdr_checkpwr(xsdr_dev_t *d)
        return xsdr_pwren(d, true);
     }
     return 0;
-}
-
-int xsdr_i2c_addr_ext_set(xsdr_dev_t *d, uint8_t addr)
-{
-    uint32_t lut;
-    if (d->new_rev) {
-        lut = I2C_LUTX;
-    } else if (d->dac_old_r5) {
-        lut = I2C_LUTO5;
-    } else {
-        lut = I2C_LUTO4;
-    }
-    lut |= (uint32_t)addr << 24;
-
-    return lowlevel_reg_wr32(d->base.lmsstate.dev, 0, M2PCI_REG_STAT_CTRL, lut);
 }
 
 int xsdr_set_samplerate(xsdr_dev_t *d,
@@ -779,10 +751,6 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
         d->base.cfg_auto_rx[1].swlb = 1;
     }
 
-    res = lowlevel_reg_wr32(dev, subdev, M2PCI_REG_STAT_CTRL, I2C_LUTX);
-    if (res)
-        return res;
-
     res = dev_gpo_set(dev, IGPO_LMS_PWR, 0);
     if (res)
         return res;
@@ -922,8 +890,6 @@ int _xsdr_init_revo(xsdr_dev_t *d)
     strncpy(d->base.cfg_auto_tx[1].name0, "H", sizeof(d->base.cfg_auto_tx[1].name0));
     strncpy(d->base.cfg_auto_tx[1].name1, "B1", sizeof(d->base.cfg_auto_tx[1].name1));
 
-
-    res = res ? res : lowlevel_reg_wr32(dev, subdev, M2PCI_REG_STAT_CTRL, I2C_LUTO5);
     // Set external GPIOs to 3.3V
     res = res ? res : dev_gpo_set(dev, IGPO_IOVCCSEL, 1);
     // Take control of second I2C bus
@@ -1019,10 +985,6 @@ int _xsdr_init_revo(xsdr_dev_t *d)
     return 0;
 
 rev4_check:
-    res = lowlevel_reg_wr32(dev, subdev, M2PCI_REG_STAT_CTRL, I2C_LUTO4);
-    if (res)
-        return res;
-
     res = _dac_mcp4725_set_vout(dev, subdev, (1.099f / 2) * 65535);
     if (res)
         return res;
@@ -1611,9 +1573,9 @@ restore_rxcfg:
 int xsdr_gettemp(xsdr_dev_t *d, int* temp256)
 {
     if (d->new_rev) {
-        return tmp114_temp_get(d->base.lmsstate.dev, 0, I2C_BUS_TMP, temp256);
+        return tmp114_temp_get(d->base.lmsstate.dev, 0, I2C_BUS_TMP_114, temp256);
     } else {
-        return tmp108_temp_get(d->base.lmsstate.dev, 0, I2C_BUS_TMP, temp256);
+        return tmp108_temp_get(d->base.lmsstate.dev, 0, I2C_BUS_TMP_108, temp256);
     }
 }
 

@@ -21,6 +21,7 @@
 #include "usb_uram_generic.h"
 
 #include "../device/device.h"
+#include "../device/device_cores.h"
 #include "../device/device_bus.h"
 #include "../device/device_names.h"
 #include "../device/device_vfs.h"
@@ -124,6 +125,8 @@ struct usb_dev
     unsigned spi_int_number[MAX_INTERRUPTS];
     unsigned i2c_int_number[MAX_INTERRUPTS];
     uint32_t rbvalue[MAX_INTERRUPTS];
+
+    struct i2c_cache i2cc[4 * DBMAX_I2C_BUSES];
 
     bool stop;
     sem_t tr_regout_a;
@@ -594,6 +597,9 @@ static int usb_uram_wait_msi(usb_dev_t* dev, unsigned i, int timeout_ms)
     return sem_wait_ex(&dev->interrupts[i], timeout_ms * 1000);
 }
 
+#define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
+#define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
+
 static
 int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
                        unsigned ls_op, lsopaddr_t ls_op_addr,
@@ -612,6 +618,8 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
     }
     case USDR_LSOP_SPI: {
         if (ls_op_addr >= d->db.spi_count)
+            return -EINVAL;
+        if (d->db.spi_core[ls_op_addr] != SPI_CORE_32W)
             return -EINVAL;
 
         if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
@@ -642,15 +650,33 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
         return 0;
     }
     case USDR_LSOP_I2C_DEV: {
-        uint32_t i2ccmd, data = 0;
+        uint32_t i2ccmd[2], data = 0;
         const uint8_t* dd = (const uint8_t*)pout;
         uint8_t* di = (uint8_t*)pin;
+        uint8_t instance_no = LSOP_I2C_INSTANCE(ls_op_addr);
+        uint8_t bus_no = LSOP_I2C_BUSNO(ls_op_addr);
+        uint8_t i2caddr = LSOP_I2C_ADDR(ls_op_addr);
+        unsigned lidx;
 
-        res = si2c_make_ctrl_reg(ls_op_addr, dd, memoutsz, meminsz, &i2ccmd);
+        if (instance_no >= d->db.i2c_count)
+            return -EINVAL;
+        if (d->db.i2c_core[instance_no] != I2C_CORE_AUTO_LUTUPD)
+            return -EINVAL;
+
+        if (bus_no > 1)
+            return -EINVAL;
+
+        lidx = si2c_update_lut_idx(&d->i2cc[4 * instance_no], i2caddr, bus_no);
+        i2ccmd[0] = si2c_get_lut(&d->i2cc[4 * instance_no]);
+        res = si2c_make_ctrl_reg(lidx, dd, memoutsz, meminsz, &i2ccmd[1]);
         if (res)
             return res;
 
-        res = usb_uram_reg_out(d, d->db.i2c_base[ls_op_addr >> 8], i2ccmd);
+        USDR_LOG("USBX", USDR_LOG_DEBUG, "%s: I2C[%d.%d.%02x] LUT:CMD %08x.%08x\n",
+                 d->gdev.name, instance_no, bus_no, i2caddr, i2ccmd[0], i2ccmd[1]);
+
+        res = usb_async_regwrite32(d, d->db.i2c_base[instance_no] - 1,
+                                   i2ccmd, 2, 20000);
         if (res)
             return res;
 
@@ -659,17 +685,14 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
             if (res)
                 return res;
 
-            res = usb_uram_wait_msi(d, d->i2c_int_number[ls_op_addr >> 8], 1000);
+            res = usb_uram_wait_msi(d, d->i2c_int_number[instance_no], 1000);
             if (res) {
-                USDR_LOG("USBX", USDR_LOG_ERROR, "%s: I2C%d MSI wait timed out!\n",
-                         d->gdev.name, ls_op_addr);
+                USDR_LOG("USBX", USDR_LOG_ERROR, "%s: I2C[%d.%d.%02x] MSI wait timed out!\n",
+                         d->gdev.name, instance_no, bus_no, i2caddr);
                 return res;
             }
 
-            data = d->rbvalue[d->i2c_int_number[ls_op_addr >> 8]];
-            //res = usb_uram_reg_in(d, d->db.i2c_base[ls_op_addr >> 8], &data);
-            //if (res)
-            //    return res;
+            data = d->rbvalue[d->i2c_int_number[instance_no]];
 
             if (meminsz == 1) {
                 di[0] = data;

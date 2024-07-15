@@ -105,29 +105,6 @@ struct dev_fe {
 };
 typedef struct dev_fe dev_fe_t;
 
-
-static
-int _usdr_ext_i2c(lldev_t dev, subdev_t subdev, unsigned ls_op, lsopaddr_t ls_op_addr,
-                  size_t meminsz, void* pin, size_t memoutsz,
-                  const void* pout)
-{
-    int res;
-    uint32_t addr = (ls_op_addr >> 16) & 0x7f;
-    if (addr == 0)
-        return -EINVAL;
-
-    res = usdr_device_vfs_obj_val_set_by_path(dev->pdev, "/ll/i2c/0/addr_ext", addr);
-    if (res)
-        return res;
-
-    res = lowlevel_get_ops(dev)->ls_op(dev, subdev,
-                                       USDR_LSOP_I2C_DEV, 3,
-                                       meminsz, pin, memoutsz, pout);
-
-    return res;
-}
-
-
 int _debug_ll_mdev_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     int res;
@@ -153,7 +130,7 @@ int _debug_ll_mdev_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 }
 
 
-int device_fe_probe(device_t* base, const char* compat, const char* fename, dev_fe_t** out)
+int device_fe_probe(device_t* base, const char* compat, const char* fename, unsigned def_i2c_loc, dev_fe_t** out)
 {
     lldev_t dev = base->dev;
     unsigned i;
@@ -188,10 +165,10 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, dev_
         }
 
         switch (i) {
-        case FET_PICE_BREAKOUT: res = board_exm2pe_init(dev, 0, gpiobase, hint_strip, compat, &_usdr_ext_i2c, &dfe.fe.exm2pe); break;
-        case FET_PCIE_DEVBOARD: res = board_ext_pciefe_init(dev, 0, gpiobase, hint_strip, compat, &_usdr_ext_i2c, &dfe.fe.devboard); break;
-        case FET_PCIE_SUPER_SYNC: res = board_ext_supersync_init(dev, 0, gpiobase, &_usdr_ext_i2c, &dfe.fe.supersync); break;
-        case FET_PCIE_SIMPLE_SYNC: res = board_ext_simplesync_init(dev, 0, gpiobase, compat, &_usdr_ext_i2c, &dfe.fe.simplesync); break;
+        case FET_PICE_BREAKOUT: res = board_exm2pe_init(dev, 0, gpiobase, hint_strip, compat, def_i2c_loc, &dfe.fe.exm2pe); break;
+        case FET_PCIE_DEVBOARD: res = board_ext_pciefe_init(dev, 0, gpiobase, hint_strip, compat, def_i2c_loc, &dfe.fe.devboard); break;
+        case FET_PCIE_SUPER_SYNC: res = board_ext_supersync_init(dev, 0, gpiobase, def_i2c_loc, &dfe.fe.supersync); break;
+        case FET_PCIE_SIMPLE_SYNC: res = board_ext_simplesync_init(dev, 0, gpiobase, compat, def_i2c_loc, &dfe.fe.simplesync); break;
         case FET_PCIE_FE1005000: res = ext_fe_100_5000_init(dev, 0, gpiobase, 58, 4, hint_strip, compat, &dfe.fe.fe_100_5000); break;
         default: return -EIO;
         }

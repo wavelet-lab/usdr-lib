@@ -30,8 +30,12 @@ struct device_bus
     unsigned tfe_count;
     unsigned drp_count;
 
+
+    unsigned spi_core[DBMAX_SPI_BUSES];
+    unsigned i2c_core[DBMAX_I2C_BUSES];
     unsigned spi_base[DBMAX_SPI_BUSES];
     unsigned i2c_base[DBMAX_I2C_BUSES];
+
     unsigned idxreg_base[DBMAX_IDXREG_MAPS];
     unsigned idxreg_virt_base[DBMAX_IDXREG_MAPS];
     unsigned drp_base[DBMAX_DRP];

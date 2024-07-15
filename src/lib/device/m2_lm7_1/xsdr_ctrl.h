@@ -139,8 +139,6 @@ enum xsdr_tx_port_cfg_flags {
 };
 int xsdr_tx_antennat_port_cfg(xsdr_dev_t *d, unsigned mask);
 
-int xsdr_i2c_addr_ext_set(xsdr_dev_t *d, uint8_t addr);
-
 int xsdr_trim_dac_vctcxo(xsdr_dev_t *d, uint16_t val);
 
 // Calibration helpers

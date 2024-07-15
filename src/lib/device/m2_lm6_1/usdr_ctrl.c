@@ -40,18 +40,16 @@
 //  1   |           | B0322J5050AHF        | RF2 - 1
 //  2   |           | 3600BL14M050         | RF1 - 0
 //
-// I2C bus:
-//  LP8758
-//  SI5332A
-//  TPS63811
-//  TMP114
+//
 
 
-enum BUSIDX_m2_lm6_1_rev000 {
-    I2C_BUS_LP8758 = 0,
-    I2C_BUS_SI5332A = 1,
-    I2C_BUS_TPS63811 = 2,
-    I2C_BUS_TEMP = 2,
+enum usdr_rev000 {
+    I2C_BUS_LP8758   = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_PMIC_FPGA),
+    I2C_BUS_SI5332A  = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_CLKGEN),
+    I2C_BUS_TPS63811 = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_DCDCBOOST),
+    I2C_BUS_TEMP     = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_TMP114NB),
+
+    I2C_BUS_FRONTEND = MAKE_LSOP_I2C_ADDR(0, 1, 0),
 
     SPI_LMS6 = 0,
 };
@@ -463,12 +461,6 @@ int usdr_ctor(lldev_t dev, subdev_t sub, struct usdr_dev *d)
     return 0;
 }
 
-int usdr_i2c_addr_ext_set(struct usdr_dev *d, uint8_t addr)
-{
-    return lowlevel_reg_wr32(d->base.dev, d->subdev, M2PCI_REG_STAT_CTRL,
-                             MAKE_I2C_LUT(0x80 | addr, I2C_DEV_TMP114NB, I2C_DEV_CLKGEN, I2C_DEV_PMIC_FPGA));
-}
-
 int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
 {
     lldev_t dev = d->base.dev;
@@ -569,11 +561,6 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
         return 0;
     }
 
-    res = usdr_i2c_addr_ext_set(d, 0);
-
-    if (res)
-        return res;
-
     if (d->hw_board_rev == USDR_REV_3) {
         int devid = ~0u;
 
@@ -622,19 +609,10 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
         return res;
 
     // Turn on force PWM
-    res = lowlevel_reg_wr32(d->base.dev, d->subdev, M2PCI_REG_STAT_CTRL,
-                            MAKE_I2C_LUT(0x80, I2C_DEV_DCDCBOOST, I2C_DEV_CLKGEN, I2C_DEV_PMIC_FPGA));
-    if (res)
-        return res;
-
     res = tps6381x_init(dev, d->subdev, I2C_BUS_TPS63811, true, true, 3450);
     if (res) {
         return res;
     }
-
-    res = usdr_i2c_addr_ext_set(d, 0);
-    if (res)
-        return res;
 
     usleep(10000);
 

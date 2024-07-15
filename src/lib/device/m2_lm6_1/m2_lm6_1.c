@@ -25,15 +25,15 @@
 #include "../device/ext_supersync/ext_supersync.h"
 #include "../device/ext_simplesync/ext_simplesync.h"
 
+
 //
 // NOTE Freq set required for IO opeartion since it's automatically trigger POWERON for LMS
 //
-enum BUSIDX_m2_lm6_1_rev000 {
-    I2C_BUS_LP8758 = 0,
-    I2C_BUS_SI5332A = 1,
-    I2C_BUS_TPS63811 = 2,
+enum {
+    I2C_BUS_SI5332A  = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_CLKGEN),
+    I2C_BUS_TPS63811 = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_DCDCBOOST),
 
-    SPI_LMS6 = 0,
+    I2C_BUS_FRONTEND = MAKE_LSOP_I2C_ADDR(0, 1, 0),
 };
 
 enum {
@@ -98,6 +98,8 @@ const usdr_dev_param_constant_t s_params_m2_lm6_1_rev000[] = {
     { "/ll/poll_event/in",  M2PCI_INT_RX },
     { "/ll/poll_event/out", M2PCI_INT_TX },
 
+    { "/ll/fe/i2c_addr", },
+
 };
 
 static int dev_m2_lm6_1_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -155,8 +157,6 @@ static int dev_m2_lm6_1_debug_si5332_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, 
 static int dev_m2_lm6_1_debug_tps6381x_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_debug_tps6381x_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
-static int dev_m2_lm6_1_i2c_addr_ext_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-
 static int dev_m2_lm6_1_sdr_atcrbs_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_atcrbs_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value);
 
@@ -175,8 +175,6 @@ static int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
 
 static
 const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
-    { "/ll/i2c/0/addr_ext",     { dev_m2_lm6_1_i2c_addr_ext_set, NULL } },
-
     { "/dm/rate/master",        { dev_m2_lm6_1_rate_set, NULL }},
     { "/dm/rate/rxtxadcdac",    { dev_m2_lm6_1_rate_m_set, NULL }},
 
@@ -304,13 +302,6 @@ int dev_m2_lm6_1_sdr_clkmeas_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ov
 
     *ovalue = v;
     return 0;
-}
-
-
-int dev_m2_lm6_1_i2c_addr_ext_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
-{
-    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
-    return usdr_i2c_addr_ext_set(&d->d, value);
 }
 
 int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
@@ -895,7 +886,7 @@ int usdr_device_m2_lm6_1_initialize(pdevice_t udev, unsigned pcount, const char*
 
 
     // Init FE
-    res = device_fe_probe(udev, "m2a+e", fe, &d->fe);
+    res = device_fe_probe(udev, "m2a+e", fe, I2C_BUS_FRONTEND, &d->fe);
     if (res == -ENODEV) {
         // Ignore no front end was found error
         res = 0;

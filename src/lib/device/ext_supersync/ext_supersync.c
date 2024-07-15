@@ -23,21 +23,15 @@ enum {
     I2C_ADDR_LMK = 0x64,
 };
 
-#if 0   //unused
-static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
-{
-    return lowlevel_reg_rd32(dev, 0, 16 + (bank / 4), data);
-}
-#endif
 
 int board_ext_supersync_init(lldev_t dev,
                              unsigned subdev,
                              unsigned gpio_base,
-                             ext_i2c_func_t func,
+                             unsigned i2cloc,
                              board_ext_supersync_t* ob)
 {
     int res = 0;
-    // uint8_t dummy[4];
+    unsigned i2ca = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2cloc), LSOP_I2C_BUSNO(i2cloc), I2C_ADDR_LMK);
 
     // Configure external SDA/SCL
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_SDA, GPIO_CFG_IN);
@@ -46,16 +40,13 @@ int board_ext_supersync_init(lldev_t dev,
     if (res)
         return res;
 
-
     // Wait for power up
     usleep(50000);
 
-    res = lmk5c33216_create(dev, subdev, I2C_ADDR_LMK << I2C_EXTERNAL_CMD_OFF, func, &ob->lmk);
+    res = lmk5c33216_create(dev, subdev, i2ca, &ob->lmk);
     if (res)
         return res;
 
-
     USDR_LOG("XDEV", USDR_LOG_ERROR, "SuperSync 5c33216 has been initialized!\n");
-
     return 0;
 }

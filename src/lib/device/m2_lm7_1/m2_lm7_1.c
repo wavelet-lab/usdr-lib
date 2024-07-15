@@ -41,6 +41,11 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
 enum {
     SRF4_FIFOBSZ = 0x10000, // 64kB
 };
+
+enum {
+    I2C_BUS_FRONTEND = MAKE_LSOP_I2C_ADDR(0, 1, 0),
+};
+
 //
 static
 const usdr_dev_param_constant_t s_params_m2_lm7_1_rev000[] = {
@@ -186,14 +191,10 @@ static int dev_m2_lm7_1_phyrxlm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t 
 static int dev_m2_lm7_1_lms7002rxlml_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_debug_clkinfo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
-static int dev_m2_lm7_1_i2c_addr_ext_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-
 static int dev_m2_lm7_1_revision_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 
 static
 const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
-    { "/ll/i2c/0/addr_ext",     { dev_m2_lm7_1_i2c_addr_ext_set, NULL } },
-
     { "/dm/rate/master",        { dev_m2_lm7_1_rate_set, NULL }},
     { "/dm/rate/rxtxadcdac",    { dev_m2_lm7_1_rate_m_set, NULL }},
 
@@ -295,12 +296,6 @@ struct dev_m2_lm7_1_gps {
     stream_handle_t* rx;
     stream_handle_t* tx;
 };
-
-int dev_m2_lm7_1_i2c_addr_ext_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
-{
-    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    return xsdr_i2c_addr_ext_set(&d->xdev, value);
-}
 
 int dev_m2_lm7_1_debug_clkinfo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -994,7 +989,7 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
 
     if (d->xdev.new_rev) {
         // Init FE
-        res = device_fe_probe(udev, d->xdev.ssdr ? "m2b+m" : "m2a+e", fe, &d->fe);
+        res = device_fe_probe(udev, d->xdev.ssdr ? "m2b+m" : "m2a+e", fe, I2C_BUS_FRONTEND, &d->fe);
         if (res) {
             return res;
         }

@@ -1012,7 +1012,7 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
 
 
     // Init FE
-    res = device_fe_probe(udev, "lsdr", fe, &d->fe);
+    res = device_fe_probe(udev, "lsdr", fe, 0, &d->fe);
     if (res) {
         return res;
     }

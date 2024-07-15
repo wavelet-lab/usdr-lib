@@ -22,6 +22,10 @@ int device_bus_init(pdevice_t dev, struct device_bus* pdb)
     } params[] = {
         { DNLL_SPI_COUNT, SIZEOF_ARRAY(pdb->spi_base), &pdb->spi_count, DNLLFP_BASE(DN_BUS_SPI, "%d"), pdb->spi_base },
         { DNLL_I2C_COUNT, SIZEOF_ARRAY(pdb->i2c_base), &pdb->i2c_count, DNLLFP_BASE(DN_BUS_I2C, "%d"), pdb->i2c_base },
+
+        { DNLL_SPI_COUNT, SIZEOF_ARRAY(pdb->spi_core), &pdb->spi_count, DNLLFP_CORE(DN_BUS_SPI, "%d"), pdb->spi_core },
+        { DNLL_I2C_COUNT, SIZEOF_ARRAY(pdb->i2c_core), &pdb->i2c_count, DNLLFP_CORE(DN_BUS_I2C, "%d"), pdb->i2c_core },
+
         { DNLL_IDX_REGSP_COUNT, SIZEOF_ARRAY(pdb->idxreg_base), &pdb->idx_regsps, DNLLFP_BASE(DN_IDX_REGSP, "%d"), pdb->idxreg_base },
 
         { DNLL_SRX_COUNT, SIZEOF_ARRAY(pdb->srx_base), &pdb->srx_count, DNLLFP_BASE(DN_SRX, "%d"), pdb->srx_base },

@@ -11,12 +11,17 @@
 enum lowlevel_ls_ops {
     USDR_LSOP_HWREG = 0, // Write followed by read
     USDR_LSOP_SPI = 1,
-    USDR_LSOP_I2C_DEV = 2,
+    USDR_LSOP_I2C_DEV = 2, // Address format [8 bit instance_no][8 bit bus_no][16 bit i2c_address]
     USDR_LSOP_URAM = 3,  // Read followed by write
     USDR_LSOP_DRP = 4, // Xilinx DRP port
 
     USDR_LSOP_CUSTOM_CMD = 65536, //Custom commands
 };
+
+#define MAKE_LSOP_I2C_ADDR(i, b, a)  (((i) & 0xff) << 24) | (((b) & 0xff) << 16) | (((a) & 0xffff) << 0)
+#define LSOP_I2C_INSTANCE(ls)        (((ls) >> 24) & 0xff)
+#define LSOP_I2C_BUSNO(ls)           (((ls) >> 16) & 0xff)
+#define LSOP_I2C_ADDR(ls)            (((ls) >> 0)  & 0xffff)
 
 enum sdr_type {
     SDR_NONE = 0,

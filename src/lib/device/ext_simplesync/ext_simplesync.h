@@ -25,7 +25,7 @@ int board_ext_simplesync_init(lldev_t dev,
                               unsigned subdev,
                               unsigned gpio_base,
                               const char* compat,
-                              ext_i2c_func_t func,
+                              unsigned int i2c_loc,
                               board_ext_simplesync_t* ob);
 
 
