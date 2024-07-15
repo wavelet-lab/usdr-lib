@@ -21,7 +21,6 @@
 #include "usb_uram_generic.h"
 
 #include "../device/device.h"
-#include "../device/device_cores.h"
 #include "../device/device_bus.h"
 #include "../device/device_names.h"
 #include "../device/device_vfs.h"
@@ -596,9 +595,6 @@ static int usb_uram_wait_msi(usb_dev_t* dev, unsigned i, int timeout_ms)
 {
     return sem_wait_ex(&dev->interrupts[i], timeout_ms * 1000);
 }
-
-#define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
-#define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
 
 static
 int usb_uram_ls_op(lldev_t dev, subdev_t subdev,

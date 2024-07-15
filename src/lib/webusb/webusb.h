@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include "controller.h"
 #include "../ipblks/lms64c_proto.h"
+#include "../device/device_bus.h"
+#include "../ipblks/si2c.h"
 
 struct sdr_call;
 
@@ -40,14 +42,18 @@ struct webusb_device {
 
 struct webusb_device_ugen {
     struct webusb_device base;
-
+#if 0
     // General config
     uint16_t base_spi[MAX_SPI_BUS];
     uint16_t base_i2c[MAX_I2C_BUS];
+#endif
     uint16_t base_virt[MAX_VIRT_BUS];
-
     uint8_t event_spi[MAX_SPI_BUS];
     uint8_t event_i2c[MAX_I2C_BUS];
+
+    device_bus_t db;
+
+    struct i2c_cache i2cc[4 * DBMAX_I2C_BUSES];
 
     uint32_t ntfy_seqnum_exp;
 };

@@ -167,14 +167,19 @@ static
         }
         return 0;
     case USDR_LSOP_SPI:
+        if (ls_op_addr >= wbd->db.spi_count)
+            return -EINVAL;
+        if (wbd->db.spi_core[ls_op_addr] != SPI_CORE_32W)
+            return -EINVAL;
+
         if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
             return -EINVAL;
         if (ls_op_addr >= MAX_SPI_BUS)
             return -EINVAL;
-        if (wbd->base_spi[ls_op_addr] == BUS_INVALID)
+        if (wbd->db.spi_base[ls_op_addr] == BUS_INVALID)
             return -EINVAL;
 
-        res = libusb_websdr_io_write(wbd, wbd->base_spi[ls_op_addr], memoutsz / 4,
+        res = libusb_websdr_io_write(wbd, wbd->db.spi_base[ls_op_addr], memoutsz / 4,
                                      (const uint32_t*)pout);
         if (res)
             return res;
@@ -186,21 +191,39 @@ static
 
         return 0;
     case USDR_LSOP_I2C_DEV: {
-        uint32_t i2ccmd, data = 0;
+        uint32_t i2ccmd[2], data = 0;
         const uint8_t* dd = (const uint8_t*)pout;
         uint8_t* di = (uint8_t*)pin;
-        uint8_t busno = (ls_op_addr >> 8);
+        uint8_t instance_no = LSOP_I2C_INSTANCE(ls_op_addr);
+        uint8_t busno = LSOP_I2C_BUSNO(ls_op_addr);
+        uint8_t i2caddr = LSOP_I2C_ADDR(ls_op_addr);
+        unsigned lidx;
 
-        if (busno >= MAX_I2C_BUS)
+        if (instance_no >= wbd->db.i2c_count)
             return -EINVAL;
+        if (wbd->db.i2c_core[instance_no] != I2C_CORE_AUTO_LUTUPD)
+            return -EINVAL;
+
+        if (busno >= 1)
+            return -EINVAL;
+#if 0
         if (wbd->base_i2c[busno] == BUS_INVALID)
             return -EINVAL;
-
         res = si2c_make_ctrl_reg(ls_op_addr, dd, memoutsz, meminsz, &i2ccmd);
         if (res)
             return res;
+#endif
 
-        res = libusb_websdr_io_write(wbd, wbd->base_i2c[busno], 1, &i2ccmd);
+        lidx = si2c_update_lut_idx(&wbd->i2cc[4 * instance_no], i2caddr, busno);
+        i2ccmd[0] = si2c_get_lut(&wbd->i2cc[4 * instance_no]);
+        res = si2c_make_ctrl_reg(lidx, dd, memoutsz, meminsz, &i2ccmd[1]);
+        if (res)
+            return res;
+
+        USDR_LOG("WEBU", USDR_LOG_DEBUG, "%s: I2C[%d.%d.%02x] LUT:CMD %08x.%08x\n",
+                 "WebUsb", instance_no, busno, i2caddr, i2ccmd[0], i2ccmd[1]);
+
+        res = libusb_websdr_io_write(wbd, wbd->db.i2c_base[instance_no] - 1, 1, &i2ccmd[1]);
         if (res)
             return res;
         if (meminsz == 0)
@@ -335,14 +358,15 @@ static
     d->base.strms[0] = NULL;
     d->base.strms[1] = NULL;
 
+#if 0
     // Init buses cores
     d->base_i2c[0] = M2PCI_REG_I2C;
     d->base_i2c[1] = BUS_INVALID;
     d->base_spi[0] = M2PCI_REG_SPI0;
     d->base_spi[1] = BUS_INVALID;
+#endif
     d->base_virt[0] = M2PCI_REG_WR_BADDR;
     d->base_virt[1] = BUS_INVALID;
-
     d->event_spi[0] = M2PCI_INT_SPI_0;
     d->event_spi[1] = 0;
     d->event_i2c[0] = M2PCI_INT_I2C_0;
@@ -353,6 +377,14 @@ static
     res = usdr_device_create(lldev, libusb_get_deviceid(dev_idx));
     if (res) {
         USDR_LOG("WEBU", USDR_LOG_ERROR, "Unable to create WebUsb device, error %d\n", res);
+        goto usbinit_fail;
+    }
+
+    res = device_bus_init(lldev->pdev, &d->db);
+    if (res) {
+        USDR_LOG("WEBU", USDR_LOG_ERROR,
+                 "Unable to initialize bus parameters for the device %s!\n", "WebUsb");
+
         goto usbinit_fail;
     }
 
