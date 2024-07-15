@@ -126,6 +126,139 @@ int libusb_websdr_io_read(struct webusb_device_ugen* dev, unsigned addr, unsigne
     return 0;
 }
 
+static int webusb_uram_reg_out(struct webusb_device_ugen* dev, unsigned reg,
+                            uint32_t outval)
+{
+    int res = libusb_websdr_io_write(dev, reg, 1, &outval);
+
+    USDR_LOG("WEBU", USDR_LOG_DEBUG, "%s: Write [%04x] = %08x (%d)\n",
+             "WebUsb", reg, outval, res);
+    return res;
+}
+
+static int webusb_uram_reg_in(struct webusb_device_ugen* dev, unsigned reg,
+                           uint32_t *pinval)
+{
+    uint32_t inval;
+    int	res = libusb_websdr_io_read(dev, reg, 1, &inval);
+
+    USDR_LOG("WEBU", USDR_LOG_DEBUG, "%s: Read  [%04x] = %08x (%d)\n",
+             "WebUsb", reg, inval, res);
+    *pinval = inval;
+    return res;
+}
+
+static int webusb_uram_reg_out_n(struct webusb_device_ugen* dev, unsigned reg,
+                              const uint32_t *outval, const unsigned dwcnt)
+{
+    int res = libusb_websdr_io_write(dev, reg, dwcnt, outval);
+    USDR_LOG("WEBU", USDR_LOG_DEBUG, "%s: WriteArray [%04x + %d] (%d)\n",
+             "WebUsb", reg, dwcnt, res);
+    return res;
+}
+
+static int webusb_uram_reg_in_n(struct webusb_device_ugen* dev, unsigned reg,
+                             uint32_t *pinval, const unsigned dwcnt)
+{
+    unsigned off = 0;
+    unsigned rem = dwcnt;
+    unsigned sz = rem;
+
+    for (; rem != 0; ) {
+        if (sz > 256 / 4)
+            sz = 256 / 4;
+
+        int	res = libusb_websdr_io_read(dev, reg + off, sz, pinval + off);
+        USDR_LOG("WEBU", USDR_LOG_DEBUG, "%s: ReadArray [%04x + %d] (%d)\n",
+                 "WebUsb", reg, sz, res);
+        if (res)
+            return res;
+
+        off += sz;
+        rem -= sz;
+    }
+
+    return 0;
+}
+
+
+
+static
+    int webusb_uram_reg_op(struct webusb_device_ugen* d, unsigned ls_op_addr,
+                    uint32_t* ina, size_t meminsz, const uint32_t* outa, size_t memoutsz)
+{
+    unsigned i;
+    int res;
+
+    if ((meminsz % 4) || (memoutsz % 4))
+        return -EINVAL;
+
+    for (unsigned k = 0; k < d->db.idx_regsps; k++) {
+        if (ls_op_addr >= d->db.idxreg_virt_base[k]) {
+            // Indexed register operation
+            unsigned amax = ((memoutsz > meminsz) ? memoutsz : meminsz) / 4;
+
+            for (i = 0; i < amax; i++) {
+                //Write address
+                res = webusb_uram_reg_out(d, d->db.idxreg_base[k],
+                                       ls_op_addr - d->db.idxreg_virt_base[k] + i);
+                if (res)
+                    return res;
+
+                if (i < memoutsz / 4) {
+                    res = webusb_uram_reg_out(d, d->db.idxreg_base[k] + 1, outa[i]);
+                    if (res)
+                        return res;
+                }
+
+                if (i < meminsz / 4) {
+                    res = webusb_uram_reg_in(d, d->db.idxreg_base[k] + 1, &ina[i]);
+                    if (res)
+                        return res;
+                }
+            }
+
+            return 0;
+        }
+    }
+#if 1
+    // TODO Wrap to 128b
+    if (memoutsz > 4) {
+        res = webusb_uram_reg_out_n(d, ls_op_addr, outa, memoutsz / 4);
+        if (res)
+            return res;
+    } else if (memoutsz == 4) {
+        res = webusb_uram_reg_out(d, ls_op_addr, outa[0]);
+        if (res)
+            return res;
+    }
+
+    if (meminsz > 4) {
+        res = webusb_uram_reg_in_n(d, ls_op_addr, ina, meminsz / 4);
+        if (res)
+            return res;
+    } else if (meminsz == 4) {
+        res = webusb_uram_reg_in(d, ls_op_addr, ina);
+        if (res)
+            return res;
+    }
+#else
+    // Normal operation
+    for (i = 0; i < memoutsz / 4; i++) {
+        res = usb_uram_reg_out(d, ls_op_addr + i, outa[i]);
+        if (res)
+            return res;
+    }
+    for (i = 0; i < meminsz / 4; i++) {
+        res = usb_uram_reg_in(d, ls_op_addr + i, &ina[i]);
+        if (res)
+            return res;
+    }
+#endif
+    return 0;
+}
+
+
 // IO functions
 static
     int webusb_ll_ls_op(lldev_t dev, subdev_t subdev,
@@ -139,6 +272,7 @@ static
 
     switch (ls_op) {
     case USDR_LSOP_HWREG:
+#if 0
         if (meminsz) {
             res = libusb_websdr_io_read(wbd, ls_op_addr, meminsz / 4, (uint32_t*)pin);
             if (res)
@@ -166,6 +300,13 @@ static
                 return res;
         }
         return 0;
+#endif
+    {
+        uint32_t* ina = (uint32_t*)pin;
+        const uint32_t* outa = (const uint32_t*)pout;
+
+        return webusb_uram_reg_op(wbd, ls_op_addr, ina, meminsz, outa, memoutsz);
+    }
     case USDR_LSOP_SPI:
         if (ls_op_addr >= wbd->db.spi_count)
             return -EINVAL;
@@ -364,9 +505,10 @@ static
     d->base_i2c[1] = BUS_INVALID;
     d->base_spi[0] = M2PCI_REG_SPI0;
     d->base_spi[1] = BUS_INVALID;
-#endif
     d->base_virt[0] = M2PCI_REG_WR_BADDR;
     d->base_virt[1] = BUS_INVALID;
+#endif
+
     d->event_spi[0] = M2PCI_INT_SPI_0;
     d->event_spi[1] = 0;
     d->event_i2c[0] = M2PCI_INT_I2C_0;

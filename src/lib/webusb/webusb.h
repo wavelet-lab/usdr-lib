@@ -46,8 +46,8 @@ struct webusb_device_ugen {
     // General config
     uint16_t base_spi[MAX_SPI_BUS];
     uint16_t base_i2c[MAX_I2C_BUS];
-#endif
     uint16_t base_virt[MAX_VIRT_BUS];
+#endif
     uint8_t event_spi[MAX_SPI_BUS];
     uint8_t event_i2c[MAX_I2C_BUS];
 
