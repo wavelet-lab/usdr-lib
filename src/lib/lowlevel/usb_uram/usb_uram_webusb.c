@@ -223,7 +223,7 @@ static
         USDR_LOG("WEBU", USDR_LOG_DEBUG, "%s: I2C[%d.%d.%02x] LUT:CMD %08x.%08x\n",
                  "WebUsb", instance_no, busno, i2caddr, i2ccmd[0], i2ccmd[1]);
 
-        res = libusb_websdr_io_write(wbd, wbd->db.i2c_base[instance_no] - 1, 1, &i2ccmd[1]);
+        res = libusb_websdr_io_write(wbd, wbd->db.i2c_base[instance_no] - 1, 2, i2ccmd);
         if (res)
             return res;
         if (meminsz == 0)
