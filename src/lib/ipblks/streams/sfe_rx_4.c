@@ -113,28 +113,8 @@ enum {
     MAX_BURSTS_IN_BUFF = 32,
 };
 
-/*
-struct bitsfmt get_bits_fmt(const char* fmt)
-{
-    struct bitsfmt bmft = { 0, false };
-    if (*fmt == 'c' || *fmt == 'C') {
-        fmt++;
-        bmft.complex = true;
-    }
 
-    if (strcasecmp(fmt, "i8") == 0)
-        bmft.bits = 8;
-    else if (strcasecmp(fmt, "i12") == 0)
-        bmft.bits = 12;
-    else if (strcasecmp(fmt, "i16") == 0)
-        bmft.bits = 16;
-
-    return bmft;
-}
-*/
-
-#define DSPFUNC_CFFT512_IMRE_I32    "cfft512imrei32"
-#define DSPFUNC_CFFT512_LPWR_I16    "cfft512lpwri16"
+#define DSPFUNC_CFFT_LPWR_I16    "cfftlpwri16"
 
 int sfe_rx4_check_format(const struct stream_config* psc)
 {
@@ -143,26 +123,24 @@ int sfe_rx4_check_format(const struct stream_config* psc)
         return 0;
 
     // TODO check device capabilities
-    if (strcmp((const char*)bfmt.func, &DSPFUNC_CFFT512_LPWR_I16[1]) == 0)
+    if (strcmp((const char*)bfmt.func, &DSPFUNC_CFFT_LPWR_I16[1]) == 0)
         return 0;
 
     return -EINVAL;
 }
 
-
-
-static int _configure_cfft512lpwri16(lldev_t dev,
-                                     subdev_t subdev,
-                                     unsigned cfg_base,
-                                     unsigned cfg_fifomaxbytes,
-                                     const struct stream_config* psc,
-                                     struct fifo_config* pfc)
+static int _configure_cfftlpwri16(lldev_t dev,
+                                  subdev_t subdev,
+                                  unsigned cfg_base,
+                                  unsigned cfg_fifomaxbytes,
+                                  const struct stream_config* psc,
+                                  struct fifo_config* pfc)
 {
     int res;
     if (psc->chmsk != 1)
         return -EINVAL;
 
-    unsigned fft_size = 512;
+    unsigned fft_size = 512; // Assume FFT512 as a default frame size
     unsigned bps = 16;
 
     if (psc->spburst % fft_size) {
@@ -199,15 +177,6 @@ static int _configure_cfft512lpwri16(lldev_t dev,
                             (1 << SFE_CMD_RST_DDR_OFF) |
                             (1 << SFE_CMD_RST_RXSA_OFF) |
                             (1 << SFE_CMD_RST_BURSTER_OFF));
-
-
-    // Put everything into reset
-    res = lowlevel_reg_wr32(dev, subdev, cfg_base + FE_CMD_REG_ROUTE,
-                            (FE_CMD_RESET << CMD_REG_ROUTE_OFF) | RX_SCMD_IDLE |
-                            (1 << SFE_CMD_RST_DSP_OFF) |
-                            (1 << SFE_CMD_RST_DDR_OFF) |
-                            (1 << SFE_CMD_RST_RXSA_OFF) |
-                            (1 << SFE_CMD_RST_BURSTER_OFF));
     if (res)
         return res;
 
@@ -223,9 +192,9 @@ static int _configure_cfft512lpwri16(lldev_t dev,
 
     res = lowlevel_reg_wr32(dev, subdev, cfg_base + FE_CMD_REG_ROUTE,
                             (FE_CMD_BURST_FORMAT << CMD_REG_ROUTE_OFF) |
-                            (IFMT_CH_3210 << SFE_CMD_BF_CHFMT_OFF) |
+                            (IFMT_CH_xx10  << SFE_CMD_BF_CHFMT_OFF) |
                             ((IFMT_DSP) << SFE_CMD_BF_IFMT_OFF) |
-                            ((bwords - 1) << SFE_CMD_BF_BWORDS_OFF) |
+                            ((bwords - 1)  << SFE_CMD_BF_BWORDS_OFF) |
                             (fifo_capacity << SFE_CMD_BF_BTOTAL_OFF));
     if (res)
         return res;
@@ -246,8 +215,8 @@ int sfe_rx4_configure(lldev_t dev,
 {
     struct bitsfmt bfmt = get_bits_fmt(psc->sfmt);
     int res;
-    if (strcmp((const char*)bfmt.func, &DSPFUNC_CFFT512_LPWR_I16[1]) == 0) {
-        return _configure_cfft512lpwri16(dev, subdev, cfg_base, cfg_fifomaxbytes, psc, pfc);
+    if (strcmp((const char*)bfmt.func, &DSPFUNC_CFFT_LPWR_I16[1]) == 0) {
+        return _configure_cfftlpwri16(dev, subdev, cfg_base, cfg_fifomaxbytes, psc, pfc);
     } else if (bfmt.bits == 0) {
         USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: RX Stream format `%s' not supported!\n",
                  psc->sfmt);
