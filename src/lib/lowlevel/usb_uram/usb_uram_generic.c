@@ -1,0 +1,372 @@
+#include "usb_uram_generic.h"
+#include "../ipblks/si2c.h"
+
+#include <string.h>
+#include <stdio.h>
+#include "../../device/generic_usdr/generic_regs.h"
+
+struct usb_uram_io_ops* get_io_ops();
+const char* get_dev_name(lldev_t dev);
+device_bus_t* get_device_bus(lldev_t dev);
+struct i2c_cache* get_i2c_cache(lldev_t dev);
+
+device_id_t get_dev_id(lldev_t dev);
+unsigned* get_spi_int_number(lldev_t dev);
+unsigned* get_i2c_int_number(lldev_t dev);
+
+
+int usb_uram_reg_out(lldev_t dev, unsigned reg, uint32_t outval)
+{
+    int res = get_io_ops()->io_write_fn(dev, reg, &outval, 1, USB_IO_TIMEOUT);
+    const char* devname = get_dev_name(dev);
+
+    const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
+    USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: Write [%04x] = %08x (%d)\n",
+             devname, reg, outval, res);
+    return res;
+}
+
+int usb_uram_reg_in(lldev_t dev, unsigned reg, uint32_t *pinval)
+{
+    uint32_t inval;
+    int	res = get_io_ops()->io_read_fn(dev, reg, &inval, 1, USB_IO_TIMEOUT);
+    const char* devname = get_dev_name(dev);
+
+    const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
+    USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: Read  [%04x] = %08x (%d)\n",
+             devname, reg, inval, res);
+    *pinval = inval;
+    return res;
+}
+
+int usb_uram_reg_out_n(lldev_t dev, unsigned reg, const uint32_t *outval, const unsigned dwcnt)
+{
+    int res = get_io_ops()->io_write_fn(dev, reg, outval, dwcnt, USB_IO_TIMEOUT);
+    const char* devname = get_dev_name(dev);
+
+    const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
+    USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: WriteArray [%04x + %d] (%d)\n",
+             devname, reg, dwcnt, res);
+    return res;
+}
+
+int usb_uram_reg_in_n(lldev_t dev, unsigned reg, uint32_t *pinval, const unsigned dwcnt)
+{
+    unsigned off = 0;
+    unsigned rem = dwcnt;
+    unsigned sz = rem;
+
+    for (; rem != 0; ) {
+        if (sz > 256 / 4)
+            sz = 256 / 4;
+
+        int	res = get_io_ops()->io_read_fn(dev, reg + off, pinval + off, sz, USB_IO_TIMEOUT);
+        const char* devname = get_dev_name(dev);
+
+        const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
+        USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: ReadArray [%04x + %d] (%d)\n",
+                 devname, reg, sz, res);
+        if (res)
+            return res;
+
+        off += sz;
+        rem -= sz;
+    }
+
+    return 0;
+}
+
+int usb_uram_reg_op(lldev_t d, unsigned ls_op_addr,
+                    uint32_t* ina, size_t meminsz, const uint32_t* outa, size_t memoutsz)
+{
+    unsigned i;
+    int res;
+    device_bus_t* pdb = get_device_bus(d);
+
+    if ((meminsz % 4) || (memoutsz % 4))
+        return -EINVAL;
+
+    for (unsigned k = 0; k < pdb->idx_regsps; k++) {
+        if (ls_op_addr >= pdb->idxreg_virt_base[k]) {
+            // Indexed register operation
+            unsigned amax = ((memoutsz > meminsz) ? memoutsz : meminsz) / 4;
+
+            for (i = 0; i < amax; i++) {
+                //Write address
+                res = usb_uram_reg_out(d, pdb->idxreg_base[k],
+                                       ls_op_addr - pdb->idxreg_virt_base[k] + i);
+                if (res)
+                    return res;
+
+                if (i < memoutsz / 4) {
+                    res = usb_uram_reg_out(d, pdb->idxreg_base[k] + 1, outa[i]);
+                    if (res)
+                        return res;
+                }
+
+                if (i < meminsz / 4) {
+                    res = usb_uram_reg_in(d, pdb->idxreg_base[k] + 1, &ina[i]);
+                    if (res)
+                        return res;
+                }
+            }
+
+            return 0;
+        }
+    }
+#if 1
+    // TODO Wrap to 128b
+    if (memoutsz > 4) {
+        res = usb_uram_reg_out_n(d, ls_op_addr, outa, memoutsz / 4);
+        if (res)
+            return res;
+    } else if (memoutsz == 4) {
+        res = usb_uram_reg_out(d, ls_op_addr, outa[0]);
+        if (res)
+            return res;
+    }
+
+    if (meminsz > 4) {
+        res = usb_uram_reg_in_n(d, ls_op_addr, ina, meminsz / 4);
+        if (res)
+            return res;
+    } else if (meminsz == 4) {
+        res = usb_uram_reg_in(d, ls_op_addr, ina);
+        if (res)
+            return res;
+    }
+#else
+    // Normal operation
+    for (i = 0; i < memoutsz / 4; i++) {
+        res = usb_uram_reg_out(d, ls_op_addr + i, outa[i]);
+        if (res)
+            return res;
+    }
+    for (i = 0; i < meminsz / 4; i++) {
+        res = usb_uram_reg_in(d, ls_op_addr + i, &ina[i]);
+        if (res)
+            return res;
+    }
+#endif
+    return 0;
+}
+
+int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
+                   unsigned ls_op, lsopaddr_t ls_op_addr,
+                   size_t meminsz, void* pin,
+                   size_t memoutsz, const void* pout)
+{
+    int res;
+    device_bus_t* pdb = get_device_bus(dev);
+    struct i2c_cache* pi2cc = get_i2c_cache(dev);
+
+    switch (ls_op) {
+    case USDR_LSOP_HWREG:
+    {
+        uint32_t* ina = (uint32_t*)pin;
+        const uint32_t* outa = (const uint32_t*)pout;
+
+        return usb_uram_reg_op(dev, ls_op_addr, ina, meminsz, outa, memoutsz);
+    }
+    case USDR_LSOP_SPI: {
+        if (ls_op_addr >= pdb->spi_count)
+            return -EINVAL;
+        if (pdb->spi_core[ls_op_addr] != SPI_CORE_32W)
+            return -EINVAL;
+
+        if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
+            return -EINVAL;
+
+        res = usb_uram_reg_out(dev, pdb->spi_base[ls_op_addr], *(const uint32_t*)pout);
+        if (res)
+            return res;
+
+        res = get_io_ops()->io_read_wait(dev, ls_op, ls_op_addr, meminsz, pin);
+        return res;
+    }
+    case USDR_LSOP_I2C_DEV: {
+        uint32_t i2ccmd[2], data = 0;
+        const uint8_t* dd = (const uint8_t*)pout;
+        uint8_t* di = (uint8_t*)pin;
+        uint8_t instance_no = LSOP_I2C_INSTANCE(ls_op_addr);
+        uint8_t bus_no = LSOP_I2C_BUSNO(ls_op_addr);
+        uint8_t i2caddr = LSOP_I2C_ADDR(ls_op_addr);
+        unsigned lidx;
+
+        if (instance_no >= pdb->i2c_count)
+            return -EINVAL;
+        if (pdb->i2c_core[instance_no] != I2C_CORE_AUTO_LUTUPD)
+            return -EINVAL;
+
+        if (bus_no > 1)
+            return -EINVAL;
+
+        lidx = si2c_update_lut_idx(&pi2cc[4 * instance_no], i2caddr, bus_no);
+        i2ccmd[0] = si2c_get_lut(&pi2cc[4 * instance_no]);
+        res = si2c_make_ctrl_reg(lidx, dd, memoutsz, meminsz, &i2ccmd[1]);
+        if (res)
+            return res;
+
+        const char* devname = get_dev_name(dev);
+        const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
+        USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: I2C[%d.%d.%02x] LUT:CMD %08x.%08x\n",
+                 devname, instance_no, bus_no, i2caddr, i2ccmd[0], i2ccmd[1]);
+
+        res = usb_uram_reg_out_n(dev, pdb->i2c_base[instance_no] - 1, i2ccmd, 2);
+        if (res)
+            return res;
+
+        if (meminsz > 0) {
+
+            res = get_io_ops()->io_read_wait(dev, ls_op, instance_no, meminsz, &data);
+            if (res)
+                return res;
+
+            if (meminsz == 1) {
+                di[0] = data;
+            } else if (meminsz == 2) {
+                di[0] = data;
+                di[1] = data >> 8;
+            } else if (meminsz == 3) {
+                di[0] = data;
+                di[1] = data >> 8;
+                di[2] = data >> 16;
+            } else {
+                *(uint32_t*)pin = data;
+            }
+        }
+        return 0;
+    }
+    case USDR_LSOP_DRP: {
+        return device_bus_drp_generic_op(dev, subdev, pdb, ls_op_addr, meminsz, pin, memoutsz, pout);
+    }
+    }
+    return -EOPNOTSUPP;
+}
+
+int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** devparam,
+                                     const char** devval)
+{
+    int res;
+    device_bus_t* pdb = get_device_bus(dev);
+    const char* devname = get_dev_name(dev);
+    const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
+
+    res = usdr_device_create(dev, get_dev_id(dev));
+    if (res) {
+        USDR_LOG(logtag, USDR_LOG_ERROR,
+                 "Unable to find device spcec for %s, uuid %s! Update software!\n",
+                 devname, usdr_device_id_to_str(get_dev_id(dev)));
+
+        return res;
+    }
+
+    res = device_bus_init(dev->pdev, pdb);
+    if (res) {
+        USDR_LOG(logtag, USDR_LOG_ERROR,
+                 "Unable to initialize bus parameters for the device %s!\n", devname);
+
+        return res;
+    }
+
+    struct device_params {
+        const char* path;
+        unsigned *store;
+        unsigned count;
+    } bii[] = {
+               { DNLLFP_IRQ(DN_BUS_SPI, "%d"), get_spi_int_number(dev), pdb->spi_count },
+               { DNLLFP_IRQ(DN_BUS_I2C, "%d"), get_i2c_int_number(dev), pdb->i2c_count },
+               //{ DNLLFP_IRQ(DN_SRX, "%d"), dl.stream_int_number, dev->db.srx_count },
+               //{ DNLLFP_IRQ(DN_STX, "%d"), dl.stream_int_number + dev->db.srx_count, dev->db.stx_count },
+               //{ DNLLFP_NAME(DN_SRX, "%d", DNP_DMACAP), dl.stream_cap, dev->db.srx_count },
+               //{ DNLLFP_NAME(DN_STX, "%d", DNP_DMACAP), dl.stream_cap + dev->db.srx_count, dev->db.stx_count },
+               };
+    uint64_t tmp;
+    uint32_t interrupt_count;
+    uint32_t interrupt_base;
+    uint32_t int_mask = 0;
+    for (unsigned i = 0; i < SIZEOF_ARRAY(bii); i++) {
+        for (unsigned j = 0; j < bii[i].count; j++) {
+            uint64_t tmp;
+            char buffer[32];
+
+            snprintf(buffer, sizeof(buffer), bii[i].path, j);
+            res = usdr_device_vfs_obj_val_get_u64(dev->pdev, buffer, &tmp);
+            if (res) {
+                return res;
+            }
+
+            bii[i].store[j] = (unsigned)tmp;
+            int_mask |= (1u << tmp);
+        }
+    }
+
+    // TODO move hwid to 0
+    // IGPI / HWID
+    uint32_t hwid;
+
+    res = usb_uram_reg_in(dev, 16 + (IGPI_HWID / 4), &hwid);
+    if (res)
+        return res;
+
+    if (hwid & 0x40000000) {
+
+        // INIT Interrupts only if PCIe is down
+        res = usb_uram_reg_out(dev, 0xf, int_mask);
+        if (res)
+            return res;
+        // Put stream to 1
+
+        res = usdr_device_vfs_obj_val_get_u64(dev->pdev, DNLL_IRQ_COUNT, &tmp);
+        if (res)
+            return res;
+
+        interrupt_count = tmp;
+
+        res = usdr_device_vfs_obj_val_get_u64(dev->pdev, DNLLFP_BASE(DNP_IRQ, "0"), &tmp);
+        if (res)
+            return res;
+
+        interrupt_base = tmp;
+
+        //Do these in case of pure USB only
+
+        const unsigned REG_WR_PNTFY_CFG = 8;
+        const unsigned REG_WR_PNTFY_ACK = 9;
+
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_CFG, 0xdeadb000);
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_CFG, 0xeeadb001);
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_CFG, 0xfeadb002);
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_CFG, 0xaeadb003);
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_CFG, 0xbeadb004);
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_CFG, 0xceadb005);
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_CFG, 0x9eadb006);
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_CFG, 0x8eadb007);
+
+        for (unsigned i = 0; i < interrupt_count; i++) {
+            res = res ? res : usb_uram_reg_out(dev, interrupt_base,  i | (i << 8) | (1 << 16) | (7 << 20));
+            res = res ? res : usb_uram_reg_out(dev, REG_WR_PNTFY_ACK, 0 | i << 16);
+        }
+
+        // IGPO_FRONT activates tran_usb_active to route interrupts to NTFY endpoint
+        res = res ? res : usb_uram_reg_out(dev, 0, (15u << 24) | (0x80));
+        if (res) {
+            USDR_LOG(logtag, USDR_LOG_ERROR,
+                     "Unable to set stream routing, error %d\n", res);
+            return res;
+        }
+
+    } else {
+        USDR_LOG(logtag, USDR_LOG_WARNING, "Omit interrupt initialization on USB+PCIE mode\n");
+    }
+
+    // Device initialization
+    res = dev->pdev->initialize(dev->pdev, pcount, devparam, devval);
+    if (res) {
+        USDR_LOG(logtag, USDR_LOG_ERROR,
+                 "Unable to initialize device, error %d\n", res);
+        return res;
+    }
+
+    return 0;
+}
