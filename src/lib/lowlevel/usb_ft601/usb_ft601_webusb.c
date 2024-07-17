@@ -35,6 +35,19 @@ enum {
     MAX_CTRL_BURST = 1,
 };
 
+struct webusb_device_lime
+{
+    struct webusb_device base;
+
+    uint32_t ft601_counter;
+
+    proto_lms64c_t data_ctrl_out[1];
+    proto_lms64c_t data_ctrl_in[1];
+};
+
+typedef struct webusb_device_lime webusb_device_lime_t;
+
+
 int _ft601_cmd(lldev_t lld, uint8_t ep, uint8_t cmd, uint32_t param)
 {
     uint8_t wbuffer[20];

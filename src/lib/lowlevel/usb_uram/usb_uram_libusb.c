@@ -29,24 +29,6 @@
 // Write command                     [R/W ... L5:L0|A15...A0]
 // Read number of bytes requested
 
-enum {
-    DEV_RX_STREAM_NO = 0,
-    DEV_TX_STREAM_NO = 1,
-};
-
-enum {
-    TXSTRM_META_SZ = 16,
-
-    // TODO Get rid of duplication constant, use DMA caps to calculate actual size
-    MAX_TX_BUFFER_SZ = 126976, // (4k * 31)
-};
-
-enum {
-    MAX_INTERRUPTS = 32,
-    MSI_USRB_COUNT = 2,
-    TO_IRQ_POLL = 250,
-};
-
 #define DUMP_MAXBUF 512
 #define MIN(x, y)  (((x) < (y)) ? (x) : (y))
 #define dump_tochar(x) \

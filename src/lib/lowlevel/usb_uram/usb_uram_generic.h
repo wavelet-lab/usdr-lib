@@ -14,6 +14,24 @@
 #define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
 #define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
 
+enum {
+    DEV_RX_STREAM_NO = 0,
+    DEV_TX_STREAM_NO = 1,
+};
+
+enum {
+    TXSTRM_META_SZ = 16,
+
+    // TODO Get rid of duplication constant, use DMA caps to calculate actual size
+    MAX_TX_BUFFER_SZ = 126976, // (4k * 31)
+};
+
+enum {
+    MAX_INTERRUPTS = 32,
+    MSI_USRB_COUNT = 2,
+    TO_IRQ_POLL = 250,
+};
+
 #define USB_IO_TIMEOUT 20000
 #define WEBUSB_DEV_NAME "webusb"
 
@@ -29,8 +47,10 @@ struct usb_uram_io_ops
     io_read_wait_t io_read_wait;
 };
 
-const struct lowlevel_plugin *usb_uram_register();
+struct usb_uram_generic
+{
 
+};
 
 int usb_uram_reg_out(lldev_t dev, unsigned reg, uint32_t outval);
 int usb_uram_reg_in(lldev_t dev, unsigned reg, uint32_t *pinval);
@@ -46,5 +66,8 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
 
 int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** devparam,
                                      const char** devval);
+
+
+const struct lowlevel_plugin *usb_uram_register();
 
 #endif // USB_URAM_GENERIC_H

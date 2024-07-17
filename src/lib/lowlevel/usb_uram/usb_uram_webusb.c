@@ -7,8 +7,19 @@
 #include "usb_uram_generic.h"
 #include "libusb_vidpid_map.h"
 #include "webusb_generic.h"
-#include "../../device/generic_usdr/generic_regs.h"
 #include "../../ipblks/si2c.h"
+
+struct webusb_device_ugen
+{
+    struct webusb_device base;
+
+    device_bus_t db;
+    unsigned spi_int_number[MAX_INTERRUPTS];
+    unsigned i2c_int_number[MAX_INTERRUPTS];
+    struct i2c_cache i2cc[4 * DBMAX_I2C_BUSES];
+
+    uint32_t ntfy_seqnum_exp;
+};
 
 static
     const char* webusb_uram_plugin_info_str(unsigned iparam) {
