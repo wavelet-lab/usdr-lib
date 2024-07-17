@@ -5,20 +5,15 @@
 #include <stdio.h>
 #include "../../device/generic_usdr/generic_regs.h"
 
-struct usb_uram_io_ops* get_io_ops();
-const char* get_dev_name(lldev_t dev);
-device_bus_t* get_device_bus(lldev_t dev);
-struct i2c_cache* get_i2c_cache(lldev_t dev);
-
-device_id_t get_dev_id(lldev_t dev);
-unsigned* get_spi_int_number(lldev_t dev);
-unsigned* get_i2c_int_number(lldev_t dev);
+usb_uram_generic_t* get_uram_generic(lldev_t dev);
 
 
 int usb_uram_reg_out(lldev_t dev, unsigned reg, uint32_t outval)
 {
-    int res = get_io_ops()->io_write_fn(dev, reg, &outval, 1, USB_IO_TIMEOUT);
-    const char* devname = get_dev_name(dev);
+    usb_uram_generic_t* gen = get_uram_generic(dev);
+
+    int res = gen->io_ops.io_write_fn(dev, reg, &outval, 1, USB_IO_TIMEOUT);
+    const char* devname = gen->dev_ops.get_dev_name_fn(dev);
 
     const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
     USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: Write [%04x] = %08x (%d)\n",
@@ -29,8 +24,10 @@ int usb_uram_reg_out(lldev_t dev, unsigned reg, uint32_t outval)
 int usb_uram_reg_in(lldev_t dev, unsigned reg, uint32_t *pinval)
 {
     uint32_t inval;
-    int	res = get_io_ops()->io_read_fn(dev, reg, &inval, 1, USB_IO_TIMEOUT);
-    const char* devname = get_dev_name(dev);
+    usb_uram_generic_t* gen = get_uram_generic(dev);
+
+    int	res = gen->io_ops.io_read_fn(dev, reg, &inval, 1, USB_IO_TIMEOUT);
+    const char* devname = gen->dev_ops.get_dev_name_fn(dev);
 
     const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
     USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: Read  [%04x] = %08x (%d)\n",
@@ -41,8 +38,10 @@ int usb_uram_reg_in(lldev_t dev, unsigned reg, uint32_t *pinval)
 
 int usb_uram_reg_out_n(lldev_t dev, unsigned reg, const uint32_t *outval, const unsigned dwcnt)
 {
-    int res = get_io_ops()->io_write_fn(dev, reg, outval, dwcnt, USB_IO_TIMEOUT);
-    const char* devname = get_dev_name(dev);
+    usb_uram_generic_t* gen = get_uram_generic(dev);
+
+    int res = gen->io_ops.io_write_fn(dev, reg, outval, dwcnt, USB_IO_TIMEOUT);
+    const char* devname = gen->dev_ops.get_dev_name_fn(dev);
 
     const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
     USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: WriteArray [%04x + %d] (%d)\n",
@@ -55,13 +54,14 @@ int usb_uram_reg_in_n(lldev_t dev, unsigned reg, uint32_t *pinval, const unsigne
     unsigned off = 0;
     unsigned rem = dwcnt;
     unsigned sz = rem;
+    usb_uram_generic_t* gen = get_uram_generic(dev);
 
     for (; rem != 0; ) {
         if (sz > 256 / 4)
             sz = 256 / 4;
 
-        int	res = get_io_ops()->io_read_fn(dev, reg + off, pinval + off, sz, USB_IO_TIMEOUT);
-        const char* devname = get_dev_name(dev);
+        int	res = gen->io_ops.io_read_fn(dev, reg + off, pinval + off, sz, USB_IO_TIMEOUT);
+        const char* devname = gen->dev_ops.get_dev_name_fn(dev);
 
         const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
         USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: ReadArray [%04x + %d] (%d)\n",
@@ -76,12 +76,13 @@ int usb_uram_reg_in_n(lldev_t dev, unsigned reg, uint32_t *pinval, const unsigne
     return 0;
 }
 
-int usb_uram_reg_op(lldev_t d, unsigned ls_op_addr,
+int usb_uram_reg_op(lldev_t dev, unsigned ls_op_addr,
                     uint32_t* ina, size_t meminsz, const uint32_t* outa, size_t memoutsz)
 {
     unsigned i;
     int res;
-    device_bus_t* pdb = get_device_bus(d);
+    usb_uram_generic_t* gen = get_uram_generic(dev);
+    device_bus_t* pdb = &gen->db;
 
     if ((meminsz % 4) || (memoutsz % 4))
         return -EINVAL;
@@ -93,19 +94,19 @@ int usb_uram_reg_op(lldev_t d, unsigned ls_op_addr,
 
             for (i = 0; i < amax; i++) {
                 //Write address
-                res = usb_uram_reg_out(d, pdb->idxreg_base[k],
+                res = usb_uram_reg_out(dev, pdb->idxreg_base[k],
                                        ls_op_addr - pdb->idxreg_virt_base[k] + i);
                 if (res)
                     return res;
 
                 if (i < memoutsz / 4) {
-                    res = usb_uram_reg_out(d, pdb->idxreg_base[k] + 1, outa[i]);
+                    res = usb_uram_reg_out(dev, pdb->idxreg_base[k] + 1, outa[i]);
                     if (res)
                         return res;
                 }
 
                 if (i < meminsz / 4) {
-                    res = usb_uram_reg_in(d, pdb->idxreg_base[k] + 1, &ina[i]);
+                    res = usb_uram_reg_in(dev, pdb->idxreg_base[k] + 1, &ina[i]);
                     if (res)
                         return res;
                 }
@@ -117,33 +118,33 @@ int usb_uram_reg_op(lldev_t d, unsigned ls_op_addr,
 #if 1
     // TODO Wrap to 128b
     if (memoutsz > 4) {
-        res = usb_uram_reg_out_n(d, ls_op_addr, outa, memoutsz / 4);
+        res = usb_uram_reg_out_n(dev, ls_op_addr, outa, memoutsz / 4);
         if (res)
             return res;
     } else if (memoutsz == 4) {
-        res = usb_uram_reg_out(d, ls_op_addr, outa[0]);
+        res = usb_uram_reg_out(dev, ls_op_addr, outa[0]);
         if (res)
             return res;
     }
 
     if (meminsz > 4) {
-        res = usb_uram_reg_in_n(d, ls_op_addr, ina, meminsz / 4);
+        res = usb_uram_reg_in_n(dev, ls_op_addr, ina, meminsz / 4);
         if (res)
             return res;
     } else if (meminsz == 4) {
-        res = usb_uram_reg_in(d, ls_op_addr, ina);
+        res = usb_uram_reg_in(dev, ls_op_addr, ina);
         if (res)
             return res;
     }
 #else
     // Normal operation
     for (i = 0; i < memoutsz / 4; i++) {
-        res = usb_uram_reg_out(d, ls_op_addr + i, outa[i]);
+        res = usb_uram_reg_out(dev, ls_op_addr + i, outa[i]);
         if (res)
             return res;
     }
     for (i = 0; i < meminsz / 4; i++) {
-        res = usb_uram_reg_in(d, ls_op_addr + i, &ina[i]);
+        res = usb_uram_reg_in(dev, ls_op_addr + i, &ina[i]);
         if (res)
             return res;
     }
@@ -157,8 +158,9 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
                    size_t memoutsz, const void* pout)
 {
     int res;
-    device_bus_t* pdb = get_device_bus(dev);
-    struct i2c_cache* pi2cc = get_i2c_cache(dev);
+    usb_uram_generic_t* gen = get_uram_generic(dev);
+    device_bus_t* pdb = &gen->db;
+    struct i2c_cache* pi2cc = gen->i2cc;
 
     switch (ls_op) {
     case USDR_LSOP_HWREG:
@@ -181,7 +183,7 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
         if (res)
             return res;
 
-        res = get_io_ops()->io_read_wait(dev, ls_op, ls_op_addr, meminsz, pin);
+        res = usb_uram_read_wait(dev, ls_op, ls_op_addr, meminsz, pin);
         return res;
     }
     case USDR_LSOP_I2C_DEV: {
@@ -207,7 +209,7 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
         if (res)
             return res;
 
-        const char* devname = get_dev_name(dev);
+        const char* devname = gen->dev_ops.get_dev_name_fn(dev);
         const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
         USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: I2C[%d.%d.%02x] LUT:CMD %08x.%08x\n",
                  devname, instance_no, bus_no, i2caddr, i2ccmd[0], i2ccmd[1]);
@@ -218,7 +220,7 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
 
         if (meminsz > 0) {
 
-            res = get_io_ops()->io_read_wait(dev, ls_op, instance_no, meminsz, &data);
+            res = usb_uram_read_wait(dev, ls_op, instance_no, meminsz, &data);
             if (res)
                 return res;
 
@@ -244,19 +246,56 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
     return -EOPNOTSUPP;
 }
 
+int usb_uram_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_addr, size_t meminsz, void* pin)
+{
+    int res;
+    usb_uram_generic_t* gen = get_uram_generic(dev);
+
+    unsigned int_number, reg;
+    char busname[4];
+    switch(lsop)
+    {
+    case USDR_LSOP_SPI:
+        int_number = gen->spi_int_number[ls_op_addr];
+        reg = gen->db.spi_core[ls_op_addr];
+        strcpy(busname, "SPI");
+        break;
+    case USDR_LSOP_I2C_DEV:
+        int_number = gen->i2c_int_number[ls_op_addr];
+        reg = gen->db.i2c_base[ls_op_addr];
+        strcpy(busname, "I2C");
+        break;
+    default:
+        return -EOPNOTSUPP;
+    }
+
+    res = gen->io_ops.io_read_bus_fn(dev, int_number, reg, meminsz, pin);
+    if (res)
+    {
+        const char* devname = gen->dev_ops.get_dev_name_fn(dev);
+        const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
+
+        USDR_LOG(logtag, USDR_LOG_ERROR, "%s: %s%d MSI wait timed out! res=%d\n",
+                 devname, busname, ls_op_addr, res);
+    }
+
+    return res;
+}
+
 int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** devparam,
                                      const char** devval)
 {
     int res;
-    device_bus_t* pdb = get_device_bus(dev);
-    const char* devname = get_dev_name(dev);
+    usb_uram_generic_t* gen = get_uram_generic(dev);
+    device_bus_t* pdb = &gen->db;
+    const char* devname = gen->dev_ops.get_dev_name_fn(dev);
     const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
 
-    res = usdr_device_create(dev, get_dev_id(dev));
+    res = usdr_device_create(dev, gen->dev_ops.get_dev_id_fn(dev));
     if (res) {
         USDR_LOG(logtag, USDR_LOG_ERROR,
                  "Unable to find device spcec for %s, uuid %s! Update software!\n",
-                 devname, usdr_device_id_to_str(get_dev_id(dev)));
+                 devname, usdr_device_id_to_str(gen->dev_ops.get_dev_id_fn(dev)));
 
         return res;
     }
@@ -274,8 +313,8 @@ int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** 
         unsigned *store;
         unsigned count;
     } bii[] = {
-               { DNLLFP_IRQ(DN_BUS_SPI, "%d"), get_spi_int_number(dev), pdb->spi_count },
-               { DNLLFP_IRQ(DN_BUS_I2C, "%d"), get_i2c_int_number(dev), pdb->i2c_count },
+               { DNLLFP_IRQ(DN_BUS_SPI, "%d"), gen->spi_int_number, pdb->spi_count },
+               { DNLLFP_IRQ(DN_BUS_I2C, "%d"), gen->i2c_int_number, pdb->i2c_count },
                //{ DNLLFP_IRQ(DN_SRX, "%d"), dl.stream_int_number, dev->db.srx_count },
                //{ DNLLFP_IRQ(DN_STX, "%d"), dl.stream_int_number + dev->db.srx_count, dev->db.stx_count },
                //{ DNLLFP_NAME(DN_SRX, "%d", DNP_DMACAP), dl.stream_cap, dev->db.srx_count },

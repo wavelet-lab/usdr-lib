@@ -368,7 +368,7 @@ static
         goto usbinit_fail;
     }
 
-    res = usdr_device_create(lldev, libusb_get_deviceid(dev_idx));
+    res = usdr_device_create(lldev, d->base.devid);
     if (res) {
         USDR_LOG("WEBU", USDR_LOG_ERROR, "Unable to create WebUsb device, error %d\n", res);
         goto usbinit_fail;

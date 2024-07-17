@@ -96,14 +96,10 @@ struct usb_dev
     struct lowlevel_ops ops;
 
     libusb_generic_dev_t gdev;
-    device_bus_t db;
+    usb_uram_generic_t uram_generic;
 
     sem_t interrupts[MAX_INTERRUPTS];
-    unsigned spi_int_number[MAX_INTERRUPTS];
-    unsigned i2c_int_number[MAX_INTERRUPTS];
     uint32_t rbvalue[MAX_INTERRUPTS];
-
-    struct i2c_cache i2cc[4 * DBMAX_I2C_BUSES];
 
     bool stop;
     sem_t tr_regout_a;
@@ -120,8 +116,6 @@ struct usb_dev
     unsigned char buffer_ntfy_n[IN_NTFY_SIZE * MAX_NTFY_REQS];
 
     unsigned buffer_regout_flags[MAX_REGOUT_REQS];
-
-    uint16_t ntfy_seqnum_exp;
 
     uint64_t stream_info[STREAM_MAX_SLOTS];
     unsigned stream_info_widx;
@@ -340,12 +334,12 @@ void LIBUSB_CALL libusb_transfer_ntfy(struct libusb_transfer *transfer)
         unsigned event = header & 0x3f;
         unsigned blen = ((header >> 12) & 0xf);
 
-        if (dev->ntfy_seqnum_exp != seqnum) {
+        if (dev->uram_generic.ntfy_seqnum_exp != seqnum) {
             USDR_LOG("USBX", USDR_LOG_ERROR, "Notification exp seqnum %04x, got %04x: %08x hdr\n",
-                     dev->ntfy_seqnum_exp, seqnum, header);
-            dev->ntfy_seqnum_exp = seqnum;
+                     dev->uram_generic.ntfy_seqnum_exp, seqnum, header);
+            dev->uram_generic.ntfy_seqnum_exp = seqnum;
         }
-        dev->ntfy_seqnum_exp++;
+        dev->uram_generic.ntfy_seqnum_exp++;
         if (event >= MAX_INTERRUPTS) {
             USDR_LOG("USBX", USDR_LOG_ERROR, "Broken notification, event %d: %08x hdr\n", event, header);
             i += blen + 1;
@@ -441,42 +435,21 @@ static int usb_uram_wait_msi(usb_dev_t* dev, unsigned i, int timeout_ms)
     return sem_wait_ex(&dev->interrupts[i], timeout_ms * 1000);
 }
 
-static int usb_uram_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_addr, size_t meminsz, void* pin)
+static int usb_read_bus(lldev_t dev, unsigned interrupt_number, UNUSED unsigned reg, size_t meminsz, void* pin)
 {
     int res;
     usb_dev_t* d = (usb_dev_t*)dev;
-
-    unsigned int_number, UNUSED reg;
-    char busname[4];
-    switch(lsop)
-    {
-    case USDR_LSOP_SPI:
-        int_number = d->spi_int_number[ls_op_addr];
-        reg = d->db.spi_core[ls_op_addr];
-        strcpy(busname, "SPI");
-        break;
-    case USDR_LSOP_I2C_DEV:
-        int_number = d->i2c_int_number[ls_op_addr];
-        reg = d->db.i2c_base[ls_op_addr];
-        strcpy(busname, "I2C");
-        break;
-    default:
-        return -EOPNOTSUPP;
-    }
 
     res = libusb_to_errno(libusb_submit_transfer(d->transfer_ntfy[0]));
     if (res)
         return res;
 
-    res = usb_uram_wait_msi(d, int_number, 1000);
-    if (res) {
-        USDR_LOG("USBX", USDR_LOG_ERROR, "%s: %s%d MSI wait timed out!\n",
-                 d->gdev.name, busname, ls_op_addr);
+    res = usb_uram_wait_msi(d, interrupt_number, 1000);
+    if (res)
         return res;
-    }
 
     if (meminsz != 0) {
-        *(uint32_t*)pin = d->rbvalue[int_number];
+        *(uint32_t*)pin = d->rbvalue[interrupt_number];
 #if 0
         res = usb_uram_reg_in(dev, reg, (uint32_t*)pin);
         if (res)
@@ -892,6 +865,34 @@ int usb_uram_plugin_discovery(unsigned pcount, const char** filterparams,
 }
 
 
+const static
+usb_uram_io_ops_t s_io_ops = {
+    usb_async_regread32,
+    usb_async_regwrite32,
+    usb_read_bus
+};
+
+static const char* get_dev_name(lldev_t dev)
+{
+    const char* name;
+    int res = usb_uram_generic_get(dev, LLGO_DEVICE_NAME, &name);
+    if(res)
+        return "unknown";
+    return name;
+}
+
+static device_id_t get_dev_id(lldev_t dev)
+{
+    usb_dev_t* d = (usb_dev_t*)dev;
+    return d->gdev.devid;
+}
+
+const static
+usb_uram_dev_ops_t s_dev_ops = {
+    get_dev_name,
+    get_dev_id
+};
+
 static
 int usb_uram_plugin_create(unsigned pcount, const char** devparam,
                                const char** devval, lldev_t* odev,
@@ -910,6 +911,9 @@ int usb_uram_plugin_create(unsigned pcount, const char** devparam,
     dev->tx_strms[0].fd_event = -101;
     dev->lld.ops = &dev->ops;
     dev->ops = s_usb_uram_ops;
+
+    dev->uram_generic.io_ops = s_io_ops;
+    dev->uram_generic.dev_ops = s_dev_ops;
 
     res = libusb_generic_plugin_create(pcount, devparam, devval, s_known_devices, KNOWN_USB_DEVICES,
                                        "usb", &dev->gdev);
@@ -964,55 +968,10 @@ usbinit_fail:
     return res;
 }
 
-static struct usb_uram_io_ops s_io_ops =
-{
-    usb_async_regread32,
-    usb_async_regwrite32,
-    usb_uram_read_wait
-};
-
-struct usb_uram_io_ops* get_io_ops()
-{
-    return &s_io_ops;
-}
-
-const char* get_dev_name(lldev_t dev)
-{
-    const char* name;
-    int res = usb_uram_generic_get(dev, LLGO_DEVICE_NAME, &name);
-    if(res)
-        return "unknown";
-    return name;
-}
-
-device_bus_t* get_device_bus(lldev_t dev)
+usb_uram_generic_t* get_uram_generic(lldev_t dev)
 {
     usb_dev_t* d = (usb_dev_t*)dev;
-    return &d->db;
-}
-
-struct i2c_cache* get_i2c_cache(lldev_t dev)
-{
-    usb_dev_t* d = (usb_dev_t*)dev;
-    return d->i2cc;
-}
-
-device_id_t get_dev_id(lldev_t dev)
-{
-    usb_dev_t* d = (usb_dev_t*)dev;
-    return d->gdev.devid;
-}
-
-unsigned* get_spi_int_number(lldev_t dev)
-{
-    usb_dev_t* d = (usb_dev_t*)dev;
-    return d->spi_int_number;
-}
-
-unsigned* get_i2c_int_number(lldev_t dev)
-{
-    usb_dev_t* d = (usb_dev_t*)dev;
-    return d->i2c_int_number;
+    return &d->uram_generic;
 }
 
 // Factory operations
