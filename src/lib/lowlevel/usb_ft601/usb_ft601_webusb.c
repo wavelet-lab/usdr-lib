@@ -235,7 +235,7 @@ static
     int webusb_ll_stream_initialize(lldev_t dev, subdev_t subdev, lowlevel_stream_params_t* params, stream_t* channel)
 {
     int res = 0;
-    const unsigned data_endpoint = (params->streamno == DEV_RX_STREAM_NO) ? EP_IN_DEFSTREAM : EP_OUT_DEFSTREAM;
+    UNUSED const unsigned data_endpoint = (params->streamno == DEV_RX_STREAM_NO) ? EP_IN_DEFSTREAM : EP_OUT_DEFSTREAM;
 
     USDR_LOG("USBX", USDR_LOG_ERROR, "webusb_ll_stream_initialize(streamno=%d)\n", params->streamno);
     *channel = params->streamno;
