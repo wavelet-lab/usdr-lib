@@ -337,6 +337,7 @@ static
     lldev->ops = &s_webusb_ft601_ops;
 
     d->base.type_sdr = libusb_get_dev_sdrtype(dev_idx);
+    d->base.devid = libusb_get_deviceid(dev_idx);
     d->base.param = param;
     d->base.ops = (webusb_ops_t*)webops;
     d->base.rpc_call = &generic_rpc_call;

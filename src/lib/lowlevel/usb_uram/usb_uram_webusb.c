@@ -141,11 +141,11 @@ static int libusb_websdr_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_
     switch(lsop)
     {
     case USDR_LSOP_SPI:
-        event = d->event_spi[ls_op_addr];
+        event = d->spi_int_number[ls_op_addr];
         strcpy(busname, "SPI");
         break;
     case USDR_LSOP_I2C_DEV:
-        event = d->event_i2c[ls_op_addr];
+        event = d->i2c_int_number[ls_op_addr];
         strcpy(busname, "I2C");
         break;
     default:
@@ -251,7 +251,7 @@ static
     lldev->ops = &s_webusb_uram_ops;
 
     d->base.type_sdr = libusb_get_dev_sdrtype(dev_idx);
-    d->base.device_idx = dev_idx;
+    d->base.devid = libusb_get_deviceid(dev_idx);
     d->base.param = param;
     d->base.ops = (webusb_ops_t*)webops;
     d->base.rpc_call = &generic_rpc_call;
@@ -260,11 +260,6 @@ static
 
     d->base.strms[0] = NULL;
     d->base.strms[1] = NULL;
-
-    d->event_spi[0] = M2PCI_INT_SPI_0;
-    d->event_spi[1] = 0;
-    d->event_i2c[0] = M2PCI_INT_I2C_0;
-    d->event_i2c[1] = 0;
 
     d->ntfy_seqnum_exp = 0;
 
@@ -316,7 +311,7 @@ struct i2c_cache* get_i2c_cache(lldev_t dev)
 device_id_t get_dev_id(lldev_t dev)
 {
     struct webusb_device_ugen* d = (struct webusb_device_ugen*)dev;
-    return libusb_get_deviceid(d->base.device_idx);
+    return d->base.devid;
 }
 
 unsigned* get_spi_int_number(lldev_t dev)

@@ -22,6 +22,8 @@ struct webusb_device {
     struct lowlevel_dev ll;
     struct webusb_ops* ops;
     uintptr_t param;
+
+    device_id_t devid;
     sdr_type_t type_sdr;
 
     rpc_call_fn rpc_call;
@@ -29,7 +31,6 @@ struct webusb_device {
     dif_get_uint_fn  dif_get_uint;
 
     pusdr_dms_t strms[2]; // 0 - RX, 1 - TX
-    int device_idx; // idx in vidpid map
 };
 
 #define MAX_SPI_BUS    2
@@ -43,10 +44,6 @@ struct webusb_device {
 
 struct webusb_device_ugen {
     struct webusb_device base;
-
-    uint8_t event_spi[MAX_SPI_BUS];
-    uint8_t event_i2c[MAX_I2C_BUS];
-
     device_bus_t db;
     unsigned spi_int_number[MAX_INTERRUPTS];
     unsigned i2c_int_number[MAX_INTERRUPTS];
