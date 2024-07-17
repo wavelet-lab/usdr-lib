@@ -181,13 +181,13 @@ int usdr_device_vfs_obj_val_get_u64(pdevice_t dev, const char* fullpath, uint64_
 int _oapi_vfs_set_i64_func(vfs_object_t* obj, uint64_t value)
 {
     usdr_vfs_obj_ops_t* ops = (usdr_vfs_obj_ops_t* )obj->data.obj;
-    return ops->val_set(obj->object, obj, value);
+    return ops->val_set((pdevice_t)obj->object, obj, value);
 }
 
 int _oapi_vfs_get_i64_func(vfs_object_t* obj, uint64_t* ovalue)
 {
     usdr_vfs_obj_ops_t* ops = (usdr_vfs_obj_ops_t* )obj->data.obj;
-    return ops->val_get(obj->object, obj, ovalue);
+    return ops->val_get((pdevice_t)obj->object, obj, ovalue);
 }
 
 int usdr_vfs_obj_param_init_array_param(pdevice_t dev,

@@ -740,6 +740,11 @@ int lms6002d_cal_vga2(lms6002d_state_t* obj)
         // MAKE_LMS6002D_RXVGA2_CTRL(7, 1, 1),
         MAKE_LMS6002D_RXVGA2_GAIN(0, 10),
     };
+
+    uint16_t regs_1[] = {
+        MAKE_LMS6002D_RXVGA2_GAIN(10, 0),
+    };
+
     res = lms6002d_spi_post(obj, regs_0, SIZEOF_ARRAY(regs_0));
     if (res)
         goto fail_cal;
@@ -756,9 +761,6 @@ int lms6002d_cal_vga2(lms6002d_state_t* obj)
     if (res)
         goto fail_cal;
 
-    uint16_t regs_1[] = {
-        MAKE_LMS6002D_RXVGA2_GAIN(10, 0),
-    };
     res = lms6002d_spi_post(obj, regs_1, SIZEOF_ARRAY(regs_1));
     if (res)
         goto fail_cal;
