@@ -1,13 +1,19 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "usb_uram_generic.h"
 #include "libusb_vidpid_map.h"
 #include "webusb_generic.h"
-#include "../../device/generic_usdr/generic_regs.h"
 #include "../../ipblks/si2c.h"
+
+struct webusb_device_uram
+{
+    struct webusb_device base;
+    usb_uram_generic_t uram_generic;
+};
 
 static
     const char* webusb_uram_plugin_info_str(unsigned iparam) {
@@ -19,7 +25,7 @@ static
 }
 
 static
-    int webusb_await_event(struct webusb_device_ugen* wbd, int num, uint32_t* data)
+    int webusb_await_event(struct webusb_device_uram* wbd, int num, uint32_t* data)
 {
     uint32_t buffer[16];
     int res;
@@ -41,12 +47,12 @@ static
         unsigned event = header & 0x3f;
         unsigned blen = ((header >> 12) & 0xf);
 
-        if (wbd->ntfy_seqnum_exp != seqnum) {
+        if (wbd->uram_generic.ntfy_seqnum_exp != seqnum) {
             USDR_LOG("USBX", USDR_LOG_ERROR, "Notification exp seqnum %04x, got %04x: %08x hdr\n",
-                     wbd->ntfy_seqnum_exp, seqnum, header);
-            wbd->ntfy_seqnum_exp = seqnum;
+                     wbd->uram_generic.ntfy_seqnum_exp, seqnum, header);
+            wbd->uram_generic.ntfy_seqnum_exp = seqnum;
         }
-        wbd->ntfy_seqnum_exp++;
+        wbd->uram_generic.ntfy_seqnum_exp++;
         if (event >= MAX_INTERRUPTS) {
             USDR_LOG("USBX", USDR_LOG_ERROR, "Broken notification, event %d: %08x hdr\n", event, header);
             i += blen + 1;
@@ -70,8 +76,9 @@ static
 }
 
 static
-    int libusb_websdr_io_write(struct webusb_device_ugen* dev, unsigned addr, unsigned dwcnt, const uint32_t* data)
+    int libusb_websdr_io_write(lldev_t d, unsigned addr, const uint32_t* data, unsigned dwcnt, UNUSED int timeout)
 {
+    struct webusb_device_uram* dev = (struct webusb_device_uram*)d;
     uint32_t pkt[65]; // header + 256b payload
     int res;
 
@@ -95,8 +102,10 @@ static
     return 0;
 }
 
-int libusb_websdr_io_read(struct webusb_device_ugen* dev, unsigned addr, unsigned dwcnt, uint32_t *data)
+static
+    int libusb_websdr_io_read(lldev_t d, unsigned addr, uint32_t *data, unsigned dwcnt, UNUSED int timeout)
 {
+    struct webusb_device_uram* dev = (struct webusb_device_uram*)d;
     int res;
     uint32_t cmd = (((dwcnt - 1) & 0x3f) << 16) | (addr & 0xffff) | (0xC0000000);
 
@@ -126,114 +135,12 @@ int libusb_websdr_io_read(struct webusb_device_ugen* dev, unsigned addr, unsigne
     return 0;
 }
 
-// IO functions
-static
-    int webusb_ll_ls_op(lldev_t dev, subdev_t subdev,
-                    unsigned ls_op, lsopaddr_t ls_op_addr,
-                    size_t meminsz, void* pin, size_t memoutsz,
-                    const void* pout)
+static int libusb_websdr_read_bus(lldev_t dev, unsigned interrupt_number, UNUSED unsigned reg, size_t meminsz, void* pin)
 {
-    struct webusb_device_ugen* wbd = (struct webusb_device_ugen*)dev;
-    int res;
     uint32_t dummy;
+    struct webusb_device_uram* d = (struct webusb_device_uram*)dev;
 
-    switch (ls_op) {
-    case USDR_LSOP_HWREG:
-        if (meminsz) {
-            res = libusb_websdr_io_read(wbd, ls_op_addr, meminsz / 4, (uint32_t*)pin);
-            if (res)
-                return res;
-        }
-        if (memoutsz) {
-            unsigned vidx = ls_op_addr / BUS_VIRT_IDX;
-            if (vidx > 0) {
-                if (vidx > MAX_VIRT_BUS)
-                    return -EINVAL;
-                if (memoutsz != 4)
-                    return -EINVAL;
-                if (wbd->base_virt[vidx - 1] == BUS_INVALID)
-                    return -EINVAL;
-
-                uint32_t data[2] = {
-                    ls_op_addr % BUS_VIRT_IDX,
-                    *((const uint32_t*)pout),
-                };
-                res = libusb_websdr_io_write(wbd, wbd->base_virt[vidx - 1], 2, data);
-            } else {
-                res = libusb_websdr_io_write(wbd, ls_op_addr, memoutsz / 4, (uint32_t*)pout);
-            }
-            if (res)
-                return res;
-        }
-        return 0;
-    case USDR_LSOP_SPI:
-        if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
-            return -EINVAL;
-        if (ls_op_addr >= MAX_SPI_BUS)
-            return -EINVAL;
-        if (wbd->base_spi[ls_op_addr] == BUS_INVALID)
-            return -EINVAL;
-
-        res = libusb_websdr_io_write(wbd, wbd->base_spi[ls_op_addr], memoutsz / 4,
-                                     (const uint32_t*)pout);
-        if (res)
-            return res;
-
-        res = webusb_await_event(wbd, wbd->event_spi[ls_op_addr],
-                                 (meminsz != 0) ? (uint32_t*)pin : &dummy);
-        if (res)
-            return res;
-
-        return 0;
-    case USDR_LSOP_I2C_DEV: {
-        uint32_t i2ccmd, data = 0;
-        const uint8_t* dd = (const uint8_t*)pout;
-        uint8_t* di = (uint8_t*)pin;
-        uint8_t busno = (ls_op_addr >> 8);
-
-        if (busno >= MAX_I2C_BUS)
-            return -EINVAL;
-        if (wbd->base_i2c[busno] == BUS_INVALID)
-            return -EINVAL;
-
-        res = si2c_make_ctrl_reg(ls_op_addr, dd, memoutsz, meminsz, &i2ccmd);
-        if (res)
-            return res;
-
-        res = libusb_websdr_io_write(wbd, wbd->base_i2c[busno], 1, &i2ccmd);
-        if (res)
-            return res;
-        if (meminsz == 0)
-            return 0;
-
-        // Only when we need readback
-        res = webusb_await_event(wbd, wbd->event_i2c[busno],
-                                 &data);
-        if (res)
-            return res;
-
-        if (meminsz == 1) {
-            di[0] = data;
-        } else if (meminsz == 2) {
-            di[0] = data;
-            di[1] = data >> 8;
-        } else if (meminsz == 3) {
-            di[0] = data;
-            di[1] = data >> 8;
-            di[2] = data >> 16;
-        } else {
-            *(uint32_t*)pin = data;
-        }
-
-        return 0;
-    }
-    case USDR_LSOP_URAM:
-        return -EINVAL;
-    default:
-        break;
-    }
-
-    return -EINVAL;
+    return webusb_await_event(d, interrupt_number, (meminsz != 0) ? (uint32_t*)pin : &dummy);
 }
 
 static
@@ -262,19 +169,19 @@ static
 }
 
 static
-    struct lowlevel_ops s_webusb_uram_ops = {
-        &webusb_ll_generic_get,
-        &webusb_ll_ls_op,
-        &webusb_ll_stream_initialize,
-        &webusb_ll_stream_deinitialize,
-        NULL,                       //recv_dma_wait,
-        NULL,                       //recv_dma_release,
-        NULL,                       //send_dma_get,
-        NULL,                       //send_dma_commit,
-        NULL,                       //recv_buf,
-        NULL,                       //send_buf,
-        NULL,                       //await,
-        &webusb_ll_destroy
+struct lowlevel_ops s_webusb_uram_ops = {
+    &webusb_ll_generic_get,
+    &usb_uram_ls_op,
+    &webusb_ll_stream_initialize,
+    &webusb_ll_stream_deinitialize,
+    NULL,                       //recv_dma_wait,
+    NULL,                       //recv_dma_release,
+    NULL,                       //send_dma_get,
+    NULL,                       //send_dma_commit,
+    NULL,                       //recv_buf,
+    NULL,                       //send_buf,
+    NULL,                       //await,
+    &webusb_ll_destroy
 };
 
 static
@@ -291,6 +198,13 @@ static
     return -EINVAL;
 }
 
+
+static struct usb_uram_io_ops s_io_ops = {
+    libusb_websdr_io_read,
+    libusb_websdr_io_write,
+    libusb_websdr_read_bus
+};
+
 static
     int webusb_uram_plugin_create(unsigned pcount, const char** devparam,
                            const char** devval, lldev_t* odev,
@@ -298,7 +212,6 @@ static
 {
     int res = 0;
     lldev_t lldev = NULL;
-    unsigned hwid = 0;
 
     if(!vidpid) {
         return -EINVAL;
@@ -315,17 +228,18 @@ static
    }
 
     assert( *odev == NULL );
-    struct webusb_device_ugen *d = (struct webusb_device_ugen *)malloc(sizeof(struct webusb_device_ugen));
+    struct webusb_device_uram *d = (struct webusb_device_uram *)malloc(sizeof(struct webusb_device_uram));
     if(d == NULL) {
         return -ENOMEM;
     }
 
-    memset(d, 0, sizeof(struct webusb_device_ugen));
+    memset(d, 0, sizeof(struct webusb_device_uram));
 
     lldev = &d->base.ll;
     lldev->ops = &s_webusb_uram_ops;
 
     d->base.type_sdr = libusb_get_dev_sdrtype(dev_idx);
+    d->base.devid = libusb_get_deviceid(dev_idx);
     d->base.param = param;
     d->base.ops = (webusb_ops_t*)webops;
     d->base.rpc_call = &generic_rpc_call;
@@ -335,71 +249,12 @@ static
     d->base.strms[0] = NULL;
     d->base.strms[1] = NULL;
 
-    // Init buses cores
-    d->base_i2c[0] = M2PCI_REG_I2C;
-    d->base_i2c[1] = BUS_INVALID;
-    d->base_spi[0] = M2PCI_REG_SPI0;
-    d->base_spi[1] = BUS_INVALID;
-    d->base_virt[0] = M2PCI_REG_WR_BADDR;
-    d->base_virt[1] = BUS_INVALID;
+    d->uram_generic.ntfy_seqnum_exp = 0;
+    d->uram_generic.io_ops = s_io_ops;
 
-    d->event_spi[0] = M2PCI_INT_SPI_0;
-    d->event_spi[1] = 0;
-    d->event_i2c[0] = M2PCI_INT_I2C_0;
-    d->event_i2c[1] = 0;
-
-    d->ntfy_seqnum_exp = 0;
-
-    res = usdr_device_create(lldev, libusb_get_deviceid(dev_idx));
-    if (res) {
-        USDR_LOG("WEBU", USDR_LOG_ERROR, "Unable to create WebUsb device, error %d\n", res);
+    res = usb_uram_generic_create_and_init(lldev, pcount, devparam, devval, &d->base.devid);
+    if(res)
         goto usbinit_fail;
-    }
-
-    res = lowlevel_reg_rd32(lldev, 0, 16 + (IGPI_HWID / 4), &hwid);
-
-    if (res)
-        goto usbinit_fail;
-
-    if (hwid & 0x40000000) {
-        const unsigned REG_WR_PNTFY_CFG = 8;
-        const unsigned REG_WR_PNTFY_ACK = 9;
-
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_CFG, 0xdeadb000);
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_CFG, 0xeeadb001);
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_CFG, 0xfeadb002);
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_CFG, 0xaeadb003);
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_CFG, 0xbeadb004);
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_CFG, 0xceadb005);
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_CFG, 0x9eadb006);
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_CFG, 0x8eadb007);
-
-        for (unsigned i = 0; i < 8; i++) {
-            res = res ? res : lowlevel_reg_wr32(lldev, 0, M2PCI_REG_INT,  i | (i << 8) | (1 << 16) | (7 << 20));
-            res = res ? res : lowlevel_reg_wr32(lldev, 0, REG_WR_PNTFY_ACK, 0 | i << 16);
-        }
-
-        // IGPO_FRONT activates tran_usb_active to route interrupts to NTFY endpoint
-        res = res ? res : lowlevel_reg_wr32(lldev, 0, 0, (15u << 24) | (0x80));
-        if (res) {
-            USDR_LOG("WEBU", USDR_LOG_ERROR,
-                     "Unable to set stream routing, error %d\n", res);
-            goto usbinit_fail;
-        }
-
-        res = lowlevel_reg_wr32(lldev, 0, M2PCI_REG_INT, (1 << M2PCI_INT_SPI_0) | (1 << M2PCI_INT_I2C_0));
-        if (res) {
-            goto usbinit_fail;
-        }
-    }
-
-    // Device initialization
-    res = lldev->pdev->initialize(lldev->pdev, pcount, devparam, devval);
-    if (res) {
-        USDR_LOG("WEBU", USDR_LOG_ERROR,
-                 "Unable to initialize device, error %d\n", res);
-        goto usbinit_fail;
-    }
 
     *odev = (lldev_t)d;
     return 0;
@@ -407,6 +262,12 @@ static
 usbinit_fail:
     free(d);
     return res;
+}
+
+usb_uram_generic_t* get_uram_generic(lldev_t dev)
+{
+    struct webusb_device_uram* d = (struct webusb_device_uram*)dev;
+    return &d->uram_generic;
 }
 
 // Factory operations
