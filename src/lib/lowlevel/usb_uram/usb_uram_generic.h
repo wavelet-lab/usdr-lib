@@ -70,7 +70,6 @@ struct usb_uram_generic
     uint32_t ntfy_seqnum_exp;
 
     usb_uram_io_ops_t io_ops;
-    usb_uram_dev_ops_t dev_ops;
 };
 typedef struct usb_uram_generic usb_uram_generic_t;
 
@@ -88,7 +87,7 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
 
 int usb_uram_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_addr, size_t meminsz, void* pin);
 int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** devparam,
-                                     const char** devval);
+                                     const char** devval, device_id_t* pdevid);
 
 
 const struct lowlevel_plugin *usb_uram_register();

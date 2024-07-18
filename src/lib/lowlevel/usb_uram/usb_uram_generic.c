@@ -13,7 +13,7 @@ int usb_uram_reg_out(lldev_t dev, unsigned reg, uint32_t outval)
     usb_uram_generic_t* gen = get_uram_generic(dev);
 
     int res = gen->io_ops.io_write_fn(dev, reg, &outval, 1, USB_IO_TIMEOUT);
-    const char* devname = gen->dev_ops.get_dev_name_fn(dev);
+    const char* devname = lowlevel_get_devname(dev);
 
     const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
     USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: Write [%04x] = %08x (%d)\n",
@@ -27,7 +27,7 @@ int usb_uram_reg_in(lldev_t dev, unsigned reg, uint32_t *pinval)
     usb_uram_generic_t* gen = get_uram_generic(dev);
 
     int	res = gen->io_ops.io_read_fn(dev, reg, &inval, 1, USB_IO_TIMEOUT);
-    const char* devname = gen->dev_ops.get_dev_name_fn(dev);
+    const char* devname = lowlevel_get_devname(dev);
 
     const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
     USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: Read  [%04x] = %08x (%d)\n",
@@ -41,7 +41,7 @@ int usb_uram_reg_out_n(lldev_t dev, unsigned reg, const uint32_t *outval, const 
     usb_uram_generic_t* gen = get_uram_generic(dev);
 
     int res = gen->io_ops.io_write_fn(dev, reg, outval, dwcnt, USB_IO_TIMEOUT);
-    const char* devname = gen->dev_ops.get_dev_name_fn(dev);
+    const char* devname = lowlevel_get_devname(dev);
 
     const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
     USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: WriteArray [%04x + %d] (%d)\n",
@@ -61,7 +61,7 @@ int usb_uram_reg_in_n(lldev_t dev, unsigned reg, uint32_t *pinval, const unsigne
             sz = 256 / 4;
 
         int	res = gen->io_ops.io_read_fn(dev, reg + off, pinval + off, sz, USB_IO_TIMEOUT);
-        const char* devname = gen->dev_ops.get_dev_name_fn(dev);
+        const char* devname = lowlevel_get_devname(dev);
 
         const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
         USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: ReadArray [%04x + %d] (%d)\n",
@@ -209,7 +209,7 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
         if (res)
             return res;
 
-        const char* devname = gen->dev_ops.get_dev_name_fn(dev);
+        const char* devname = lowlevel_get_devname(dev);
         const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
         USDR_LOG(logtag, USDR_LOG_DEBUG, "%s: I2C[%d.%d.%02x] LUT:CMD %08x.%08x\n",
                  devname, instance_no, bus_no, i2caddr, i2ccmd[0], i2ccmd[1]);
@@ -272,7 +272,7 @@ int usb_uram_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_addr, size_t
     res = gen->io_ops.io_read_bus_fn(dev, int_number, reg, meminsz, pin);
     if (res)
     {
-        const char* devname = gen->dev_ops.get_dev_name_fn(dev);
+        const char* devname = lowlevel_get_devname(dev);
         const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
 
         USDR_LOG(logtag, USDR_LOG_ERROR, "%s: %s%d MSI wait timed out! res=%d\n",
@@ -283,19 +283,19 @@ int usb_uram_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_addr, size_t
 }
 
 int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** devparam,
-                                     const char** devval)
+                                     const char** devval, device_id_t* pdevid)
 {
     int res;
     usb_uram_generic_t* gen = get_uram_generic(dev);
     device_bus_t* pdb = &gen->db;
-    const char* devname = gen->dev_ops.get_dev_name_fn(dev);
+    const char* devname = lowlevel_get_devname(dev);
     const char* logtag = strcmp(devname, WEBUSB_DEV_NAME) == 0 ? "WEBU" : "USBX";
 
-    res = usdr_device_create(dev, gen->dev_ops.get_dev_id_fn(dev));
+    res = usdr_device_create(dev, *pdevid);
     if (res) {
         USDR_LOG(logtag, USDR_LOG_ERROR,
                  "Unable to find device spcec for %s, uuid %s! Update software!\n",
-                 devname, usdr_device_id_to_str(gen->dev_ops.get_dev_id_fn(dev)));
+                 devname, usdr_device_id_to_str(*pdevid));
 
         return res;
     }

@@ -205,27 +205,6 @@ static struct usb_uram_io_ops s_io_ops = {
     libusb_websdr_read_bus
 };
 
-static const char* get_dev_name(lldev_t dev)
-{
-    const char* name;
-    int res = webusb_ll_generic_get(dev, LLGO_DEVICE_NAME, &name);
-    if(res)
-        return "unknown";
-    return name;
-}
-
-static device_id_t get_dev_id(lldev_t dev)
-{
-    struct webusb_device_uram* d = (struct webusb_device_uram*)dev;
-    return d->base.devid;
-}
-
-const static
-usb_uram_dev_ops_t s_dev_ops = {
-    get_dev_name,
-    get_dev_id
-};
-
 static
     int webusb_uram_plugin_create(unsigned pcount, const char** devparam,
                            const char** devval, lldev_t* odev,
@@ -272,9 +251,8 @@ static
 
     d->uram_generic.ntfy_seqnum_exp = 0;
     d->uram_generic.io_ops = s_io_ops;
-    d->uram_generic.dev_ops = s_dev_ops;
 
-    res = usb_uram_generic_create_and_init(lldev, pcount, devparam, devval);
+    res = usb_uram_generic_create_and_init(lldev, pcount, devparam, devval, &d->base.devid);
     if(res)
         goto usbinit_fail;
 

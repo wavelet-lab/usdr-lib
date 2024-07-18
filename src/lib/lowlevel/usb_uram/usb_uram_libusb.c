@@ -872,27 +872,6 @@ usb_uram_io_ops_t s_io_ops = {
     usb_read_bus
 };
 
-static const char* get_dev_name(lldev_t dev)
-{
-    const char* name;
-    int res = usb_uram_generic_get(dev, LLGO_DEVICE_NAME, &name);
-    if(res)
-        return "unknown";
-    return name;
-}
-
-static device_id_t get_dev_id(lldev_t dev)
-{
-    usb_dev_t* d = (usb_dev_t*)dev;
-    return d->gdev.devid;
-}
-
-const static
-usb_uram_dev_ops_t s_dev_ops = {
-    get_dev_name,
-    get_dev_id
-};
-
 static
 int usb_uram_plugin_create(unsigned pcount, const char** devparam,
                                const char** devval, lldev_t* odev,
@@ -913,7 +892,6 @@ int usb_uram_plugin_create(unsigned pcount, const char** devparam,
     dev->ops = s_usb_uram_ops;
 
     dev->uram_generic.io_ops = s_io_ops;
-    dev->uram_generic.dev_ops = s_dev_ops;
 
     res = libusb_generic_plugin_create(pcount, devparam, devval, s_known_devices, KNOWN_USB_DEVICES,
                                        "usb", &dev->gdev);
@@ -946,7 +924,7 @@ int usb_uram_plugin_create(unsigned pcount, const char** devparam,
         goto usb_astart_fail;
     }
 
-    res = usb_uram_generic_create_and_init(&dev->lld, pcount, devparam, devval);
+    res = usb_uram_generic_create_and_init(&dev->lld, pcount, devparam, devval, &dev->gdev.devid);
     if(res)
         goto remove_dev;
 
