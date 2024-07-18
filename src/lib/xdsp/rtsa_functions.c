@@ -22,11 +22,20 @@ void rtsa_init(fft_rtsa_data_t* rtsa_data, unsigned fft_size)
 #include "templates/rtsa_update_u16_generic.t"
 DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_generic)
 
+#define TEMPLATE_FUNC_NAME rtsa_update_hwi16_generic
+#include "templates/rtsa_update_hwi16_u16_generic.t"
+DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(rtsa_update_hwi16_generic)
+
 #ifdef WVLT_AVX2
 #define TEMPLATE_FUNC_NAME rtsa_update_avx2
 VWLT_ATTRIBUTE(optimize("-O3"), target("avx2,fma"))
 #include "templates/rtsa_update_u16_avx2.t"
 DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_avx2)
+
+#define TEMPLATE_FUNC_NAME rtsa_update_hwi16_avx2
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx2,fma"))
+#include "templates/rtsa_update_hwi16_u16_avx2.t"
+DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(rtsa_update_hwi16_avx2)
 #endif  //WVLT_AVX2
 
 #ifdef WVLT_NEON
@@ -34,6 +43,11 @@ DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_avx2)
 VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/rtsa_update_neon_u16.t"
 DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_neon)
+
+#define TEMPLATE_FUNC_NAME rtsa_update_hwi16_neon
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/rtsa_update_hwi16_u16_neon.t"
+DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(rtsa_update_hwi16_neon)
 #endif  //WVLT_NEON
 
 rtsa_update_function_t rtsa_update_c(generic_opts_t cpu_cap, const char** sfunc)
@@ -49,3 +63,15 @@ rtsa_update_function_t rtsa_update_c(generic_opts_t cpu_cap, const char** sfunc)
     return fn;
 }
 
+rtsa_update_hwi16_function_t rtsa_update_hwi16_c(generic_opts_t cpu_cap, const char** sfunc)
+{
+    const char* fname;
+    rtsa_update_hwi16_function_t fn;
+
+    SELECT_GENERIC_FN(fn, fname, tr_rtsa_update_hwi16_generic, cpu_cap);
+    SELECT_AVX2_FN(fn, fname, tr_rtsa_update_hwi16_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_rtsa_update_hwi16_neon, cpu_cap);
+
+    if (sfunc) *sfunc = fname;
+    return fn;
+}

@@ -10,6 +10,9 @@
 
 #define I16RND(x) (int16_t)(x)
 
+#define HWI16_SCALE_COEF 1024.f
+#define HWI16_CORR_COEF -178.f
+
 union wu_u32b {uint32_t i; uint8_t b[4];};
 typedef union wu_u32b wu_u32b_t;
 
@@ -169,6 +172,18 @@ void tr_##conv_fn (wvlt_fftwf_complex* __restrict in, unsigned fft_size, \
                    fft_rtsa_data_t* __restrict rtsa_data, \
                    float fcale_mpy, float mine, float corr) \
 { conv_fn( in, fft_size, rtsa_data, fcale_mpy, mine, corr ); }
+
+
+typedef void (*rtsa_update_hwi16_function_t)
+    (   uint16_t* __restrict in, unsigned fft_size,
+        fft_rtsa_data_t* __restrict rtsa_data,
+        float fcale_mpy, float corr);
+
+#define DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(conv_fn) \
+void tr_##conv_fn (uint16_t* __restrict in, unsigned fft_size, \
+                  fft_rtsa_data_t* __restrict rtsa_data, \
+                  float fcale_mpy, float corr) \
+{ conv_fn( in, fft_size, rtsa_data, fcale_mpy, corr ); }
 
 
 //FFT windows conv

@@ -32,6 +32,7 @@ extern "C" {
 void rtsa_init(fft_rtsa_data_t* rtsa_data, unsigned fft_size);
 
 rtsa_update_function_t rtsa_update_c(generic_opts_t cpu_cap, const char** sfunc);
+rtsa_update_hwi16_function_t rtsa_update_hwi16_c(generic_opts_t cpu_cap, const char** sfunc);
 
 static inline
 void rtsa_update(wvlt_fftwf_complex* in, unsigned fft_size,
@@ -39,6 +40,14 @@ void rtsa_update(wvlt_fftwf_complex* in, unsigned fft_size,
                  float fcale_mpy, float mine, float corr)
 {
     return (*rtsa_update_c(cpu_vcap_get(), NULL)) (in, fft_size, rtsa_data, fcale_mpy, mine, corr);
+}
+
+static inline
+void rtsa_update_hwi16(uint16_t* in, unsigned fft_size,
+                       fft_rtsa_data_t* rtsa_data,
+                       float fcale_mpy, float corr)
+{
+    return (*rtsa_update_hwi16_c(cpu_vcap_get(), NULL)) (in, fft_size, rtsa_data, fcale_mpy, corr);
 }
 
 #ifdef __cplusplus

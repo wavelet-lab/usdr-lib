@@ -55,9 +55,25 @@ VWLT_ATTRIBUTE(optimize("-O3"), target("avx2,fma"))
 #include "templates/fftad_norm_avx2.t"
 DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_avx2)
 
+#define TEMPLATE_FUNC_NAME fftad_init_hwi16_avx2
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
+#include "templates/fftad_init_hwi16_avx2.t"
+DECLARE_TR_FUNC_FFTAD_INIT_HWI16(fftad_init_hwi16_avx2)
+
+#define TEMPLATE_FUNC_NAME fftad_add_hwi16_avx2
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
+#include "templates/fftad_add_hwi16_avx2.t"
+DECLARE_TR_FUNC_FFTAD_ADD_HWI16(fftad_add_hwi16_avx2)
+
+#define TEMPLATE_FUNC_NAME fftad_norm_hwi16_avx2
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx2,fma"))
+#include "templates/fftad_norm_hwi16_avx2.t"
+DECLARE_TR_FUNC_FFTAD_NORM_HWI16(fftad_norm_hwi16_avx2)
+
 #endif //WVLT_AVX2
 
 #ifdef WVLT_NEON
+
 #define TEMPLATE_FUNC_NAME fftad_init_neon
 VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/fftad_init_neon.t"
@@ -72,6 +88,22 @@ DECLARE_TR_FUNC_FFTAD_ADD(fftad_add_neon)
 VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/fftad_norm_neon.t"
 DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_neon)
+
+#define TEMPLATE_FUNC_NAME fftad_init_hwi16_neon
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_init_hwi16_neon.t"
+DECLARE_TR_FUNC_FFTAD_INIT_HWI16(fftad_init_hwi16_neon)
+
+#define TEMPLATE_FUNC_NAME fftad_add_hwi16_neon
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_add_hwi16_neon.t"
+DECLARE_TR_FUNC_FFTAD_ADD_HWI16(fftad_add_hwi16_neon)
+
+#define TEMPLATE_FUNC_NAME fftad_norm_hwi16_neon
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_norm_hwi16_neon.t"
+DECLARE_TR_FUNC_FFTAD_NORM_HWI16(fftad_norm_hwi16_neon)
+
 #endif
 
 // Bin(0) = SUM(x0 .. xn) = (A/2) * N
@@ -123,8 +155,8 @@ fftad_init_hwi16_function_t fftad_init_hwi16_c(generic_opts_t cpu_cap, const cha
     fftad_init_hwi16_function_t fn;
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_init_hwi16_generic, cpu_cap);
-//    SELECT_AVX2_FN(fn, fname, tr_fftad_init_avx2, cpu_cap);
-//    SELECT_NEON_FN(fn, fname, tr_fftad_init_neon, cpu_cap);
+    SELECT_AVX2_FN(fn, fname, tr_fftad_init_hwi16_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_fftad_init_hwi16_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
@@ -136,8 +168,8 @@ fftad_add_hwi16_function_t fftad_add_hwi16_c(generic_opts_t cpu_cap, const char*
     fftad_add_hwi16_function_t fn;
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_add_hwi16_generic, cpu_cap);
-//    SELECT_AVX2_FN(fn, fname, tr_fftad_add_avx2, cpu_cap);
-//    SELECT_NEON_FN(fn, fname, tr_fftad_add_neon, cpu_cap);
+    SELECT_AVX2_FN(fn, fname, tr_fftad_add_hwi16_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_fftad_add_hwi16_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
@@ -149,8 +181,8 @@ fftad_norm_hwi16_function_t fftad_norm_hwi16_c(generic_opts_t cpu_cap, const cha
     fftad_norm_hwi16_function_t fn;
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_norm_hwi16_generic, cpu_cap);
-//    SELECT_AVX2_FN(fn, fname, tr_fftad_norm_avx2, cpu_cap);
-//    SELECT_NEON_FN(fn, fname, tr_fftad_norm_neon, cpu_cap);
+    SELECT_AVX2_FN(fn, fname, tr_fftad_norm_hwi16_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_fftad_norm_hwi16_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
