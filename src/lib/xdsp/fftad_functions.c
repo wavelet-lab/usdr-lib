@@ -23,6 +23,21 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/fftad_norm_generic.t"
 DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_generic)
 
+#define TEMPLATE_FUNC_NAME fftad_init_hwi16_generic
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_init_hwi16_generic.t"
+DECLARE_TR_FUNC_FFTAD_INIT_HWI16(fftad_init_hwi16_generic)
+
+#define TEMPLATE_FUNC_NAME fftad_add_hwi16_generic
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_add_hwi16_generic.t"
+DECLARE_TR_FUNC_FFTAD_ADD_HWI16(fftad_add_hwi16_generic)
+
+#define TEMPLATE_FUNC_NAME fftad_norm_hwi16_generic
+VWLT_ATTRIBUTE(optimize("-O3"))
+#include "templates/fftad_norm_hwi16_generic.t"
+DECLARE_TR_FUNC_FFTAD_NORM_HWI16(fftad_norm_hwi16_generic)
+
 #ifdef WVLT_AVX2
 
 #define TEMPLATE_FUNC_NAME fftad_init_avx2
@@ -96,6 +111,46 @@ fftad_norm_function_t fftad_norm_c(generic_opts_t cpu_cap, const char** sfunc)
     SELECT_GENERIC_FN(fn, fname, tr_fftad_norm_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_fftad_norm_avx2, cpu_cap);
     SELECT_NEON_FN(fn, fname, tr_fftad_norm_neon, cpu_cap);
+
+    if (sfunc) *sfunc = fname;
+    return fn;
+}
+
+
+fftad_init_hwi16_function_t fftad_init_hwi16_c(generic_opts_t cpu_cap, const char** sfunc)
+{
+    const char* fname;
+    fftad_init_hwi16_function_t fn;
+
+    SELECT_GENERIC_FN(fn, fname, tr_fftad_init_hwi16_generic, cpu_cap);
+//    SELECT_AVX2_FN(fn, fname, tr_fftad_init_avx2, cpu_cap);
+//    SELECT_NEON_FN(fn, fname, tr_fftad_init_neon, cpu_cap);
+
+    if (sfunc) *sfunc = fname;
+    return fn;
+}
+
+fftad_add_hwi16_function_t fftad_add_hwi16_c(generic_opts_t cpu_cap, const char** sfunc)
+{
+    const char* fname;
+    fftad_add_hwi16_function_t fn;
+
+    SELECT_GENERIC_FN(fn, fname, tr_fftad_add_hwi16_generic, cpu_cap);
+//    SELECT_AVX2_FN(fn, fname, tr_fftad_add_avx2, cpu_cap);
+//    SELECT_NEON_FN(fn, fname, tr_fftad_add_neon, cpu_cap);
+
+    if (sfunc) *sfunc = fname;
+    return fn;
+}
+
+fftad_norm_hwi16_function_t fftad_norm_hwi16_c(generic_opts_t cpu_cap, const char** sfunc)
+{
+    const char* fname;
+    fftad_norm_hwi16_function_t fn;
+
+    SELECT_GENERIC_FN(fn, fname, tr_fftad_norm_hwi16_generic, cpu_cap);
+//    SELECT_AVX2_FN(fn, fname, tr_fftad_norm_avx2, cpu_cap);
+//    SELECT_NEON_FN(fn, fname, tr_fftad_norm_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
