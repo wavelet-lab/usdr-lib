@@ -35,6 +35,19 @@ enum {
     MAX_CTRL_BURST = 1,
 };
 
+struct webusb_device_lime
+{
+    struct webusb_device base;
+
+    uint32_t ft601_counter;
+
+    proto_lms64c_t data_ctrl_out[1];
+    proto_lms64c_t data_ctrl_in[1];
+};
+
+typedef struct webusb_device_lime webusb_device_lime_t;
+
+
 int _ft601_cmd(lldev_t lld, uint8_t ep, uint8_t cmd, uint32_t param)
 {
     uint8_t wbuffer[20];
@@ -222,7 +235,7 @@ static
     int webusb_ll_stream_initialize(lldev_t dev, subdev_t subdev, lowlevel_stream_params_t* params, stream_t* channel)
 {
     int res = 0;
-    const unsigned data_endpoint = (params->streamno == DEV_RX_STREAM_NO) ? EP_IN_DEFSTREAM : EP_OUT_DEFSTREAM;
+    UNUSED const unsigned data_endpoint = (params->streamno == DEV_RX_STREAM_NO) ? EP_IN_DEFSTREAM : EP_OUT_DEFSTREAM;
 
     USDR_LOG("USBX", USDR_LOG_ERROR, "webusb_ll_stream_initialize(streamno=%d)\n", params->streamno);
     *channel = params->streamno;
@@ -337,6 +350,7 @@ static
     lldev->ops = &s_webusb_ft601_ops;
 
     d->base.type_sdr = libusb_get_dev_sdrtype(dev_idx);
+    d->base.devid = libusb_get_deviceid(dev_idx);
     d->base.param = param;
     d->base.ops = (webusb_ops_t*)webops;
     d->base.rpc_call = &generic_rpc_call;
@@ -354,7 +368,7 @@ static
         goto usbinit_fail;
     }
 
-    res = usdr_device_create(lldev, libusb_get_deviceid(dev_idx));
+    res = usdr_device_create(lldev, d->base.devid);
     if (res) {
         USDR_LOG("WEBU", USDR_LOG_ERROR, "Unable to create WebUsb device, error %d\n", res);
         goto usbinit_fail;
