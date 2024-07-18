@@ -34,8 +34,7 @@ enum {
 };
 
 #define USB_IO_TIMEOUT 20000
-#define WEBUSB_DEV_NAME "webusb"
-
+#define USBG_LOG_TAG "USBG"
 
 typedef int (*io_read_fn_t)(lldev_t d, unsigned addr, uint32_t *data, unsigned dwcnt, UNUSED int timeout);
 typedef int (*io_write_fn_t)(lldev_t d, unsigned addr, const uint32_t* data, unsigned dwcnt, UNUSED int timeout);
