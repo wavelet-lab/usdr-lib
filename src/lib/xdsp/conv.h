@@ -11,6 +11,7 @@
 #define I16RND(x) (int16_t)(x)
 
 #define HWI16_SCALE_COEF 1024.f
+#define HWI16_SCALE_N2_COEF 10u
 #define HWI16_CORR_COEF -178.f
 
 union wu_u32b {uint32_t i; uint8_t b[4];};

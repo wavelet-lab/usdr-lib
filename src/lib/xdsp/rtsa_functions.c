@@ -11,6 +11,7 @@
 
 
 #define USE_POLYLOG2
+#define USE_PURE_U16
 
 VWLT_ATTRIBUTE(optimize("-O3"))
 void rtsa_init(fft_rtsa_data_t* rtsa_data, unsigned fft_size)
@@ -23,7 +24,11 @@ void rtsa_init(fft_rtsa_data_t* rtsa_data, unsigned fft_size)
 DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_generic)
 
 #define TEMPLATE_FUNC_NAME rtsa_update_hwi16_generic
+#ifdef USE_PURE_U16
+#include "templates/rtsa_update_hwi16_pure_u16_generic.t"
+#else
 #include "templates/rtsa_update_hwi16_u16_generic.t"
+#endif
 DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(rtsa_update_hwi16_generic)
 
 #ifdef WVLT_AVX2
@@ -34,7 +39,11 @@ DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_avx2)
 
 #define TEMPLATE_FUNC_NAME rtsa_update_hwi16_avx2
 VWLT_ATTRIBUTE(optimize("-O3"), target("avx2,fma"))
+#ifdef USE_PURE_U16
+#include "templates/rtsa_update_hwi16_pure_u16_avx2.t"
+#else
 #include "templates/rtsa_update_hwi16_u16_avx2.t"
+#endif
 DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(rtsa_update_hwi16_avx2)
 #endif  //WVLT_AVX2
 
