@@ -1,12 +1,13 @@
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, float corr)
+                        float scale, UNUSED float corr)
 {
     // Attention please!
     // rtsa_depth should be multiple to 32/sizeof(rtsa_pwr_t) here!
     // It will crash otherwise, due to aligning issues!
     //
+
 #ifdef USE_POLYLOG2
     wvlt_log2f_fn_t wvlt_log2f_fn = wvlt_polylog2f;
 #else
@@ -15,6 +16,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const uint16_t rtsa_depth = st->rtsa_depth;
+    const __m256i v_depth = _mm256_set1_epi16(rtsa_depth);
 
     const uint16_t nscale = (uint16_t)wvlt_log2f_fn(scale + 0.5);
     const uint16_t ndivs_for_dB = (uint16_t)wvlt_log2f_fn(st->divs_for_dB + 0.5);
@@ -49,6 +51,10 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     union u_v16si { __m256i vect; v16si arr; };
     typedef union u_v16si u_v16si_t;
 
+    typedef uint32_t v8si __attribute__ ((vector_size (32)));
+    union u_v8si { __m256i vect; v8si arr; };
+    typedef union u_v8si u_v8si_t;
+
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
     for (unsigned i = 0; i < fft_size; i += 16)
@@ -57,28 +63,25 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
         __m256i p0 = _mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c1), shr0), v_scale);
                 p0 = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0, shr1), v_c2));
+                p0 = _mm256_min_epi16(p0, max_ind);
 
-        // normalize
-        //
-        u_v16si_t pi0 = {_mm256_min_epi16(p0, max_ind)};
-/*
         // load charge cells
         //
-        const __m256i inds = _mm256_set_epi16(  i + 15, i + 14, i + 11, i + 10, i + 13, i + 12, i + 9, i + 8,
-                                                i + 7,  i + 6,  i +  3, i +  2, i +  5, i +  4, i + 1, i + 0);
+        const __m256i inds = _mm256_setr_epi16(i+0,i+1,i+2,i+3, i+8,i+9,i+10,i+11, i+4,i+5,i+6,i+7, i+12,i+13,i+14,i+15);
 
-        __m256i fft_offs_lo0 = _mm256_mullo_epi16(inds, v_depth);
-        __m256i fft_offs_hi0 = _mm256_mulhi_epi16(inds, v_depth);
+        __m256i c32_lo0 = _mm256_mullo_epi16(inds, v_depth);
+        __m256i c32_hi0 = _mm256_mulhi_epi16(inds, v_depth);
 
-        u_v16si_t
-            pi0_offs = { _mm256_add_epi16(fft_offs0, pi0) };
-*/
+        u_v8si_t ind_lo0 = {_mm256_add_epi32(_mm256_unpacklo_epi16(c32_lo0, c32_hi0), _mm256_cvtepi16_epi32(_mm256_castsi256_si128(p0)))};
+        u_v8si_t ind_hi0 = {_mm256_add_epi32(_mm256_unpackhi_epi16(c32_lo0, c32_hi0), _mm256_cvtepi16_epi32(_mm256_extracti128_si256(p0, 1)))};
+
         u_v16si_t pwr0;
-        for(unsigned j = 0; j < 16; ++j)
+        for(unsigned j = 0; j < 8; ++j)
         {
-            //pwr0.arr[j] = rtsa_data->pwr[pi0_offs.arr[j]];
-            pwr0.arr[j] = rtsa_data->pwr[(i + j) * rtsa_depth + pi0.arr[j]];
+            pwr0.arr[j+0] = rtsa_data->pwr[ind_lo0.arr[j]];
+            pwr0.arr[j+8] = rtsa_data->pwr[ind_hi0.arr[j]];
         }
+        //pwr0.arr[j] = rtsa_data->pwr[(i + j) * rtsa_depth + p0.arr[j]];
 
         //Charge
         //
@@ -90,11 +93,12 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
         //Store charged
         //
-        for(unsigned j = 0; j < 16; ++j)
+        for(unsigned j = 0; j < 8; ++j)
         {
-            //rtsa_data->pwr[pi0_offs.arr[j]] = pwr0.arr[j];
-            rtsa_data->pwr[(i + j) * rtsa_depth + pi0.arr[j]] = pwr0.arr[j];
+            rtsa_data->pwr[ind_lo0.arr[j]] = pwr0.arr[j+0];
+            rtsa_data->pwr[ind_hi0.arr[j]] = pwr0.arr[j+8];
         }
+        //rtsa_data->pwr[(i + j) * rtsa_depth + p0.arr[j]] = pwr0.arr[j];
 
         // discharge all
         // note - we will discharge cells in the [i, i+16) fft band because those pages are already loaded to cache

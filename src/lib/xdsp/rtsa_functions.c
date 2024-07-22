@@ -8,6 +8,7 @@
 #include "rtsa_functions.h"
 #include "attribute_switch.h"
 #include "fast_math.h"
+#include "usdr_port.h"
 
 
 #define USE_POLYLOG2

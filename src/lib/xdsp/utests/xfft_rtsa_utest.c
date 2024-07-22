@@ -22,7 +22,7 @@
 
 #define STREAM_SIZE 4096
 static_assert( STREAM_SIZE >= 4096, "STREAM_SIZE should be >= 4096!" );
-static const unsigned packet_lens[3] = { 256, 1024, STREAM_SIZE };
+static const unsigned packet_lens[4] = { 256, 512, 1024, STREAM_SIZE };
 
 #define SPEED_MEASURE_ITERS 100
 
@@ -32,6 +32,7 @@ static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
 
 static wvlt_fftwf_complex* in;
+static uint16_t* in16;
 static rtsa_pwr_t* out = NULL;
 static rtsa_pwr_t* out_etalon = NULL;
 
@@ -43,7 +44,8 @@ static fft_rtsa_settings_t rtsa_settings;
 
 static void setup(void)
 {
-    posix_memalign((void**)&in, ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE * AVGS);
+    posix_memalign((void**)&in,   ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE * AVGS);
+    posix_memalign((void**)&in16, ALIGN_BYTES, sizeof(uint16_t) * STREAM_SIZE * AVGS);
 
     //init input data
     srand( time(0) );
@@ -55,6 +57,12 @@ static void setup(void)
         {
             ptr[i][0] =  100.0f * (float)(rand()) / (float)RAND_MAX;
             ptr[i][1] = -100.0f * (float)(rand()) / (float)RAND_MAX;
+        }
+
+        uint16_t* ptr16 = in16 + j * STREAM_SIZE;
+        for(unsigned i = 0; i < STREAM_SIZE; ++i)
+        {
+            ptr16[i] =  (uint16_t)(65535.f * (float)(rand()) / (float)RAND_MAX);
         }
     }
 
@@ -216,6 +224,68 @@ START_TEST(rtsa_speed)
 END_TEST
 
 
+START_TEST(rtsa_speed_u16)
+{
+    fprintf(stderr, "\n**** Compare SIMD implementations speed (pure u16) ***\n");
+
+    const char* fn_name = NULL;
+    rtsa_update_hwi16_function_t fn_update = NULL;
+
+    unsigned size = packet_lens[_i];
+
+    last_fn_name = NULL;
+    generic_opts_t opt = max_opt;
+
+    fprintf(stderr, "**** packet: %u elems, rtsa_depth = %u, averaging = %u, iters: %u ***\n", size, rtsa_settings.rtsa_depth, AVGS, SPEED_MEASURE_ITERS);
+
+    while(opt != OPT_GENERIC)
+    {
+        fn_update = rtsa_update_hwi16_c(opt, &fn_name);
+
+        if(last_fn_name && !strcmp(last_fn_name, fn_name))
+        {
+            --opt;
+            continue;
+        }
+        last_fn_name = fn_name;
+
+        fprintf(stderr, "%-20s\t", fn_name);
+
+        //warming
+        rtsa_init(&rtsa_data, size);
+        for(unsigned i = 0; i < 100; ++i)
+            (*fn_update)
+                (in16, size, &rtsa_data, 3.010f, 0.0f);
+
+        //measuring
+        rtsa_init(&rtsa_data, size);
+        uint64_t tk = clock_get_time();
+
+        for(unsigned i = 0; i < SPEED_MEASURE_ITERS; ++i)
+        {
+            for(unsigned j = 0; j < AVGS; ++j)
+            {
+                uint16_t* ptr = in16 + j * STREAM_SIZE;
+                (*fn_update)
+                    (ptr, size, &rtsa_data, 3.010f, 0.0f);
+            }
+        }
+
+        uint64_t tk1 = clock_get_time() - tk;
+
+        fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 cycle, ave speed = %" PRIu64 " cycles/s \n",
+                tk1,
+                (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS),
+                (uint64_t)(1000000LL*SPEED_MEASURE_ITERS/tk1));
+
+        --opt;
+    }
+}
+END_TEST
+
+
+
+
 Suite * rtsa_suite(void)
 {
     Suite *s;
@@ -228,7 +298,8 @@ Suite * rtsa_suite(void)
     tcase_set_timeout(tc_core, 300);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
     tcase_add_test(tc_core, rtsa_check);
-    tcase_add_loop_test(tc_core, rtsa_speed, 0, 3);
+    tcase_add_loop_test(tc_core, rtsa_speed, 0, 4);
+    tcase_add_loop_test(tc_core, rtsa_speed_u16, 0, 4);
     suite_add_tcase(s, tc_core);
     return s;
 }

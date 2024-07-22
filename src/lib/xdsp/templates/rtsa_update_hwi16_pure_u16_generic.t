@@ -16,7 +16,7 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, float corr)
+                        float scale, UNUSED float corr)
 {
 #ifdef USE_POLYLOG2
     wvlt_log2f_fn_t wvlt_log2f_fn = wvlt_polylog2f;
