@@ -16,7 +16,6 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const uint16_t rtsa_depth = st->rtsa_depth;
-    const __m256i v_depth = _mm256_set1_epi16(rtsa_depth);
 
     const uint16_t nscale = (uint16_t)wvlt_log2f_fn(scale + 0.5);
     const uint16_t ndivs_for_dB = (uint16_t)wvlt_log2f_fn(st->divs_for_dB + 0.5);
@@ -51,69 +50,105 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     union u_v16si { __m256i vect; v16si arr; };
     typedef union u_v16si u_v16si_t;
 
-    typedef uint32_t v8si __attribute__ ((vector_size (32)));
-    union u_v8si { __m256i vect; v8si arr; };
-    typedef union u_v8si u_v8si_t;
-
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
-    for (unsigned i = 0; i < fft_size; i += 16)
+    for (unsigned i = 0; i < fft_size; i += 32)
     {
-        __m256i s0 = _mm256_load_si256((__m256i*)&in[i]);
+        __m256i s0 = _mm256_load_si256((__m256i*)&in[i +  0]);
+        __m256i s1 = _mm256_load_si256((__m256i*)&in[i + 16]);
 
-        __m256i p0 = _mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c1), shr0), v_scale);
-                p0 = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0, shr1), v_c2));
-                p0 = _mm256_min_epi16(p0, max_ind);
+        u_v16si_t p0      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c1), shr0), v_scale)};
+                  p0.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0.vect, shr1), v_c2));
+                  p0.vect = _mm256_min_epi16(p0.vect, max_ind);
+
+        u_v16si_t p1      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s1, v_c1), shr0), v_scale)};
+                  p1.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p1.vect, shr1), v_c2));
+                  p1.vect = _mm256_min_epi16(p1.vect, max_ind);
 
         // load charge cells
         //
-        const __m256i inds = _mm256_setr_epi16(i+0,i+1,i+2,i+3, i+8,i+9,i+10,i+11, i+4,i+5,i+6,i+7, i+12,i+13,i+14,i+15);
+        u_v16si_t pwr0, pwr1;
 
-        __m256i c32_lo0 = _mm256_mullo_epi16(inds, v_depth);
-        __m256i c32_hi0 = _mm256_mulhi_epi16(inds, v_depth);
-
-        u_v8si_t ind_lo0 = {_mm256_add_epi32(_mm256_unpacklo_epi16(c32_lo0, c32_hi0), _mm256_cvtepi16_epi32(_mm256_castsi256_si128(p0)))};
-        u_v8si_t ind_hi0 = {_mm256_add_epi32(_mm256_unpackhi_epi16(c32_lo0, c32_hi0), _mm256_cvtepi16_epi32(_mm256_extracti128_si256(p0, 1)))};
-
-        u_v16si_t pwr0;
-        for(unsigned j = 0; j < 8; ++j)
+        for(unsigned j = 0; j < 16; ++j)
         {
-            pwr0.arr[j+0] = rtsa_data->pwr[ind_lo0.arr[j]];
-            pwr0.arr[j+8] = rtsa_data->pwr[ind_hi0.arr[j]];
+            pwr0.arr[j] = rtsa_data->pwr[(i + j +  0) * rtsa_depth + p0.arr[j]];
+            pwr1.arr[j] = rtsa_data->pwr[(i + j + 16) * rtsa_depth + p1.arr[j]];
         }
-        //pwr0.arr[j] = rtsa_data->pwr[(i + j) * rtsa_depth + p0.arr[j]];
 
         //Charge
         //
         __m256i cdelta0  = _mm256_subs_epu16(ch_add_coef, _mm256_srl_epi16(pwr0.vect, ch_rshift));
         __m256i cmdelta0 = _mm256_subs_epu16(v_maxcharge, pwr0.vect);
         __m256i cdelta_norm0 = _mm256_min_epu16(cdelta0, cmdelta0);
-
         pwr0.vect = _mm256_adds_epu16(pwr0.vect, cdelta_norm0);
+
+        __m256i cdelta1  = _mm256_subs_epu16(ch_add_coef, _mm256_srl_epi16(pwr1.vect, ch_rshift));
+        __m256i cmdelta1 = _mm256_subs_epu16(v_maxcharge, pwr1.vect);
+        __m256i cdelta_norm1 = _mm256_min_epu16(cdelta1, cmdelta1);
+        pwr1.vect = _mm256_adds_epu16(pwr1.vect, cdelta_norm1);
 
         //Store charged
         //
-        for(unsigned j = 0; j < 8; ++j)
+        for(unsigned j = 0; j < 16; ++j)
         {
-            rtsa_data->pwr[ind_lo0.arr[j]] = pwr0.arr[j+0];
-            rtsa_data->pwr[ind_hi0.arr[j]] = pwr0.arr[j+8];
+            rtsa_data->pwr[(i + j +  0) * rtsa_depth + p0.arr[j]] = pwr0.arr[j];
+            rtsa_data->pwr[(i + j + 16) * rtsa_depth + p1.arr[j]] = pwr1.arr[j];
         }
-        //rtsa_data->pwr[(i + j) * rtsa_depth + p0.arr[j]] = pwr0.arr[j];
 
         // discharge all
         // note - we will discharge cells in the [i, i+16) fft band because those pages are already loaded to cache
         //
 
-        __m256i d0, d1;
-        __m256i da0, da1;
-        __m256i delta0, delta1;
-        __m256i delta_norm0, delta_norm1;
-        __m256i res0, res1;
+        __m256i d0, d1, d2, d3;
+        __m256i da0, da1, da2, da3;
+        __m256i delta0, delta1, delta2, delta3;
+        __m256i delta_norm0, delta_norm1, delta_norm2, delta_norm3;
+        __m256i res0, res1, res2, res3;
 
-        for(unsigned j = i; j < i + 16; ++j)
+        for(unsigned j = i; j < i + 32; ++j)
         {
             __m256i* ptr = (__m256i*)(rtsa_data->pwr + j * rtsa_depth);
             unsigned n = rtsa_depth_bz;
+
+            while(n >= 128)
+            {
+                d0 = _mm256_load_si256(ptr + 0);
+                d1 = _mm256_load_si256(ptr + 1);
+
+                da0 = _mm256_srl_epi16(d0, dch_rshift);
+                da1 = _mm256_srl_epi16(d1, dch_rshift);
+
+                delta0 = _mm256_adds_epu16(da0, dch_add_coef);
+                delta1 = _mm256_adds_epu16(da1, dch_add_coef);
+
+                delta_norm0 = _mm256_min_epu16(delta0, d0);
+                delta_norm1 = _mm256_min_epu16(delta1, d1);
+
+                res0 = _mm256_subs_epu16(d0, delta_norm0);
+                res1 = _mm256_subs_epu16(d1, delta_norm1);
+
+                d2 = _mm256_load_si256(ptr + 2);
+                d3 = _mm256_load_si256(ptr + 3);
+
+                da2 = _mm256_srl_epi16(d2, dch_rshift);
+                da3 = _mm256_srl_epi16(d3, dch_rshift);
+
+                delta2 = _mm256_adds_epu16(da2, dch_add_coef);
+                delta3 = _mm256_adds_epu16(da3, dch_add_coef);
+
+                delta_norm2 = _mm256_min_epu16(delta2, d2);
+                delta_norm3 = _mm256_min_epu16(delta3, d3);
+
+                res2 = _mm256_subs_epu16(d2, delta_norm2);
+                res3 = _mm256_subs_epu16(d3, delta_norm3);
+
+                _mm256_store_si256(ptr++, res0);
+                _mm256_store_si256(ptr++, res1);
+                _mm256_store_si256(ptr++, res2);
+                _mm256_store_si256(ptr++, res3);
+
+                n -= 128;
+            }
 
             while(n >= 64)
             {
