@@ -76,7 +76,7 @@ for(unsigned j = i; j < i + (len); ++j) \
         } \
 \
         RTSA_SH_SWITCH(RTSA_SHIFT4) \
-
+\
         delta_norm0 = vminq_u16(delta0, d0); \
         delta_norm1 = vminq_u16(delta1, d1); \
         delta_norm2 = vminq_u16(delta2, d2); \

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "rtsa_functions.h"
 #include "attribute_switch.h"
