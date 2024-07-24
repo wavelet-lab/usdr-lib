@@ -38,8 +38,8 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const unsigned charge_add       = ((unsigned)(CHARGE_NORM_COEF) >> raise_rate_pw2);
     const uint16x8_t ch_add_coef    = vdupq_n_u16((uint16_t)charge_add);
 
-    const uint16x8_t shr0 = vdupq_n_u16((uint8_t)(-nscale));
-    const uint16x8_t shr1 = vdupq_n_u16((uint8_t)(-(HWI16_SCALE_N2_COEF - nscale > ndivs_for_dB ? HWI16_SCALE_N2_COEF - nscale - ndivs_for_dB : 16)));
+    const int16x8_t shr0 = vdupq_n_s16((uint8_t)(-nscale));
+    const int16x8_t shr1 = vdupq_n_s16((uint8_t)(-(HWI16_SCALE_N2_COEF - nscale > ndivs_for_dB ? HWI16_SCALE_N2_COEF - nscale - ndivs_for_dB : 16)));
 
     const uint16x8_t v_c1 = vdupq_n_u16(2 * HWI16_SCALE_COEF * nfft);
     const uint16x8_t v_c2 = vdupq_n_u16(((uint16_t)(- HWI16_CORR_COEF * 0.69897f) << ndivs_for_dB) + st->upper_pwr_bound);
