@@ -6,6 +6,12 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
 #include "rtsa_update_u16_neon.inc"
 
+#ifdef USE_POLYLOG2
+    wvlt_log2f_fn_t wvlt_log2f_fn = wvlt_polylog2f;
+#else
+    wvlt_log2f_fn_t wvlt_log2f_fn = wvlt_fastlog2;
+#endif
+
     // Attention please!
     // rtsa_depth should be multiple to 16/sizeof(rtsa_pwr_t) here!
     // It will crash otherwise, due to aligning issues!
@@ -13,7 +19,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const unsigned rtsa_depth = st->rtsa_depth;
     const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
-    const unsigned decay_rate_pw2 = (unsigned)(wvlt_fastlog2(st->charging_frame * st->decay_coef) + 0.5);
+    const unsigned decay_rate_pw2 = (unsigned)(wvlt_log2f_fn(st->charging_frame * st->decay_coef) + 0.5);
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
     scale /= HWI16_SCALE_COEF;
@@ -120,78 +126,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         // discharge all
         // note - we will discharge cells in the [i, i+8) fft band because those pages are already loaded to cache
         //
-
-        uint16x8_t d0, d1, d2, d3;
-        uint16x8_t delta0, delta1, delta2, delta3;
-        uint16x8_t delta_norm0, delta_norm1, delta_norm2, delta_norm3;
-        uint16x8_t res0, res1, res2, res3;
-
-        for(unsigned j = i; j < i + 8; ++j)
-        {
-            uint16_t* ptr = rtsa_data->pwr + j * rtsa_depth;
-            unsigned n = rtsa_depth_bz;
-
-            while(n >= 64)
-            {
-                d0 = vld1q_u16(ptr + 0);
-                d1 = vld1q_u16(ptr + 8);
-                d2 = vld1q_u16(ptr + 16);
-                d3 = vld1q_u16(ptr + 24);
-
-                RTSA_SH_SWITCH(RTSA_SHIFT4)
-
-                delta_norm0 = vminq_u16(delta0, d0);
-                delta_norm1 = vminq_u16(delta1, d1);
-                delta_norm2 = vminq_u16(delta2, d2);
-                delta_norm3 = vminq_u16(delta3, d3);
-
-                res0 = vsubq_u16(d0, delta_norm0);
-                res1 = vsubq_u16(d1, delta_norm1);
-                res2 = vsubq_u16(d2, delta_norm2);
-                res3 = vsubq_u16(d3, delta_norm3);
-
-                vst1q_u16(ptr + 0 , res0);
-                vst1q_u16(ptr + 8 , res1);
-                vst1q_u16(ptr + 16, res2);
-                vst1q_u16(ptr + 24, res3);
-
-                n -= 64;
-                ptr += 32;
-            }
-
-            while(n >= 32)
-            {
-                d0 = vld1q_u16(ptr + 0);
-                d1 = vld1q_u16(ptr + 8);
-
-                RTSA_SH_SWITCH(RTSA_SHIFT2)
-
-                delta_norm0 = vminq_u16(delta0, d0);
-                delta_norm1 = vminq_u16(delta1, d1);
-
-                res0 = vsubq_u16(d0, delta_norm0);
-                res1 = vsubq_u16(d1, delta_norm1);
-
-                vst1q_u16(ptr + 0 , res0);
-                vst1q_u16(ptr + 8 , res1);
-
-                n -= 32;
-                ptr += 16;
-            }
-
-            while(n >= 16)
-            {
-                d0 = vld1q_u16(ptr + 0);
-                RTSA_SH_SWITCH(RTSA_SHIFT1)
-                delta_norm0 = vminq_u16(delta0, d0);
-                res0 = vsubq_u16(d0, delta_norm0);
-                vst1q_u16(ptr + 0 , res0);
-
-                n -= 16;
-                ptr += 8;
-            }
-            // we definitely have n == 0 here due to rtsa_depth aligning
-        }
+        RTSA_U16_DISCHARGE(8);
     }
 }
 
