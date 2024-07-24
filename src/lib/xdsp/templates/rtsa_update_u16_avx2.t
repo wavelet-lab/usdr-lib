@@ -1,7 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float fcale_mpy, float mine, float corr)
+                        float fcale_mpy, float mine, float corr, fft_diap_t diap)
 {
     // Attention please!
     // rtsa_depth should be multiple to 32/sizeof(rtsa_pwr_t) here!
@@ -44,7 +44,7 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
-    for (unsigned i = 0; i < fft_size; i += 16)
+    for (unsigned i = diap.from; i < diap.to; i += 16)
     {
 
         // load 8*4 = 32 floats = 16 complex pairs

@@ -16,7 +16,7 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, UNUSED float corr)
+                        float scale, UNUSED float corr, fft_diap_t diap)
 {
 #ifdef USE_POLYLOG2
     wvlt_log2f_fn_t wvlt_log2f_fn = wvlt_polylog2f;
@@ -43,7 +43,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const uint16_t shr0 = nscale;
     const uint16_t shr1 = HWI16_SCALE_N2_COEF - nscale > ndivs_for_dB ? HWI16_SCALE_N2_COEF - nscale - ndivs_for_dB : 16;
 
-    for(unsigned i = 0; i < fft_size; ++i)
+    for(unsigned i = diap.from; i < diap.to; ++i)
     {
         uint16_t tmp = (in[i] - c1);
         tmp = tmp >> shr0;

@@ -1,7 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, float corr)
+                        float scale, float corr, fft_diap_t diap)
 {
 
 #include "rtsa_update_u16_neon.inc"
@@ -27,7 +27,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const unsigned discharge_add    = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
     const uint16x8_t dch_add_coef   = vdupq_n_u16((uint16_t)discharge_add);
 
-    for (unsigned i = 0; i < fft_size; i += 8)
+    for (unsigned i = diap.from; i < diap.to; i += 8)
     {
         float32x4_t l2_res0 = vcvtq_f32_u32( vmovl_u16(vld1_u16(&in[i + 0])) );
         float32x4_t l2_res1 = vcvtq_f32_u32( vmovl_u16(vld1_u16(&in[i + 4])) );

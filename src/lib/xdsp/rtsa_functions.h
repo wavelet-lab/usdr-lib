@@ -37,17 +37,17 @@ rtsa_update_hwi16_function_t rtsa_update_hwi16_c(generic_opts_t cpu_cap, const c
 static inline
 void rtsa_update(wvlt_fftwf_complex* in, unsigned fft_size,
                  fft_rtsa_data_t* rtsa_data,
-                 float fcale_mpy, float mine, float corr)
+                 float fcale_mpy, float mine, float corr, fft_diap_t diap)
 {
-    return (*rtsa_update_c(cpu_vcap_get(), NULL)) (in, fft_size, rtsa_data, fcale_mpy, mine, corr);
+    return (*rtsa_update_c(cpu_vcap_get(), NULL)) (in, fft_size, rtsa_data, fcale_mpy, mine, corr, diap);
 }
 
 static inline
 void rtsa_update_hwi16(uint16_t* in, unsigned fft_size,
                        fft_rtsa_data_t* rtsa_data,
-                       float fcale_mpy, float corr)
+                       float fcale_mpy, float corr, fft_diap_t diap)
 {
-    return (*rtsa_update_hwi16_c(cpu_vcap_get(), NULL)) (in, fft_size, rtsa_data, fcale_mpy, corr);
+    return (*rtsa_update_hwi16_c(cpu_vcap_get(), NULL)) (in, fft_size, rtsa_data, fcale_mpy, corr, diap);
 }
 
 #ifdef __cplusplus

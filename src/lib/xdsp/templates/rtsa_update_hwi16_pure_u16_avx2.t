@@ -1,7 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, UNUSED float corr)
+                        float scale, UNUSED float corr, fft_diap_t diap)
 {
     // Attention please!
     // rtsa_depth should be multiple to 32/sizeof(rtsa_pwr_t) here!
@@ -52,7 +52,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
-    for (unsigned i = 0; i < fft_size; i += 32)
+    for (unsigned i = diap.from; i < diap.to; i += 32)
     {
         __m256i s0 = _mm256_load_si256((__m256i*)&in[i +  0]);
         __m256i s1 = _mm256_load_si256((__m256i*)&in[i + 16]);

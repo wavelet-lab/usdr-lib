@@ -108,13 +108,15 @@ START_TEST(rtsa_check)
     generic_opts_t opt = max_opt;
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
 
+    fft_diap_t diap = {0, STREAM_SIZE};
+
     // get reference
     rtsa_init(&rtsa_data_etalon, STREAM_SIZE);
     for(unsigned i = 0; i < AVGS; ++i)
     {
         wvlt_fftwf_complex* ptr = in + i * STREAM_SIZE;
         rtsa_update_c(OPT_GENERIC, NULL)
-            (ptr, STREAM_SIZE, &rtsa_data_etalon, scale_mpy, 1E-7f, -50.0f);
+            (ptr, STREAM_SIZE, &rtsa_data_etalon, scale_mpy, 1E-7f, -50.0f, diap);
     }
 
     last_fn_name = NULL;
@@ -138,7 +140,7 @@ START_TEST(rtsa_check)
         {
             wvlt_fftwf_complex* ptr = in + i * STREAM_SIZE;
             (*fn_update)
-                (ptr, STREAM_SIZE, &rtsa_data, scale_mpy, 1E-7f, -50.0f);
+                (ptr, STREAM_SIZE, &rtsa_data, scale_mpy, 1E-7f, -50.0f, diap);
         }
 
         int res = is_equal();
@@ -172,6 +174,7 @@ START_TEST(rtsa_speed)
     rtsa_update_function_t fn_update = NULL;
 
     unsigned size = packet_lens[_i];
+    fft_diap_t diap = {0, size};
 
     last_fn_name = NULL;
     generic_opts_t opt = max_opt;
@@ -195,7 +198,7 @@ START_TEST(rtsa_speed)
         rtsa_init(&rtsa_data, size);
         for(unsigned i = 0; i < 100; ++i)
                 (*fn_update)
-                    (in, size, &rtsa_data, scale_mpy, 1E-7f, -50.0f);
+                    (in, size, &rtsa_data, scale_mpy, 1E-7f, -50.0f, diap);
 
         //measuring
         rtsa_init(&rtsa_data, size);
@@ -207,7 +210,7 @@ START_TEST(rtsa_speed)
             {
                 wvlt_fftwf_complex* ptr = in + j * STREAM_SIZE;
                 (*fn_update)
-                    (ptr, size, &rtsa_data, scale_mpy, 1E-7f, -50.0f);
+                    (ptr, size, &rtsa_data, scale_mpy, 1E-7f, -50.0f, diap);
             }
         }
 
@@ -232,6 +235,7 @@ START_TEST(rtsa_speed_u16)
     rtsa_update_hwi16_function_t fn_update = NULL;
 
     unsigned size = packet_lens[_i];
+    fft_diap_t diap = {0, size};
 
     last_fn_name = NULL;
     generic_opts_t opt = max_opt;
@@ -255,7 +259,7 @@ START_TEST(rtsa_speed_u16)
         rtsa_init(&rtsa_data, size);
         for(unsigned i = 0; i < 100; ++i)
             (*fn_update)
-                (in16, size, &rtsa_data, 3.010f, 0.0f);
+                (in16, size, &rtsa_data, 3.010f, 0.0f, diap);
 
         //measuring
         rtsa_init(&rtsa_data, size);
@@ -267,7 +271,7 @@ START_TEST(rtsa_speed_u16)
             {
                 uint16_t* ptr = in16 + j * STREAM_SIZE;
                 (*fn_update)
-                    (ptr, size, &rtsa_data, 3.010f, 0.0f);
+                    (ptr, size, &rtsa_data, 3.010f, 0.0f, diap);
             }
         }
 

@@ -1,7 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float fcale_mpy, float mine, float corr)
+                        float fcale_mpy, float mine, float corr, fft_diap_t diap)
 {
 
 #include "rtsa_update_u16_neon.inc"
@@ -30,7 +30,7 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     const unsigned discharge_add    = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
     const uint16x8_t dch_add_coef   = vdupq_n_u16((uint16_t)discharge_add);
 
-    for (unsigned i = 0; i < fft_size; i += 8)
+    for (unsigned i = diap.from; i < diap.to; i += 8)
     {
         // load 8 complex pairs = 16 floats = 64b = 512bits
         //
