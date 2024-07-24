@@ -57,7 +57,11 @@ DECLARE_TR_FUNC_RTSA_UPDATE(rtsa_update_neon)
 
 #define TEMPLATE_FUNC_NAME rtsa_update_hwi16_neon
 VWLT_ATTRIBUTE(optimize("-O3"))
+#ifdef USE_PURE_U16
+#include "templates/rtsa_update_hwi16_pure_u16_neon.t"
+#else
 #include "templates/rtsa_update_hwi16_u16_neon.t"
+#endif
 DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(rtsa_update_hwi16_neon)
 #endif  //WVLT_NEON
 

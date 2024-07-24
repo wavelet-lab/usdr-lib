@@ -4,6 +4,10 @@
     delta2 = vsraq_n_u16(dch_add_coef, d2, n); \
     delta3 = vsraq_n_u16(dch_add_coef, d3, n);
 
+#define RTSA_CHARGE_SHIFT2(n) \
+    cdelta0 = vsraq_n_u16(ch_add_coef, pwr0, n); \
+    cdelta1 = vsraq_n_u16(ch_add_coef, pwr1, n);
+
 #define RTSA_SHIFT2(n) \
     delta0 = vsraq_n_u16(dch_add_coef, d0, n); \
     delta1 = vsraq_n_u16(dch_add_coef, d1, n);
@@ -11,8 +15,8 @@
 #define RTSA_SHIFT1(n) \
     delta0 = vsraq_n_u16(dch_add_coef, d0, n);
 
-#define RTSA_SH_SWITCH(shft) \
-    switch(decay_rate_pw2) \
+#define RTSA_SH_SWITCH(shft, n) \
+    switch(n) \
     { \
     case  1: shft(1); break; \
     case  2: shft(2); break; \
@@ -41,6 +45,19 @@
     case 3 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_f32(src, 3), dst, 3); break; \
     }
 
+#define RTSA_GATHER_U16(dst, src, reg, n) \
+    switch(n) \
+    { \
+    case 0 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(src, 0), dst, 0); break; \
+    case 1 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(src, 1), dst, 1); break; \
+    case 2 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(src, 2), dst, 2); break; \
+    case 3 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(src, 3), dst, 3); break; \
+    case 4 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(src, 4), dst, 4); break; \
+    case 5 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(src, 5), dst, 5); break; \
+    case 6 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(src, 6), dst, 6); break; \
+    case 7 : dst = vld1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(src, 7), dst, 7); break; \
+    }
+
 #define RTSA_SCATTER(dst, src, reg, n) \
     switch(n) \
     { \
@@ -48,6 +65,19 @@
     case 1 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_f32(dst, 1), src, 1); break; \
     case 2 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_f32(dst, 2), src, 2); break; \
     case 3 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_f32(dst, 3), src, 3); break; \
+    }
+
+#define RTSA_SCATTER_U16(dst, src, reg, n) \
+    switch(n) \
+    { \
+    case 0 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(dst, 0), src, 0); break; \
+    case 1 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(dst, 1), src, 1); break; \
+    case 2 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(dst, 2), src, 2); break; \
+    case 3 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(dst, 3), src, 3); break; \
+    case 4 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(dst, 4), src, 4); break; \
+    case 5 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(dst, 5), src, 5); break; \
+    case 6 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(dst, 6), src, 6); break; \
+    case 7 : vst1_lane_u16(rtsa_data->pwr + (i + n + reg) * rtsa_depth + (unsigned)vgetq_lane_u16(dst, 7), src, 7); break; \
     }
 
 #define RTSA_U16_DISCHARGE(len) \
@@ -75,7 +105,7 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        RTSA_SH_SWITCH(RTSA_SHIFT4) \
+        RTSA_SH_SWITCH(RTSA_SHIFT4, decay_rate_pw2) \
 \
         delta_norm0 = vminq_u16(delta0, d0); \
         delta_norm1 = vminq_u16(delta1, d1); \
@@ -107,7 +137,7 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        RTSA_SH_SWITCH(RTSA_SHIFT2) \
+        RTSA_SH_SWITCH(RTSA_SHIFT2, decay_rate_pw2) \
 \
         delta_norm0 = vminq_u16(delta0, d0); \
         delta_norm1 = vminq_u16(delta1, d1); \
@@ -132,7 +162,7 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        RTSA_SH_SWITCH(RTSA_SHIFT1) \
+        RTSA_SH_SWITCH(RTSA_SHIFT1, decay_rate_pw2) \
         delta_norm0 = vminq_u16(delta0, d0); \
         res0 = vsubq_u16(d0, delta_norm0); \
         vst1q_u16(ptr + 0 , res0); \
