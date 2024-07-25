@@ -34,7 +34,6 @@ enum {
 };
 
 #define USB_IO_TIMEOUT 20000
-#define USBG_LOG_TAG "USBG"
 
 typedef int (*io_read_fn_t)(lldev_t d, unsigned addr, uint32_t *data, unsigned dwcnt, UNUSED int timeout);
 typedef int (*io_write_fn_t)(lldev_t d, unsigned addr, const uint32_t* data, unsigned dwcnt, UNUSED int timeout);
@@ -47,16 +46,6 @@ struct usb_uram_io_ops
     io_read_bus_fn_t io_read_bus_fn;
 };
 typedef struct usb_uram_io_ops usb_uram_io_ops_t;
-
-typedef const char* (*get_dev_name_fn_t)(lldev_t dev);
-typedef device_id_t (*get_dev_id_fn_t)(lldev_t dev);
-
-struct usb_uram_dev_ops
-{
-    get_dev_name_fn_t get_dev_name_fn;
-    get_dev_id_fn_t get_dev_id_fn;
-};
-typedef struct usb_uram_dev_ops usb_uram_dev_ops_t;
 
 struct usb_uram_generic
 {

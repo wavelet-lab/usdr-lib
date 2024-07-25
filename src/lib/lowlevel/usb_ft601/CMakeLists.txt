@@ -11,6 +11,7 @@ else(NOT LIBUSB_1_FOUND)
 	list(APPEND USDR_LINK_FILES ${LIBUSB_1_LIBRARIES})
 
 	set(USDR_USB_URAM_LIB_FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/usb_ft601_generic.c
             ${CMAKE_CURRENT_SOURCE_DIR}/usb_ft601_libusb.c
 	)
 
