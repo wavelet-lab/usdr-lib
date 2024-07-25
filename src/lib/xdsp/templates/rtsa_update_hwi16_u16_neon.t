@@ -20,6 +20,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const unsigned rtsa_depth = st->rtsa_depth;
     const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
     const unsigned decay_rate_pw2 = (unsigned)(wvlt_log2f_fn(st->charging_frame * st->decay_coef) + 0.5);
+    const int16x8_t decay_shr = vdupq_n_s16((uint8_t)(-decay_rate_pw2));
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
     scale /= HWI16_SCALE_COEF;
@@ -70,21 +71,15 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         float32x4_t hi1 = vaddq_f32(lo1, f_ones);
 
         //load cells
-        uint16x4_t ipwr_lo0, ipwr_lo1, ipwr_hi0, ipwr_hi1;
+        float32x4_t pwr_lo0, pwr_lo1, pwr_hi0, pwr_hi1;
 
         for(unsigned j = 0; j < 4; ++j)
         {
-            RTSA_GATHER(ipwr_lo0, lo0, 0, j)
-            RTSA_GATHER(ipwr_lo1, lo1, 4, j)
-            RTSA_GATHER(ipwr_hi0, hi0, 0, j)
-            RTSA_GATHER(ipwr_hi1, hi1, 4, j)
+            pwr_lo0[j] = (float)rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)lo0[j]];
+            pwr_lo1[j] = (float)rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)lo1[j]];
+            pwr_hi0[j] = (float)rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)hi0[j]];
+            pwr_hi1[j] = (float)rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)hi1[j]];
         }
-
-
-        float32x4_t pwr_lo0 = vcvtq_f32_u32(vmovl_u16(ipwr_lo0));
-        float32x4_t pwr_lo1 = vcvtq_f32_u32(vmovl_u16(ipwr_lo1));
-        float32x4_t pwr_hi0 = vcvtq_f32_u32(vmovl_u16(ipwr_hi0));
-        float32x4_t pwr_hi1 = vcvtq_f32_u32(vmovl_u16(ipwr_hi1));
 
         // calc charge rates
         //
@@ -105,24 +100,19 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
         // charge
         //
-        float32x4_t new_pwr_hi0 = vminq_f32( vmlaq_f32(ch_b_hi0, pwr_hi0, ch_a_hi0), f_maxcharge);
-        float32x4_t new_pwr_hi1 = vminq_f32( vmlaq_f32(ch_b_hi1, pwr_hi1, ch_a_hi1), f_maxcharge);
-        float32x4_t new_pwr_lo0 = vminq_f32( vmlaq_f32(ch_b_lo0, pwr_lo0, ch_a_lo0), f_maxcharge);
-        float32x4_t new_pwr_lo1 = vminq_f32( vmlaq_f32(ch_b_lo1, pwr_lo1, ch_a_lo1), f_maxcharge);
+        pwr_hi0 = vminq_f32( vmlaq_f32(ch_b_hi0, pwr_hi0, ch_a_hi0), f_maxcharge);
+        pwr_hi1 = vminq_f32( vmlaq_f32(ch_b_hi1, pwr_hi1, ch_a_hi1), f_maxcharge);
+        pwr_lo0 = vminq_f32( vmlaq_f32(ch_b_lo0, pwr_lo0, ch_a_lo0), f_maxcharge);
+        pwr_lo1 = vminq_f32( vmlaq_f32(ch_b_lo1, pwr_lo1, ch_a_lo1), f_maxcharge);
 
         // store charged
         //
-        ipwr_lo0 = vmovn_u32(vcvtq_u32_f32(new_pwr_lo0));
-        ipwr_lo1 = vmovn_u32(vcvtq_u32_f32(new_pwr_lo1));
-        ipwr_hi0 = vmovn_u32(vcvtq_u32_f32(new_pwr_hi0));
-        ipwr_hi1 = vmovn_u32(vcvtq_u32_f32(new_pwr_hi1));
-
         for(unsigned j = 0; j < 4; ++j)
         {
-            RTSA_SCATTER(lo0, ipwr_lo0, 0, j)
-            RTSA_SCATTER(lo1, ipwr_lo1, 4, j)
-            RTSA_SCATTER(hi0, ipwr_hi0, 0, j)
-            RTSA_SCATTER(hi1, ipwr_hi1, 4, j)
+            rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)lo0[j]] = (uint16_t)pwr_lo0[j];
+            rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)lo1[j]] = (uint16_t)pwr_lo1[j];
+            rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)hi0[j]] = (uint16_t)pwr_hi0[j];
+            rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)hi1[j]] = (uint16_t)pwr_hi1[j];
         }
 
         // discharge all

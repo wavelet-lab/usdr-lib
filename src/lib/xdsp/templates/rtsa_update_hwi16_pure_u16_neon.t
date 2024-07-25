@@ -28,9 +28,11 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const unsigned raise_rate_pw2 =
         (unsigned)wvlt_log2f_fn(st->charging_frame) - (unsigned)wvlt_log2f_fn(st->raise_coef) - ndivs_for_dB;
 
+    const int16x8_t decay_shr = vdupq_n_s16((uint8_t)(-decay_rate_pw2));
+    const int16x8_t raise_shr = vdupq_n_s16((uint8_t)(-raise_rate_pw2));
+
     const uint16_t nfft        = (uint16_t)wvlt_log2f_fn(fft_size);
     const uint16x8_t max_ind   = vdupq_n_u16(rtsa_depth - 1);
-    const uint16x8_t v_maxcharge = vdupq_n_u16(MAX_RTSA_PWR);
 
     const unsigned discharge_add    = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
     const uint16x8_t dch_add_coef   = vdupq_n_u16((uint16_t)discharge_add);
@@ -64,27 +66,22 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
         for(unsigned j = 0; j < 8; ++j)
         {
-            RTSA_GATHER_U16(pwr0, p0, 0, j)
-            RTSA_GATHER_U16(pwr1, p1, 8, j)
+            pwr0[j] = rtsa_data->pwr[(i + j + 0) * rtsa_depth + p0[j]];
+            pwr1[j] = rtsa_data->pwr[(i + j + 8) * rtsa_depth + p1[j]];
         }
 
-        uint16x8_t cdelta0, cdelta1;
-        RTSA_SH_SWITCH(RTSA_CHARGE_SHIFT2, raise_rate_pw2);
+        uint16x8_t cdelta0 = vqsubq_u16(ch_add_coef, vshlq_u16(pwr0, raise_shr));
+        uint16x8_t cdelta1 = vqsubq_u16(ch_add_coef, vshlq_u16(pwr1, raise_shr));
 
-        uint16x8_t cmdelta0 = vsubq_u16(v_maxcharge, pwr0);
-        uint16x8_t cdelta_norm0 = vminq_u16(cdelta0, cmdelta0);
-        pwr0 = vaddq_u16(pwr0, cdelta_norm0);
-
-        uint16x8_t cmdelta1 = vsubq_u16(v_maxcharge, pwr1);
-        uint16x8_t cdelta_norm1 = vminq_u16(cdelta1, cmdelta1);
-        pwr1 = vaddq_u16(pwr1, cdelta_norm1);
+        pwr0 = vqaddq_u16(pwr0, cdelta0);
+        pwr1 = vqaddq_u16(pwr1, cdelta1);
 
         // store charged
         //
         for(unsigned j = 0; j < 8; ++j)
         {
-            RTSA_SCATTER_U16(p0, pwr0, 0, j)
-            RTSA_SCATTER_U16(p1, pwr1, 8, j)
+            rtsa_data->pwr[(i + j + 0) * rtsa_depth + p0[j]] = pwr0[j];
+            rtsa_data->pwr[(i + j + 8) * rtsa_depth + p1[j]] = pwr1[j];
         }
 
         // discharge all

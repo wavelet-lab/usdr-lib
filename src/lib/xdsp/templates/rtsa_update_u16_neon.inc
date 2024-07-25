@@ -1,41 +1,3 @@
-#define RTSA_SHIFT4(n) \
-    delta0 = vsraq_n_u16(dch_add_coef, d0, n); \
-    delta1 = vsraq_n_u16(dch_add_coef, d1, n); \
-    delta2 = vsraq_n_u16(dch_add_coef, d2, n); \
-    delta3 = vsraq_n_u16(dch_add_coef, d3, n);
-
-#define RTSA_CHARGE_SHIFT2(n) \
-    cdelta0 = vsraq_n_u16(ch_add_coef, pwr0, n); \
-    cdelta1 = vsraq_n_u16(ch_add_coef, pwr1, n);
-
-#define RTSA_SHIFT2(n) \
-    delta0 = vsraq_n_u16(dch_add_coef, d0, n); \
-    delta1 = vsraq_n_u16(dch_add_coef, d1, n);
-
-#define RTSA_SHIFT1(n) \
-    delta0 = vsraq_n_u16(dch_add_coef, d0, n);
-
-#define RTSA_SH_SWITCH(shft, n) \
-    switch(n) \
-    { \
-    case  1: shft(1); break; \
-    case  2: shft(2); break; \
-    case  3: shft(3); break; \
-    case  4: shft(4); break; \
-    case  5: shft(5); break; \
-    case  6: shft(6); break; \
-    case  7: shft(7); break; \
-    case  8: shft(8); break; \
-    case  9: shft(9); break; \
-    case 10: shft(10); break; \
-    case 11: shft(11); break; \
-    case 12: shft(12); break; \
-    case 13: shft(13); break; \
-    case 14: shft(14); break; \
-    case 15: shft(15); break; \
-    default: shft(16); \
-    }
-
 #define RTSA_GATHER(dst, src, reg, n) \
     switch(n) \
     { \
@@ -84,8 +46,6 @@
 \
 uint16x8_t d0, d1, d2, d3; \
 uint16x8_t delta0, delta1, delta2, delta3; \
-uint16x8_t delta_norm0, delta_norm1, delta_norm2, delta_norm3; \
-uint16x8_t res0, res1, res2, res3; \
 \
 for(unsigned j = i; j < i + (len); ++j) \
 { \
@@ -105,22 +65,16 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        RTSA_SH_SWITCH(RTSA_SHIFT4, decay_rate_pw2) \
 \
-        delta_norm0 = vminq_u16(delta0, d0); \
-        delta_norm1 = vminq_u16(delta1, d1); \
-        delta_norm2 = vminq_u16(delta2, d2); \
-        delta_norm3 = vminq_u16(delta3, d3); \
+        delta0 = vqaddq_u16(vshlq_u16(d0, decay_shr), dch_add_coef); \
+        delta1 = vqaddq_u16(vshlq_u16(d1, decay_shr), dch_add_coef); \
+        delta2 = vqaddq_u16(vshlq_u16(d2, decay_shr), dch_add_coef); \
+        delta3 = vqaddq_u16(vshlq_u16(d3, decay_shr), dch_add_coef); \
 \
-        res0 = vsubq_u16(d0, delta_norm0); \
-        res1 = vsubq_u16(d1, delta_norm1); \
-        res2 = vsubq_u16(d2, delta_norm2); \
-        res3 = vsubq_u16(d3, delta_norm3); \
-\
-        vst1q_u16(ptr + 0 , res0); \
-        vst1q_u16(ptr + 8 , res1); \
-        vst1q_u16(ptr + 16, res2); \
-        vst1q_u16(ptr + 24, res3); \
+        vst1q_u16(ptr + 0 , vqsubq_u16(d0, delta0)); \
+        vst1q_u16(ptr + 8 , vqsubq_u16(d1, delta1)); \
+        vst1q_u16(ptr + 16, vqsubq_u16(d2, delta2)); \
+        vst1q_u16(ptr + 24, vqsubq_u16(d3, delta3)); \
 \
         n -= 64; \
         ptr += 32; \
@@ -137,20 +91,16 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        RTSA_SH_SWITCH(RTSA_SHIFT2, decay_rate_pw2) \
+        delta0 = vqaddq_u16(vshlq_u16(d0, decay_shr), dch_add_coef); \
+        delta1 = vqaddq_u16(vshlq_u16(d1, decay_shr), dch_add_coef); \
 \
-        delta_norm0 = vminq_u16(delta0, d0); \
-        delta_norm1 = vminq_u16(delta1, d1); \
-\
-        res0 = vsubq_u16(d0, delta_norm0); \
-        res1 = vsubq_u16(d1, delta_norm1); \
-\
-        vst1q_u16(ptr + 0 , res0); \
-        vst1q_u16(ptr + 8 , res1); \
+        vst1q_u16(ptr + 0 , vqsubq_u16(d0, delta0)); \
+        vst1q_u16(ptr + 8 , vqsubq_u16(d1, delta1)); \
 \
         n -= 32; \
         ptr += 16; \
     } \
+\
 \
     while(n >= 16) \
     { \
@@ -162,10 +112,8 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        RTSA_SH_SWITCH(RTSA_SHIFT1, decay_rate_pw2) \
-        delta_norm0 = vminq_u16(delta0, d0); \
-        res0 = vsubq_u16(d0, delta_norm0); \
-        vst1q_u16(ptr + 0 , res0); \
+        delta0 = vqaddq_u16(vshlq_u16(d0, decay_shr), dch_add_coef); \
+        vst1q_u16(ptr + 0 , vqsubq_u16(d0, delta0)); \
 \
         n -= 16; \
         ptr += 8; \
