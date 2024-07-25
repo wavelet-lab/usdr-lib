@@ -10,6 +10,9 @@
 
 #define I16RND(x) (int16_t)(x)
 
+#define HWI16_SCALE_COEF 1024.f
+#define HWI16_CORR_COEF -178.f
+
 union wu_u32b {uint32_t i; uint8_t b[4];};
 typedef union wu_u32b wu_u32b_t;
 
@@ -97,24 +100,36 @@ typedef float wvlt_fftwf_complex[2];
 
 typedef void (*fftad_init_function_t)
     (fft_acc_t* __restrict p,  unsigned fftsz);
+typedef fftad_init_function_t fftad_init_hwi16_function_t;
+
 typedef void (*fftad_add_function_t)
     (fft_acc_t* __restrict p, wvlt_fftwf_complex * __restrict d, unsigned fftsz);
+typedef void (*fftad_add_hwi16_function_t)
+    (fft_acc_t* __restrict p, uint16_t * __restrict d, unsigned fftsz);
+
 typedef void (*fftad_norm_function_t)
     (fft_acc_t* __restrict p, unsigned fftsz, float scale, float corr, float* __restrict outa);
-
+typedef fftad_norm_function_t fftad_norm_hwi16_function_t;
 
 #define DECLARE_TR_FUNC_FFTAD_INIT(conv_fn) \
 void tr_##conv_fn (fft_acc_t* __restrict p,  unsigned fftsz) \
 { conv_fn(p, fftsz); }
 
+#define DECLARE_TR_FUNC_FFTAD_INIT_HWI16(conv_fn) DECLARE_TR_FUNC_FFTAD_INIT(conv_fn)
+
 #define DECLARE_TR_FUNC_FFTAD_ADD(conv_fn) \
 void tr_##conv_fn (fft_acc_t* __restrict p, wvlt_fftwf_complex * __restrict d, unsigned fftsz) \
+{ conv_fn(p, d, fftsz); }
+
+#define DECLARE_TR_FUNC_FFTAD_ADD_HWI16(conv_fn) \
+void tr_##conv_fn (fft_acc_t* __restrict p, uint16_t * __restrict d, unsigned fftsz) \
 { conv_fn(p, d, fftsz); }
 
 #define DECLARE_TR_FUNC_FFTAD_NORM(conv_fn) \
 void tr_##conv_fn (fft_acc_t* __restrict p, unsigned fftsz, float scale, float corr, float* __restrict outa) \
 { conv_fn(p, fftsz, scale, corr, outa); }
 
+#define DECLARE_TR_FUNC_FFTAD_NORM_HWI16(conv_fn) DECLARE_TR_FUNC_FFTAD_NORM(conv_fn)
 
 // RTSA
 
@@ -157,6 +172,18 @@ void tr_##conv_fn (wvlt_fftwf_complex* __restrict in, unsigned fft_size, \
                    fft_rtsa_data_t* __restrict rtsa_data, \
                    float fcale_mpy, float mine, float corr) \
 { conv_fn( in, fft_size, rtsa_data, fcale_mpy, mine, corr ); }
+
+
+typedef void (*rtsa_update_hwi16_function_t)
+    (   uint16_t* __restrict in, unsigned fft_size,
+        fft_rtsa_data_t* __restrict rtsa_data,
+        float fcale_mpy, float corr);
+
+#define DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(conv_fn) \
+void tr_##conv_fn (uint16_t* __restrict in, unsigned fft_size, \
+                  fft_rtsa_data_t* __restrict rtsa_data, \
+                  float fcale_mpy, float corr) \
+{ conv_fn( in, fft_size, rtsa_data, fcale_mpy, corr ); }
 
 
 //FFT windows conv

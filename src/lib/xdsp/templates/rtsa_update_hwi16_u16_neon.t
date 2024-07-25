@@ -1,7 +1,7 @@
 static
-void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
+void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float fcale_mpy, float mine, float corr)
+                        float scale, float corr)
 {
 
 #include "rtsa_update_u16_neon.inc"
@@ -16,12 +16,9 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     const unsigned decay_rate_pw2 = (unsigned)(wvlt_fastlog2(st->charging_frame * st->decay_coef) + 0.5);
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
-    const float32x4_t v_mine        = vdupq_n_f32(mine);
-#ifdef USE_POLYLOG2
-    WVLT_POLYLOG2_DECL_CONSTS;
-#else
-    const float32x4_t log2_sub      = vdupq_n_f32(-WVLT_FASTLOG2_SUB);
-#endif
+    scale /= HWI16_SCALE_COEF;
+    corr = corr / HWI16_SCALE_COEF + HWI16_CORR_COEF;
+
     const float32x4_t v_corr        = vdupq_n_f32(corr - (float)st->upper_pwr_bound);
     const float32x4_t max_ind       = vdupq_n_f32((float)(rtsa_depth - 1) - 0.5f);
     const float32x4_t f_ones        = vdupq_n_f32(1.0f);
@@ -32,29 +29,12 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
     for (unsigned i = 0; i < fft_size; i += 8)
     {
-        // load 8 complex pairs = 16 floats = 64b = 512bits
-        //
-        float32x4x2_t e0 = vld2q_f32(&in[i + 0][0]);
-        float32x4x2_t e1 = vld2q_f32(&in[i + 4][0]);
+        float32x4_t l2_res0 = vcvtq_f32_u32( vmovl_u16(vld1_u16(&in[i + 0])) );
+        float32x4_t l2_res1 = vcvtq_f32_u32( vmovl_u16(vld1_u16(&in[i + 4])) );
 
-        float32x4_t summ0 = vmlaq_f32(vmlaq_f32(v_mine, e0.val[0], e0.val[0]), e0.val[1], e0.val[1]);
-        float32x4_t summ1 = vmlaq_f32(vmlaq_f32(v_mine, e1.val[0], e1.val[0]), e1.val[1], e1.val[1]);
-
-#ifdef USE_POLYLOG2
-        float32x4_t l2_res0, l2_res1;
-        WVLT_POLYLOG2F8(summ0, l2_res0);
-        WVLT_POLYLOG2F8(summ1, l2_res1);
-#else
-        // fasterlog2
-        //
-        float32x4_t summ0_ = vcvtq_f32_u32(vreinterpretq_u32_f32(summ0));
-        float32x4_t summ1_ = vcvtq_f32_u32(vreinterpretq_u32_f32(summ1));
-        float32x4_t l2_res0 = vmlaq_n_f32(log2_sub, summ0_, WVLT_FASTLOG2_MUL);
-        float32x4_t l2_res1 = vmlaq_n_f32(log2_sub, summ1_, WVLT_FASTLOG2_MUL);
-#endif
         // add scale & corr
-        float32x4_t pwr0 = vmlaq_n_f32(v_corr, l2_res0, fcale_mpy);
-        float32x4_t pwr1 = vmlaq_n_f32(v_corr, l2_res1, fcale_mpy);
+        float32x4_t pwr0 = vmlaq_n_f32(v_corr, l2_res0, scale);
+        float32x4_t pwr1 = vmlaq_n_f32(v_corr, l2_res1, scale);
 
         // drop sign
         //

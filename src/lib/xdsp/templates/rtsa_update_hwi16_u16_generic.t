@@ -2,10 +2,13 @@
 
 VWLT_ATTRIBUTE(optimize("-O3"))
 static
-void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
+void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float fcale_mpy, float mine, float corr)
+                        float scale, float corr)
 {
+    scale /= HWI16_SCALE_COEF;
+    corr = corr / HWI16_SCALE_COEF + HWI16_CORR_COEF;
+
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const unsigned rtsa_depth = st->rtsa_depth;
     const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
@@ -13,11 +16,8 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
     for(unsigned i = 0; i < fft_size; ++i)
     {
-#ifdef USE_POLYLOG2
-        float p = fcale_mpy * wvlt_polylog2f(in[i][0]*in[i][0] + in[i][1]*in[i][1] + mine) + corr;
-#else
-        float p = fcale_mpy * wvlt_fastlog2(in[i][0]*in[i][0] + in[i][1]*in[i][1] + mine) + corr;
-#endif
+        float p = scale * (float)in[i] + corr;
+
         p -= st->upper_pwr_bound;
         p = fabs(p);
         p *= st->divs_for_dB;
