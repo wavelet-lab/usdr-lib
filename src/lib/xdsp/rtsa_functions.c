@@ -13,7 +13,7 @@
 
 
 #define USE_POLYLOG2
-#define USE_PURE_U16
+#undef USE_PURE_U16
 
 VWLT_ATTRIBUTE(optimize("-O3"))
 void rtsa_init(fft_rtsa_data_t* rtsa_data, unsigned fft_size)
