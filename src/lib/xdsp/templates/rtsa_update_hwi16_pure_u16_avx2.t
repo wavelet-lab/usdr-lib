@@ -32,7 +32,6 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const __m256i v_scale      = _mm256_set1_epi16((uint16_t)scale);
 
     const __m256i max_ind      = _mm256_set1_epi16(rtsa_depth - 1);
-    const __m256i v_maxcharge  = _mm256_set1_epi16(MAX_RTSA_PWR);
 
     const unsigned discharge_add = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
     const __m256i dch_add_coef = _mm256_set1_epi16((uint16_t)discharge_add);
@@ -80,14 +79,10 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         //Charge
         //
         __m256i cdelta0  = _mm256_subs_epu16(ch_add_coef, _mm256_srl_epi16(pwr0.vect, ch_rshift));
-        __m256i cmdelta0 = _mm256_subs_epu16(v_maxcharge, pwr0.vect);
-        __m256i cdelta_norm0 = _mm256_min_epu16(cdelta0, cmdelta0);
-        pwr0.vect = _mm256_adds_epu16(pwr0.vect, cdelta_norm0);
+        pwr0.vect = _mm256_adds_epu16(pwr0.vect, cdelta0);
 
         __m256i cdelta1  = _mm256_subs_epu16(ch_add_coef, _mm256_srl_epi16(pwr1.vect, ch_rshift));
-        __m256i cmdelta1 = _mm256_subs_epu16(v_maxcharge, pwr1.vect);
-        __m256i cdelta_norm1 = _mm256_min_epu16(cdelta1, cmdelta1);
-        pwr1.vect = _mm256_adds_epu16(pwr1.vect, cdelta_norm1);
+        pwr1.vect = _mm256_adds_epu16(pwr1.vect, cdelta1);
 
         //Store charged
         //

@@ -1,10 +1,7 @@
 #define RTSA_U16_DISCHARGE(len) \
 \
 __m256i d0, d1, d2, d3; \
-__m256i da0, da1, da2, da3; \
 __m256i delta0, delta1, delta2, delta3; \
-__m256i delta_norm0, delta_norm1, delta_norm2, delta_norm3; \
-__m256i res0, res1, res2, res3; \
 \
 for(unsigned j = i; j < i + (len); ++j) \
 { \
@@ -25,34 +22,15 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        da0 = _mm256_srl_epi16(d0, dch_rshift); \
-        da1 = _mm256_srl_epi16(d1, dch_rshift); \
+        delta0 = _mm256_adds_epu16(_mm256_srl_epi16(d0, dch_rshift), dch_add_coef); \
+        delta1 = _mm256_adds_epu16(_mm256_srl_epi16(d1, dch_rshift), dch_add_coef); \
+        delta2 = _mm256_adds_epu16(_mm256_srl_epi16(d2, dch_rshift), dch_add_coef); \
+        delta3 = _mm256_adds_epu16(_mm256_srl_epi16(d3, dch_rshift), dch_add_coef); \
 \
-        delta0 = _mm256_adds_epu16(da0, dch_add_coef); \
-        delta1 = _mm256_adds_epu16(da1, dch_add_coef); \
-\
-        delta_norm0 = _mm256_min_epu16(delta0, d0); \
-        delta_norm1 = _mm256_min_epu16(delta1, d1); \
-\
-        res0 = _mm256_subs_epu16(d0, delta_norm0); \
-        res1 = _mm256_subs_epu16(d1, delta_norm1); \
-\
-        da2 = _mm256_srl_epi16(d2, dch_rshift); \
-        da3 = _mm256_srl_epi16(d3, dch_rshift); \
-\
-        delta2 = _mm256_adds_epu16(da2, dch_add_coef); \
-        delta3 = _mm256_adds_epu16(da3, dch_add_coef); \
-\
-        delta_norm2 = _mm256_min_epu16(delta2, d2); \
-        delta_norm3 = _mm256_min_epu16(delta3, d3); \
-\
-        res2 = _mm256_subs_epu16(d2, delta_norm2); \
-        res3 = _mm256_subs_epu16(d3, delta_norm3); \
-\
-        _mm256_store_si256(ptr++, res0); \
-        _mm256_store_si256(ptr++, res1); \
-        _mm256_store_si256(ptr++, res2); \
-        _mm256_store_si256(ptr++, res3); \
+        _mm256_store_si256(ptr++, _mm256_subs_epu16(d0, delta0)); \
+        _mm256_store_si256(ptr++, _mm256_subs_epu16(d1, delta1)); \
+        _mm256_store_si256(ptr++, _mm256_subs_epu16(d2, delta2)); \
+        _mm256_store_si256(ptr++, _mm256_subs_epu16(d3, delta3)); \
 \
         n -= 128; \
     } \
@@ -68,20 +46,11 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        da0 = _mm256_srl_epi16(d0, dch_rshift); \
-        da1 = _mm256_srl_epi16(d1, dch_rshift); \
+        delta0 = _mm256_adds_epu16(_mm256_srl_epi16(d0, dch_rshift), dch_add_coef); \
+        delta1 = _mm256_adds_epu16(_mm256_srl_epi16(d1, dch_rshift), dch_add_coef); \
 \
-        delta0 = _mm256_adds_epu16(da0, dch_add_coef); \
-        delta1 = _mm256_adds_epu16(da1, dch_add_coef); \
-\
-        delta_norm0 = _mm256_min_epu16(delta0, d0); \
-        delta_norm1 = _mm256_min_epu16(delta1, d1); \
-\
-        res0 = _mm256_subs_epu16(d0, delta_norm0); \
-        res1 = _mm256_subs_epu16(d1, delta_norm1); \
-\
-        _mm256_store_si256(ptr++, res0); \
-        _mm256_store_si256(ptr++, res1); \
+        _mm256_store_si256(ptr++, _mm256_subs_epu16(d0, delta0)); \
+        _mm256_store_si256(ptr++, _mm256_subs_epu16(d1, delta1)); \
 \
         n -= 64; \
     } \
@@ -96,12 +65,8 @@ for(unsigned j = i; j < i + (len); ++j) \
             continue; \
         } \
 \
-        da0 = _mm256_srl_epi16(d0, dch_rshift); \
-        delta0 = _mm256_adds_epu16(da0, dch_add_coef); \
-        delta_norm0 = _mm256_min_epu16(delta0, d0); \
-        res0 = _mm256_subs_epu16(d0, delta_norm0); \
-\
-        _mm256_store_si256(ptr++, res0); \
+        delta0 = _mm256_adds_epu16(_mm256_srl_epi16(d0, dch_rshift), dch_add_coef); \
+        _mm256_store_si256(ptr++, _mm256_subs_epu16(d0, delta0)); \
 \
         n -= 32; \
     } \

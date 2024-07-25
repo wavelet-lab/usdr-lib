@@ -151,35 +151,24 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
         // charge
         //
-        __m256 ch_a_hi0 = _mm256_sub_ps(f_ones, charge_hi0);
-        __m256 ch_a_hi1 = _mm256_sub_ps(f_ones, charge_hi1);
-        __m256 ch_a_lo0 = _mm256_sub_ps(f_ones, charge_lo0);
-        __m256 ch_a_lo1 = _mm256_sub_ps(f_ones, charge_lo1);
+        __m256 cdelta_lo0 = _mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_lo0.vect), charge_lo0);
+        __m256 cdelta_lo1 = _mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_lo1.vect), charge_lo1);
+        __m256 cdelta_hi0 = _mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_hi0.vect), charge_hi0);
+        __m256 cdelta_hi1 = _mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_hi1.vect), charge_hi1);
 
-        __m256 ch_b_hi0 = _mm256_mul_ps(ch_norm_coef, charge_hi0);
-        __m256 ch_b_hi1 = _mm256_mul_ps(ch_norm_coef, charge_hi1);
-        __m256 ch_b_lo0 = _mm256_mul_ps(ch_norm_coef, charge_lo0);
-        __m256 ch_b_lo1 = _mm256_mul_ps(ch_norm_coef, charge_lo1);
-
-        __m256 new_pwr_hi0 = _mm256_min_ps( _mm256_add_ps( _mm256_mul_ps(pwr_hi0.vect, ch_a_hi0), ch_b_hi0), f_maxcharge);
-        __m256 new_pwr_hi1 = _mm256_min_ps( _mm256_add_ps( _mm256_mul_ps(pwr_hi1.vect, ch_a_hi1), ch_b_hi1), f_maxcharge);
-        __m256 new_pwr_lo0 = _mm256_min_ps( _mm256_add_ps( _mm256_mul_ps(pwr_lo0.vect, ch_a_lo0), ch_b_lo0), f_maxcharge);
-        __m256 new_pwr_lo1 = _mm256_min_ps( _mm256_add_ps( _mm256_mul_ps(pwr_lo1.vect, ch_a_lo1), ch_b_lo1), f_maxcharge);
+        pwr_lo0.vect = _mm256_min_ps(_mm256_add_ps(pwr_lo0.vect, cdelta_lo0), f_maxcharge);
+        pwr_lo1.vect = _mm256_min_ps(_mm256_add_ps(pwr_lo1.vect, cdelta_lo1), f_maxcharge);
+        pwr_hi0.vect = _mm256_min_ps(_mm256_add_ps(pwr_hi0.vect, cdelta_hi0), f_maxcharge);
+        pwr_hi1.vect = _mm256_min_ps(_mm256_add_ps(pwr_hi1.vect, cdelta_hi1), f_maxcharge);
 
         // store charged
         //
-        u_v8ps_t
-            ch_res_hi0 = { new_pwr_hi0 },
-            ch_res_hi1 = { new_pwr_hi1 },
-            ch_res_lo0 = { new_pwr_lo0 },
-            ch_res_lo1 = { new_pwr_lo1 };
-
         for( unsigned j = 0; j < 8; ++j)
         {
-            rtsa_data->pwr[lo0_offs.arr[j]] = (rtsa_pwr_t)ch_res_lo0.arr[j];
-            rtsa_data->pwr[lo1_offs.arr[j]] = (rtsa_pwr_t)ch_res_lo1.arr[j];
-            rtsa_data->pwr[hi0_offs.arr[j]] = (rtsa_pwr_t)ch_res_hi0.arr[j];
-            rtsa_data->pwr[hi1_offs.arr[j]] = (rtsa_pwr_t)ch_res_hi1.arr[j];
+            rtsa_data->pwr[lo0_offs.arr[j]] = (rtsa_pwr_t)pwr_lo0.arr[j];
+            rtsa_data->pwr[lo1_offs.arr[j]] = (rtsa_pwr_t)pwr_lo1.arr[j];
+            rtsa_data->pwr[hi0_offs.arr[j]] = (rtsa_pwr_t)pwr_hi0.arr[j];
+            rtsa_data->pwr[hi1_offs.arr[j]] = (rtsa_pwr_t)pwr_hi1.arr[j];
         }
 
         // discharge all
