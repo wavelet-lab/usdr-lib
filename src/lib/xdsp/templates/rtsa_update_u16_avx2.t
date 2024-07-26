@@ -24,10 +24,9 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
     const unsigned decay_rate_pw2 = (unsigned)(wvlt_log2f_fn(st->charging_frame * st->decay_coef) + 0.5);
 
-    const __m256 v_scale_mpy   = _mm256_set1_ps(fcale_mpy);
+    const __m256 v_scale_mpy   = _mm256_set1_ps(fcale_mpy * (float)st->divs_for_dB);
     const __m256 v_mine        = _mm256_set1_ps(mine);
-    const __m256 v_corr        = _mm256_set1_ps(corr - (float)st->upper_pwr_bound);
-    const __m256 divs_for_dB   = _mm256_set1_ps((float)st->divs_for_dB);
+    const __m256 v_corr        = _mm256_set1_ps((corr - (float)st->upper_pwr_bound) * (float)st->divs_for_dB);
 
     const __m256 sign_bit      = _mm256_set1_ps(-0.0f);
     const __m256i v_depth      = _mm256_set1_epi32((int32_t)rtsa_depth);
@@ -35,7 +34,7 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     const __m256 ch_rate       = _mm256_set1_ps(charge_rate);
     const __m256 ch_norm_coef  = _mm256_set1_ps(CHARGE_NORM_COEF);
     const __m256 f_ones        = _mm256_set1_ps(1.0f);
-    const __m256 f_maxcharge   = _mm256_set1_ps((float)MAX_RTSA_PWR);
+    const __m256i v_maxcharge  = _mm256_set1_epi32(MAX_RTSA_PWR);
 
     const unsigned discharge_add = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
     const __m256i dch_add_coef = _mm256_set1_epi16((uint16_t)discharge_add);
@@ -45,15 +44,15 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     union u_v8si { __m256i vect; v8si arr; };
     typedef union u_v8si u_v8si_t;
 
-    typedef float v8ps __attribute__ ((vector_size (32)));
-    union u_v8ps { __m256 vect; v8ps arr; };
-    typedef union u_v8ps u_v8ps_t;
+    typedef uint16_t v16si __attribute__ ((vector_size (32)));
+    union u_v16si { __m256i vect; v16si arr; };
+    typedef union u_v16si u_v16si_t;
 
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
     for (unsigned i = diap.from; i < diap.to; i += 16)
     {
-
+#if 1
         // load 8*4 = 32 floats = 16 complex pairs
         //
         __m256 e0 = _mm256_load_ps(&in[i +  0][0]);
@@ -96,13 +95,8 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
         // drop sign
         //
-        __m256 p0raw = _mm256_andnot_ps(sign_bit, pwr0);
-        __m256 p1raw = _mm256_andnot_ps(sign_bit, pwr1);
-
-        // multiply to div cost
-        //
-        __m256 p0 = _mm256_mul_ps(p0raw, divs_for_dB);
-        __m256 p1 = _mm256_mul_ps(p1raw, divs_for_dB);
+        __m256 p0 = _mm256_andnot_ps(sign_bit, pwr0);
+        __m256 p1 = _mm256_andnot_ps(sign_bit, pwr1);
 
         // normalize
         //
@@ -132,15 +126,23 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
             hi0_offs = { _mm256_add_epi32(fft_offs0, _mm256_cvtps_epi32(hi0)) },
             hi1_offs = { _mm256_add_epi32(fft_offs1, _mm256_cvtps_epi32(hi1)) };
 
-        u_v8ps_t pwr_lo0, pwr_lo1, pwr_hi0, pwr_hi1;
+        u_v16si_t pwri_lo0 = {_mm256_setzero_si256()};
+        u_v16si_t pwri_lo1 = {_mm256_setzero_si256()};
+        u_v16si_t pwri_hi0 = {_mm256_setzero_si256()};
+        u_v16si_t pwri_hi1 = {_mm256_setzero_si256()};
 
-        for(unsigned j = 0; j < 8; ++j)
+        for(unsigned j = 0, j2 = 0; j < 8; ++j, j2 += 2)
         {
-            pwr_lo0.arr[j] = (float)rtsa_data->pwr[lo0_offs.arr[j]];
-            pwr_lo1.arr[j] = (float)rtsa_data->pwr[lo1_offs.arr[j]];
-            pwr_hi0.arr[j] = (float)rtsa_data->pwr[hi0_offs.arr[j]];
-            pwr_hi1.arr[j] = (float)rtsa_data->pwr[hi1_offs.arr[j]];
+            pwri_lo0.arr[j2] = *(rtsa_data->pwr + lo0_offs.arr[j]);
+            pwri_lo1.arr[j2] = *(rtsa_data->pwr + lo1_offs.arr[j]);
+            pwri_hi0.arr[j2] = *(rtsa_data->pwr + hi0_offs.arr[j]);
+            pwri_hi1.arr[j2] = *(rtsa_data->pwr + hi1_offs.arr[j]);
         }
+
+        __m256 pwr_lo0 = _mm256_cvtepi32_ps(pwri_lo0.vect);
+        __m256 pwr_lo1 = _mm256_cvtepi32_ps(pwri_lo1.vect);
+        __m256 pwr_hi0 = _mm256_cvtepi32_ps(pwri_hi0.vect);
+        __m256 pwr_hi1 = _mm256_cvtepi32_ps(pwri_hi1.vect);
 
         // calc charge rates
         //
@@ -151,26 +153,26 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
         // charge
         //
-        __m256 cdelta_lo0 = _mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_lo0.vect), charge_lo0);
-        __m256 cdelta_lo1 = _mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_lo1.vect), charge_lo1);
-        __m256 cdelta_hi0 = _mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_hi0.vect), charge_hi0);
-        __m256 cdelta_hi1 = _mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_hi1.vect), charge_hi1);
+        __m256i cdelta_lo0 = _mm256_cvtps_epi32(_mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_lo0), charge_lo0));
+        __m256i cdelta_lo1 = _mm256_cvtps_epi32(_mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_lo1), charge_lo1));
+        __m256i cdelta_hi0 = _mm256_cvtps_epi32(_mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_hi0), charge_hi0));
+        __m256i cdelta_hi1 = _mm256_cvtps_epi32(_mm256_mul_ps(_mm256_sub_ps(ch_norm_coef, pwr_hi1), charge_hi1));
 
-        pwr_lo0.vect = _mm256_min_ps(_mm256_add_ps(pwr_lo0.vect, cdelta_lo0), f_maxcharge);
-        pwr_lo1.vect = _mm256_min_ps(_mm256_add_ps(pwr_lo1.vect, cdelta_lo1), f_maxcharge);
-        pwr_hi0.vect = _mm256_min_ps(_mm256_add_ps(pwr_hi0.vect, cdelta_hi0), f_maxcharge);
-        pwr_hi1.vect = _mm256_min_ps(_mm256_add_ps(pwr_hi1.vect, cdelta_hi1), f_maxcharge);
+        pwri_lo0.vect = _mm256_min_epu32(_mm256_add_epi32(pwri_lo0.vect, cdelta_lo0), v_maxcharge);
+        pwri_lo1.vect = _mm256_min_epu32(_mm256_add_epi32(pwri_lo1.vect, cdelta_lo1), v_maxcharge);
+        pwri_hi0.vect = _mm256_min_epu32(_mm256_add_epi32(pwri_hi0.vect, cdelta_hi0), v_maxcharge);
+        pwri_hi1.vect = _mm256_min_epu32(_mm256_add_epi32(pwri_hi1.vect, cdelta_hi1), v_maxcharge);
 
         // store charged
         //
-        for( unsigned j = 0; j < 8; ++j)
+        for( unsigned j = 0, j2 = 0; j < 8; ++j, j2 += 2)
         {
-            rtsa_data->pwr[lo0_offs.arr[j]] = (rtsa_pwr_t)pwr_lo0.arr[j];
-            rtsa_data->pwr[lo1_offs.arr[j]] = (rtsa_pwr_t)pwr_lo1.arr[j];
-            rtsa_data->pwr[hi0_offs.arr[j]] = (rtsa_pwr_t)pwr_hi0.arr[j];
-            rtsa_data->pwr[hi1_offs.arr[j]] = (rtsa_pwr_t)pwr_hi1.arr[j];
+            *(rtsa_data->pwr + lo0_offs.arr[j]) = pwri_lo0.arr[j2];
+            *(rtsa_data->pwr + lo1_offs.arr[j]) = pwri_lo1.arr[j2];
+            *(rtsa_data->pwr + hi0_offs.arr[j]) = pwri_hi0.arr[j2];
+            *(rtsa_data->pwr + hi1_offs.arr[j]) = pwri_hi1.arr[j2];
         }
-
+#endif
         // discharge all
         // note - we will discharge cells in the [i, i+16) fft band because those pages are already loaded to cache
         //
