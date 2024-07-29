@@ -1,8 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(fft_acc_t* __restrict p, unsigned fftsz, float scale, float corr, float* __restrict outa)
 {
-    const float32x4_t vcorr = vdupq_n_f32(corr / HWI16_SCALE_COEF + HWI16_CORR_COEF);
-    scale /= HWI16_SCALE_COEF;
+    const float32x4_t vcorr = vdupq_n_f32(corr);
 
     for(unsigned i = 0; i < fftsz; i += 16)
     {

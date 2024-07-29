@@ -23,9 +23,6 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const int16x8_t decay_shr = vdupq_n_s16((uint8_t)(-decay_rate_pw2));
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
-    scale /= HWI16_SCALE_COEF;
-    corr = corr / HWI16_SCALE_COEF + HWI16_CORR_COEF;
-
     const float32x4_t v_corr        = vdupq_n_f32(corr - (float)st->upper_pwr_bound);
     const float32x4_t max_ind       = vdupq_n_f32((float)(rtsa_depth - 1) - 0.5f);
     const float32x4_t f_ones        = vdupq_n_f32(1.0f);

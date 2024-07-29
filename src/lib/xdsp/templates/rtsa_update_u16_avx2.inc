@@ -1,9 +1,9 @@
-#define RTSA_U16_DISCHARGE(len) \
-\
+#define RTSA_U16_DISCHARGE(from,len) \
+{\
 __m256i d0, d1, d2, d3; \
 __m256i delta0, delta1, delta2, delta3; \
 \
-for(unsigned j = i; j < i + (len); ++j) \
+for(unsigned j = (from); j < (from) + (len); ++j) \
 { \
     __m256i* ptr = (__m256i*)(rtsa_data->pwr + j * rtsa_depth); \
     unsigned n = rtsa_depth_bz; \
@@ -71,4 +71,4 @@ for(unsigned j = i; j < i + (len); ++j) \
         n -= 32; \
     } \
     /* we definitely have n == 0 here due to rtsa_depth aligning */ \
-}
+}}

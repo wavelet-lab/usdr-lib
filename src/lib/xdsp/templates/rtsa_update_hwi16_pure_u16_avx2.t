@@ -53,40 +53,71 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
-    for (unsigned i = diap.from; i < diap.to; i += 16)
+    for (unsigned i = diap.from; i < diap.to; i += 64)
     {
+        // discharge all
+        RTSA_U16_DISCHARGE(i, 64);
+
+#if 1
         __m256i s0 = _mm256_load_si256((__m256i*)&in[i +  0]);
+        __m256i s1 = _mm256_load_si256((__m256i*)&in[i + 16]);
+        __m256i s2 = _mm256_load_si256((__m256i*)&in[i + 32]);
+        __m256i s3 = _mm256_load_si256((__m256i*)&in[i + 48]);
 
         u_v16si_t p0      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c1), shr0), v_scale)};
                   p0.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0.vect, shr1), v_c2));
                   p0.vect = _mm256_min_epi16(p0.vect, max_ind);
 
+        u_v16si_t p1      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s1, v_c1), shr0), v_scale)};
+                  p1.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p1.vect, shr1), v_c2));
+                  p1.vect = _mm256_min_epi16(p1.vect, max_ind);
+
+        u_v16si_t p2      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s2, v_c1), shr0), v_scale)};
+                  p2.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p2.vect, shr1), v_c2));
+                  p2.vect = _mm256_min_epi16(p2.vect, max_ind);
+
+        u_v16si_t p3      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s3, v_c1), shr0), v_scale)};
+                  p3.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p3.vect, shr1), v_c2));
+                  p3.vect = _mm256_min_epi16(p3.vect, max_ind);
+
         // load charge cells
         //
-        u_v16si_t pwr0;
+        u_v16si_t pwr0, pwr1, pwr2, pwr3;
 
         for(unsigned j = 0; j < 16; ++j)
-        {
             pwr0.arr[j] = rtsa_data->pwr[(i + j +  0) * rtsa_depth + p0.arr[j]];
-        }
+        for(unsigned j = 0; j < 16; ++j)
+            pwr1.arr[j] = rtsa_data->pwr[(i + j + 16) * rtsa_depth + p1.arr[j]];
+        for(unsigned j = 0; j < 16; ++j)
+            pwr2.arr[j] = rtsa_data->pwr[(i + j + 32) * rtsa_depth + p2.arr[j]];
+        for(unsigned j = 0; j < 16; ++j)
+            pwr3.arr[j] = rtsa_data->pwr[(i + j + 48) * rtsa_depth + p3.arr[j]];
 
         //Charge
         //
         __m256i cdelta0  = _mm256_subs_epu16(ch_add_coef, _mm256_srl_epi16(pwr0.vect, ch_rshift));
+        __m256i cdelta1  = _mm256_subs_epu16(ch_add_coef, _mm256_srl_epi16(pwr1.vect, ch_rshift));
+        __m256i cdelta2  = _mm256_subs_epu16(ch_add_coef, _mm256_srl_epi16(pwr2.vect, ch_rshift));
+        __m256i cdelta3  = _mm256_subs_epu16(ch_add_coef, _mm256_srl_epi16(pwr3.vect, ch_rshift));
 
         pwr0.vect = _mm256_adds_epu16(pwr0.vect, cdelta0);
+        pwr1.vect = _mm256_adds_epu16(pwr1.vect, cdelta1);
+        pwr2.vect = _mm256_adds_epu16(pwr2.vect, cdelta2);
+        pwr3.vect = _mm256_adds_epu16(pwr3.vect, cdelta3);
 
         //Store charged
         //
-        for(unsigned j = 0; j < 16; ++j)
-        {
-            rtsa_data->pwr[(i + j +  0) * rtsa_depth + p0.arr[j]] = pwr0.arr[j];
-        }
 
-        // discharge all
-        // note - we will discharge cells in the [i, i+16) fft band because those pages are already loaded to cache
-        //
-        RTSA_U16_DISCHARGE(16);
+        for(unsigned j = 0; j < 16; ++j)
+            rtsa_data->pwr[(i + j +  0) * rtsa_depth + p0.arr[j]] = pwr0.arr[j];
+        for(unsigned j = 0; j < 16; ++j)
+            rtsa_data->pwr[(i + j + 16) * rtsa_depth + p1.arr[j]] = pwr1.arr[j];
+        for(unsigned j = 0; j < 16; ++j)
+            rtsa_data->pwr[(i + j + 32) * rtsa_depth + p2.arr[j]] = pwr2.arr[j];
+        for(unsigned j = 0; j < 16; ++j)
+            rtsa_data->pwr[(i + j + 48) * rtsa_depth + p3.arr[j]] = pwr3.arr[j];
+
+#endif
     }
 }
 

@@ -18,6 +18,9 @@ VWLT_ATTRIBUTE(optimize("-O3", "inline"))
 static inline
 void rtsa_discharge_u16(rtsa_pwr_t* pwr, unsigned pw2_decay)
 {
+    if(*pwr == 0)
+        return;
+
     unsigned delta = (*pwr >> pw2_decay) + ((unsigned)(DISCHARGE_NORM_COEF) >> pw2_decay);
 
     if(delta > *pwr)

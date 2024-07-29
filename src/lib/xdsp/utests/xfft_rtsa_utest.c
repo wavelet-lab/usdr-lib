@@ -19,6 +19,7 @@
 #define AVGS 256
 #define RAISE_COEF 32
 #define DECAY_COEF 1
+#define CHARGING_FRAME 256
 
 #define STREAM_SIZE 4096
 static_assert( STREAM_SIZE >= 4096, "STREAM_SIZE should be >= 4096!" );
@@ -71,7 +72,7 @@ static void setup(void)
     st->lower_pwr_bound = LOWER_PWR_BOUND;
     st->upper_pwr_bound = UPPER_PWR_BOUND;
     st->divs_for_dB     = DIVS_FOR_DB;
-    st->charging_frame  = AVGS;
+    st->charging_frame  = CHARGING_FRAME;
     st->raise_coef      = RAISE_COEF;
     st->decay_coef      = DECAY_COEF;
     rtsa_calc_depth(st);
@@ -302,8 +303,8 @@ Suite * rtsa_suite(void)
     tcase_set_timeout(tc_core, 300);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
     tcase_add_test(tc_core, rtsa_check);
-    tcase_add_loop_test(tc_core, rtsa_speed, 0, 4);
-    tcase_add_loop_test(tc_core, rtsa_speed_u16, 0, 4);
+    tcase_add_loop_test(tc_core, rtsa_speed, 0, 3);
+    tcase_add_loop_test(tc_core, rtsa_speed_u16, 0, 3);
     suite_add_tcase(s, tc_core);
     return s;
 }

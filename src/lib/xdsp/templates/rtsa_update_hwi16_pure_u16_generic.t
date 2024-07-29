@@ -45,6 +45,13 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     for(unsigned i = diap.from; i < diap.to; ++i)
     {
+        rtsa_pwr_t* pwr = rtsa_data->pwr + i * rtsa_depth;
+
+        for(unsigned j = 0; j < rtsa_depth; ++j)
+        {
+            rtsa_discharge_u16(&pwr[j], decay_rate_pw2);
+        }
+
         uint16_t tmp = (in[i] - c1);
         tmp = tmp >> shr0;
         tmp *= (uint16_t)scale;
@@ -55,13 +62,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
         if(pi > (rtsa_depth - 1)) pi = (rtsa_depth - 1);
 
-        rtsa_pwr_t* pwr = rtsa_data->pwr + i * rtsa_depth;
         rtsa_charge_pure_u16(&pwr[pi], raise_rate_pw2 - ndivs_for_dB);
-
-        for(unsigned j = 0; j < rtsa_depth; ++j)
-        {
-            rtsa_discharge_u16(&pwr[j], decay_rate_pw2);
-        }
     }
 }
 
