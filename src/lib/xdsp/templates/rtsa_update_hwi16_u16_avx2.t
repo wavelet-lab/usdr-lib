@@ -1,7 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, float corr, fft_diap_t diap)
+                        float scale, float corr, fft_diap_t diap, UNUSED const rtsa_hwi16_consts_t* hwi16_consts)
 {
     // Attention please!
     // rtsa_depth should be multiple to 32/sizeof(rtsa_pwr_t) here!

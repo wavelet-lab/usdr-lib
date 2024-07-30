@@ -16,7 +16,7 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, UNUSED float corr, fft_diap_t diap)
+                        UNUSED float scale, UNUSED float corr, fft_diap_t diap, const rtsa_hwi16_consts_t* __restrict hwi16_consts)
 {
 #ifdef USE_POLYLOG2
     wvlt_log2f_fn_t wvlt_log2f_fn = wvlt_polylog2f;
@@ -28,20 +28,10 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const unsigned rtsa_depth = st->rtsa_depth;
 
     const unsigned decay_rate_pw2 =
-        (unsigned)wvlt_log2f_fn(st->charging_frame) + (unsigned)wvlt_log2f_fn(st->decay_coef);
+        (unsigned)(wvlt_log2f_fn((float)st->charging_frame * st->decay_coef) + 0.5f);
 
     const unsigned raise_rate_pw2 =
-        (unsigned)wvlt_log2f_fn(st->charging_frame) - (unsigned)wvlt_log2f_fn(st->raise_coef);
-
-    const uint16_t nfft = (uint16_t)wvlt_log2f_fn(fft_size);
-    const uint16_t c1 = 2 * HWI16_SCALE_COEF * nfft;
-    //const uint16_t c2 = - HWI16_CORR_COEF * ( 1.f - 1.f / wvlt_fastlog2(10));
-    static const uint16_t c2 = (- HWI16_CORR_COEF) * 0.69897f;
-
-    const uint16_t nscale = (uint16_t)wvlt_log2f_fn(scale + 0.5);
-    const uint16_t ndivs_for_dB = (uint16_t)wvlt_log2f_fn(st->divs_for_dB + 0.5);
-    const uint16_t shr0 = nscale;
-    const uint16_t shr1 = HWI16_SCALE_N2_COEF - nscale > ndivs_for_dB ? HWI16_SCALE_N2_COEF - nscale - ndivs_for_dB : 16;
+        (unsigned)(wvlt_log2f_fn((float)st->charging_frame / st->raise_coef) + 0.5f);
 
     for(unsigned i = diap.from; i < diap.to; ++i)
     {
@@ -52,17 +42,15 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
             rtsa_discharge_u16(&pwr[j], decay_rate_pw2);
         }
 
-        uint16_t tmp = (in[i] - c1);
-        tmp = tmp >> shr0;
-        tmp *= (uint16_t)scale;
-        int16_t pi = (tmp >> shr1) - (c2 << ndivs_for_dB);
-
-        pi -= st->upper_pwr_bound;
+        uint16_t tmp = (in[i] - hwi16_consts->c0);
+        tmp = tmp >> hwi16_consts->shr0;
+        tmp *= (uint16_t)hwi16_consts->org_scale;
+        int16_t pi = (tmp >> hwi16_consts->shr1) - hwi16_consts->c1;
         pi = abs(pi);
 
         if(pi > (rtsa_depth - 1)) pi = (rtsa_depth - 1);
 
-        rtsa_charge_pure_u16(&pwr[pi], raise_rate_pw2 - ndivs_for_dB);
+        rtsa_charge_pure_u16(&pwr[pi], raise_rate_pw2 - hwi16_consts->ndivs_for_dB);
     }
 }
 

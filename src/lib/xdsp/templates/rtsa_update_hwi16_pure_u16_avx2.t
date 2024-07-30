@@ -1,7 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, UNUSED float corr, fft_diap_t diap)
+                        UNUSED float scale, UNUSED float corr, fft_diap_t diap, const rtsa_hwi16_consts_t* __restrict hwi16_consts)
 {
     // Attention please!
     // rtsa_depth should be multiple to 32/sizeof(rtsa_pwr_t) here!
@@ -19,18 +19,13 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const uint16_t rtsa_depth = st->rtsa_depth;
 
-    const uint16_t nscale = (uint16_t)wvlt_log2f_fn(scale + 0.5);
-    const uint16_t ndivs_for_dB = (uint16_t)wvlt_log2f_fn(st->divs_for_dB + 0.5);
-
     const unsigned decay_rate_pw2 =
-        (unsigned)wvlt_log2f_fn(st->charging_frame) + (unsigned)wvlt_log2f_fn(st->decay_coef);
+        (unsigned)(wvlt_log2f_fn((float)st->charging_frame * st->decay_coef) + 0.5f);
 
     const unsigned raise_rate_pw2 =
-        (unsigned)wvlt_log2f_fn(st->charging_frame) - (unsigned)wvlt_log2f_fn(st->raise_coef) - ndivs_for_dB;
+        (unsigned)(wvlt_log2f_fn((float)st->charging_frame / st->raise_coef) + 0.5f) - hwi16_consts->ndivs_for_dB;
 
-    const uint16_t nfft        = (uint16_t)wvlt_log2f_fn(fft_size);
-    const __m256i v_scale      = _mm256_set1_epi16((uint16_t)scale);
-
+    const __m256i v_scale      = _mm256_set1_epi16((uint16_t)hwi16_consts->org_scale);
     const __m256i max_ind      = _mm256_set1_epi16(rtsa_depth - 1);
 
     const unsigned discharge_add = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
@@ -41,11 +36,11 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const __m256i ch_add_coef  = _mm256_set1_epi16((uint16_t)charge_add);
     const __m128i ch_rshift    = _mm_set_epi64x(0, raise_rate_pw2);
 
-    const __m128i shr0 = _mm_set_epi64x(0, nscale);
-    const __m128i shr1 = _mm_set_epi64x(0, HWI16_SCALE_N2_COEF - nscale > ndivs_for_dB ? HWI16_SCALE_N2_COEF - nscale - ndivs_for_dB : 16);
+    const __m128i shr0 = _mm_set_epi64x(0, hwi16_consts->shr0);
+    const __m128i shr1 = _mm_set_epi64x(0, hwi16_consts->shr1);
 
-    const __m256i v_c1         = _mm256_set1_epi16(2 * HWI16_SCALE_COEF * nfft);
-    const __m256i v_c2         = _mm256_set1_epi16(((uint16_t)(- HWI16_CORR_COEF * 0.69897f) << ndivs_for_dB) + st->upper_pwr_bound);
+    const __m256i v_c0         = _mm256_set1_epi16(hwi16_consts->c0);
+    const __m256i v_c1         = _mm256_set1_epi16(hwi16_consts->c1);
 
     typedef uint16_t v16si __attribute__ ((vector_size (32)));
     union u_v16si { __m256i vect; v16si arr; };
@@ -64,20 +59,20 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         __m256i s2 = _mm256_load_si256((__m256i*)&in[i + 32]);
         __m256i s3 = _mm256_load_si256((__m256i*)&in[i + 48]);
 
-        u_v16si_t p0      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c1), shr0), v_scale)};
-                  p0.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0.vect, shr1), v_c2));
+        u_v16si_t p0      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c0), shr0), v_scale)};
+                  p0.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0.vect, shr1), v_c1));
                   p0.vect = _mm256_min_epi16(p0.vect, max_ind);
 
-        u_v16si_t p1      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s1, v_c1), shr0), v_scale)};
-                  p1.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p1.vect, shr1), v_c2));
+        u_v16si_t p1      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s1, v_c0), shr0), v_scale)};
+                  p1.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p1.vect, shr1), v_c1));
                   p1.vect = _mm256_min_epi16(p1.vect, max_ind);
 
-        u_v16si_t p2      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s2, v_c1), shr0), v_scale)};
-                  p2.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p2.vect, shr1), v_c2));
+        u_v16si_t p2      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s2, v_c0), shr0), v_scale)};
+                  p2.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p2.vect, shr1), v_c1));
                   p2.vect = _mm256_min_epi16(p2.vect, max_ind);
 
-        u_v16si_t p3      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s3, v_c1), shr0), v_scale)};
-                  p3.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p3.vect, shr1), v_c2));
+        u_v16si_t p3      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s3, v_c0), shr0), v_scale)};
+                  p3.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p3.vect, shr1), v_c1));
                   p3.vect = _mm256_min_epi16(p3.vect, max_ind);
 
         // load charge cells

@@ -13,7 +13,7 @@
 
 
 #define USE_POLYLOG2
-#undef USE_PURE_U16
+#define USE_PURE_U16
 #undef USE_RTSA_ANTIALIASING
 
 VWLT_ATTRIBUTE(optimize("-O3"))
