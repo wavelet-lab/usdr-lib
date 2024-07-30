@@ -19,14 +19,19 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     for(unsigned i = diap.from; i < diap.to; ++i)
     {
+        rtsa_pwr_t* pwr = rtsa_data->pwr + i * rtsa_depth;
+
+        for(unsigned j = 0; j < rtsa_depth; ++j)
+        {
+            rtsa_discharge_u16(&pwr[j], decay_rate_pw2);
+        }
+
         float p = scale * (float)in[i] + corr;
 
         p -= st->upper_pwr_bound;
         p = fabs(p);
         p *= st->divs_for_dB;
         if(p > (float)(rtsa_depth - 1) - 0.5f) p = (float)(rtsa_depth - 1) - 0.5f;
-
-        rtsa_pwr_t* pwr = rtsa_data->pwr + i * rtsa_depth;
 
 #ifdef USE_RTSA_ANTIALIASING
         float pi_lo = (unsigned)p;
@@ -42,10 +47,6 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 #endif
         rtsa_charge_u16(&pwr[(unsigned)(p + REPS)], charge_rate);
 #endif
-        for(unsigned j = 0; j < rtsa_depth; ++j)
-        {
-            rtsa_discharge_u16(&pwr[j], decay_rate_pw2);
-        }
     }
 }
 

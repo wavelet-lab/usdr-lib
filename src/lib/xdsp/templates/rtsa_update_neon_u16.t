@@ -41,6 +41,9 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
     for (unsigned i = diap.from; i < diap.to; i += 8)
     {
+        // discharge all
+        RTSA_U16_DISCHARGE(8);
+
         // load 8 complex pairs = 16 floats = 64b = 512bits
         //
         float32x4x2_t e0 = vld2q_f32(&in[i + 0][0]);
@@ -151,10 +154,6 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
             rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)pn1[j]] = (uint16_t)pwr1[j];
         }
 #endif
-        // discharge all
-        // note - we will discharge cells in the [i, i+8) fft band because those pages are already loaded to cache
-        //
-        RTSA_U16_DISCHARGE(8);
     }
 }
 

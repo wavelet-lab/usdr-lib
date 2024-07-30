@@ -38,6 +38,9 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     for (unsigned i = diap.from; i < diap.to; i += 8)
     {
+        // discharge all
+        RTSA_U16_DISCHARGE(8);
+
         uint16x8_t l2 = vld1q_u16(&in[i]);
 
         float32x4_t l2_res0 = vcvtq_f32_u32( vmovl_u16(vget_low_u16(l2)) );
@@ -133,10 +136,6 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
             rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)pn1[j]] = (uint16_t)pwr1[j];
         }
 #endif
-        // discharge all
-        // note - we will discharge cells in the [i, i+8) fft band because those pages are already loaded to cache
-        //
-        RTSA_U16_DISCHARGE(8);
     }
 }
 
