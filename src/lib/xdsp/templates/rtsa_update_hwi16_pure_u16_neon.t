@@ -1,7 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, float corr, fft_diap_t diap)
+                        UNUSED float scale, UNUSED float corr, fft_diap_t diap, const rtsa_hwi16_consts_t* __restrict hwi16_consts)
 {
 
 #include "rtsa_update_u16_neon.inc"
@@ -19,19 +19,15 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const unsigned rtsa_depth = st->rtsa_depth;
 
-    const uint16_t nscale = (uint16_t)wvlt_log2f_fn(scale + 0.5);
-    const uint16_t ndivs_for_dB = (uint16_t)wvlt_log2f_fn(st->divs_for_dB + 0.5);
-
     const unsigned decay_rate_pw2 =
-        (unsigned)wvlt_log2f_fn(st->charging_frame) + (unsigned)wvlt_log2f_fn(st->decay_coef);
+        (unsigned)(wvlt_log2f_fn((float)st->charging_frame * st->decay_coef) + 0.5f);
 
     const unsigned raise_rate_pw2 =
-        (unsigned)wvlt_log2f_fn(st->charging_frame) - (unsigned)wvlt_log2f_fn(st->raise_coef) - ndivs_for_dB;
+        (unsigned)(wvlt_log2f_fn((float)st->charging_frame / st->raise_coef) + 0.5f) - hwi16_consts->ndivs_for_dB;
 
     const int16x8_t decay_shr = vdupq_n_s16((uint8_t)(-decay_rate_pw2));
     const int16x8_t raise_shr = vdupq_n_s16((uint8_t)(-raise_rate_pw2));
 
-    const uint16_t nfft        = (uint16_t)wvlt_log2f_fn(fft_size);
     const uint16x8_t max_ind   = vdupq_n_u16(rtsa_depth - 1);
 
     const unsigned discharge_add    = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
@@ -40,11 +36,11 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const unsigned charge_add       = ((unsigned)(CHARGE_NORM_COEF) >> raise_rate_pw2);
     const uint16x8_t ch_add_coef    = vdupq_n_u16((uint16_t)charge_add);
 
-    const int16x8_t shr0 = vdupq_n_s16((uint8_t)(-nscale));
-    const int16x8_t shr1 = vdupq_n_s16((uint8_t)(-(HWI16_SCALE_N2_COEF - nscale > ndivs_for_dB ? HWI16_SCALE_N2_COEF - nscale - ndivs_for_dB : 16)));
+    const int16x8_t shr0 = vdupq_n_s16((uint8_t)(-hwi16_consts->shr0));
+    const int16x8_t shr1 = vdupq_n_s16((uint8_t)(-hwi16_consts->shr1));
 
-    const uint16x8_t v_c1 = vdupq_n_u16(2 * HWI16_SCALE_COEF * nfft);
-    const uint16x8_t v_c2 = vdupq_n_u16(((uint16_t)(- HWI16_CORR_COEF * 0.69897f) << ndivs_for_dB) + st->upper_pwr_bound);
+    const uint16x8_t v_c0 = vdupq_n_u16(hwi16_consts->c0);
+    const uint16x8_t v_c1 = vdupq_n_u16(hwi16_consts->c1);
 
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
@@ -53,12 +49,12 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         uint16x8_t s0 = vld1q_u16(&in[i + 0]);
         uint16x8_t s1 = vld1q_u16(&in[i + 8]);
 
-        uint16x8_t p0 = vmulq_n_u16(vshlq_u16(vsubq_u16(s0, v_c1), shr0), (uint16_t)scale);
-                   p0 = vabdq_u16(vshlq_u16(p0, shr1), v_c2);
+        uint16x8_t p0 = vmulq_n_u16(vshlq_u16(vsubq_u16(s0, v_c0), shr0), hwi16_consts->org_scale);
+                   p0 = vabdq_u16(vshlq_u16(p0, shr1), v_c1);
                    p0 = vminq_u16(p0, max_ind);
 
-        uint16x8_t p1 = vmulq_n_u16(vshlq_u16(vsubq_u16(s1, v_c1), shr0), (uint16_t)scale);
-                   p1 = vabdq_u16(vshlq_u16(p1, shr1), v_c2);
+        uint16x8_t p1 = vmulq_n_u16(vshlq_u16(vsubq_u16(s1, v_c0), shr0), hwi16_consts->org_scale);
+                   p1 = vabdq_u16(vshlq_u16(p1, shr1), v_c1);
                    p1 = vminq_u16(p1, max_ind);
 
         //load cells

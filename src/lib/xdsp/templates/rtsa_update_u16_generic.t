@@ -40,7 +40,12 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         rtsa_charge_u16(&pwr[(unsigned)pi_hi], charge_rate * (p - pi_lo));
         rtsa_charge_u16(&pwr[(unsigned)pi_lo], charge_rate * (pi_hi - p));
 #else
-        rtsa_charge_u16(&pwr[(unsigned)(p + 0.5f)], charge_rate);
+#ifdef WVLT_NEON
+#define REPS 0.f
+#else
+#define REPS 0.5f
+#endif
+        rtsa_charge_u16(&pwr[(unsigned)(p + REPS)], charge_rate);
 #endif
     }
 }

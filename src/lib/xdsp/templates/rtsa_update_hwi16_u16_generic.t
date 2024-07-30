@@ -35,7 +35,12 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         rtsa_charge_u16(&pwr[(unsigned)pi_hi], charge_rate * (p - pi_lo));
         rtsa_charge_u16(&pwr[(unsigned)pi_lo], charge_rate * (pi_hi - p));
 #else
-        rtsa_charge_u16(&pwr[(unsigned)p], charge_rate);
+#ifdef WVLT_NEON
+#define REPS 0.f
+#else
+#define REPS 0.5f
+#endif
+        rtsa_charge_u16(&pwr[(unsigned)(p + REPS)], charge_rate);
 #endif
         for(unsigned j = 0; j < rtsa_depth; ++j)
         {
