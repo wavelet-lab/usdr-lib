@@ -313,8 +313,8 @@ Suite * rtsa_suite(void)
     tcase_set_timeout(tc_core, 300);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
     tcase_add_test(tc_core, rtsa_check);
-    tcase_add_loop_test(tc_core, rtsa_speed, 0, 3);
-    tcase_add_loop_test(tc_core, rtsa_speed_u16, 0, 3);
+    tcase_add_loop_test(tc_core, rtsa_speed, 0, 4);
+    tcase_add_loop_test(tc_core, rtsa_speed_u16, 0, 4);
     suite_add_tcase(s, tc_core);
     return s;
 }

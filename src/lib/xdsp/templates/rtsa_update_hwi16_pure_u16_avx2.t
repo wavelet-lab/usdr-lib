@@ -46,6 +46,12 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     union u_v16si { __m256i vect; v16si arr; };
     typedef union u_v16si u_v16si_t;
 
+    const __m256i v_depth_cfs  = _mm256_set_epi16(
+                                       rtsa_depth * 15, rtsa_depth * 14, rtsa_depth * 13, rtsa_depth * 12,
+                                       rtsa_depth * 11, rtsa_depth * 10, rtsa_depth *  9, rtsa_depth *  8,
+                                       rtsa_depth *  7, rtsa_depth *  6, rtsa_depth *  5, rtsa_depth *  4,
+                                       rtsa_depth *  3, rtsa_depth *  2, rtsa_depth *  1, rtsa_depth *  0);
+
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
     for (unsigned i = diap.from; i < diap.to; i += 64)
@@ -53,40 +59,51 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         // discharge all
         RTSA_U16_DISCHARGE(i, 64);
 
-#if 1
         __m256i s0 = _mm256_load_si256((__m256i*)&in[i +  0]);
         __m256i s1 = _mm256_load_si256((__m256i*)&in[i + 16]);
         __m256i s2 = _mm256_load_si256((__m256i*)&in[i + 32]);
         __m256i s3 = _mm256_load_si256((__m256i*)&in[i + 48]);
 
-        u_v16si_t p0      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c0), shr0), v_scale)};
-                  p0.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0.vect, shr1), v_c1));
-                  p0.vect = _mm256_min_epi16(p0.vect, max_ind);
+        __m256i p0 = _mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c0), shr0), v_scale);
+                p0 = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0, shr1), v_c1));
+                p0 = _mm256_min_epi16(p0, max_ind);
 
-        u_v16si_t p1      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s1, v_c0), shr0), v_scale)};
-                  p1.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p1.vect, shr1), v_c1));
-                  p1.vect = _mm256_min_epi16(p1.vect, max_ind);
+        __m256i p1 = _mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s1, v_c0), shr0), v_scale);
+                p1 = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p1, shr1), v_c1));
+                p1 = _mm256_min_epi16(p1, max_ind);
 
-        u_v16si_t p2      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s2, v_c0), shr0), v_scale)};
-                  p2.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p2.vect, shr1), v_c1));
-                  p2.vect = _mm256_min_epi16(p2.vect, max_ind);
+        __m256i p2 = _mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s2, v_c0), shr0), v_scale);
+                p2 = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p2, shr1), v_c1));
+                p2 = _mm256_min_epi16(p2, max_ind);
 
-        u_v16si_t p3      = {_mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s3, v_c0), shr0), v_scale)};
-                  p3.vect = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p3.vect, shr1), v_c1));
-                  p3.vect = _mm256_min_epi16(p3.vect, max_ind);
+        __m256i p3 = _mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s3, v_c0), shr0), v_scale);
+                p3 = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p3, shr1), v_c1));
+                p3 = _mm256_min_epi16(p3, max_ind);
 
         // load charge cells
         //
         u_v16si_t pwr0, pwr1, pwr2, pwr3;
 
+        u_v16si_t offs0 = {_mm256_adds_epu16(v_depth_cfs, p0)},
+                  offs1 = {_mm256_adds_epu16(v_depth_cfs, p1)},
+                  offs2 = {_mm256_adds_epu16(v_depth_cfs, p2)},
+                  offs3 = {_mm256_adds_epu16(v_depth_cfs, p3)};
+
+        uint16_t* ptr = rtsa_data->pwr + i * rtsa_depth;
         for(unsigned j = 0; j < 16; ++j)
-            pwr0.arr[j] = rtsa_data->pwr[(i + j +  0) * rtsa_depth + p0.arr[j]];
+            pwr0.arr[j] = *(ptr + offs0.arr[j]);
+
+        ptr += 16 * rtsa_depth;
         for(unsigned j = 0; j < 16; ++j)
-            pwr1.arr[j] = rtsa_data->pwr[(i + j + 16) * rtsa_depth + p1.arr[j]];
+            pwr1.arr[j] = *(ptr + offs1.arr[j]);
+
+        ptr += 16 * rtsa_depth;
         for(unsigned j = 0; j < 16; ++j)
-            pwr2.arr[j] = rtsa_data->pwr[(i + j + 32) * rtsa_depth + p2.arr[j]];
+            pwr2.arr[j] = *(ptr + offs2.arr[j]);
+
+        ptr += 16 * rtsa_depth;
         for(unsigned j = 0; j < 16; ++j)
-            pwr3.arr[j] = rtsa_data->pwr[(i + j + 48) * rtsa_depth + p3.arr[j]];
+            pwr3.arr[j] = *(ptr + offs3.arr[j]);
 
         //Charge
         //
@@ -102,17 +119,21 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
         //Store charged
         //
+        ptr = rtsa_data->pwr + i * rtsa_depth;
+        for(unsigned j = 0; j < 16; ++j)
+            *(ptr + offs0.arr[j]) = pwr0.arr[j];
 
+        ptr += 16 * rtsa_depth;
         for(unsigned j = 0; j < 16; ++j)
-            rtsa_data->pwr[(i + j +  0) * rtsa_depth + p0.arr[j]] = pwr0.arr[j];
-        for(unsigned j = 0; j < 16; ++j)
-            rtsa_data->pwr[(i + j + 16) * rtsa_depth + p1.arr[j]] = pwr1.arr[j];
-        for(unsigned j = 0; j < 16; ++j)
-            rtsa_data->pwr[(i + j + 32) * rtsa_depth + p2.arr[j]] = pwr2.arr[j];
-        for(unsigned j = 0; j < 16; ++j)
-            rtsa_data->pwr[(i + j + 48) * rtsa_depth + p3.arr[j]] = pwr3.arr[j];
+            *(ptr + offs1.arr[j]) = pwr1.arr[j];
 
-#endif
+        ptr += 16 * rtsa_depth;
+        for(unsigned j = 0; j < 16; ++j)
+            *(ptr + offs2.arr[j]) = pwr2.arr[j];
+
+        ptr += 16 * rtsa_depth;
+        for(unsigned j = 0; j < 16; ++j)
+            *(ptr + offs3.arr[j]) = pwr3.arr[j];
     }
 }
 
