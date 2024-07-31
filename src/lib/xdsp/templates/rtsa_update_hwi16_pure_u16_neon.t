@@ -44,6 +44,9 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
 
+    const uint16x8_t v_depth_cfs = { rtsa_depth * 7, rtsa_depth * 6, rtsa_depth * 5, rtsa_depth * 4,
+                                     rtsa_depth * 3, rtsa_depth * 2, rtsa_depth * 1, rtsa_depth * 0 };
+
     for (unsigned i = diap.from; i < diap.to; i += 16)
     {
         // discharge all
@@ -63,10 +66,16 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         //load cells
         uint16x8_t pwr0, pwr1;
 
+        const uint16x8_t offs0 = vqaddq_u16(v_depth_cfs, p0);
+        const uint16x8_t offs1 = vqaddq_u16(v_depth_cfs, p1);
+
+        uint16_t* ptr0 = rtsa_data->pwr + (i + 0) * rtsa_depth;
+        uint16_t* ptr1 = rtsa_data->pwr + (i + 8) * rtsa_depth;
+
         for(unsigned j = 0; j < 8; ++j)
         {
-            pwr0[j] = rtsa_data->pwr[(i + j + 0) * rtsa_depth + p0[j]];
-            pwr1[j] = rtsa_data->pwr[(i + j + 8) * rtsa_depth + p1[j]];
+            pwr0[j] = *(ptr0 + offs0[j]);
+            pwr1[j] = *(ptr1 + offs1[j]);
         }
 
         uint16x8_t cdelta0 = vqsubq_u16(ch_add_coef, vshlq_u16(pwr0, raise_shr));
@@ -79,8 +88,8 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         //
         for(unsigned j = 0; j < 8; ++j)
         {
-            rtsa_data->pwr[(i + j + 0) * rtsa_depth + p0[j]] = pwr0[j];
-            rtsa_data->pwr[(i + j + 8) * rtsa_depth + p1[j]] = pwr1[j];
+            *(ptr0 + offs0[j]) = pwr0[j];
+            *(ptr1 + offs1[j]) = pwr1[j];
         }
     }
 }
