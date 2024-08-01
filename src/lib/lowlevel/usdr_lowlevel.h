@@ -8,6 +8,8 @@
 #include <stddef.h>
 #include <usdr_port.h>
 
+#define USBG_LOG_TAG "USBG"
+
 enum lowlevel_ls_ops {
     USDR_LSOP_HWREG = 0, // Write followed by read
     USDR_LSOP_SPI = 1,

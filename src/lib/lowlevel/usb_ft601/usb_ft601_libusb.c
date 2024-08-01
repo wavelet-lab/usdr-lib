@@ -20,7 +20,6 @@
 #include <usdr_logging.h>
 
 #include "../device/device.h"
-#include "../device/device_bus.h"
 #include "../device/device_names.h"
 #include "../device/device_vfs.h"
 
@@ -28,46 +27,7 @@
 #include "../libusb_vidpid_map.h"
 
 #include "usb_ft601_generic.h"
-
 #include "../libusb_generic.h"
-
-enum {
-    DEV_RX_STREAM_NO = 0,
-    DEV_TX_STREAM_NO = 1,
-};
-
-enum {
-    EP_OUT_CONFIG      = LIBUSB_ENDPOINT_OUT | 1,
-    EP_OUT_CTRL        = LIBUSB_ENDPOINT_OUT | 2,     //USB configuration fuses / reset bits
-    EP_OUT_DEFSTREAM   = LIBUSB_ENDPOINT_OUT | 3,
-
-    EP_IN_CONFIG       = LIBUSB_ENDPOINT_IN | 1,
-    EP_IN_CTRL         = LIBUSB_ENDPOINT_IN | 2,
-    EP_IN_DEFSTREAM    = LIBUSB_ENDPOINT_IN | 3,
-};
-
-enum {
-    DATA_PACKET_SIZE = 4096,
-};
-
-// ft601 control commands
-
-enum {
-    CTRL_SIZE = 64, // EP_OUT_CTRL & EP_IN_CTRL size
-
-    MAX_CONFIG_REQS = 1,
-
-    MAX_IN_CTRL_REQS = 1,
-    MAX_OUT_CTRL_REQS = 1,
-
-    MAX_IN_STRM_REQS = 16,
-    MAX_OUT_STRM_REQS = 16,
-
-    MAX_CTRL_BURST = 64,
-};
-
-
-
 
 struct usbft601_dev
 {
@@ -75,9 +35,7 @@ struct usbft601_dev
     struct lowlevel_ops ops;
 
     libusb_generic_dev_t gdev;
-
-    device_bus_t db;
-    uint32_t ft601_counter;
+    usb_ft601_generic_t ft601_generic;
 
     sem_t tr_ctrl_out;
     sem_t tr_ctrl_rb;
@@ -86,33 +44,23 @@ struct usbft601_dev
     struct libusb_transfer *transfer_in_ctrl[MAX_IN_CTRL_REQS];
     struct libusb_transfer *transfer_out_ctrl[MAX_OUT_CTRL_REQS];
 
-    proto_lms64c_t data_ctrl_out[MAX_CTRL_BURST];
-    proto_lms64c_t data_ctrl_in[MAX_CTRL_BURST];
-
-
     struct buffers rx_strms[1];
     struct buffers tx_strms[1];
 
 };
 typedef struct usbft601_dev usbft601_dev_t;
 
-int _ft601_cmd(lldev_t lld, uint8_t ep, uint8_t cmd, uint32_t param)
+
+usb_ft601_generic_t* get_ft601_generic(lldev_t dev)
 {
-    uint8_t wbuffer[20];
-    int res, actual;
+    usbft601_dev_t* d = (usbft601_dev_t*)dev;
+    return &d->ft601_generic;
+}
+
+static int libusb_io_write(lldev_t lld, uint8_t* wbuffer, int len, int* actual_len, int timeout)
+{
     usbft601_dev_t* d = (usbft601_dev_t*)lld;
-
-    fill_ft601_cmd(wbuffer, ++d->ft601_counter, ep, 0x00, 0);
-    res = libusb_to_errno(libusb_bulk_transfer(d->gdev.dh, EP_OUT_CONFIG, wbuffer, 20, &actual, 1000));
-    if (res || actual != 20)
-        return -EIO;
-
-    fill_ft601_cmd(wbuffer, ++d->ft601_counter, ep, cmd, param);
-    res = libusb_to_errno(libusb_bulk_transfer(d->gdev.dh, EP_OUT_CONFIG, wbuffer, 20, &actual, 1000));
-    if (res || actual != 20)
-        return -EIO;
-
-    return 0;
+    return libusb_to_errno(libusb_bulk_transfer(d->gdev.dh, EP_OUT_CONFIG, wbuffer, 20, actual_len, timeout));
 }
 
 // Class operations
@@ -132,16 +80,17 @@ int usbft601_uram_generic_get(lldev_t dev, int generic_op, const char** pout)
 }
 
 static
-int usbft601_uram_ctrl_out_pkt(usbft601_dev_t* dev, unsigned pkt_szb, unsigned timeout_ms)
+int usbft601_uram_ctrl_out_pkt(lldev_t lld, unsigned pkt_szb, unsigned timeout_ms)
 {
+    usbft601_dev_t* d = (usbft601_dev_t*)lld;
     int res;
-    res = sem_wait_ex(&dev->tr_ctrl_out, timeout_ms * 1000 * 1000);
+    res = sem_wait_ex(&d->tr_ctrl_out, timeout_ms * 1000 * 1000);
     if (res) {
         return res;
     }
 
     unsigned idx = 0;
-    struct libusb_transfer *transfer = dev->transfer_out_ctrl[idx];
+    struct libusb_transfer *transfer = d->transfer_out_ctrl[idx];
 
     transfer->length = pkt_szb;
     transfer->timeout = timeout_ms;
@@ -149,7 +98,7 @@ int usbft601_uram_ctrl_out_pkt(usbft601_dev_t* dev, unsigned pkt_szb, unsigned t
     res = libusb_to_errno(libusb_submit_transfer(transfer));
     if (res) {
         USDR_LOG("USBX", USDR_LOG_ERROR, "FAILED to post CTRL_OUT %d\n", res);
-        sem_post(&dev->tr_ctrl_out);
+        sem_post(&d->tr_ctrl_out);
         return res;
     }
 
@@ -159,7 +108,7 @@ int usbft601_uram_ctrl_out_pkt(usbft601_dev_t* dev, unsigned pkt_szb, unsigned t
 void LIBUSB_CALL libusb_transfer_ctrl_out_pkt(struct libusb_transfer *transfer)
 {
     usbft601_dev_t* dev = (usbft601_dev_t* )transfer->user_data;
-    const proto_lms64c_t* d = &dev->data_ctrl_out[0];
+    const proto_lms64c_t* d = &dev->ft601_generic.data_ctrl_out[0];
 
     USDR_LOG("USBX", USDR_LOG_DEBUG, "WR transfer %d / %d => { %02x %02x %02x %02x  %02x %02x %02x %02x | %02x %02x %02x %02x  %02x %02x %02x %02x  ... }\n",
              transfer->status, transfer->actual_length,
@@ -175,14 +124,16 @@ void LIBUSB_CALL libusb_transfer_ctrl_out_pkt(struct libusb_transfer *transfer)
 }
 
 static
-int usbft601_uram_ctrl_in_pkt(usbft601_dev_t* dev, unsigned pkt_szb, unsigned timeout_ms)
+int usbft601_uram_ctrl_in_pkt(lldev_t lld, unsigned pkt_szb, unsigned timeout_ms)
 {
+    usbft601_dev_t* d = (usbft601_dev_t*)lld;
+
     unsigned idx = 0;
-    struct libusb_transfer *transfer = dev->transfer_in_ctrl[idx];
+    struct libusb_transfer *transfer = d->transfer_in_ctrl[idx];
     int res;
 
     transfer->length = pkt_szb;
-    transfer->buffer = (uint8_t*)dev->data_ctrl_in;
+    transfer->buffer = (uint8_t*)d->ft601_generic.data_ctrl_in;
 
     res = libusb_to_errno(libusb_submit_transfer(transfer));
     if (res) {
@@ -193,11 +144,23 @@ int usbft601_uram_ctrl_in_pkt(usbft601_dev_t* dev, unsigned pkt_szb, unsigned ti
     return 0;
 }
 
+static int usbft601_sem_ctrl_rb_wait(lldev_t lld, int64_t timeout)
+{
+    usbft601_dev_t* d = (usbft601_dev_t*)lld;
+    return sem_wait_ex(&d->tr_ctrl_rb, timeout);
+}
+
+static void usbft601_sem_ctrl_out_post(lldev_t lld)
+{
+    usbft601_dev_t* d = (usbft601_dev_t*)lld;
+    sem_post(&d->tr_ctrl_out);
+}
+
 void LIBUSB_CALL libusb_transfer_ctrl_rb(struct libusb_transfer *transfer)
 {
     usbft601_dev_t* dev = (usbft601_dev_t*)transfer->user_data;
     dev->len_ctrl_in_rb = transfer->actual_length;
-    const proto_lms64c_t* d = &dev->data_ctrl_in[0];
+    const proto_lms64c_t* d = &dev->ft601_generic.data_ctrl_in[0];
 
     USDR_LOG("USBX", USDR_LOG_DEBUG, "     RB transfer %d / %d <= { %02x %02x %02x %02x  %02x %02x %02x %02x | %02x %02x %02x %02x  %02x %02x %02x %02x  ... }\n",
              transfer->status, transfer->actual_length,
@@ -213,157 +176,6 @@ void LIBUSB_CALL libusb_transfer_ctrl_rb(struct libusb_transfer *transfer)
     }
 
     sem_post(&dev->tr_ctrl_rb);
-}
-
-
-static
-int usbft601_ctrl_transfer(usbft601_dev_t* dev, uint8_t cmd, const uint8_t* data_in, unsigned length_in,
-                                uint8_t* data_out, unsigned length_out, unsigned timeout_ms)
-{
-    int cnt, res;
-    unsigned pkt_szb;
-    // Compose packet
-    if (length_in == 0)
-        length_in = 1;
-
-    cnt = lms64c_fill_packet(cmd, 0, 0, data_in, length_in, dev->data_ctrl_out, MAX_CTRL_BURST);
-    if (cnt < 0) {
-        USDR_LOG("USBX", USDR_LOG_ERROR, "Too long command %d bytes; might be an error!\n", length_in);
-        return -EINVAL;
-    }
-    pkt_szb = cnt * LMS64C_PKT_LENGTH;
-
-    res = usbft601_uram_ctrl_out_pkt(dev, pkt_szb, timeout_ms);
-    if (res) {
-        return res;
-    }
-
-    res = usbft601_uram_ctrl_in_pkt(dev, pkt_szb, timeout_ms);
-    if (res) {
-        goto failed;
-    }
-
-    res = sem_wait_ex(&dev->tr_ctrl_rb, timeout_ms * 1000 * 1000);
-    if (res) {
-        goto failed;
-    }
-
-    // Parse result
-    if (length_out) {
-        res = lms64c_parse_packet(cmd, dev->data_ctrl_in, cnt, data_out, length_out);
-    }
-
-    // Return status of transfer
-    switch (dev->data_ctrl_in[0].status) {
-    case STATUS_COMPLETED_CMD: res = 0; break;
-    case STATUS_UNKNOWN_CMD: res = -ENOENT; break;
-    case STATUS_BUSY_CMD: res = -EBUSY; break;
-    default: res = -EFAULT; break;
-    }
-
-failed:
-    sem_post(&dev->tr_ctrl_out);
-    return res;
-}
-
-struct ft601_device_info {
-    unsigned firmware;
-    unsigned device;
-    unsigned protocol;
-    unsigned hardware;
-    unsigned expansion;
-    uint64_t boardSerialNumber;
-};
-typedef struct ft601_device_info ft601_device_info_t;
-
-static
-int usbft601_uram_get_info(usbft601_dev_t* dev, ft601_device_info_t* info)
-{
-    uint8_t tmpdata[32];
-    int res;
-
-    res = usbft601_ctrl_transfer(dev, CMD_GET_INFO, NULL, 0, tmpdata, sizeof(tmpdata), 3000);
-    if (res)
-        return res;
-
-    info->firmware = tmpdata[0];
-    info->device = tmpdata[1];
-    info->protocol = tmpdata[2];
-    info->hardware = tmpdata[3];
-    info->expansion = tmpdata[4];
-    info->boardSerialNumber = 0;
-
-    return 0;
-}
-
-
-
-static
-int usbft601_uram_ls_op(lldev_t dev, subdev_t subdev,
-                        unsigned ls_op, lsopaddr_t ls_op_addr,
-                        size_t meminsz, void* pin,
-                        size_t memoutsz, const void* pout)
-{
-    int res;
-    usbft601_dev_t* d = (usbft601_dev_t*)dev;
-    unsigned timeout_ms = 3000;
-    uint16_t tmpbuf_out[2048];
-
-    switch (ls_op) {
-    case USDR_LSOP_HWREG:
-         if (pout == NULL || memoutsz == 0) {
-             if (meminsz > sizeof(tmpbuf_out))
-                 return -E2BIG;
-
-             // Register read
-             for (unsigned i = 0; i < meminsz / 2; i++) {
-                 tmpbuf_out[i] = ls_op_addr + i;
-             }
-
-             res = usbft601_ctrl_transfer(d, CMD_BRDSPI_RD, (const uint8_t* )tmpbuf_out, meminsz, pin, meminsz, timeout_ms);
-         } else if (pin == NULL || meminsz == 0) {
-             if (memoutsz * 2 > sizeof(tmpbuf_out))
-                 return -E2BIG;
-
-             // Rgister write
-             const uint16_t* out_s = (const uint16_t* )pout;
-             for (unsigned i = 0; i < memoutsz / 2; i++) {
-                 tmpbuf_out[2 * i + 1] = ls_op_addr + i;
-                 tmpbuf_out[2 * i + 0] = out_s[i];
-             }
-
-             res = usbft601_ctrl_transfer(d, CMD_BRDSPI_WR, (const uint8_t* )tmpbuf_out, memoutsz * 2, pin, meminsz, timeout_ms);
-         } else {
-             return -EINVAL;
-         }
-         break;
-
-    case USDR_LSOP_SPI:
-        // TODO split to RD / WR packets
-        if (pin == NULL || meminsz == 0 || ((*(const uint32_t*)pout) & 0x80000000) != 0) {
-            res = usbft601_ctrl_transfer(d, CMD_LMS7002_WR, pout, memoutsz, pin, meminsz, timeout_ms);
-        } else {
-            for (unsigned k = 0; k < memoutsz / 4; k++) {
-                const uint32_t* pz = (const uint32_t*)(pout + 4 * k);
-                tmpbuf_out[k] = *pz >> 16;
-            }
-            res = usbft601_ctrl_transfer(d, CMD_LMS7002_RD, (const uint8_t* )tmpbuf_out /*pout*/, memoutsz / 2, pin, meminsz, timeout_ms);
-        }
-        break;
-
-    case USDR_LSOP_I2C_DEV:
-        break;
-
-    case USDR_LSOP_CUSTOM_CMD: {
-        uint8_t cmd = LMS_RST_PULSE;
-        res = usbft601_ctrl_transfer(d, CMD_LMS7002_RST, (const uint8_t* )&cmd, 1, NULL, 0, timeout_ms);
-        break;
-    }
-    default:
-        return -EOPNOTSUPP;
-    }
-
-    return res;
 }
 
 static
@@ -407,7 +219,6 @@ int usbft601_uram_stream_initialize(lldev_t dev, subdev_t subdev,
     *channel = params->streamno;
     return 0;
 }
-
 
 static
 int usbft601_uram_stream_deinitialize(lldev_t dev, subdev_t subdev, stream_t channel)
@@ -621,9 +432,10 @@ int usbft601_uram_plugin_discovery(unsigned pcount, const char** filterparams,
 
 
 static
-int usbft601_uram_async_start(usbft601_dev_t* dev)
+int usbft601_uram_async_start(lldev_t lld)
 {
     int res;
+    usbft601_dev_t* dev = (usbft601_dev_t*)lld;
 
     res = sem_init(&dev->tr_ctrl_out, 0, MAX_OUT_CTRL_REQS);
     if (res) {
@@ -638,8 +450,8 @@ int usbft601_uram_async_start(usbft601_dev_t* dev)
     // Prepare transfer queues
     res = libusb_generic_prepare_transfer(&dev->gdev, dev, EP_OUT_CTRL, LIBUSB_TRANSFER_TYPE_BULK,
                                           dev->transfer_out_ctrl,
-                                          (uint8_t*)dev->data_ctrl_out,
-                                          sizeof(dev->data_ctrl_out) / MAX_OUT_CTRL_REQS,
+                                          (uint8_t*)dev->ft601_generic.data_ctrl_out,
+                                          sizeof(dev->ft601_generic.data_ctrl_out) / MAX_OUT_CTRL_REQS,
                                           MAX_OUT_CTRL_REQS,
                                           &libusb_transfer_ctrl_out_pkt);
     if (res) {
@@ -648,8 +460,8 @@ int usbft601_uram_async_start(usbft601_dev_t* dev)
 
     res = libusb_generic_prepare_transfer(&dev->gdev, dev, EP_IN_CTRL, LIBUSB_TRANSFER_TYPE_BULK,
                                           dev->transfer_in_ctrl,
-                                          (uint8_t*)dev->data_ctrl_in,
-                                          sizeof(dev->data_ctrl_in) / MAX_IN_CTRL_REQS,
+                                          (uint8_t*)dev->ft601_generic.data_ctrl_in,
+                                          sizeof(dev->ft601_generic.data_ctrl_in) / MAX_IN_CTRL_REQS,
                                           MAX_IN_CTRL_REQS,
                                           &libusb_transfer_ctrl_rb);
     if (res) {
@@ -662,7 +474,15 @@ failed_prepare:
     return res;
 }
 
-
+const static
+usb_ft601_io_ops_t s_io_ops = {
+    libusb_io_write,
+    usbft601_uram_ctrl_out_pkt,
+    usbft601_uram_ctrl_in_pkt,
+    usbft601_sem_ctrl_rb_wait,
+    usbft601_sem_ctrl_out_post,
+    usbft601_uram_async_start,
+};
 
 static
 int usbft601_uram_plugin_create(unsigned pcount, const char** devparam,
@@ -682,6 +502,8 @@ int usbft601_uram_plugin_create(unsigned pcount, const char** devparam,
     dev->lld.ops = &dev->ops;
     dev->ops = s_usbft601_uram_ops;
 
+    dev->ft601_generic.io_ops = s_io_ops;
+
     res = libusb_generic_plugin_create(pcount, devparam, devval, s_known_devices, KNOWN_USB_DEVICES,
                                        "usbft601", &dev->gdev);
     if (res) {
@@ -698,61 +520,9 @@ int usbft601_uram_plugin_create(unsigned pcount, const char** devparam,
         goto usballoc_fail;
     }
 
-    // FT601 initialization
-    res = res ? res : ft601_flush_pipe(&dev->lld, EP_IN_CTRL);  //clear ctrl ep rx buffer
-    res = res ? res : ft601_set_stream_pipe(&dev->lld, EP_IN_CTRL, CTRL_SIZE);
-    res = res ? res : ft601_set_stream_pipe(&dev->lld, EP_OUT_CTRL, CTRL_SIZE);
-    if (res) {
+    res = usbft601_uram_generic_create_and_init(&dev->lld, pcount, devparam, devval, &dev->gdev.devid);
+    if(res) {
         goto usballoc_fail;
-    }
-
-    res = usbft601_uram_async_start(dev);
-    if (res) {
-        goto usballoc_fail;
-    }
-
-    ft601_device_info_t nfo;
-    res = usbft601_uram_get_info(dev, &nfo);
-    if (res) {
-        goto stop_async;
-    }
-
-    USDR_LOG("USBX", USDR_LOG_INFO, "Firmware: %d, Dev: %d, Proto: %d, HW: %d, Serial: %lld\n",
-             nfo.firmware, nfo.device, nfo.protocol, nfo.hardware,
-             (long long int)nfo.boardSerialNumber);
-
-    if (nfo.device != LMS_DEV_LIMESDRMINI_V2) {
-        USDR_LOG("USBX", USDR_LOG_INFO, "Unsupported device!\n");
-        goto stop_async;
-    }
-
-    // Device initialization
-    res = usdr_device_create(&dev->lld, dev->gdev.devid);
-    if (res) {
-        USDR_LOG("USBX", USDR_LOG_ERROR,
-                 "Unable to find device spcec for %s, uuid %s! Update software!\n",
-                 dev->gdev.name, usdr_device_id_to_str(dev->gdev.devid));
-
-        goto stop_async;
-    }
-
-    res = device_bus_init(dev->lld.pdev, &dev->db);
-    if (res) {
-        USDR_LOG("USBX", USDR_LOG_ERROR,
-                 "Unable to initialize bus parameters for the device %s!\n", dev->gdev.name);
-
-        goto remove_dev;
-    }
-
-    // Register operations are now available
-
-
-
-    res = dev->lld.pdev->initialize(dev->lld.pdev, pcount, devparam, devval);
-    if (res) {
-        USDR_LOG("U601", USDR_LOG_ERROR,
-                 "Unable to initialize device, error %d\n", res);
-        goto remove_dev;
     }
 
     USDR_LOG("U601", USDR_LOG_INFO, "USB FT601 device %s{%s} created with %d Mbps link\n",
@@ -760,10 +530,6 @@ int usbft601_uram_plugin_create(unsigned pcount, const char** devparam,
 
     *odev = &dev->lld;
     return 0;
-
-remove_dev:
-
-stop_async:
 
 usballoc_fail:
     free(dev);

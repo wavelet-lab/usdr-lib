@@ -50,6 +50,7 @@ add_subdirectory(../json_controller json_controller)
 set(WEBUSB_TEST_LIB_FILES
     "../lowlevel/usb_uram/usb_uram_generic.c"
     "../lowlevel/usb_uram/usb_uram_webusb.c"
+    "../lowlevel/usb_ft601/usb_ft601_generic.c"
     "../lowlevel/usb_ft601/usb_ft601_webusb.c"
     "../lowlevel/usdr_lowlevel.c"
     "webusb.c"
