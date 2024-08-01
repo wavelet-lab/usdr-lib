@@ -49,9 +49,6 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     for (unsigned i = diap.from; i < diap.to; i += 16)
     {
-        // discharge all
-        RTSA_U16_DISCHARGE(16);
-
         uint16x8_t s0 = vld1q_u16(&in[i + 0]);
         uint16x8_t s1 = vld1q_u16(&in[i + 8]);
 
@@ -62,6 +59,9 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         uint16x8_t p1 = vmulq_n_u16(vshlq_u16(vsubq_u16(s1, v_c0), shr0), hwi16_consts->org_scale);
                    p1 = vabdq_u16(vshlq_u16(p1, shr1), v_c1);
                    p1 = vminq_u16(p1, max_ind);
+
+        // discharge all
+        RTSA_U16_DISCHARGE(16);
 
         //load cells
         uint16x8_t pwr0, pwr1;

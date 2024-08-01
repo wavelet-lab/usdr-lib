@@ -41,9 +41,6 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
     for (unsigned i = diap.from; i < diap.to; i += 8)
     {
-        // discharge all
-        RTSA_U16_DISCHARGE(8);
-
         // load 8 complex pairs = 16 floats = 64b = 512bits
         //
         float32x4x2_t e0 = vld2q_f32(&in[i + 0][0]);
@@ -77,6 +74,9 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         //
         float32x4_t pn0 = vminq_f32(p0, max_ind);
         float32x4_t pn1 = vminq_f32(p1, max_ind);
+
+        // discharge all
+        RTSA_U16_DISCHARGE(8);
 
 #ifdef USE_RTSA_ANTIALIASING
         // low bound

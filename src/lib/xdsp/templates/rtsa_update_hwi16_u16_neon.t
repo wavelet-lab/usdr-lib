@@ -38,9 +38,6 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     for (unsigned i = diap.from; i < diap.to; i += 8)
     {
-        // discharge all
-        RTSA_U16_DISCHARGE(8);
-
         uint16x8_t l2 = vld1q_u16(&in[i]);
 
         float32x4_t l2_res0 = vcvtq_f32_u32( vmovl_u16(vget_low_u16(l2)) );
@@ -59,6 +56,9 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         //
         float32x4_t pn0 = vminq_f32(p0, max_ind);
         float32x4_t pn1 = vminq_f32(p1, max_ind);
+
+        // discharge all
+        RTSA_U16_DISCHARGE(8);
 
 #ifdef USE_RTSA_ANTIALIASING
         // low bound

@@ -56,10 +56,6 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     for (unsigned i = diap.from; i < diap.to; i += 64)
     {
-        // discharge all
-        RTSA_U16_DISCHARGE(i, 32);
-        RTSA_U16_DISCHARGE(i+32, 32);
-
         __m256i s0 = _mm256_load_si256((__m256i*)&in[i +  0]);
         __m256i s1 = _mm256_load_si256((__m256i*)&in[i + 16]);
         __m256i s2 = _mm256_load_si256((__m256i*)&in[i + 32]);
@@ -80,6 +76,10 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         __m256i p3 = _mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s3, v_c0), shr0), v_scale);
                 p3 = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p3, shr1), v_c1));
                 p3 = _mm256_min_epi16(p3, max_ind);
+
+        // discharge all
+        RTSA_U16_DISCHARGE(i, 32);
+        RTSA_U16_DISCHARGE(i+32, 32);
 
         // load charge cells
         //
