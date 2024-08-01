@@ -18,14 +18,14 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 static
 void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float fcale_mpy, float mine, float corr)
+                        float fcale_mpy, float mine, float corr, fft_diap_t diap)
 {
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const unsigned rtsa_depth = st->rtsa_depth;
     const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
     const float discharge_rate = 1.0f / st->charging_frame / st->decay_coef;
 
-    for(unsigned i = 0; i < fft_size; ++i)
+    for(unsigned i = diap.from; i < diap.to; ++i)
     {
 #ifdef USE_POLYLOG2
         float p = fcale_mpy * wvlt_polylog2f(in[i][0]*in[i][0] + in[i][1]*in[i][1] + mine) + corr;

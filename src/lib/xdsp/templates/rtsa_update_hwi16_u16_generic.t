@@ -4,7 +4,7 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, float corr)
+                        float scale, float corr, fft_diap_t diap)
 {
     scale /= HWI16_SCALE_COEF;
     corr = corr / HWI16_SCALE_COEF + HWI16_CORR_COEF;
@@ -14,7 +14,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
     const unsigned decay_rate_pw2 = (unsigned)(wvlt_fastlog2(st->charging_frame * st->decay_coef) + 0.5);
 
-    for(unsigned i = 0; i < fft_size; ++i)
+    for(unsigned i = diap.from; i < diap.to; ++i)
     {
         float p = scale * (float)in[i] + corr;
 
