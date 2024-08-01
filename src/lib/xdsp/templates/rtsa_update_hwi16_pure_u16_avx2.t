@@ -57,7 +57,8 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     for (unsigned i = diap.from; i < diap.to; i += 64)
     {
         // discharge all
-        RTSA_U16_DISCHARGE(i, 64);
+        RTSA_U16_DISCHARGE(i, 32);
+        RTSA_U16_DISCHARGE(i+32, 32);
 
         __m256i s0 = _mm256_load_si256((__m256i*)&in[i +  0]);
         __m256i s1 = _mm256_load_si256((__m256i*)&in[i + 16]);
@@ -89,21 +90,19 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                   offs2 = {_mm256_adds_epu16(v_depth_cfs, p2)},
                   offs3 = {_mm256_adds_epu16(v_depth_cfs, p3)};
 
-        uint16_t* ptr = rtsa_data->pwr + i * rtsa_depth;
-        for(unsigned j = 0; j < 16; ++j)
-            pwr0.arr[j] = *(ptr + offs0.arr[j]);
+        uint16_t* ptr0 = rtsa_data->pwr + i * rtsa_depth;
+        uint16_t* ptr1 = ptr0 + 16 * rtsa_depth;
+        uint16_t* ptr2 = ptr1 + 16 * rtsa_depth;
+        uint16_t* ptr3 = ptr2 + 16 * rtsa_depth;
 
-        ptr += 16 * rtsa_depth;
         for(unsigned j = 0; j < 16; ++j)
-            pwr1.arr[j] = *(ptr + offs1.arr[j]);
-
-        ptr += 16 * rtsa_depth;
+            pwr0.arr[j] = *(ptr0 + offs0.arr[j]);
         for(unsigned j = 0; j < 16; ++j)
-            pwr2.arr[j] = *(ptr + offs2.arr[j]);
-
-        ptr += 16 * rtsa_depth;
+            pwr1.arr[j] = *(ptr1 + offs1.arr[j]);
         for(unsigned j = 0; j < 16; ++j)
-            pwr3.arr[j] = *(ptr + offs3.arr[j]);
+            pwr2.arr[j] = *(ptr2 + offs2.arr[j]);
+        for(unsigned j = 0; j < 16; ++j)
+            pwr3.arr[j] = *(ptr3 + offs3.arr[j]);
 
         //Charge
         //
@@ -119,21 +118,14 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
         //Store charged
         //
-        ptr = rtsa_data->pwr + i * rtsa_depth;
         for(unsigned j = 0; j < 16; ++j)
-            *(ptr + offs0.arr[j]) = pwr0.arr[j];
-
-        ptr += 16 * rtsa_depth;
+            *(ptr0 + offs0.arr[j]) = pwr0.arr[j];
         for(unsigned j = 0; j < 16; ++j)
-            *(ptr + offs1.arr[j]) = pwr1.arr[j];
-
-        ptr += 16 * rtsa_depth;
+            *(ptr1 + offs1.arr[j]) = pwr1.arr[j];
         for(unsigned j = 0; j < 16; ++j)
-            *(ptr + offs2.arr[j]) = pwr2.arr[j];
-
-        ptr += 16 * rtsa_depth;
+            *(ptr2 + offs2.arr[j]) = pwr2.arr[j];
         for(unsigned j = 0; j < 16; ++j)
-            *(ptr + offs3.arr[j]) = pwr3.arr[j];
+            *(ptr3 + offs3.arr[j]) = pwr3.arr[j];
     }
 }
 
