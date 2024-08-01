@@ -14,6 +14,7 @@
 
 #define USE_POLYLOG2
 #undef USE_PURE_U16
+#undef USE_RTSA_ANTIALIASING
 
 VWLT_ATTRIBUTE(optimize("-O3"))
 void rtsa_init(fft_rtsa_data_t* rtsa_data, unsigned fft_size)

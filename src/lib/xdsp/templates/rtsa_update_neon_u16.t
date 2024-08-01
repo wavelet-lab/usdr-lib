@@ -21,14 +21,19 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const unsigned rtsa_depth = st->rtsa_depth;
     const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
+    const float32x4_t ch_norm_coef  = vdupq_n_f32(CHARGE_NORM_COEF);
+
     const unsigned decay_rate_pw2 = (unsigned)(wvlt_log2f_fn(st->charging_frame * st->decay_coef) + 0.5);
     const int16x8_t decay_shr = vdupq_n_s16((uint8_t)(-decay_rate_pw2));
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
+    const float scale = fcale_mpy * (float)st->divs_for_dB;
 
     const float32x4_t v_mine        = vdupq_n_f32(mine);
-    const float32x4_t v_corr        = vdupq_n_f32(corr - (float)st->upper_pwr_bound);
+    const float32x4_t v_corr        = vdupq_n_f32((corr - (float)st->upper_pwr_bound) * (float)st->divs_for_dB);
     const float32x4_t max_ind       = vdupq_n_f32((float)(rtsa_depth - 1) - 0.5f);
+#ifdef USE_RTSA_ANTIALIASING
     const float32x4_t f_ones        = vdupq_n_f32(1.0f);
+#endif
     const float32x4_t f_maxcharge   = vdupq_n_f32((float)MAX_RTSA_PWR);
 
     const unsigned discharge_add    = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
@@ -57,24 +62,23 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         float32x4_t l2_res1 = vmlaq_n_f32(log2_sub, summ1_, WVLT_FASTLOG2_MUL);
 #endif
         // add scale & corr
-        float32x4_t pwr0 = vmlaq_n_f32(v_corr, l2_res0, fcale_mpy);
-        float32x4_t pwr1 = vmlaq_n_f32(v_corr, l2_res1, fcale_mpy);
+        float32x4_t pw0 = vmlaq_n_f32(v_corr, l2_res0, scale);
+        float32x4_t pw1 = vmlaq_n_f32(v_corr, l2_res1, scale);
 
         // drop sign
         //
-        float32x4_t p0raw = vabsq_f32(pwr0);
-        float32x4_t p1raw = vabsq_f32(pwr1);
-
-        // multiply to div cost
-        //
-        float32x4_t p0 = vmulq_n_f32(p0raw, (float)st->divs_for_dB);
-        float32x4_t p1 = vmulq_n_f32(p1raw, (float)st->divs_for_dB);
+        float32x4_t p0 = vabsq_f32(pw0);
+        float32x4_t p1 = vabsq_f32(pw1);
 
         // normalize
         //
         float32x4_t pn0 = vminq_f32(p0, max_ind);
         float32x4_t pn1 = vminq_f32(p1, max_ind);
 
+        // discharge all
+        RTSA_U16_DISCHARGE(8);
+
+#ifdef USE_RTSA_ANTIALIASING
         // low bound
         //
         float32x4_t lo0 = vrndq_f32(pn0);
@@ -103,22 +107,17 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         float32x4_t charge_lo0 = vmulq_n_f32(vsubq_f32(hi0, pn0), charge_rate);
         float32x4_t charge_lo1 = vmulq_n_f32(vsubq_f32(hi1, pn1), charge_rate);
 
-        float32x4_t ch_a_hi0 = vsubq_f32(f_ones, charge_hi0);
-        float32x4_t ch_a_hi1 = vsubq_f32(f_ones, charge_hi1);
-        float32x4_t ch_a_lo0 = vsubq_f32(f_ones, charge_lo0);
-        float32x4_t ch_a_lo1 = vsubq_f32(f_ones, charge_lo1);
-
-        float32x4_t ch_b_hi0 = vmulq_n_f32(charge_hi0, CHARGE_NORM_COEF);
-        float32x4_t ch_b_hi1 = vmulq_n_f32(charge_hi1, CHARGE_NORM_COEF);
-        float32x4_t ch_b_lo0 = vmulq_n_f32(charge_lo0, CHARGE_NORM_COEF);
-        float32x4_t ch_b_lo1 = vmulq_n_f32(charge_lo1, CHARGE_NORM_COEF);
-
         // charge
         //
-        pwr_hi0 = vminq_f32( vmlaq_f32(ch_b_hi0, pwr_hi0, ch_a_hi0), f_maxcharge);
-        pwr_hi1 = vminq_f32( vmlaq_f32(ch_b_hi1, pwr_hi1, ch_a_hi1), f_maxcharge);
-        pwr_lo0 = vminq_f32( vmlaq_f32(ch_b_lo0, pwr_lo0, ch_a_lo0), f_maxcharge);
-        pwr_lo1 = vminq_f32( vmlaq_f32(ch_b_lo1, pwr_lo1, ch_a_lo1), f_maxcharge);
+        float32x4_t cdelta_lo0 = vmulq_f32(vsubq_f32(ch_norm_coef, pwr_lo0), charge_lo0);
+        float32x4_t cdelta_hi0 = vmulq_f32(vsubq_f32(ch_norm_coef, pwr_hi0), charge_hi0);
+        float32x4_t cdelta_lo1 = vmulq_f32(vsubq_f32(ch_norm_coef, pwr_lo1), charge_lo1);
+        float32x4_t cdelta_hi1 = vmulq_f32(vsubq_f32(ch_norm_coef, pwr_hi1), charge_hi1);
+
+        pwr_lo0 = vminq_f32(vaddq_f32(pwr_lo0, cdelta_lo0), f_maxcharge);
+        pwr_hi0 = vminq_f32(vaddq_f32(pwr_hi0, cdelta_hi0), f_maxcharge);
+        pwr_lo1 = vminq_f32(vaddq_f32(pwr_lo1, cdelta_lo1), f_maxcharge);
+        pwr_hi1 = vminq_f32(vaddq_f32(pwr_hi1, cdelta_hi1), f_maxcharge);
 
         // store charged
         //
@@ -129,11 +128,32 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
             rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)hi0[j]] = (uint16_t)pwr_hi0[j];
             rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)hi1[j]] = (uint16_t)pwr_hi1[j];
         }
+#else
+        float32x4_t pwr0, pwr1;
 
-        // discharge all
-        // note - we will discharge cells in the [i, i+8) fft band because those pages are already loaded to cache
+        // load cells
+        for(unsigned j = 0; j < 4; ++j)
+        {
+            pwr0[j] = (float)rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)pn0[j]];
+            pwr1[j] = (float)rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)pn1[j]];
+        }
+
+        // charge
         //
-        RTSA_U16_DISCHARGE(8);
+        float32x4_t cdelta_p0 = vmulq_n_f32(vsubq_f32(ch_norm_coef, pwr0), charge_rate);
+        float32x4_t cdelta_p1 = vmulq_n_f32(vsubq_f32(ch_norm_coef, pwr1), charge_rate);
+
+        pwr0 = vminq_f32(vaddq_f32(pwr0, cdelta_p0), f_maxcharge);
+        pwr1 = vminq_f32(vaddq_f32(pwr1, cdelta_p1), f_maxcharge);
+
+        // store charged
+        //
+        for(unsigned j = 0; j < 4; ++j)
+        {
+            rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)pn0[j]] = (uint16_t)pwr0[j];
+            rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)pn1[j]] = (uint16_t)pwr1[j];
+        }
+#endif
     }
 }
 

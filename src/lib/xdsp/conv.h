@@ -146,6 +146,16 @@ struct fft_rtsa_settings
 };
 typedef struct fft_rtsa_settings fft_rtsa_settings_t;
 
+struct rtsa_hwi16_consts
+{
+    float org_scale;        // original scale
+    uint16_t nfft;          // log2(fft_size)
+    uint16_t c0, c1;        // scaling coefs
+    uint16_t ndivs_for_dB;  // log2(divs_for_dB)
+    uint16_t shr0, shr1;    // shifting coefs
+};
+typedef struct rtsa_hwi16_consts rtsa_hwi16_consts_t;
+
 #undef RTSA_FP32
 
 #ifdef RTSA_FP32
@@ -184,13 +194,13 @@ void tr_##conv_fn (wvlt_fftwf_complex* __restrict in, unsigned fft_size, \
 typedef void (*rtsa_update_hwi16_function_t)
     (   uint16_t* __restrict in, unsigned fft_size,
         fft_rtsa_data_t* __restrict rtsa_data,
-        float fcale_mpy, float corr, fft_diap_t diap);
+        float fcale_mpy, float corr, fft_diap_t diap, const rtsa_hwi16_consts_t* __restrict hwi16_consts);
 
 #define DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(conv_fn) \
 void tr_##conv_fn (uint16_t* __restrict in, unsigned fft_size, \
                   fft_rtsa_data_t* __restrict rtsa_data, \
-                  float fcale_mpy, float corr, fft_diap_t diap) \
-{ conv_fn( in, fft_size, rtsa_data, fcale_mpy, corr, diap ); }
+                  float fcale_mpy, float corr, fft_diap_t diap, const rtsa_hwi16_consts_t* __restrict hwi16_consts) \
+{ conv_fn( in, fft_size, rtsa_data, fcale_mpy, corr, diap, hwi16_consts); }
 
 
 //FFT windows conv

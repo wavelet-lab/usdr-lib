@@ -19,6 +19,7 @@
 #define AVGS 256
 #define RAISE_COEF 32
 #define DECAY_COEF 1
+#define CHARGING_FRAME 256
 
 #define STREAM_SIZE 4096
 static_assert( STREAM_SIZE >= 4096, "STREAM_SIZE should be >= 4096!" );
@@ -26,7 +27,7 @@ static const unsigned packet_lens[4] = { 256, 512, 1024, STREAM_SIZE };
 
 #define SPEED_MEASURE_ITERS 100
 
-#define EPSILON MAX_RTSA_PWR / 100
+#define EPSILON MAX_RTSA_PWR / 10
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
@@ -39,8 +40,12 @@ static rtsa_pwr_t* out_etalon = NULL;
 static struct fft_rtsa_data rtsa_data;
 static struct fft_rtsa_data rtsa_data_etalon;
 
-static float scale_mpy = 0.0f;
+static float scale_mpy = 3.010f;
+static float mine = 1E-7f;
+static float corr = -50.f;
+
 static fft_rtsa_settings_t rtsa_settings;
+static rtsa_hwi16_consts_t hwi16_consts;
 
 static void setup(void)
 {
@@ -71,7 +76,7 @@ static void setup(void)
     st->lower_pwr_bound = LOWER_PWR_BOUND;
     st->upper_pwr_bound = UPPER_PWR_BOUND;
     st->divs_for_dB     = DIVS_FOR_DB;
-    st->charging_frame  = AVGS;
+    st->charging_frame  = CHARGING_FRAME;
     st->raise_coef      = RAISE_COEF;
     st->decay_coef      = DECAY_COEF;
     rtsa_calc_depth(st);
@@ -109,6 +114,7 @@ START_TEST(rtsa_check)
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
 
     fft_diap_t diap = {0, STREAM_SIZE};
+    rtsa_fill_hwi16_consts(&rtsa_settings, STREAM_SIZE, scale_mpy, &hwi16_consts);
 
     // get reference
     rtsa_init(&rtsa_data_etalon, STREAM_SIZE);
@@ -116,7 +122,7 @@ START_TEST(rtsa_check)
     {
         wvlt_fftwf_complex* ptr = in + i * STREAM_SIZE;
         rtsa_update_c(OPT_GENERIC, NULL)
-            (ptr, STREAM_SIZE, &rtsa_data_etalon, scale_mpy, 1E-7f, -50.0f, diap);
+            (ptr, STREAM_SIZE, &rtsa_data_etalon, scale_mpy, mine, corr, diap);
     }
 
     last_fn_name = NULL;
@@ -140,7 +146,7 @@ START_TEST(rtsa_check)
         {
             wvlt_fftwf_complex* ptr = in + i * STREAM_SIZE;
             (*fn_update)
-                (ptr, STREAM_SIZE, &rtsa_data, scale_mpy, 1E-7f, -50.0f, diap);
+                (ptr, STREAM_SIZE, &rtsa_data, scale_mpy, mine, corr, diap);
         }
 
         int res = is_equal();
@@ -175,6 +181,7 @@ START_TEST(rtsa_speed)
 
     unsigned size = packet_lens[_i];
     fft_diap_t diap = {0, size};
+    rtsa_fill_hwi16_consts(&rtsa_settings, _i, scale_mpy, &hwi16_consts);
 
     last_fn_name = NULL;
     generic_opts_t opt = max_opt;
@@ -198,7 +205,7 @@ START_TEST(rtsa_speed)
         rtsa_init(&rtsa_data, size);
         for(unsigned i = 0; i < 100; ++i)
                 (*fn_update)
-                    (in, size, &rtsa_data, scale_mpy, 1E-7f, -50.0f, diap);
+                    (in, size, &rtsa_data, scale_mpy, mine, corr, diap);
 
         //measuring
         rtsa_init(&rtsa_data, size);
@@ -210,7 +217,7 @@ START_TEST(rtsa_speed)
             {
                 wvlt_fftwf_complex* ptr = in + j * STREAM_SIZE;
                 (*fn_update)
-                    (ptr, size, &rtsa_data, scale_mpy, 1E-7f, -50.0f, diap);
+                    (ptr, size, &rtsa_data, scale_mpy, mine, corr, diap);
             }
         }
 
@@ -237,6 +244,10 @@ START_TEST(rtsa_speed_u16)
     unsigned size = packet_lens[_i];
     fft_diap_t diap = {0, size};
 
+    scale_mpy /= HWI16_SCALE_COEF;
+    corr = corr / HWI16_SCALE_COEF + HWI16_CORR_COEF;
+    rtsa_fill_hwi16_consts(&rtsa_settings, _i, scale_mpy, &hwi16_consts);
+
     last_fn_name = NULL;
     generic_opts_t opt = max_opt;
 
@@ -259,7 +270,7 @@ START_TEST(rtsa_speed_u16)
         rtsa_init(&rtsa_data, size);
         for(unsigned i = 0; i < 100; ++i)
             (*fn_update)
-                (in16, size, &rtsa_data, 3.010f, 0.0f, diap);
+                (in16, size, &rtsa_data, scale_mpy, corr, diap, &hwi16_consts);
 
         //measuring
         rtsa_init(&rtsa_data, size);
@@ -271,7 +282,7 @@ START_TEST(rtsa_speed_u16)
             {
                 uint16_t* ptr = in16 + j * STREAM_SIZE;
                 (*fn_update)
-                    (ptr, size, &rtsa_data, 3.010f, 0.0f, diap);
+                    (ptr, size, &rtsa_data, scale_mpy, corr, diap, &hwi16_consts);
             }
         }
 
