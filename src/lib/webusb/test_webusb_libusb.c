@@ -147,7 +147,7 @@ static
 char s_rpc_revision[] =
         "{"
         "\"req_method\":\"sdr_get_revision\","
-        "\"req_ref\":\"abyr_valg123456\","
+        "\"id\":\"abyr_valg123456\","
         "\"req_params\": {}"
         "}";
 

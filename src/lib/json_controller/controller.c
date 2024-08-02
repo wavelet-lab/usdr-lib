@@ -75,6 +75,7 @@ static const struct idx_list s_param_list[] = {
     { "contrast",          SDRC_CONTRAST },
     { "stream_type",       SDRC_STREAM_TYPE },
     { "fft_provider",      SDRC_FFT_PROVIDER },
+    { "compression",       SDRC_COMPRESSION },
 };
 
 static int parse_parameter(const char* parameter)
@@ -166,7 +167,7 @@ int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* paren
 
                 psdrc->call_data_ptr = idx;
                 psdrc->call_data_size = len;
-            } else if (strcmp(name, "req_ref") == 0 && value != NULL && *value != 0) {
+            } else if (strcmp(name, "id") == 0 && value != NULL && *value != 0) {
                 // request reference -> will be added to reply
                 psdrc->call_req_ref = value;
             }
@@ -273,7 +274,7 @@ void print_rpc_reply(const struct sdr_call* sdrc,
     char wrap_format[256];
 
     if(sdrc->call_req_ref && *sdrc->call_req_ref)
-        snprintf(wrap_format, sizeof(wrap_format), "{\"result\":%d,\"rep_ref\":\"%.64s\",\"details\":{%s}}", res, sdrc->call_req_ref, details_format);
+        snprintf(wrap_format, sizeof(wrap_format), "{\"result\":%d,\"id\":\"%.64s\",\"details\":{%s}}", res, sdrc->call_req_ref, details_format);
     else
         snprintf(wrap_format, sizeof(wrap_format), "{\"result\":%d,\"details\":{%s}}", res, details_format);
 
