@@ -198,6 +198,17 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
             type = RFIC_AD45LB49;
     }
 
+    if (args.count("rx_bw")) {
+        unsigned bw = atoi(args.at("rx_bw").c_str());
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() RX_BW set to %d", bw);
+        usdr_dme_set_uint(_dev->dev(), "/dm/sdr/0/rx/bandwidth", bw);
+    }
+    if (args.count("tx_bw")) {
+        unsigned bw = atoi(args.at("tx_bw").c_str());
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() TX_BW set to %d", bw);
+        usdr_dme_set_uint(_dev->dev(), "/dm/sdr/0/tx/bandwidth", bw);
+    }
+
     _streams[0].active = false;
     _streams[1].active = false;
 }
