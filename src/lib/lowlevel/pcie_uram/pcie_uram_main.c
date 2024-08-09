@@ -1031,7 +1031,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     err = pcie_reg_write32_ioctl(dev, 0, (15u << 24) | (0x00));
 
     // Device initialization
-    err = dev->ll.pdev->initialize(dev->ll.pdev, pcount, devparam, devval);
+    err = err ? err : dev->ll.pdev->initialize(dev->ll.pdev, pcount, devparam, devval);
     if (err) {
         USDR_LOG("PCIE", USDR_LOG_ERROR,
                  "Unable to initialize device, error %d\n", err);
