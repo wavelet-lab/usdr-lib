@@ -587,7 +587,7 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
         // Disable mixer LO
         // OUT3210_OE, ~0,
 
-        OUT3210_OE, (!loen ? B6_OUT3_OE : 0) | (!txen ? B6_OUT2_OE : 0) |  B6_OUT0_OE | B6_OUT1_OE,
+        OUT3210_OE, (loen ? B6_OUT3_OE : 0) | (txen ? B6_OUT2_OE : 0) |  B6_OUT0_OE | B6_OUT1_OE,
 
         USYS_CTRL, 0x01, //READY
         0xBA, (!loen ? BA_HSDIV3_DIS : 0) | BA_HSDIV1_DIS | BA_HSDIV2_DIS | BA_HSDIV4_DIS | BA_ID0_DIS | BA_ID1_DIS,
@@ -606,6 +606,7 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
             return res;
     }
 
+    USDR_LOG("5332", USDR_LOG_INFO, "MXLO_EN=%d TXCLK_EN=%d\n", loen, txen);
     return 0;
 }
 
