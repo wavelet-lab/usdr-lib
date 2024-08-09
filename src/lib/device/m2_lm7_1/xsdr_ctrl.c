@@ -1224,15 +1224,17 @@ int xsdr_prepare(xsdr_dev_t *d, bool rxen, bool txen)
                                  LMS7_CH_AB, 0,
                                  LMS7_CH_AB, 0);
 
-    if (txen) {
+    //if (txen) {
         // TODO: Add proper delay calibration
-        const unsigned coeff = 0x30;
+        // assign cfg_rx_idelay_addr = ~igp_phydly[3:0];
+        // assign cfg_rx_idelay_data = { 1'b0, igp_phydly[7:4] };
+        const unsigned coeff = 0x40;
         res = (res) ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_PHYCAL, coeff | 1);
         res = (res) ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_PHYCAL, coeff | 0);
         if (res) {
             return res;
         }
-    }
+    //}
 
     lms7002m_limelight_reset(&d->base.lmsstate);
 
