@@ -777,6 +777,7 @@ static int initialize_stream_tx_32(device_t* device,
 
     strdev->cached_samples = ~0u;
     strdev->rcnt = 0;
+    strdev->r_ts = 0; // Start timestamp
 
     strdev->stats.wirebytes = 0;
     strdev->stats.symbols = 0;
@@ -785,7 +786,8 @@ static int initialize_stream_tx_32(device_t* device,
 
     strdev->fd = sparams.underlying_fd;
 
-    strdev->burst_count = 0;
+    strdev->burst_mask = 0;
+    strdev->burst_count = 0; //TODO: fill actual maximum burst count
     *outu = strdev;
     return 0;
 }
