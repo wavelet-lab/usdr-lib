@@ -708,7 +708,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
     // TODO Read configuration from FLASH
 
     // Antenna band switch configuration
-    d->base.cfg_auto_rx[0].stop_freq = 3000e6;
+    d->base.cfg_auto_rx[0].stop_freq = 2200e6;
     d->base.cfg_auto_rx[0].band = RFE_LNAW;
     d->base.cfg_auto_rx[0].sw = 0;
     d->base.cfg_auto_rx[0].swlb = 1;
@@ -728,7 +728,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
     strncpy(d->base.cfg_auto_rx[2].name1, "EXT", sizeof(d->base.cfg_auto_rx[2].name1));
 
     d->base.cfg_auto_tx[0].stop_freq = (txcfg == TX_SW_HARD_H) ? 0 :
-                                  (txcfg == TX_SW_HARD_W) ? 4000e6 : 3000e6;
+                                  (txcfg == TX_SW_HARD_W) ? 4000e6 : 2200e6;
     d->base.cfg_auto_tx[0].band = 1;
     d->base.cfg_auto_tx[0].sw = 1;
     d->base.cfg_auto_tx[0].swlb = 0;
@@ -743,6 +743,9 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
 
     if (hwid == SSDR_DEV) {
         // QPC8019Q   0: RFC1 -- HF; 1: RFC2 -- LF
+
+        d->base.cfg_auto_rx[0].stop_freq = 3000e6;
+        d->base.cfg_auto_tx[0].stop_freq = 3000e6;
 
         d->base.cfg_auto_rx[0].sw = 1;
         d->base.cfg_auto_rx[0].swlb = 0;
