@@ -431,6 +431,26 @@ const lms7002m_lml_map_t lms7nfe_get_lml_portcfg(bool rx, unsigned chs, unsigned
         {{ LML_BI, LML_BQ, LML_BI, LML_BQ }},
         {{ LML_BQ, LML_BI, LML_BQ, LML_BI }},
     };
+
+    static const lms7002m_lml_map_t diqarray_tx[] = {
+         // MIMO modes
+         // {{ LML_BQ, LML_BI, LML_AQ, LML_AI }},
+         // {{ LML_BI, LML_BQ, LML_AI, LML_AQ }},
+         // {{ LML_AQ, LML_AI, LML_BQ, LML_BI }},
+         // {{ LML_AI, LML_AQ, LML_BI, LML_BQ }},
+        {{ LML_AQ, LML_AI, LML_BQ, LML_BI }},
+        {{ LML_AI, LML_AQ, LML_BI, LML_BQ }},
+        {{ LML_BQ, LML_BI, LML_AQ, LML_AI }},
+        {{ LML_BI, LML_BQ, LML_AI, LML_AQ }},
+
+         // SISO modes
+         {{ LML_AQ, LML_AI, LML_AQ, LML_AI }},
+         {{ LML_AI, LML_AQ, LML_AI, LML_AQ }},
+         {{ LML_BQ, LML_BI, LML_BQ, LML_BI }},
+         {{ LML_BI, LML_BQ, LML_BI, LML_BQ }},
+
+    };
+
 #if 0
     static const lms7002m_lml_map_t diqarray_tx[] = {
         // MIMO modes
@@ -462,7 +482,7 @@ const lms7002m_lml_map_t lms7nfe_get_lml_portcfg(bool rx, unsigned chs, unsigned
 
     const lms7002m_lml_map_t *diqarray = (rx) ? diqarray_rx : diqarray_tx;
 #endif
-    const lms7002m_lml_map_t *diqarray = diqarray_rx;
+    const lms7002m_lml_map_t *diqarray = (rx) ? diqarray_rx : diqarray_tx;;
     unsigned diqidx = 0;
     if (flags & RFIC_SWAP_IQ)
         diqidx |= 1;
