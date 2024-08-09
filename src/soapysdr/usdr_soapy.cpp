@@ -244,9 +244,14 @@ SoapySDR::Kwargs SoapyUSDR::getHardwareInfo(void) const
  ******************************************************************/
 size_t SoapyUSDR::getNumChannels(const int direction) const
 {
-    unsigned chans = 1;
+    uint64_t chans = 1;
+    const char* nch = direction == SOAPY_SDR_RX ? "/ll/sdr/max_sw_rx_chans" :  "/ll/sdr/max_sw_tx_chans";
+    int res = usdr_dme_get_uint(_dev->dev(), nch, &chans);
+    if (res) {
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::getNumChannels(%d): couldn't obtain channels count, defaulting to 1", direction);
+        return 1;
+    }
 
-    // TODO check channels count
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::getNumChannels(%d) => %d", direction, chans);
     return chans;
 }
