@@ -45,7 +45,8 @@ enum rfic_lms7_gain_types {
     RFIC_LMS7_RX_PGA_GAIN,
     RFIC_LMS7_RX_LB_GAIN,
     RFIC_LMS7_TX_PAD_GAIN,
-    RFIC_LMS7_TX_LB_GAIN
+    RFIC_LMS7_TX_LB_GAIN,
+    RFIC_LMS7_TX_PGA_GAIN,
 };
 
 enum rfic_lms7_tune_types {

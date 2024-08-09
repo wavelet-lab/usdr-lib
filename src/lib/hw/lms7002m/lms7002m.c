@@ -52,7 +52,7 @@ static int lms7002m_spi_post(lms7002m_state_t* obj, uint32_t* regs, unsigned cou
         if (res)
             return res;
 
-        USDR_LOG("7002", USDR_LOG_INFO, "%d/%d reg wr [mac:%d] %08x\n", i, count,
+        USDR_LOG("7002", USDR_LOG_NOTE, "%d/%d reg wr [mac:%d] %08x\n", i, count,
                  GET_LMS7002M_LML_0X0020_MAC(obj->reg_amac),
                  regs[i]);
 
@@ -71,7 +71,7 @@ static int lms7002m_spi_rd(lms7002m_state_t* obj, uint16_t addr, uint16_t* data)
     if (res)
         return res;
 
-    USDR_LOG("7002", USDR_LOG_INFO, "reg rd %04x => %04x\n", addr, rd & 0xffff);
+    USDR_LOG("7002", USDR_LOG_NOTE, "reg rd %04x => %04x\n", addr, rd & 0xffff);
     *data = (uint16_t)rd;
     return 0;
 }
@@ -142,6 +142,10 @@ int lms7002m_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
     out->rfe[0].tia = out->rfe[1].tia = 1;
     out->rfe[0].lna = out->rfe[1].lna = 12;
 
+    out->reg_tbb_gc_corr[0] = 0;
+    out->reg_tbb_gc_corr[1] = 0;
+    out->reg_tbb_gc[0] = 12;
+    out->reg_tbb_gc[1] = 12;
     return 0;
 }
 
@@ -1355,15 +1359,35 @@ int lms7002m_tbb_lpf_def(unsigned bw, bool lpf_l, lms7002m_lpf_params_t *params)
     }
 
     params->r = CLAMP(params->r, 0, 255);
-    params->rcc = CLAMP(params->r, 1, 63);
+    params->rcc = CLAMP(params->rcc, 1, 63);
     return 0;
 }
 
 int lms7002m_tbb_lpf_raw(lms7002m_state_t* m, lms7002m_lpf_params_t params)
 {
+    // TODO channel A/B
+    int gc = m->reg_tbb_gc_corr[0];
+    m->reg_tbb_gc[0] = m->reg_tbb_gc[1] = params.rcc;
+
+    gc = CLAMP(gc + params.rcc, 1, 63);
+
     uint32_t tbb_regs[] = {
         MAKE_LMS7002M_TBB_0x0109(params.r, params.r),
-        MAKE_LMS7002M_TBB_0x0108(params.rcc, 12, 12),
+        MAKE_LMS7002M_TBB_0x0108(gc, 12, 12),
+    };
+
+    return lms7002m_spi_post(m, tbb_regs, SIZEOF_ARRAY(tbb_regs));
+}
+
+int lms7002m_tbb_gain(lms7002m_state_t* m, int8_t gain)
+{
+    int gc = m->reg_tbb_gc[0];
+    m->reg_tbb_gc_corr[0] = m->reg_tbb_gc_corr[1] = gain;
+
+    gc = CLAMP(gain + gc, 1, 63);
+
+    uint32_t tbb_regs[] = {
+        MAKE_LMS7002M_TBB_0x0108(gc, 12, 12),
     };
 
     return lms7002m_spi_post(m, tbb_regs, SIZEOF_ARRAY(tbb_regs));

@@ -227,6 +227,7 @@ int lms7002m_set_gain(lms7002_dev_t *d,
         "RX_LB",
         "TX_PAD",
         "TX_LB",
+        "TX_PGA",
         "{invalid}",
     };
     USDR_LOG("XDEV", USDR_LOG_INFO, "%s: Set gain %s to %d on %d channel\n",
@@ -284,7 +285,15 @@ int lms7002m_set_gain(lms7002_dev_t *d,
         d->trf_lb_loss = 0;
         //res = lms7002m_trf_gain(&d->lmsstate, d->trf_lb_atten, d->trf_lb_loss);
         res = lms7002m_trf_gain(&d->lmsstate, TRF_GAIN_PAD, -10 * gain, &aret);
+        break;
+    case RFIC_LMS7_TX_PGA_GAIN:
+        if (gain > 63)
+            gain = 63;
+        else if (gain < -62)
+            gain = -62;
+        actual = 0;
 
+        res = lms7002m_tbb_gain(&d->lmsstate, gain);
         break;
     default:
         return -EINVAL;
@@ -1070,7 +1079,28 @@ int lms7002m_samplerate(lms7002_dev_t *d,
                rxtsp_div, txtsp_div, sisoddr_rx, sisoddr_tx,
                d->fref / 1e6);
 
-    return 0;
+    // Update BW if it's in auto mode
+    for (unsigned i = 0; i < 2; i++) {
+        if (rxrate > 1 && d->rx_run[i] && !d->rx_bw[i].set) {
+            USDR_LOG("XDEV", USDR_LOG_INFO, "Set RX[%d] bandwidth to %.3f Mhz\n", i, rxrate / 1e6);
+            res = res ? res : lms7002m_mac_set(&d->lmsstate, i == 0 ? LMS7_CH_A : LMS7_CH_B);
+            res = res ? res : lms7002m_rbb_bandwidth(d, rxrate, false);
+        }
+
+        if (txrate > 1 && d->tx_run[i] && !d->tx_bw[i].set) {
+            USDR_LOG("XDEV", USDR_LOG_INFO, "Set TX[%d] bandwidth to %.3f Mhz\n", i, txrate / 1e6);
+            res = res ? res : lms7002m_mac_set(&d->lmsstate, i == 0 ? LMS7_CH_A : LMS7_CH_B);
+            res = res ? res : lms7002m_tbb_bandwidth(d, txrate, false);
+
+            res = res ? res : lms7002m_set_gain(d, i == 0 ? LMS7_CH_A : LMS7_CH_B,
+                                                RFIC_LMS7_TX_PGA_GAIN, 13, NULL);
+            res = res ? res : lms7002m_set_gain(d, i == 0 ? LMS7_CH_A : LMS7_CH_B,
+                                                RFIC_LMS7_TX_PAD_GAIN, 0, NULL);
+        }
+    }
+
+
+    return res;
 }
 
 

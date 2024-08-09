@@ -123,6 +123,8 @@ static int dev_m2_lm7_1_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 static int dev_m2_lm7_1_sdr_rx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_gainlb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_sdr_tx_gainbb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int dev_m2_lm7_1_sdr_rx_bbfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_bbfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -222,6 +224,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/0/rx/gain",      { dev_m2_lm7_1_sdr_rx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain",      { dev_m2_lm7_1_sdr_tx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain/lb",   { dev_m2_lm7_1_sdr_tx_gainlb_set, NULL }},
+    { "/dm/sdr/0/tx/gain/vga1", { dev_m2_lm7_1_sdr_tx_gainbb_set, NULL }},
 
     { "/dm/sdr/0/rx/gain/pga",  { dev_m2_lm7_1_sdr_rx_gainpga_set, NULL }},
     { "/dm/sdr/0/rx/gain/vga",  { dev_m2_lm7_1_sdr_rx_gainvga_set, NULL }},
@@ -749,7 +752,11 @@ int dev_m2_lm7_1_sdr_tx_gainlb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
     return xsdr_rfic_set_gain(&d->xdev, LMS7_CH_AB, RFIC_LMS7_TX_LB_GAIN, value, NULL);
 }
-
+int dev_m2_lm7_1_sdr_tx_gainbb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    return xsdr_rfic_set_gain(&d->xdev, LMS7_CH_AB, RFIC_LMS7_TX_PGA_GAIN, value, NULL);
+}
 int dev_m2_lm7_1_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;

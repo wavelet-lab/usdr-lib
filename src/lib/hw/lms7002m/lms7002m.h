@@ -60,6 +60,8 @@ struct lms7002m_state {
     uint16_t reg_txtsp_dscpcfg[2];
     uint16_t reg_txtsp_dscmode[2];
     uint16_t reg_txtsp_hbdo_iq[2];
+    int8_t   reg_tbb_gc_corr[2];
+    uint8_t  reg_tbb_gc[2];
 };
 typedef struct lms7002m_state lms7002m_state_t;
 
@@ -292,6 +294,7 @@ int lms7002m_tbb_path(lms7002m_state_t* m, lms7002m_tbb_path_t path, lms7002m_tb
 int lms7002m_tbb_lpf_def(unsigned bw, bool lpf_l, lms7002m_lpf_params_t *params);
 int lms7002m_tbb_lpf_raw(lms7002m_state_t* m, lms7002m_lpf_params_t params);
 
+int lms7002m_tbb_gain(lms7002m_state_t* m, int8_t gain);
 
 // Calibration functions
 enum lms7002m_vco_comparator {
