@@ -949,6 +949,8 @@ int _xsdr_init_revo(xsdr_dev_t *d)
         return -EIO;
     }
 
+    res = res ? res : lp8758_vout_set(dev, subdev, I2C_BUS_LP8758_FPGA, 1, 3000);
+
     // Improve spour performance
     res = res ? res : lp8758_vout_ctrl(dev, subdev, I2C_BUS_LP8758_FPGA, 0, 1, 1); //1v0
     res = res ? res : lp8758_vout_ctrl(dev, subdev, I2C_BUS_LP8758_FPGA, 1, 1, 1); //vio
