@@ -1100,9 +1100,7 @@ int xsdr_pwren(xsdr_dev_t *d, bool on)
 
 
     res = lms7002m_create(d->base.lmsstate.dev, d->base.lmsstate.subdev, SPI_LMS7,
-                          (d->new_rev) ? 0 : 0x01B10D15,
-                          1 || !d->ssdr,
-                          &d->base.lmsstate);
+                          (d->new_rev) ? 0 : 0x01B10D15, 1, &d->base.lmsstate);
     if (res)
         return res;
 
