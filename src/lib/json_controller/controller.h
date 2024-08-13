@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include <../device/device.h>
 #include <usdr_lowlevel.h>
@@ -34,6 +35,7 @@ enum sdr_call_parameters {
     SDRC_PARAM,
     SDRC_THROTTLE_ON,
     SDRC_MODE,
+    SDRC_SENSOR,
     //
     // daemon request params
     //
@@ -85,6 +87,7 @@ enum sdr_call_type {
     SDR_CRTL_STREAMING,
     SDR_GET_REVISION,
     SDR_CALIBRATE,
+    SDR_GET_SENSOR,
     //
     // daemon requests
     //
@@ -108,6 +111,26 @@ enum {
 
     EP_CSR_NTFY = 2,
 };
+
+#define SSNS_SDR_TEMPERATURE "sdr_temp"
+
+enum sensor_type {
+    TSNS_NONE,
+    TSNS_UNKNOWN,
+    TSNS_SDR_TEMPERATURE,
+};
+typedef enum sensor_type sensor_type_t;
+
+static inline sensor_type_t sensor_type_from_char(const char* sensor)
+{
+    if(!sensor)
+        return TSNS_NONE;
+
+    if(!strcmp(sensor, SSNS_SDR_TEMPERATURE))
+        return TSNS_SDR_TEMPERATURE;
+
+    return TSNS_UNKNOWN;
+}
 
 typedef int (*fn_callback_t)(void* obj, int type, unsigned parameter);
 
