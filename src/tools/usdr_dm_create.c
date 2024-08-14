@@ -466,7 +466,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     fprintf(stderr, "Configured RX %d (%d bytes) x %d buffs  TX %d x %d buffs  ===  CH_MASK %x FMT %s\n",
             s_rx_blksampl, s_rx_blksz, rx_bufcnt, s_tx_blksz, tx_bufcnt, chmsk, fmt);
     if (rx_bufcnt > MAX_CHS || tx_bufcnt > MAX_CHS) {
-        fprintf(stderr, "Too many requested chnnels %d/%d (MAX: %d)\n", rx_bufcnt, tx_bufcnt, MAX_CHS);
+        fprintf(stderr, "Too many requested channels %d/%d (MAX: %d)\n", rx_bufcnt, tx_bufcnt, MAX_CHS);
         if (stop_on_error) goto dev_close;
     }
 
