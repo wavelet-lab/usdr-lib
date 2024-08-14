@@ -207,7 +207,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     bool chmsk_alter = false;
     const char* fmt = "ci16";
     unsigned samples = 4096;
-    unsigned loglevel = USDR_LOG_TRACE;
+    unsigned loglevel = USDR_LOG_INFO;
     unsigned resync = 1;
     int noinit = 0;
     unsigned dotx = 0;
