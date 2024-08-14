@@ -108,7 +108,7 @@ struct stream_state {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
     struct dma_attrs dma_attr;
 #endif
-    struct usdr_dmabuf dmab[0];
+    struct usdr_dmabuf dmab[];
 };
 
 enum device_interrupts {
