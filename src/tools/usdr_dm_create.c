@@ -21,6 +21,8 @@
 
 #include "../common/ring_buffer.h"
 
+#define DMCR "DMCR"
+
 char buffer[65536*2];
 static volatile bool s_stop = false;
 
@@ -61,8 +63,7 @@ void* disk_write_thread(void* obj)
         char* data = ring_buffer_at(rbuff[i], idx);
         size_t res = fwrite(data, s_rx_blksz, 1, s_out_file[i]);
         if (res != 1) {
-            fprintf(stderr, "Can't write %d bytes! error=%zd\n",
-                    s_rx_blksz, res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Can't write %d bytes! error=%zd", s_rx_blksz, res);
             break;
         }
 
@@ -84,8 +85,7 @@ void* disk_read_thread(void* obj)
         char* data = ring_buffer_at(tbuff[i], idx);
         size_t res = fread(data, s_tx_blksz, 1, s_in_file[i]);
         if (res != 1) {
-            fprintf(stderr, "Can't read %d bytes! error=%zd\n",
-                    s_rx_blksz, res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Can't read %d bytes! error=%zd", s_rx_blksz, res);
             break;
         }
 
@@ -163,10 +163,10 @@ bool print_device_temperature(pdm_dev_t dev)
     uint64_t temp[2];
     res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
     if (res) {
-        fprintf(stderr, "Unable to get device temperature: errno %d\n", res);
+        USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to get device temperature: errno %d", res);
         return false;
     } else {
-        fprintf(stderr, "Temp = %.1f C\n", temp[0] / 256.0);
+        USDR_LOG(DMCR, USDR_LOG_INFO, "Temp = %.1f C", temp[0] / 256.0);
         return true;
     }
 }
@@ -337,8 +337,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         char buffer[4096];
         int count = usdr_dmd_discovery(device_name, sizeof(buffer), buffer);
 
-        fprintf(stderr, "Enumerated devices %d:\n%s\n",
-                count, buffer);
+        USDR_LOG(DMCR, USDR_LOG_INFO, "Enumerated devices %d:\n%s", count, buffer);
 
         return 0;
     }
@@ -349,7 +348,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dotx) {
         s_in_file[0] = fopen(infilename, "rb+");
         if (!s_in_file[0]) {
-            fprintf(stderr, "Unable to create data file '%s'\n", filename);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to create data file '%s'", filename);
             return 3;
         }
 
@@ -361,7 +360,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dorx) {
         s_out_file[0] = fopen(filename, "wb+c");
         if (!s_out_file[0]) {
-            fprintf(stderr, "Unable to create data file '%s'\n", filename);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to create data file '%s'", filename);
             return 3;
         }
 
@@ -373,7 +372,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     res = usdr_dmd_create_string(device_name, &dev);
     if (res) {
-        fprintf(stderr, "Unable to create device: errno %d\n", res);
+        USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to create device: errno %d", res);
         return 1;
     }
 
@@ -402,13 +401,13 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (!noinit) {
         res = usdr_dme_set_uint(dev, "/dm/power/en", 1);
         if (res) {
-            fprintf(stderr, "Unable to set power: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to set power: errno %d", res);
             // goto dev_close;
         }
 
         res = usdr_dmr_rate_set(dev, NULL, rate);
         if (res) {
-            fprintf(stderr, "Unable to set device rate: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to set device rate: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
 
@@ -424,13 +423,13 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dorx) {
         res = usdr_dms_create_ex(dev, "/ll/srx/0", fmt, chmsk, samples, rxflags, &usds_rx);
         if (res) {
-            fprintf(stderr, "Unable to initialize RX data stream: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to initialize RX data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
 
         res = res ? res : usdr_dms_info(usds_rx, &snfo_rx);
         if (res) {
-            fprintf(stderr, "Unable to get data stream info: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to get data stream info: errno %d", res);
             if (stop_on_error) goto dev_close;
             s_rx_blksampl = 0;
             s_rx_blksz = 0;
@@ -445,13 +444,13 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dotx) {
         res = usdr_dms_create(dev, "/ll/stx/0", fmt, chmsk, 0 * samples, &usds_tx);
         if (res) {
-            fprintf(stderr, "Unable to initialize TX data stream: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to initialize TX data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
 
         res = res ? res : usdr_dms_info(usds_tx, &snfo_tx);
         if (res) {
-            fprintf(stderr, "Unable to get data stream info: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to get data stream info: errno %d", res);
             if (stop_on_error) goto dev_close;
             snfo_tx.channels = 0;
             snfo_tx.pktsyms = 0;
@@ -481,7 +480,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                                  (strcmp(fmt, "ci16") == 0) ? freq_gen_thread_ci16 : freq_gen_thread_cf32,
                                  (void*)(intptr_t)i);
             if (res) {
-                fprintf(stderr, "Unable start disk in thread %d: errno %d\n", i, res);
+                USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable start disk in thread %d: errno %d", i, res);
                 goto dev_close;
             }
         }
@@ -493,7 +492,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
             s_out_file[f] = fopen(fmod, "wb+c");
             if (!s_out_file[f]) {
-                fprintf(stderr, "Unable to create data file '%s'\n", fmod);
+                USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to create data file '%s'", fmod);
                 return 3;
             }
         }
@@ -502,7 +501,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             rbuff[i] = ring_buffer_create(256, snfo_rx.pktbszie);
             res = pthread_create(&wthread[i], NULL, disk_write_thread, (void*)(intptr_t)i);
             if (res) {
-                fprintf(stderr, "Unable start thread %d: errno %d\n", i, res);
+                USDR_LOG(DMCR, "Unable start thread %d: errno %d", i, res);
                 goto dev_close;
             }
         }
@@ -512,7 +511,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 /*
     res = usdr_dms_op(usds, USDR_DMS_START, 0);
     if (res) {
-        fprintf(stderr, "Unable to start data stream: errno %d\n", res);
+        USDR_LOG(DMCR, "Unable to start data stream: errno %d", res);
         goto dev_close;
     }
     */
@@ -524,7 +523,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (cal_freq > 1e6) {
         res = usdr_dme_set_uint(dev, "/dm/sync/cal/freq", (unsigned)(cal_freq));
         if (res) {
-            fprintf(stderr, "Unable to set calibration frequency: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to set calibration frequency: errno %d", res);
         }
     }
 
@@ -532,35 +531,35 @@ int main(UNUSED int argc, UNUSED char** argv)
     strms[0] = usds_rx;
     res = usdr_dms_sync(dev, "off", 2, strms);
     if (res) {
-        fprintf(stderr, "Unable to sync data streams: errno %d\n", res);
+        USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
         if (stop_on_error) goto dev_close;
     }
 
     if (dorx) {
         res = usds_rx ? usdr_dms_op(usds_rx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
-            fprintf(stderr, "Unable to start data stream: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to start data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
     }
     if (dotx) {
         res = usds_tx ? usdr_dms_op(usds_tx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
-            fprintf(stderr, "Unable to start data stream: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to start data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
     }
 
     res = usdr_dms_sync(dev, synctype, 2, strms);
     if (res) {
-        fprintf(stderr, "Unable to sync data streams: errno %d\n", res);
+        USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
         if (stop_on_error) goto dev_close;
     }
 
 
     res = usdr_dme_set_uint(dev, "/dm/sdr/0/tfe/antcfg", antennacfg);
     if (res) {
-        fprintf(stderr, "Unable to set antcfg: errno %d\n", res);
+        USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to set antcfg: errno %d", res);
         // goto dev_close;
     }
 
@@ -569,7 +568,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (!noinit) {
         res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
         if (res) {
-            fprintf(stderr, "Unable to set device parameters: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to set device parameters: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
     }
@@ -595,7 +594,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
          res = usdr_dms_send(usds_tx, (const void**)buffers, samples, nots ? UINT64_MAX : stm, 32250);
          if (res) {
-             fprintf(stderr, "Unable to send data: errno %d, i = %d\n", res, i);
+             USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to send data: errno %d, i = %d", res, i);
              //goto dev_close;
              goto stop;
          }
@@ -621,7 +620,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         res = usdr_dms_recv(usds_rx, buffers, 2250, NULL);
         if (res) {
-            fprintf(stderr, "Unable to recv data: errno %d, i = %d\n", res, i);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to recv data: errno %d, i = %d", res, i);
             //goto dev_close;
             goto stop;
         }
@@ -654,7 +653,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
             res = usdr_dms_send(usds_tx, (const void**)tx_buffers, samples, nots ? ~0ull : ts, 15250);
             if (res) {
-                fprintf(stderr, "Unable to send data: errno %d, i = %d\n", res, i);
+                USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to send data: errno %d, i = %d", res, i);
                 //goto dev_close;
                 goto stop;
             }
@@ -676,7 +675,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
             res = usdr_dms_recv(usds_rx, rx_buffers, 2250, NULL);
             if (res) {
-                fprintf(stderr, "Unable to recv data: errno %d, i = %d\n", res, i);
+                USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to recv data: errno %d, i = %d", res, i);
                 //goto dev_close;
                 goto stop;
             }
@@ -695,14 +694,14 @@ stop:
     if (dorx) {
         res = usdr_dms_op(usds_rx, USDR_DMS_STOP, 0);
         if (res) {
-            fprintf(stderr, "Unable to stop data stream: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to stop data stream: errno %d", res);
             goto dev_close;
         }
     }
     if (dotx) {
         res = usdr_dms_op(usds_tx, USDR_DMS_STOP, 0);
         if (res) {
-            fprintf(stderr, "Unable to stop data stream: errno %d\n", res);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to stop data stream: errno %d", res);
             goto dev_close;
         }
     }
@@ -711,7 +710,7 @@ stop:
 
     res = usdr_dme_get_uint(dev, "/dm/debug/all", temp);
     if (res) {
-        fprintf(stderr, "Unable to get device debug data: errno %d\n", res);
+        USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to get device debug data: errno %d", res);
         goto dev_close;
     }
 
