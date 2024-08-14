@@ -517,7 +517,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (cal_freq > 1e6) {
         res = usdr_dme_set_uint(dev, "/dm/sync/cal/freq", (unsigned)(cal_freq));
         if (res) {
-            fprintf(stderr, "Unable to set calibation frequency: errno %d\n", res);
+            fprintf(stderr, "Unable to set calibration frequency: errno %d\n", res);
         }
     }
 
