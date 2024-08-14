@@ -357,6 +357,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             dev_data[DD_TX_BANDWIDTH].value = rate;
         }
     }
+
     if (dorx) {
         s_out_file[0] = fopen(filename, "wb+c");
         if (!s_out_file[0]) {
@@ -501,7 +502,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             rbuff[i] = ring_buffer_create(256, snfo_rx.pktbszie);
             res = pthread_create(&wthread[i], NULL, disk_write_thread, (void*)(intptr_t)i);
             if (res) {
-                USDR_LOG(LOG_TAG, "Unable start thread %d: errno %d", i, res);
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable start thread %d: errno %d", i, res);
                 goto dev_close;
             }
         }
