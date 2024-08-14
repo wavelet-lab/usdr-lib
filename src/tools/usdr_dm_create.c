@@ -320,9 +320,9 @@ int main(UNUSED int argc, UNUSED char** argv)
             stop_on_error = false;
             break;
         default:
-            fprintf(stderr, "Usage: %s '[-D device] [-f filename] [-c count] [-r samplerate] [-F format] [-C chmsk] [-S samples_per_blk] [-l loglevel] "
-                    "[-q TDD_FREQ] [-e RX_FREQ] [-E TX_FREQ] [-w RX_BANDWIDTH] [-W TX_BANDWIDTH] [-y RX_GAIN_LNA] [-Y TX_GAIN] [-p RX_PATH] [-P TX_PATH] [-u RX_GAIN_PGA] [-U RX_GAIN_VGA]"
-                    "\n", argv[0]);
+            USDR_LOG(DMCR, USDR_LOG_ERROR, "Usage: %s '[-D device] [-f filename] [-c count] [-r samplerate] [-F format] [-C chmsk] [-S samples_per_blk] [-l loglevel] "
+                    "[-q TDD_FREQ] [-e RX_FREQ] [-E TX_FREQ] [-w RX_BANDWIDTH] [-W TX_BANDWIDTH] [-y RX_GAIN_LNA] [-Y TX_GAIN] [-p RX_PATH] [-P TX_PATH] [-u RX_GAIN_PGA] [-U RX_GAIN_VGA]",
+                    argv[0]);
             exit(EXIT_FAILURE);
         }
     }
@@ -378,9 +378,9 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     res = usdr_dme_get_u32(dev, "/ll/devices", (unsigned*)&devices);
     if (res) {
-        fprintf(stderr, "Defaulting devices to 1\n");
+        USDR_LOG(DMCR, USDR_LOG_INFO, "Defaulting devices to 1");
     } else {
-        fprintf(stderr, "Devices in the array: %d\n", devices);
+        USDR_LOG(DMCR, USDR_LOG_INFO, "Devices in the array: %d", devices);
     }
 
     if (!chmsk_alter) {
@@ -413,7 +413,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         usleep(5000);
         if (lmlcfg != 0) {
-            fprintf(stderr, "======================= setting LML mode to %d =======================\n", lmlcfg);
+            USDR_LOG(DMCR, USDR_LOG_INFO, "======================= setting LML mode to %d =======================", lmlcfg);
         }
         res = usdr_dme_set_uint(dev, "/debug/hw/lms7002m/0/rxlml", lmlcfg);
 
@@ -461,11 +461,11 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
-
-    fprintf(stderr, "Configured RX %d (%d bytes) x %d buffs  TX %d x %d buffs  ===  CH_MASK %x FMT %s\n",
+    USDR_LOG(DMCR, USDR_LOG_INFO, "Configured RX %d (%d bytes) x %d buffs  TX %d x %d buffs  ===  CH_MASK %x FMT %s",
             s_rx_blksampl, s_rx_blksz, rx_bufcnt, s_tx_blksz, tx_bufcnt, chmsk, fmt);
+
     if (rx_bufcnt > MAX_CHS || tx_bufcnt > MAX_CHS) {
-        fprintf(stderr, "Too many requested channels %d/%d (MAX: %d)\n", rx_bufcnt, tx_bufcnt, MAX_CHS);
+        USDR_LOG(DMCR, USDR_LOG_ERROR, "Too many requested channels %d/%d (MAX: %d)", rx_bufcnt, tx_bufcnt, MAX_CHS);
         if (stop_on_error) goto dev_close;
     }
 
@@ -587,7 +587,7 @@ int main(UNUSED int argc, UNUSED char** argv)
          for (unsigned b = 0; b < tx_bufcnt; b++) {
              unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
              if (idx == IDX_TIMEDOUT) {
-                 fprintf(stderr, "Cbuffer[%d] timed out!\n", b);
+                 USDR_LOG(DMCR, USDR_LOG_WARNING, "Cbuffer[%d] timed out!", b);
              }
              buffers[b] = ring_buffer_at(tbuff[b], idx);
          }
@@ -613,7 +613,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         for (unsigned b = 0; b < rx_bufcnt; b++) {
             unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
             if (idx == IDX_TIMEDOUT) {
-                fprintf(stderr, "Pbuffer[%d] timed out!\n", b);
+                USDR_LOG(DMCR, USDR_LOG_WARNING, "Pbuffer[%d] timed out!", b);
             }
             buffers[b] = ring_buffer_at(rbuff[b], idx);
         }
@@ -643,12 +643,12 @@ int main(UNUSED int argc, UNUSED char** argv)
             for (unsigned b = 0; b < tx_bufcnt; b++) {
                 unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
                 if (idx == IDX_TIMEDOUT) {
-                    fprintf(stderr, "Cbuffer[%d] timed out!\n", b);
+                    USDR_LOG(DMCR, USDR_LOG_WARNING, "Cbuffer[%d] timed out!", b);
                 }
                 tx_buffers[b] = ring_buffer_at(tbuff[b], idx);
 
                 uint64_t *x = (uint64_t *)(tx_buffers[b]);
-                fprintf(stderr, "%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 "\n", x[0], x[1], x[2], x[3]);
+                USDR_LOG(DMCR, USDR_LOG_INFO, "%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 "", x[0], x[1], x[2], x[3]);
             }
 
             res = usdr_dms_send(usds_tx, (const void**)tx_buffers, samples, nots ? ~0ull : ts, 15250);
@@ -668,7 +668,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             for (unsigned b = 0; b < rx_bufcnt; b++) {
                 unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
                 if (idx == IDX_TIMEDOUT) {
-                    fprintf(stderr, "Pbuffer[%d] timed out!\n", b);
+                    USDR_LOG(DMCR, USDR_LOG_WARNING, "Pbuffer[%d] timed out!", b);
                 }
                 rx_buffers[b] = ring_buffer_at(rbuff[b], idx);
             }
