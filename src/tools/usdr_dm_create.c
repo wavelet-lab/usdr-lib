@@ -158,6 +158,19 @@ void* freq_gen_thread_cf32(void* obj)
     return NULL;
 }
 
+bool print_device_temperature(pdm_dev_t dev)
+{
+    uint64_t temp[2];
+    res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
+    if (res) {
+        fprintf(stderr, "Unable to get device temperature: errno %d\n", res);
+        return false;
+    } else {
+        fprintf(stderr, "Temp = %.1f C\n", temp[0] / 256.0);
+        return true;
+    }
+}
+
 enum {
     DD_RX_FREQ,
     DD_TX_FREQ,
@@ -405,13 +418,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
         res = usdr_dme_set_uint(dev, "/debug/hw/lms7002m/0/rxlml", lmlcfg);
 
-
-        res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
-        if (res) {
-            fprintf(stderr, "Unable to get device temperature: errno %d\n", res);
-        } else {
-            fprintf(stderr, "Temp = %.1f C\n", temp[0] / 256.0);
-        }
+        print_device_temperature(dev);
     }
 
     if (dorx) {
@@ -708,12 +715,8 @@ stop:
         goto dev_close;
     }
 
-    res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
-    if (res) {
-        fprintf(stderr, "Unable to get device temperature: errno %d\n", res);
+    if (!print_device_temperature(dev)) {
         //goto dev_close;
-    } else {
-        fprintf(stderr, "Temp = %.1f C\n", temp[0] / 256.0);
     }
 
     if (dorx) {
