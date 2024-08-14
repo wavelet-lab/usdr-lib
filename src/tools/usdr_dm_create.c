@@ -3,6 +3,7 @@
 
 #define _GNU_SOURCE
 #include <stdint.h>
+#include <inttypes.h>
 
 #include <dm_dev.h>
 #include <dm_rate.h>
@@ -645,8 +646,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                 tx_buffers[b] = ring_buffer_at(tbuff[b], idx);
 
                 uint64_t *x = (uint64_t *)(tx_buffers[b]);
-                fprintf(stderr, "%016lx.%016lx.%016lx.%016lx\n",
-                        x[0], x[1], x[2], x[3]);
+                fprintf(stderr, "%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 "\n", x[0], x[1], x[2], x[3]);
             }
 
             res = usdr_dms_send(usds_tx, (const void**)tx_buffers, samples, nots ? ~0ull : ts, 15250);
