@@ -144,7 +144,7 @@ void* freq_gen_thread_cf32(void* obj)
         float *iqp = (float *)data;
 
         for (unsigned i = 0; i < tx_get_samples; i++) {
-            //float ii, qq; (but we use trick to not do invertion however it leads to incorrect phase)
+            //float ii, qq; (but we use trick to not do inversion, however, it leads to incorrect phase)
             sincosf(2 * M_PI * phase, &iqp[2 * i + 1], &iqp[2 * i + 0]);
             phase += start_dphase[p];
             if (phase > 1.0)
