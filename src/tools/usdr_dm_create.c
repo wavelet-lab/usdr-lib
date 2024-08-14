@@ -161,7 +161,7 @@ void* freq_gen_thread_cf32(void* obj)
 bool print_device_temperature(pdm_dev_t dev)
 {
     uint64_t temp[2];
-    res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
+    int res = usdr_dme_get_uint(dev, "/dm/sensor/temp", temp);
     if (res) {
         USDR_LOG(DMCR, USDR_LOG_ERROR, "Unable to get device temperature: errno %d", res);
         return false;
