@@ -201,7 +201,6 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned dorx = 1;
     unsigned rxflags =  DMS_FLAG_NEED_TX_STAT;
     uint64_t temp[2];
-    int gen = 0;
     const char* synctype = "all";
     bool listdevs = false;
     unsigned start_tx_delay = 0;
