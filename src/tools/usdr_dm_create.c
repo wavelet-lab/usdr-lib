@@ -511,7 +511,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 /*
     res = usdr_dms_op(usds, USDR_DMS_START, 0);
     if (res) {
-        USDR_LOG(LOG_TAG, "Unable to start data stream: errno %d", res);
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start data stream: errno %d", res);
         goto dev_close;
     }
     */
@@ -687,7 +687,6 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
 stop:
-    usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
     usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
     //usdr_dme_get_uint(dev, usdr_dmd_find_entity(dev, "/dm/debug/rxtime"), temp);
 
