@@ -558,7 +558,6 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
 
-
     // configure here
     if (!noinit) {
         res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
@@ -567,7 +566,6 @@ int main(UNUSED int argc, UNUSED char** argv)
             if (stop_on_error) goto dev_close;
         }
     }
-
 
     uint64_t stm = start_tx_delay;
 
@@ -579,7 +577,6 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
     if (dotx && !dorx) for (unsigned i = 0; !s_stop && (i < count); i++) {
-
          void* buffers[MAX_CHS];
          for (unsigned b = 0; b < tx_bufcnt; b++) {
              unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
