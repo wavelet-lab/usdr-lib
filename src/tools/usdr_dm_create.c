@@ -345,6 +345,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             infilename = optarg;
             tx_from_file = true;
             break;
+        //TX loop - if filesize/tx_block_sz < count
         case 'o':
             tx_file_loop = true;
             break;
