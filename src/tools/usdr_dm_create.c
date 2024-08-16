@@ -160,6 +160,7 @@ void* freq_gen_thread_cf32(void* obj)
 
 bool print_device_temperature(pdm_dev_t dev)
 {
+    //Prints the device temperature
     uint64_t temp;
     int res = usdr_dme_get_uint(dev, "/dm/sensor/temp", &temp);
 
@@ -248,15 +249,23 @@ int main(UNUSED int argc, UNUSED char** argv)
     while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:C:F:f:c:r:i:XtTNA:a:D:s:p:P:z")) != -1) {
         switch (opt) {
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
+        //Receiving frequency
         case 'e': dev_data[DD_RX_FREQ].value = atof(optarg); dev_data[DD_RX_FREQ].ignore = false; break;
+        //Transmitting frequency
         case 'E': dev_data[DD_TX_FREQ].value = atof(optarg); dev_data[DD_TX_FREQ].ignore = false; break;
+        //Receiving bandwidth
         case 'w': dev_data[DD_RX_BANDWIDTH].value = atof(optarg); dev_data[DD_RX_BANDWIDTH].ignore = false; break;
+        //Transmitting bandwidth
         case 'W': dev_data[DD_TX_BANDWIDTH].value = atof(optarg); dev_data[DD_TX_BANDWIDTH].ignore = false; break;
+        //Receiving LNA gain
         case 'y': dev_data[DD_RX_GAIN_LNA].value = atoi(optarg); dev_data[DD_RX_GAIN_LNA].ignore = false; break;
+        //Transmitting gain
         case 'Y': dev_data[DD_TX_GAIN].value = atoi(optarg); dev_data[DD_TX_GAIN].ignore = false; break;
         case 'p': dev_data[DD_RX_PATH].value = (uintptr_t)optarg; dev_data[DD_RX_PATH].ignore = false; break;
         case 'P': dev_data[DD_TX_PATH].value = (uintptr_t)optarg; dev_data[DD_TX_PATH].ignore = false; break;
+        //Receiving PGA gain
         case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
+        //Receiving VGA gain
         case 'U': dev_data[DD_RX_GAIN_VGA].value = atoi(optarg); dev_data[DD_RX_GAIN_VGA].ignore = false; break;
         case 'a':
             refclkpath = optarg;
@@ -267,9 +276,11 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 's':
             synctype = optarg;
             break;
+        //Print available devices
         case 'Q':
             listdevs = true;
             break;
+        //Device name
         case 'D':
             device_name = optarg;
             break;
@@ -279,18 +290,22 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'l':
             loglevel = atof(optarg);
             break;
+        //Set file with data to record received data (default: ./out.data)
         case 'f':
             filename = optarg;
             break;
+        //Samples count - how many samples to send/receive
         case 'c':
             count = atoi(optarg);
             break;
         case 'R':
             lmlcfg = atoi(optarg);
             break;
+        //Sample rate
         case 'r':
             rate = atof(optarg);
             break;
+        //Set data format (default: ci16)
         case 'F':
             fmt = optarg;
             break;
@@ -303,10 +318,12 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'X':
             noinit = 1;
             break;
+        //Transmitting only mode
         case 't':
             dotx = 1;
             dorx = 0;
             break;
+        //Transmitting and receiving mode
         case 'T':
             dotx = 1;
             dorx = 1;
@@ -317,6 +334,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'A':
             antennacfg = atoi(optarg);
             break;
+        //Don't stop on error
         case 'z':
             stop_on_error = false;
             break;
@@ -334,6 +352,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     usdrlog_setlevel(NULL, loglevel);
     usdrlog_enablecolorize(NULL);
 
+    // Print available devices then exit(-Q option is used)
     if (listdevs) {
         char buffer[4096];
         int count = usdr_dmd_discovery(device_name, sizeof(buffer), buffer);
@@ -346,10 +365,11 @@ int main(UNUSED int argc, UNUSED char** argv)
     rx_bufcnt = 0;
     tx_bufcnt = 0;
 
+    //Prepare parameters to transmit
     if (dotx) {
         s_in_file[0] = fopen(infilename, "rb+");
         if (!s_in_file[0]) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create data file '%s'", filename);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open data file(tx) '%s'", filename);
             return 3;
         }
 
@@ -359,10 +379,11 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
+    //Prepare parameters to receive
     if (dorx) {
         s_out_file[0] = fopen(filename, "wb+c");
         if (!s_out_file[0]) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create data file '%s'", filename);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create data file(rx) '%s'", filename);
             return 3;
         }
 
@@ -372,6 +393,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
+    //Create the device
     res = usdr_dmd_create_string(device_name, &dev);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create device: errno %d", res);
@@ -407,6 +429,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             // goto dev_close;
         }
 
+        //Set sample rate
         res = usdr_dmr_rate_set(dev, NULL, rate);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set device rate: errno %d", res);
@@ -422,6 +445,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         print_device_temperature(dev);
     }
 
+    //Open the device and prepare the RX data stream
     if (dorx) {
         res = usdr_dms_create_ex(dev, "/ll/srx/0", fmt, chmsk, samples, rxflags, &usds_rx);
         if (res) {
@@ -443,6 +467,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
+    //Open the device and prepare the TX data stream
     if (dotx) {
         res = usdr_dms_create(dev, "/ll/stx/0", fmt, chmsk, 0 * samples, &usds_tx);
         if (res) {
@@ -475,6 +500,7 @@ int main(UNUSED int argc, UNUSED char** argv)
  //   if (samples * 8 > s_tx_blksz)
   //      goto dev_close;
 
+    //Create transmit buffers and threads
     if (dotx) {
         for (unsigned i = 0; i < tx_bufcnt; i++) {
             tbuff[i] = ring_buffer_create(256, snfo_tx.pktbszie);
@@ -487,6 +513,8 @@ int main(UNUSED int argc, UNUSED char** argv)
             }
         }
     }
+
+    //Create receive buffers and threads
     if (dorx) {
         for (unsigned f = 1; f < rx_bufcnt; f++) {
             char fmod[1024];
@@ -544,6 +572,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             if (stop_on_error) goto dev_close;
         }
     }
+
     if (dotx) {
         res = usds_tx ? usdr_dms_op(usds_tx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
@@ -565,7 +594,6 @@ int main(UNUSED int argc, UNUSED char** argv)
         // goto dev_close;
     }
 
-
     // configure here
     if (!noinit) {
         res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
@@ -584,6 +612,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         goto dev_close;
     }
 
+    //Transmitting only mode
     if (dotx && !dorx) for (unsigned i = 0; !s_stop && (i < count); i++) {
          void* buffers[MAX_CHS];
          for (unsigned b = 0; b < tx_bufcnt; b++) {
@@ -610,6 +639,7 @@ int main(UNUSED int argc, UNUSED char** argv)
              //stm += 2 * 40;
          }
 
+    //Receiving only mode
     } else if (dorx && !dotx) for (unsigned i = 0; !s_stop && (i < count); i++) {
         void* buffers[MAX_CHS];
         for (unsigned b = 0; b < rx_bufcnt; b++) {
@@ -634,8 +664,8 @@ int main(UNUSED int argc, UNUSED char** argv)
         if (i == resync)
             usdr_dme_set_uint(dev, "/dm/resync", 0);
 
+    //Transmitting and receiving mode
     } else {
-        //TX & RX
         void* rx_buffers[MAX_CHS];
         void* tx_buffers[MAX_CHS];
         uint64_t ts = start_tx_delay;
