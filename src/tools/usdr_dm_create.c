@@ -294,7 +294,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'f':
             filename = optarg;
             break;
-        //Samples count - how many samples to send/receive
+        //Block count - how many samples blocks to send/receive
         case 'c':
             count = atoi(optarg);
             break;
