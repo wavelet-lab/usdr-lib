@@ -51,7 +51,7 @@ static FILE* s_in_file[MAX_CHS];
 static ring_buffer_t* rbuff[MAX_CHS];
 static ring_buffer_t* tbuff[MAX_CHS];
 
-static bool tx_file_loop = false;
+static bool tx_file_cycle = false;
 
 void* disk_write_thread(void* obj)
 {
@@ -95,7 +95,7 @@ void* disk_read_thread(void* obj)
 
             if(feof(s_in_file[i]))
             {
-                if(tx_file_loop)
+                if(tx_file_cycle)
                     rewind(s_in_file[i]);
                 else
                     if(!eof_detected) USDR_LOG(LOG_TAG, USDR_LOG_INFO, "TX from file finished, EOF was reached");
@@ -211,7 +211,7 @@ enum {
 
 static void usage(int severity, const char* me)
 {
-    USDR_LOG(LOG_TAG, severity, "Usage: %s '[-D device] [-f RX_filename] [-I TX_filename] [-o (loop TX from file flag)] [-c count] [-r samplerate] [-F format] [-C chmsk] [-S samples_per_blk] [-l loglevel] "
+    USDR_LOG(LOG_TAG, severity, "Usage: %s '[-D device] [-f RX_filename] [-I TX_filename] [-o (cycle TX from file)] [-c count] [-r samplerate] [-F format] [-C chmsk] [-S samples_per_blk] [-l loglevel] "
                                 "[-q TDD_FREQ] [-e RX_FREQ] [-E TX_FREQ] [-w RX_BANDWIDTH] [-W TX_BANDWIDTH] [-y RX_GAIN_LNA] [-Y TX_GAIN] [-p RX_PATH] [-P TX_PATH] [-u RX_GAIN_PGA] [-U RX_GAIN_VGA] "
                                 "[-h (this help)]",
              me);
@@ -345,9 +345,9 @@ int main(UNUSED int argc, UNUSED char** argv)
             infilename = optarg;
             tx_from_file = true;
             break;
-        //TX loop - if filesize/tx_block_sz < count
+        //TX cycling - if filesize/tx_block_sz < count
         case 'o':
-            tx_file_loop = true;
+            tx_file_cycle = true;
             break;
         //Block count - how many samples blocks to TX/RX
         case 'c':
