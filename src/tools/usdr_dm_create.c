@@ -51,11 +51,14 @@ static FILE* s_in_file[MAX_CHS];
 static ring_buffer_t* rbuff[MAX_CHS];
 static ring_buffer_t* tbuff[MAX_CHS];
 
+static bool tx_file_loop = false;
+
 void* disk_write_thread(void* obj)
 {
     unsigned i = (intptr_t)obj;
+    bool abort_flag = false;
 
-    while (!s_stop && !thread_stop) {
+    while (!s_stop && !thread_stop && !abort_flag) {
         unsigned idx = ring_buffer_cwait(rbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -64,7 +67,7 @@ void* disk_write_thread(void* obj)
         size_t res = fwrite(data, s_rx_blksz, 1, s_out_file[i]);
         if (res != 1) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Can't write %d bytes! error=%zd", s_rx_blksz, res);
-            break;
+            abort_flag = true;
         }
 
         ring_buffer_cpost(rbuff[i]);
@@ -76,22 +79,37 @@ void* disk_write_thread(void* obj)
 void* disk_read_thread(void* obj)
 {
     unsigned i = (intptr_t)obj;
+    bool abort_flag = false;
+    bool eof_detected = false;
 
-    while (!s_stop && !thread_stop) {
+    while (!s_stop && !thread_stop && !abort_flag) {
         unsigned idx = ring_buffer_pwait(tbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
 
         char* data = ring_buffer_at(tbuff[i], idx);
         size_t res = fread(data, s_tx_blksz, 1, s_in_file[i]);
-        if (res != 1) {
+        if (res != 1)
+        {
+            memset(data, 0, s_tx_blksz);
+
             if(feof(s_in_file[i]))
-                USDR_LOG(LOG_TAG, USDR_LOG_INFO, "TX from file finished, EOF was reached");
+            {
+                if(tx_file_loop)
+                    rewind(s_in_file[i]);
+                else
+                    if(!eof_detected) USDR_LOG(LOG_TAG, USDR_LOG_INFO, "TX from file finished, EOF was reached");
+
+                eof_detected = true;
+            }
             else
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Can't read %d bytes! res=%zd ferror=%d", s_rx_blksz, res, ferror(s_in_file[i]));
-            break;
+            {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Can't read %d bytes! res=%zd ferror=%d", s_tx_blksz, res, ferror(s_in_file[i]));
+                abort_flag = true;
+            }
         }
-        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "Read %zd bytes to TX", res * s_tx_blksz);
+        else
+            USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "Read %zd bytes to TX", res * s_tx_blksz);
 
         ring_buffer_ppost(tbuff[i]);
     }
@@ -193,9 +211,9 @@ enum {
 
 static void usage(int severity, const char* me)
 {
-    USDR_LOG(LOG_TAG, severity, "Usage: %s '[-D device] [-f RX_filename] [-I TX_filename] [-c count] [-r samplerate] [-F format] [-C chmsk] [-S samples_per_blk] [-l loglevel] "
+    USDR_LOG(LOG_TAG, severity, "Usage: %s '[-D device] [-f RX_filename] [-I TX_filename] [-o (loop TX from file flag)] [-c count] [-r samplerate] [-F format] [-C chmsk] [-S samples_per_blk] [-l loglevel] "
                                 "[-q TDD_FREQ] [-e RX_FREQ] [-E TX_FREQ] [-w RX_BANDWIDTH] [-W TX_BANDWIDTH] [-y RX_GAIN_LNA] [-Y TX_GAIN] [-p RX_PATH] [-P TX_PATH] [-u RX_GAIN_PGA] [-U RX_GAIN_VGA] "
-                                "[-h this help]",
+                                "[-h (this help)]",
              me);
 }
 
@@ -265,7 +283,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:C:F:f:c:r:i:XtTNA:a:D:s:p:P:z:I:h")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -326,6 +344,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'I':
             infilename = optarg;
             tx_from_file = true;
+            break;
+        case 'o':
+            tx_file_loop = true;
             break;
         //Block count - how many samples blocks to TX/RX
         case 'c':
@@ -405,7 +426,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dotx) {
         s_in_file[0] = fopen(infilename, "rb+");
         if (!s_in_file[0]) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open data file(tx) '%s'", filename);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open data file(tx) '%s'", infilename);
             return 3;
         }
 
@@ -725,7 +746,6 @@ int main(UNUSED int argc, UNUSED char** argv)
             res = usdr_dms_send(usds_tx, (const void**)tx_buffers, samples, nots ? ~0ull : ts, 15250);
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to send data: errno %d, i = %d", res, i);
-                //goto dev_close;
                 goto stop;
             }
 
@@ -747,7 +767,6 @@ int main(UNUSED int argc, UNUSED char** argv)
             res = usdr_dms_recv(usds_rx, rx_buffers, 2250, NULL);
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to recv data: errno %d, i = %d", res, i);
-                //goto dev_close;
                 goto stop;
             }
 
