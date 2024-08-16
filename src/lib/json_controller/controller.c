@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 #include <stdio.h>
-#include <string.h>
 #include <inttypes.h>
 
 #include "../ipblks/streams/streams.h"
@@ -33,6 +32,7 @@ static const struct idx_list s_method_list[] = {
     { "sdr_ctrl_streaming",   SDR_CRTL_STREAMING },
     { "sdr_get_revision",     SDR_GET_REVISION },
     { "sdr_calibrate",        SDR_CALIBRATE },
+    { "sdr_get_sensor",       SDR_GET_SENSOR },
     //
     // daemon requests
     //
@@ -60,6 +60,7 @@ static const struct idx_list s_param_list[] = {
     { "param",      SDRC_PARAM },
     { "throttleon", SDRC_THROTTLE_ON },
     { "mode",       SDRC_MODE },
+    { "sensor",     SDRC_SENSOR },
     //
     // daemon request params
     //
@@ -588,6 +589,31 @@ int generic_rpc_call(pdm_dev_t dmdev,
             return res;
 
         print_rpc_reply(sdrc, outbuffer, outbufsz, res, "");
+        return 0;
+    }
+    case SDR_GET_SENSOR:
+    {
+        const char* sensor = (pcall->params.parameters_type[SDRC_SENSOR] == SDRC_PARAM_TYPE_STRING) ?
+                                (const char*)pcall->params.parameters_uint[SDRC_SENSOR] : NULL;
+
+        const sensor_type_t snst = sensor_type_from_char(sensor);
+        uint64_t value;
+
+        switch(snst)
+        {
+        case TSNS_SDR_TEMPERATURE:
+        {
+            res = usdr_dme_get_uint(dmdev, "/dm/sensor/temp", &value);
+            if(res)
+                return res;
+
+            print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"sensor\":\"%s\",\"value\":%.1f",  sensor, (float)value / 256.f);
+            break;
+        }
+        default:
+            return -EINVAL;
+        }
+
         return 0;
     }
     default:
