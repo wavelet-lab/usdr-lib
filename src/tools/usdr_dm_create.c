@@ -249,23 +249,23 @@ int main(UNUSED int argc, UNUSED char** argv)
     while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:C:F:f:c:r:i:XtTNA:a:D:s:p:P:z")) != -1) {
         switch (opt) {
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
-        //Receiving frequency
+        //RX frequency
         case 'e': dev_data[DD_RX_FREQ].value = atof(optarg); dev_data[DD_RX_FREQ].ignore = false; break;
-        //Transmitting frequency
+        //TX frequency
         case 'E': dev_data[DD_TX_FREQ].value = atof(optarg); dev_data[DD_TX_FREQ].ignore = false; break;
-        //Receiving bandwidth
+        //RX bandwidth
         case 'w': dev_data[DD_RX_BANDWIDTH].value = atof(optarg); dev_data[DD_RX_BANDWIDTH].ignore = false; break;
-        //Transmitting bandwidth
+        //TX bandwidth
         case 'W': dev_data[DD_TX_BANDWIDTH].value = atof(optarg); dev_data[DD_TX_BANDWIDTH].ignore = false; break;
-        //Receiving LNA gain
+        //RX LNA gain
         case 'y': dev_data[DD_RX_GAIN_LNA].value = atoi(optarg); dev_data[DD_RX_GAIN_LNA].ignore = false; break;
-        //Transmitting gain
+        //TX gain
         case 'Y': dev_data[DD_TX_GAIN].value = atoi(optarg); dev_data[DD_TX_GAIN].ignore = false; break;
         case 'p': dev_data[DD_RX_PATH].value = (uintptr_t)optarg; dev_data[DD_RX_PATH].ignore = false; break;
         case 'P': dev_data[DD_TX_PATH].value = (uintptr_t)optarg; dev_data[DD_TX_PATH].ignore = false; break;
-        //Receiving PGA gain
+        //RX PGA gain
         case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
-        //Receiving VGA gain
+        //RX VGA gain
         case 'U': dev_data[DD_RX_GAIN_VGA].value = atoi(optarg); dev_data[DD_RX_GAIN_VGA].ignore = false; break;
         case 'a':
             refclkpath = optarg;
@@ -290,11 +290,11 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'l':
             loglevel = atof(optarg);
             break;
-        //Set file with data to record received data (default: ./out.data)
+        //Set file with data to record RX data (default: ./out.data)
         case 'f':
             filename = optarg;
             break;
-        //Block count - how many samples blocks to send/receive
+        //Block count - how many samples blocks to TX/RX
         case 'c':
             count = atoi(optarg);
             break;
@@ -318,12 +318,12 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'X':
             noinit = 1;
             break;
-        //Transmitting only mode
+        //TX only mode
         case 't':
             dotx = 1;
             dorx = 0;
             break;
-        //Transmitting and receiving mode
+        //TX and RX mode
         case 'T':
             dotx = 1;
             dorx = 1;
@@ -365,7 +365,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     rx_bufcnt = 0;
     tx_bufcnt = 0;
 
-    //Prepare parameters to transmit
+    //Prepare parameters to TX
     if (dotx) {
         s_in_file[0] = fopen(infilename, "rb+");
         if (!s_in_file[0]) {
@@ -379,7 +379,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
-    //Prepare parameters to receive
+    //Prepare parameters to RX
     if (dorx) {
         s_out_file[0] = fopen(filename, "wb+c");
         if (!s_out_file[0]) {
@@ -500,7 +500,7 @@ int main(UNUSED int argc, UNUSED char** argv)
  //   if (samples * 8 > s_tx_blksz)
   //      goto dev_close;
 
-    //Create transmit buffers and threads
+    //Create TX buffers and threads
     if (dotx) {
         for (unsigned i = 0; i < tx_bufcnt; i++) {
             tbuff[i] = ring_buffer_create(256, snfo_tx.pktbszie);
@@ -514,7 +514,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
-    //Create receive buffers and threads
+    //Create RX buffers and threads
     if (dorx) {
         for (unsigned f = 1; f < rx_bufcnt; f++) {
             char fmod[1024];
@@ -612,7 +612,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         goto dev_close;
     }
 
-    //Transmitting only mode
+    //TX only mode
     if (dotx && !dorx) for (unsigned i = 0; !s_stop && (i < count); i++) {
          void* buffers[MAX_CHS];
          for (unsigned b = 0; b < tx_bufcnt; b++) {
@@ -639,7 +639,7 @@ int main(UNUSED int argc, UNUSED char** argv)
              //stm += 2 * 40;
          }
 
-    //Receiving only mode
+    //RX only mode
     } else if (dorx && !dotx) for (unsigned i = 0; !s_stop && (i < count); i++) {
         void* buffers[MAX_CHS];
         for (unsigned b = 0; b < rx_bufcnt; b++) {
@@ -664,7 +664,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         if (i == resync)
             usdr_dme_set_uint(dev, "/dm/resync", 0);
 
-    //Transmitting and receiving mode
+    //TX and RX mode
     } else {
         void* rx_buffers[MAX_CHS];
         void* tx_buffers[MAX_CHS];
