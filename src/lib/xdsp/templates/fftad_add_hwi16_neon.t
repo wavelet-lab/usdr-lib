@@ -1,5 +1,5 @@
 static
-void TEMPLATE_FUNC_NAME(fft_acc_t* __restrict p, uint16* __restrict d, unsigned fftsz)
+void TEMPLATE_FUNC_NAME(fft_acc_t* __restrict p, uint16_t* __restrict d, unsigned fftsz)
 {
     for (unsigned i = 0; i < fftsz; i += 16)
     {
