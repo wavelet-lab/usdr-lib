@@ -237,7 +237,8 @@ static void usage(int severity, const char* me)
                                 "[-r samplerate [50e6]] "
                                 "[-F format [ci16]] "
                                 "[-C chmsk [0x1]] "
-                                "[-S samples_per_blk [4096]] "
+                                "[-S TX samples_per_blk [4096]] "
+                                "[-O RX samples_per_blk [4096]] "
                                 "[-t <flag: TX only mode>] "
                                 "[-T <flag: TX+RX mode>] "
                                 "[-N <flag: No TX timestamps>] "
@@ -286,7 +287,8 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned chmsk = 0x1;
     bool chmsk_alter = false;
     const char* fmt = "ci16";
-    unsigned samples = 4096;
+    unsigned samples_rx = 4096;
+    unsigned samples_tx = 4096;
     unsigned loglevel = USDR_LOG_INFO;
     unsigned resync = 1;
     int noinit = 0;
@@ -332,7 +334,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -418,9 +420,13 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'C':
             chmsk = atoi(optarg); chmsk_alter = true;
             break;
-        //RX/TX buffer size, in samples
+        //RX buffer size, in samples
         case 'S':
-            samples = atoi(optarg);
+            samples_rx = atoi(optarg);
+            break;
+        //TX buffer size, in samples
+        case 'O':
+            samples_tx = atoi(optarg);
             break;
         //Skip device initialization
         case 'X':
@@ -459,7 +465,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
-    start_tx_delay = samples;
+    start_tx_delay = samples_tx;
 
     // Discover & print available device list and exit (-Q option)
     if (listdevs) {
@@ -556,7 +562,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Open RX data stream
     if (dorx) {
-        res = usdr_dms_create_ex(dev, "/ll/srx/0", fmt, chmsk, samples, rxflags, &usds_rx);
+        res = usdr_dms_create_ex(dev, "/ll/srx/0", fmt, chmsk, samples_rx, rxflags, &usds_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to initialize RX data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
@@ -578,7 +584,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Open TX data stream
     if (dotx) {
-        res = usdr_dms_create(dev, "/ll/stx/0", fmt, chmsk, 0 * samples, &usds_tx);
+        res = usdr_dms_create(dev, "/ll/stx/0", fmt, chmsk, samples_tx, &usds_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to initialize TX data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
@@ -605,7 +611,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         if (stop_on_error) goto dev_close;
     }
 
-    tx_get_samples = samples;
+    tx_get_samples = samples_tx;
 
     //Create TX buffers and threads
     if (dotx) {
@@ -731,7 +737,7 @@ int main(UNUSED int argc, UNUSED char** argv)
          }
 
          //Core TX function - transmit data from tx provider thread via circular buffer
-         res = usdr_dms_send(usds_tx, (const void**)buffers, samples, nots ? UINT64_MAX : stm, 32250);
+         res = usdr_dms_send(usds_tx, (const void**)buffers, samples_tx, nots ? UINT64_MAX : stm, 32250);
          if (res) {
              USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, i);
              //goto dev_close;
@@ -742,7 +748,7 @@ int main(UNUSED int argc, UNUSED char** argv)
              ring_buffer_cpost(tbuff[b]);
          }
 
-         stm += samples;
+         stm += samples_tx;
 
     //RX only mode
     } else if (dorx && !dotx) for (unsigned i = 0; !s_stop && (i < count); i++) {
@@ -791,7 +797,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                 USDR_LOG(LOG_TAG, USDR_LOG_INFO, "%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 "", x[0], x[1], x[2], x[3]);
             }
 
-            res = usdr_dms_send(usds_tx, (const void**)tx_buffers, samples, nots ? ~0ull : ts, 15250);
+            res = usdr_dms_send(usds_tx, (const void**)tx_buffers, samples_tx, nots ? ~0ull : ts, 15250);
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, i);
                 goto stop;
@@ -801,7 +807,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                 ring_buffer_cpost(tbuff[b]);
             }
 
-            ts += samples;
+            ts += samples_tx;
 
             //RX
             for (unsigned b = 0; b < rx_bufcnt; b++) {
