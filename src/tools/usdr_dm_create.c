@@ -248,8 +248,8 @@ static void usage(int severity, const char* me)
                                 "[-W TX_BANDWIDTH [1e6]] "
                                 "[-y RX_GAIN_LNA [15]] "
                                 "[-Y TX_GAIN [0]] "
-                                "[-p RX_PATH [rx_auto]] "
-                                "[-P TX_PATH [tx_auto]] "
+                                "[-p RX_PATH ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)] "
+                                "[-P TX_PATH ([tx_auto]|txb1|txb2|txw|txh)] "
                                 "[-u RX_GAIN_PGA] [15] "
                                 "[-U RX_GAIN_VGA] [15] "
                                 "[-a Reference clock path) []] "
@@ -350,7 +350,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'Y': dev_data[DD_TX_GAIN].value = atoi(optarg); dev_data[DD_TX_GAIN].ignore = false; break;
         //RX LNA path ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)
         case 'p': dev_data[DD_RX_PATH].value = (uintptr_t)optarg; dev_data[DD_RX_PATH].ignore = false; break;
-        //TX LNA path (tx_auto|txb1|txb2|txw|txh)
+        //TX LNA path ([tx_auto]|txb1|txb2|txw|txh)
         case 'P': dev_data[DD_TX_PATH].value = (uintptr_t)optarg; dev_data[DD_TX_PATH].ignore = false; break;
         //RX PGA gain
         case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
