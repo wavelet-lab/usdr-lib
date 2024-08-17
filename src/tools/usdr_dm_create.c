@@ -523,7 +523,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     res = usdr_dme_get_u32(dev, "/ll/devices", (unsigned*)&devices);
     if (res) {
-        USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Defaulting devices to 1");
+        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "Set device count to 1");
     } else {
         USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Devices in the array: %d", devices);
     }
