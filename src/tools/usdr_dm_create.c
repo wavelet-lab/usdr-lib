@@ -53,6 +53,9 @@ static ring_buffer_t* tbuff[MAX_CHS];
 
 static bool tx_file_cycle = false;
 
+/*
+ *  Thread function - write RX stream to file
+ */
 void* disk_write_thread(void* obj)
 {
     unsigned i = (intptr_t)obj;
@@ -75,6 +78,9 @@ void* disk_write_thread(void* obj)
     return NULL;
 }
 
+/*
+ *  Thread function - read data from file to TX stream
+ */
 void* disk_read_thread(void* obj)
 {
     unsigned i = (intptr_t)obj;
@@ -120,7 +126,10 @@ void* disk_read_thread(void* obj)
 double start_phase[8] = { 0, 0.5, 0.25, 0.125 };
 double start_dphase[8] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
 unsigned tx_get_samples;
-// Sine generator
+
+/*
+ *   Thread function - Sine generator to TX stream (ci16)
+ */
 void* freq_gen_thread_ci16(void* obj)
 {
     unsigned p = (intptr_t)obj;
@@ -152,6 +161,9 @@ void* freq_gen_thread_ci16(void* obj)
     return NULL;
 }
 
+/*
+ *   Thread function - Sine generator to TX stream (cf32)
+ */
 void* freq_gen_thread_cf32(void* obj)
 {
     unsigned p = (intptr_t)obj;
@@ -180,9 +192,11 @@ void* freq_gen_thread_cf32(void* obj)
     return NULL;
 }
 
+/*
+ * Get data from the temperature sensor & print it to log
+ */
 bool print_device_temperature(pdm_dev_t dev)
 {
-    //Prints the device temperature
     uint64_t temp;
     int res = usdr_dme_get_uint(dev, "/dm/sensor/temp", &temp);
 
@@ -209,11 +223,46 @@ enum {
     DD_RX_PATH,
 };
 
+/*
+ * Utility Usage info
+ */
 static void usage(int severity, const char* me)
 {
-    USDR_LOG(LOG_TAG, severity, "Usage: %s '[-D device] [-f RX_filename] [-I TX_filename] [-o (cycle TX from file)] [-c count] [-r samplerate] [-F format] [-C chmsk] [-S samples_per_blk] [-l loglevel] "
-                                "[-q TDD_FREQ] [-e RX_FREQ] [-E TX_FREQ] [-w RX_BANDWIDTH] [-W TX_BANDWIDTH] [-y RX_GAIN_LNA] [-Y TX_GAIN] [-p RX_PATH] [-P TX_PATH] [-u RX_GAIN_PGA] [-U RX_GAIN_VGA] "
-                                "[-h (this help)]",
+    USDR_LOG(LOG_TAG, severity, "Usage: %s "
+                                "[-D device] "
+                                "[-f RX_filename [./out.data]] "
+                                "[-I TX_filename ] "
+                                "[-o <flag: cycle TX from file>] "
+                                "[-c count [128]] "
+                                "[-r samplerate [50e6]] "
+                                "[-F format [ci16]] "
+                                "[-C chmsk [0x1]] "
+                                "[-S samples_per_blk [4096]] "
+                                "[-t <flag: TX only mode>] "
+                                "[-T <flag: TX+RX mode>] "
+                                "[-N <flag: No TX timestamps>] "
+                                "[-q TDD_FREQ [910e6]] "
+                                "[-e RX_FREQ [900e6]] "
+                                "[-E TX_FREQ [920e6]] "
+                                "[-w RX_BANDWIDTH [1e6]] "
+                                "[-W TX_BANDWIDTH [1e6]] "
+                                "[-y RX_GAIN_LNA [15]] "
+                                "[-Y TX_GAIN [0]] "
+                                "[-p RX_PATH [rx_auto]] "
+                                "[-P TX_PATH [tx_auto]] "
+                                "[-u RX_GAIN_PGA] [15] "
+                                "[-U RX_GAIN_VGA] [15] "
+                                "[-a Reference clock path) []] "
+                                "[-B Calibration freq [0]] "
+                                "[-s Sync type [all]] "
+                                "[-Q <flag: Discover and exit>] "
+                                "[-i Resync iter [1]] "
+                                "[-R RX_LML_MODE [0]] "
+                                "[-A Antenna configuration [0]] "
+                                "[-X <flag: Skip initialization>] "
+                                "[-z <flag: Continue on error>] "
+                                "[-l loglevel [3(INFO)]] "
+                                "[-h <flag: This help>]",
              me);
 }
 
@@ -241,8 +290,8 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned loglevel = USDR_LOG_INFO;
     unsigned resync = 1;
     int noinit = 0;
-    unsigned dotx = 0; //means "do TX"
-    unsigned dorx = 1; //means "do RX"
+    unsigned dotx = 0; //means "do TX" - enables TX if dotx==1
+    unsigned dorx = 1; //means "do RX" - enables RX if dorx==1
     unsigned rxflags =  DMS_FLAG_NEED_TX_STAT;
     uint64_t temp[2];
     const char* synctype = "all";
@@ -340,7 +389,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'f':
             filename = optarg;
             break;
-        //Set file name to read TX data (will emit sine if omited)
+        //Set file name to read TX data (produce sine if omited)
         case 'I':
             infilename = optarg;
             tx_from_file = true;
@@ -400,6 +449,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             stop_on_error = false;
             break;
         case 'h':
+            usdrlog_disablecolorize(NULL);
             usage(USDR_LOG_INFO, argv[0]);
             exit(EXIT_SUCCESS);
         default:
@@ -410,7 +460,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     start_tx_delay = samples;
 
-    // Discover & print available device list and exit(-Q option is used)
+    // Discover & print available device list and exit (-Q option)
     if (listdevs) {
         char buffer[4096];
         int count = usdr_dmd_discovery(device_name, sizeof(buffer), buffer);
@@ -513,7 +563,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         res = res ? res : usdr_dms_info(usds_rx, &snfo_rx);
         if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get data stream info: errno %d", res);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get RX data stream info: errno %d", res);
             if (stop_on_error) goto dev_close;
             s_rx_blksampl = 0;
             s_rx_blksz = 0;
@@ -535,7 +585,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         res = res ? res : usdr_dms_info(usds_tx, &snfo_tx);
         if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get data stream info: errno %d", res);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get TX data stream info: errno %d", res);
             if (stop_on_error) goto dev_close;
             snfo_tx.channels = 0;
             snfo_tx.pktsyms = 0;
@@ -565,7 +615,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                                      (strcmp(fmt, "ci16") == 0) ? freq_gen_thread_ci16 : freq_gen_thread_cf32,
                                  (void*)(intptr_t)i);
             if (res) {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable start disk in thread %d: errno %d", i, res);
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: errno %d", i, res);
                 goto dev_close;
             }
         }
@@ -579,7 +629,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
             s_out_file[f] = fopen(fmod, "wb+c");
             if (!s_out_file[f]) {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create data file '%s'", fmod);
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create RX storage data file '%s'", fmod);
                 return 3;
             }
         }
@@ -588,7 +638,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             rbuff[i] = ring_buffer_create(256, snfo_rx.pktbszie);
             res = pthread_create(&wthread[i], NULL, disk_write_thread, (void*)(intptr_t)i);
             if (res) {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable start thread %d: errno %d", i, res);
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start RX thread %d: errno %d", i, res);
                 goto dev_close;
             }
         }
@@ -621,7 +671,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dorx) {
         res = usds_rx ? usdr_dms_op(usds_rx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start data stream: errno %d", res);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start RX data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
     }
@@ -630,7 +680,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dotx) {
         res = usds_tx ? usdr_dms_op(usds_tx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start data stream: errno %d", res);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
     }
@@ -646,8 +696,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //Set antenna configuration
     res = usdr_dme_set_uint(dev, "/dm/sdr/0/tfe/antcfg", antennacfg);
     if (res) {
-        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set antcfg: errno %d", res);
-        // goto dev_close;
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set antenna configuration parameter [%u]: errno %d", antennacfg, res);
     }
 
     //Set device parameters from the dev_data struct (see above)
@@ -675,7 +724,7 @@ int main(UNUSED int argc, UNUSED char** argv)
          for (unsigned b = 0; b < tx_bufcnt; b++) {
              unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
              if (idx == IDX_TIMEDOUT) {
-                 USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Cbuffer[%d] timed out!", b);
+                 USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX Cbuffer[%d] timed out!", b);
              }
              buffers[b] = ring_buffer_at(tbuff[b], idx);
          }
@@ -683,7 +732,7 @@ int main(UNUSED int argc, UNUSED char** argv)
          //Core TX function - transmit data from tx provider thread via circular buffer
          res = usdr_dms_send(usds_tx, (const void**)buffers, samples, nots ? UINT64_MAX : stm, 32250);
          if (res) {
-             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to send data: errno %d, i = %d", res, i);
+             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, i);
              //goto dev_close;
              goto stop;
          }
@@ -692,10 +741,7 @@ int main(UNUSED int argc, UNUSED char** argv)
              ring_buffer_cpost(tbuff[b]);
          }
 
-         stm += samples;// - 40;
-         if (i % 2 == 1) {
-             //stm += 2 * 40;
-         }
+         stm += samples;
 
     //RX only mode
     } else if (dorx && !dotx) for (unsigned i = 0; !s_stop && (i < count); i++) {
@@ -703,7 +749,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         for (unsigned b = 0; b < rx_bufcnt; b++) {
             unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
             if (idx == IDX_TIMEDOUT) {
-                USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Pbuffer[%d] timed out!", b);
+                USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "RX Pbuffer[%d] timed out!", b);
             }
             buffers[b] = ring_buffer_at(rbuff[b], idx);
         }
@@ -711,7 +757,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         //Core RX function - read data to buffers...
         res = usdr_dms_recv(usds_rx, buffers, 2250, NULL);
         if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to recv data: errno %d, i = %d", res, i);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX error, unable to recv data: errno %d, i = %d", res, i);
             //goto dev_close;
             goto stop;
         }
@@ -736,7 +782,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             for (unsigned b = 0; b < tx_bufcnt; b++) {
                 unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
                 if (idx == IDX_TIMEDOUT) {
-                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Cbuffer[%d] timed out!", b);
+                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX Cbuffer[%d] timed out!", b);
                 }
                 tx_buffers[b] = ring_buffer_at(tbuff[b], idx);
 
@@ -746,7 +792,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
             res = usdr_dms_send(usds_tx, (const void**)tx_buffers, samples, nots ? ~0ull : ts, 15250);
             if (res) {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to send data: errno %d, i = %d", res, i);
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, i);
                 goto stop;
             }
 
@@ -760,14 +806,14 @@ int main(UNUSED int argc, UNUSED char** argv)
             for (unsigned b = 0; b < rx_bufcnt; b++) {
                 unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
                 if (idx == IDX_TIMEDOUT) {
-                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Pbuffer[%d] timed out!", b);
+                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "RX Pbuffer[%d] timed out!", b);
                 }
                 rx_buffers[b] = ring_buffer_at(rbuff[b], idx);
             }
 
             res = usdr_dms_recv(usds_rx, rx_buffers, 2250, NULL);
             if (res) {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to recv data: errno %d, i = %d", res, i);
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX error, unable to recv data: errno %d, i = %d", res, i);
                 goto stop;
             }
 
@@ -779,20 +825,19 @@ int main(UNUSED int argc, UNUSED char** argv)
 
 stop:
     usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
-    //usdr_dme_get_uint(dev, usdr_dmd_find_entity(dev, "/dm/debug/rxtime"), temp);
 
     //Stop RX&TX streams
     if (dorx) {
         res = usdr_dms_op(usds_rx, USDR_DMS_STOP, 0);
         if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to stop data stream: errno %d", res);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to stop RX data stream: errno %d", res);
             goto dev_close;
         }
     }
     if (dotx) {
         res = usdr_dms_op(usds_tx, USDR_DMS_STOP, 0);
         if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to stop data stream: errno %d", res);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to stop TX data stream: errno %d", res);
             goto dev_close;
         }
     }
@@ -805,11 +850,9 @@ stop:
         goto dev_close;
     }
 
-    if (!print_device_temperature(dev)) {
-        //goto dev_close;
-    }
+    print_device_temperature(dev);
 
-    //Finalize all the threads
+    //Finalize all the threads started above
     if (dorx) {
         for (unsigned i = 0; i < rx_bufcnt; i++) {
             pthread_join(wthread[i], NULL);
