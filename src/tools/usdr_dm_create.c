@@ -281,6 +281,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     pthread_t wthread[MAX_CHS];
     pthread_t rthread[MAX_CHS];
     unsigned count = 128;
+    bool explicit_count = false;
     const char* filename = "out.data";
     const char* infilename = "/dev/zero";
     int opt;
@@ -403,6 +404,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         //Block count - how many samples blocks to TX/RX
         case 'c':
             count = atoi(optarg);
+            explicit_count = true;
             break;
         //RX LML mode
         case 'R':
@@ -486,6 +488,15 @@ int main(UNUSED int argc, UNUSED char** argv)
         if (!s_in_file[0]) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open data file(tx) '%s'", infilename);
             return 3;
+        }
+
+        //If a file is specified and the count is not explicitly specified,
+        // calculate the number of packets to send based on the file size
+        if (tx_from_file && ! explicit_count && ! tx_file_cycle) {
+            fseek(s_in_file[0], 0, SEEK_END);
+            unsigned file_size = ftell(s_in_file[0]);
+            count = file_size / (samples_tx * (strcmp(fmt, "ci16") == 0 ? 4 : 8));
+            fseek(s_in_file[0], 0, SEEK_SET);
         }
 
         if (dev_data[DD_TX_BANDWIDTH].ignore) {
