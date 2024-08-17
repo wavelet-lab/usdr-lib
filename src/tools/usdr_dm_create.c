@@ -235,7 +235,7 @@ static void usage(int severity, const char* me)
                                 "[-o <flag: cycle TX from file>] "
                                 "[-c count [128]] "
                                 "[-r samplerate [50e6]] "
-                                "[-F format [ci16]] "
+                                "[-F format [ci16] | cf32] "
                                 "[-C chmsk [0x1]] "
                                 "[-S TX samples_per_blk [4096]] "
                                 "[-O RX samples_per_blk [4096]] "
@@ -391,7 +391,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'f':
             filename = optarg;
             break;
-        //Set file name to read TX data (produce sine if omited)
+        //Set file name to read TX data (produce sine if omitted)
         case 'I':
             infilename = optarg;
             tx_from_file = true;
