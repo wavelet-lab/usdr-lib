@@ -492,7 +492,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         //If a file is specified and the count is not explicitly specified,
         // calculate the number of packets to send based on the file size
-        if (tx_from_file && ! explicit_count && ! tx_file_cycle) {
+        if (tx_from_file && !explicit_count && !tx_file_cycle) {
             fseek(s_in_file[0], 0, SEEK_END);
             unsigned file_size = ftell(s_in_file[0]);
             count = file_size / (samples_tx * (strcmp(fmt, "ci16") == 0 ? 4 : 8));
