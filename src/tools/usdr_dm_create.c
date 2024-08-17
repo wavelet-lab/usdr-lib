@@ -448,6 +448,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'z':
             stop_on_error = false;
             break;
+        //Show usage
         case 'h':
             usdrlog_disablecolorize(NULL);
             usage(USDR_LOG_INFO, argv[0]);
