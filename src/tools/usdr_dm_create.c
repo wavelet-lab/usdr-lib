@@ -56,9 +56,8 @@ static bool tx_file_cycle = false;
 void* disk_write_thread(void* obj)
 {
     unsigned i = (intptr_t)obj;
-    bool abort_flag = false;
 
-    while (!s_stop && !thread_stop && !abort_flag) {
+    while (!s_stop && !thread_stop) {
         unsigned idx = ring_buffer_cwait(rbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -67,7 +66,7 @@ void* disk_write_thread(void* obj)
         size_t res = fwrite(data, s_rx_blksz, 1, s_out_file[i]);
         if (res != 1) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Can't write %d bytes! error=%zd", s_rx_blksz, res);
-            abort_flag = true;
+            break;
         }
 
         ring_buffer_cpost(rbuff[i]);
@@ -79,10 +78,8 @@ void* disk_write_thread(void* obj)
 void* disk_read_thread(void* obj)
 {
     unsigned i = (intptr_t)obj;
-    bool abort_flag = false;
-    bool eof_detected = false;
 
-    while (!s_stop && !thread_stop && !abort_flag) {
+    while (!s_stop && !thread_stop) {
         unsigned idx = ring_buffer_pwait(tbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -91,21 +88,24 @@ void* disk_read_thread(void* obj)
         size_t res = fread(data, s_tx_blksz, 1, s_in_file[i]);
         if (res != 1)
         {
-            memset(data, 0, s_tx_blksz);
-
             if(feof(s_in_file[i]))
             {
                 if(tx_file_cycle)
+                {
                     rewind(s_in_file[i]);
+                    res = fread(data, s_tx_blksz, 1, s_in_file[i]);
+                }
                 else
-                    if(!eof_detected) USDR_LOG(LOG_TAG, USDR_LOG_INFO, "TX from file finished, EOF was reached");
-
-                eof_detected = true;
+                {
+                    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "TX from file finished, EOF was reached");
+                    break;
+                }
             }
-            else
+
+            if(res != 1)
             {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Can't read %d bytes! res=%zd ferror=%d", s_tx_blksz, res, ferror(s_in_file[i]));
-                abort_flag = true;
+                break;
             }
         }
         else
