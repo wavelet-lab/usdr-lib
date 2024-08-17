@@ -467,6 +467,10 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
+    if (tx_from_file && !explicit_count) {
+        count = -1;
+    }
+
     start_tx_delay = samples_tx;
 
     // Discover & print available device list and exit (-Q option)
@@ -488,19 +492,6 @@ int main(UNUSED int argc, UNUSED char** argv)
         if (!s_in_file[0]) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open data file(tx) '%s'", infilename);
             return 3;
-        }
-
-        //If a file is specified and the count is not explicitly specified,
-        // calculate the number of packets to send based on the file size.
-        if (tx_from_file && !explicit_count && !tx_file_cycle) {
-            fseek(s_in_file[0], 0, SEEK_END);
-            unsigned file_size = ftell(s_in_file[0]);
-            unsigned block_size = samples_tx * (strcmp(fmt, "ci16") == 0 ? 4 : 8);
-            count = file_size / block_size;
-            //if (file_size % block_size) {
-            //    count++;
-            //}
-            fseek(s_in_file[0], 0, SEEK_SET);
         }
 
         if (dev_data[DD_TX_BANDWIDTH].ignore) {
