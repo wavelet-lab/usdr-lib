@@ -740,8 +740,6 @@ int main(UNUSED int argc, UNUSED char** argv)
         goto dev_close;
     }
 
-    time_t start = time(NULL);
-
     //TX only mode
     if (dotx && !dorx) for (unsigned i = 0; !s_stop && (i < count); i++) {
          void* buffers[MAX_CHS];
@@ -848,12 +846,6 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
 stop:
-
-    USDR_LOG(LOG_TAG, USDR_LOG_CRITICAL_WARNING, "========= ===========================================");
-    time_t end = time(NULL);
-    USDR_LOG(LOG_TAG, USDR_LOG_CRITICAL_WARNING, "========= Packet size %d, TX from file thread finished in %.f seconds", samples_tx, difftime(end, start));
-    USDR_LOG(LOG_TAG, USDR_LOG_CRITICAL_WARNING, "========= ===========================================");
-
     usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
 
     //Stop RX&TX streams
