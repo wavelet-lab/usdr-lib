@@ -497,9 +497,9 @@ int main(UNUSED int argc, UNUSED char** argv)
             unsigned file_size = ftell(s_in_file[0]);
             unsigned block_size = samples_tx * (strcmp(fmt, "ci16") == 0 ? 4 : 8);
             count = file_size / block_size;
-            if (file_size % block_size) {
-                count++;
-            }
+            //if (file_size % block_size) {
+            //    count++;
+            //}
             fseek(s_in_file[0], 0, SEEK_SET);
         }
 
