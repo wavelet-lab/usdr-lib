@@ -491,11 +491,15 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
 
         //If a file is specified and the count is not explicitly specified,
-        // calculate the number of packets to send based on the file size
+        // calculate the number of packets to send based on the file size.
         if (tx_from_file && !explicit_count && !tx_file_cycle) {
             fseek(s_in_file[0], 0, SEEK_END);
             unsigned file_size = ftell(s_in_file[0]);
-            count = file_size / (samples_tx * (strcmp(fmt, "ci16") == 0 ? 4 : 8));
+            unsigned block_size = samples_tx * (strcmp(fmt, "ci16") == 0 ? 4 : 8)
+            count = file_size / block_size;
+            if (file_size % block_size) {
+                count++;
+            }
             fseek(s_in_file[0], 0, SEEK_SET);
         }
 
@@ -736,6 +740,8 @@ int main(UNUSED int argc, UNUSED char** argv)
         goto dev_close;
     }
 
+    time_t start = time(NULL);
+
     //TX only mode
     if (dotx && !dorx) for (unsigned i = 0; !s_stop && (i < count); i++) {
          void* buffers[MAX_CHS];
@@ -842,6 +848,12 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
 stop:
+
+    USDR_LOG(LOG_TAG, USDR_LOG_CRITICAL_WARNING, "========= ===========================================");
+    time_t end = time(NULL);
+    USDR_LOG(LOG_TAG, USDR_LOG_CRITICAL_WARNING, "========= Packet size %d, TX from file thread finished in %.f seconds", samples_tx, difftime(end, start));
+    USDR_LOG(LOG_TAG, USDR_LOG_CRITICAL_WARNING, "========= ===========================================");
+
     usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
 
     //Stop RX&TX streams
