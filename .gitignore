@@ -4,6 +4,8 @@ obj-*/
 /debian
 /pkg
 
+cmake-build-debug/
+
 # Prerequisites
 *.d
 
