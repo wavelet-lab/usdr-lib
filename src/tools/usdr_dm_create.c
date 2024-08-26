@@ -8,6 +8,7 @@
 #include <dm_dev.h>
 #include <dm_rate.h>
 #include <dm_stream.h>
+#include "../ipblks/streams/streams.h"
 
 #include <usdr_logging.h>
 
@@ -53,6 +54,22 @@ static ring_buffer_t* tbuff[MAX_CHS];
 
 static bool tx_file_cycle = false;
 
+typedef void* (*fn_rxtx_thread_t)(void* obj);
+
+struct tx_header
+{
+    uint32_t len;
+    uint32_t flags;
+};
+typedef struct tx_header tx_header_t;
+
+enum tx_header_flags
+{
+    TXF_NONE = 0,
+    TXF_READ_FILE_EOF = 1,
+    TXF_READ_FILE_ERROR = 2,
+};
+
 /*
  *  Thread function - write RX stream to file
  */
@@ -84,39 +101,49 @@ void* disk_write_thread(void* obj)
 void* disk_read_thread(void* obj)
 {
     unsigned i = (intptr_t)obj;
+    bool interrupt = false;
 
-    while (!s_stop && !thread_stop) {
+    while (!s_stop && !thread_stop && !interrupt) {
         unsigned idx = ring_buffer_pwait(tbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
 
         char* data = ring_buffer_at(tbuff[i], idx);
-        size_t res = fread(data, s_tx_blksz, 1, s_in_file[i]);
-        if (res != 1)
+        tx_header_t* hdr = (tx_header_t*)data;
+        hdr->len = fread(data + sizeof(tx_header_t), sizeof(char), s_tx_blksz, s_in_file[i]);
+        hdr->flags = TXF_NONE;
+
+        if(ferror(s_in_file[i]))
         {
-            if(feof(s_in_file[i]))
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX thread[%u]: can't read %u bytes! res=%u error=%d", i, s_tx_blksz, hdr->len, errno);
+            hdr->flags |= TXF_READ_FILE_ERROR;
+            interrupt = true;
+        }
+
+        if(feof(s_in_file[i]))
+        {
+            if(tx_file_cycle)
             {
-                if(tx_file_cycle)
+                rewind(s_in_file[i]);
+
+                if(hdr->len == 0)
+                    hdr->len = fread(data + sizeof(tx_header_t), sizeof(char), s_tx_blksz, s_in_file[i]);
+
+                if(hdr->len == 0)
                 {
-                    rewind(s_in_file[i]);
-                    res = fread(data, s_tx_blksz, 1, s_in_file[i]);
-                }
-                else
-                {
-                    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "TX from file finished, EOF was reached");
-                    break;
+                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX thread[%u]: can't loop empty file", i);
+                    hdr->flags |= TXF_READ_FILE_EOF;
+                    interrupt = true;
                 }
             }
-
-            if(res != 1)
+            else
             {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Can't read %d bytes! res=%zd ferror=%d", s_tx_blksz, res, ferror(s_in_file[i]));
-                break;
+                hdr->flags |= TXF_READ_FILE_EOF;
+                interrupt = true;
             }
         }
-        else
-            USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "Read %zd bytes to TX", res * s_tx_blksz);
 
+        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX thread[%u]: read %u bytes from file to TX", i, hdr->len);
         ring_buffer_ppost(tbuff[i]);
     }
 
@@ -265,6 +292,104 @@ static void usage(int severity, const char* me)
                                 "[-l loglevel [3(INFO)]] "
                                 "[-h <flag: This help>]",
              me);
+}
+
+/*
+ * Get packet from the circular buffer & TX
+ * Returns true on success, false on error or EOF
+ */
+static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nfo, bool nots, unsigned iteration)
+{
+    int res = 0;
+    void* buffers[MAX_CHS];
+    unsigned len = nfo->pktbszie;
+    bool is_eof = false;
+    bool is_error = false;
+
+    for (unsigned b = 0; b < tx_bufcnt; b++)
+    {
+        unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
+        if (idx == IDX_TIMEDOUT) {
+            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX Cbuffer[%d] timed out!", b);
+        }
+
+        char* buf = ring_buffer_at(tbuff[b], idx);
+
+        tx_header_t* tx_hdr = (tx_header_t*)buf;
+
+        len = (len > tx_hdr->len) ? tx_hdr->len : len;
+
+        is_eof |= (tx_hdr->flags & TXF_READ_FILE_EOF);
+        if(is_eof)
+            USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Got EOF reading file [%d]", b);
+
+        is_error |= (tx_hdr->flags & TXF_READ_FILE_ERROR);
+        if(is_error)
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Error reading file [%d]", b);
+
+        buffers[b] = (void*)(buf + sizeof(tx_header_t));
+    }
+
+    unsigned sample_bitsize = (nfo->pktbszie * 8) / nfo->pktsyms;
+    unsigned sample_cnt = (len * 8) / sample_bitsize;
+    USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "*** pktbszie=%u pktsyms=%u", nfo->pktbszie, nfo->pktsyms);
+    USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "*** sample_bitsize=%u sample_cnt=%u", sample_bitsize, sample_cnt);
+
+    if(sample_cnt)
+    {
+        //Core TX function - transmit data from tx provider thread via circular buffer
+        res = usdr_dms_send(strm, (const void**)buffers, sample_cnt, nots ? UINT64_MAX : *ts, 32250);
+        if (res) {
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, iteration);
+            return false;
+        }
+    }
+
+    *ts += sample_cnt;
+
+    for (unsigned b = 0; b < tx_bufcnt; b++) {
+        ring_buffer_cpost(tbuff[b]);
+    }
+
+    if(is_eof || is_error)
+    {
+        USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Exiting TX loop: eof=%d err=%d", is_eof, is_error);
+        return false;
+    }
+
+    return true;
+}
+
+/*
+ * RX packet & put it to the circular buffer
+ * Returns true on success, false on error
+ */
+static bool do_receive(pusdr_dms_t strm, unsigned iteration)
+{
+    void* buffers[MAX_CHS];
+    int res = 0;
+
+    for (unsigned b = 0; b < rx_bufcnt; b++)
+    {
+        unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
+        if (idx == IDX_TIMEDOUT) {
+            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "RX Pbuffer[%d] timed out!", b);
+        }
+        buffers[b] = ring_buffer_at(rbuff[b], idx);
+    }
+
+    //Core RX function - read data to buffers...
+    res = usdr_dms_recv(strm, buffers, 2250, NULL);
+    if (res) {
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX error, unable to recv data: errno %d, i = %d", res, iteration);
+        return false;
+    }
+
+    //...then put them to the circular buffer for rx consumer thread
+    for (unsigned b = 0; b < rx_bufcnt; b++) {
+        ring_buffer_ppost(rbuff[b]);
+    }
+    return true;
 }
 
 int main(UNUSED int argc, UNUSED char** argv)
@@ -622,11 +747,25 @@ int main(UNUSED int argc, UNUSED char** argv)
     //Create TX buffers and threads
     if (dotx) {
         for (unsigned i = 0; i < tx_bufcnt; i++) {
-            tbuff[i] = ring_buffer_create(256, snfo_tx.pktbszie);
-            res = pthread_create(&rthread[i], NULL,
-                                 tx_from_file ? disk_read_thread :
-                                     (strcmp(fmt, "ci16") == 0) ? freq_gen_thread_ci16 : freq_gen_thread_cf32,
-                                 (void*)(intptr_t)i);
+            tbuff[i] = ring_buffer_create(256, sizeof(tx_header_t) + snfo_tx.pktbszie);
+
+            fn_rxtx_thread_t thread_func;
+            if(tx_from_file)
+                thread_func = disk_read_thread;
+            else if(strcmp(fmt, SFMT_CI16) == 0)
+                thread_func = freq_gen_thread_ci16;
+            else if(strcmp(fmt, SFMT_CF32) == 0)
+                thread_func = freq_gen_thread_cf32;
+            else
+            {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: invalid format '%s', "
+                                                  "use -I option to read from file or specify %s/%s data format (-F option) for sine generator",
+                         i, fmt, SFMT_CI16, SFMT_CF32);
+                goto dev_close;
+            }
+
+            res = pthread_create(&rthread[i], NULL, thread_func, (void*)(intptr_t)i);
+
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: errno %d", i, res);
                 goto dev_close;
@@ -732,108 +871,29 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
     //TX only mode
-    if (dotx && !dorx) for (unsigned i = 0; !s_stop && (i < count); i++) {
-         void* buffers[MAX_CHS];
-         for (unsigned b = 0; b < tx_bufcnt; b++) {
-             unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
-             if (idx == IDX_TIMEDOUT) {
-                 USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX Cbuffer[%d] timed out!", b);
-             }
-             buffers[b] = ring_buffer_at(tbuff[b], idx);
-         }
-
-         //Core TX function - transmit data from tx provider thread via circular buffer
-         res = usdr_dms_send(usds_tx, (const void**)buffers, samples_tx, nots ? UINT64_MAX : stm, 32250);
-         if (res) {
-             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, i);
-             //goto dev_close;
-             goto stop;
-         }
-
-         for (unsigned b = 0; b < tx_bufcnt; b++) {
-             ring_buffer_cpost(tbuff[b]);
-         }
-
-         stm += samples_tx;
-
-    //RX only mode
-    } else if (dorx && !dotx) for (unsigned i = 0; !s_stop && (i < count); i++) {
-        void* buffers[MAX_CHS];
-        for (unsigned b = 0; b < rx_bufcnt; b++) {
-            unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
-            if (idx == IDX_TIMEDOUT) {
-                USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "RX Pbuffer[%d] timed out!", b);
-            }
-            buffers[b] = ring_buffer_at(rbuff[b], idx);
-        }
-
-        //Core RX function - read data to buffers...
-        res = usdr_dms_recv(usds_rx, buffers, 2250, NULL);
-        if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX error, unable to recv data: errno %d, i = %d", res, i);
-            //goto dev_close;
+    if (dotx && !dorx) for (unsigned i = 0; !s_stop && (i < count); i++)
+    {
+        if(!do_transmit(usds_tx, &stm, &snfo_tx, nots, i))
             goto stop;
-        }
-
-        //...then put them to the circular buffer for rx consumer thread
-        for (unsigned b = 0; b < rx_bufcnt; b++) {
-            ring_buffer_ppost(rbuff[b]);
-        }
+    }
+    //RX only mode
+    else if (dorx && !dotx) for (unsigned i = 0; !s_stop && (i < count); i++)
+    {
+        if(!do_receive(usds_rx, i))
+            goto stop;
 
         //do resync on iteration# specified
         if (i == resync)
             usdr_dme_set_uint(dev, "/dm/resync", 0);
-
+    }
     //TX and RX mode
-    } else {
-        void* rx_buffers[MAX_CHS];
-        void* tx_buffers[MAX_CHS];
-        uint64_t ts = start_tx_delay;
+    else for (unsigned i = 0; !s_stop && (i < count); i++)
+    {
+        if(!do_transmit(usds_tx, &stm, &snfo_tx, nots, i))
+            goto stop;
 
-        for (unsigned i = 0; !s_stop && (i < count); i++) {
-            // TX
-            for (unsigned b = 0; b < tx_bufcnt; b++) {
-                unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
-                if (idx == IDX_TIMEDOUT) {
-                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX Cbuffer[%d] timed out!", b);
-                }
-                tx_buffers[b] = ring_buffer_at(tbuff[b], idx);
-
-                uint64_t *x = (uint64_t *)(tx_buffers[b]);
-                USDR_LOG(LOG_TAG, USDR_LOG_INFO, "%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 ".%016" PRIx64 "", x[0], x[1], x[2], x[3]);
-            }
-
-            res = usdr_dms_send(usds_tx, (const void**)tx_buffers, samples_tx, nots ? ~0ull : ts, 15250);
-            if (res) {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, i);
-                goto stop;
-            }
-
-            for (unsigned b = 0; b < tx_bufcnt; b++) {
-                ring_buffer_cpost(tbuff[b]);
-            }
-
-            ts += samples_tx;
-
-            //RX
-            for (unsigned b = 0; b < rx_bufcnt; b++) {
-                unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
-                if (idx == IDX_TIMEDOUT) {
-                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "RX Pbuffer[%d] timed out!", b);
-                }
-                rx_buffers[b] = ring_buffer_at(rbuff[b], idx);
-            }
-
-            res = usdr_dms_recv(usds_rx, rx_buffers, 2250, NULL);
-            if (res) {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX error, unable to recv data: errno %d, i = %d", res, i);
-                goto stop;
-            }
-
-            for (unsigned b = 0; b < rx_bufcnt; b++) {
-                ring_buffer_ppost(rbuff[b]);
-            }
-        }
+        if(!do_receive(usds_rx, i))
+            goto stop;
     }
 
 stop:
