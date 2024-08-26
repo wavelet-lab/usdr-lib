@@ -284,7 +284,6 @@ static void usage(int severity, const char* me)
                                 "[-B Calibration freq [0]] "
                                 "[-s Sync type [all]] "
                                 "[-Q <flag: Discover and exit>] "
-                                "[-i Resync iter [1]] "
                                 "[-R RX_LML_MODE [0]] "
                                 "[-A Antenna configuration [0]] "
                                 "[-X <flag: Skip initialization>] "
@@ -416,7 +415,6 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned samples_rx = 4096;
     unsigned samples_tx = 4096;
     unsigned loglevel = USDR_LOG_INFO;
-    unsigned resync = 1;
     int noinit = 0;
     unsigned dotx = 0; //means "do TX" - enables TX if dotx==1
     unsigned dorx = 1; //means "do RX" - enables RX if dorx==1
@@ -503,10 +501,6 @@ int main(UNUSED int argc, UNUSED char** argv)
         //Device name
         case 'D':
             device_name = optarg;
-            break;
-        //Iteration number for resync (0..count-1, default 1)
-        case 'i':
-            resync = atoi(optarg);
             break;
         //Set log level (0 - errors only -> 6+ - trace msgs)
         case 'l':
@@ -870,29 +864,13 @@ int main(UNUSED int argc, UNUSED char** argv)
         goto dev_close;
     }
 
-    //TX only mode
-    if (dotx && !dorx) for (unsigned i = 0; !s_stop && (i < count); i++)
+    //TX & RX
+    for (unsigned i = 0; !s_stop && (i < count); i++)
     {
-        if(!do_transmit(usds_tx, &stm, &snfo_tx, nots, i))
-            goto stop;
-    }
-    //RX only mode
-    else if (dorx && !dotx) for (unsigned i = 0; !s_stop && (i < count); i++)
-    {
-        if(!do_receive(usds_rx, i))
+        if(dotx && !do_transmit(usds_tx, &stm, &snfo_tx, nots, i))
             goto stop;
 
-        //do resync on iteration# specified
-        if (i == resync)
-            usdr_dme_set_uint(dev, "/dm/resync", 0);
-    }
-    //TX and RX mode
-    else for (unsigned i = 0; !s_stop && (i < count); i++)
-    {
-        if(!do_transmit(usds_tx, &stm, &snfo_tx, nots, i))
-            goto stop;
-
-        if(!do_receive(usds_rx, i))
+        if(dorx && !do_receive(usds_rx, i))
             goto stop;
     }
 
