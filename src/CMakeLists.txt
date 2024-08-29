@@ -47,7 +47,7 @@ if(ENABLE_VERILATOR)
     add_definitions(-DENABLE_VERILATOR)
 endif(ENABLE_VERILATOR)
 
-# GDB Version <10 can't pase parameters correctly
+# GDB Version <10 can't parse parameters correctly
 add_compile_options(
     "$<$<CONFIG:DEBUG>:-O0;-g>"
     "$<$<CONFIG:RELEASE>:-O3>"

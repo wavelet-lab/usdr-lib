@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(usdr_lib C)
 
-# Auto generating registor descriptors
+# Auto generating register descriptors
 list(APPEND USDR_LIBRARY_FILES "")
 list(APPEND USDR_INCLUDE_FILES "")
 list(APPEND USDR_LINK_FILES    pthread rt)
