@@ -64,7 +64,7 @@ elseif(WVLT_ARCH_ARM64)
     #set_source_files_properties(${XDSPLIB_FILES} PROPERTIES COMPILE_FLAGS "-mfpu=neon")
 endif()
 
-add_library(webusb_test ${LIB_TYPE} ${USDR_LIBRARY_FILES} ${WEBUSB_TEST_LIB_FILES} ${JSON_CONTROLLER_FILES} ${XDSPLIB_FILES})
+add_library(webusb_test ${USDR_LIBRARY_FILES} ${WEBUSB_TEST_LIB_FILES} ${JSON_CONTROLLER_FILES} ${XDSPLIB_FILES})
 target_link_libraries(webusb_test m pthread rt)
 add_dependencies(webusb_test ${USDR_DEPEND_TARGETS})
 target_compile_options(webusb_test PRIVATE "-Wall" "-Werror=implicit-function-declaration")

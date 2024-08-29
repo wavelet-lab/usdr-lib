@@ -31,7 +31,7 @@ include_directories(${USDR_INCLUDE_FILES})
 include_directories(${USDR_INCLUDE_DIRS})
 
 
-add_library(usdr ${LIB_TYPE} ${USDR_LIBRARY_FILES})
+add_library(usdr ${USDR_LIBRARY_FILES})
 target_link_libraries(usdr pthread rt ${USDR_LINK_FILES} usdr-dsp)
 add_dependencies(usdr ${USDR_DEPEND_TARGETS})
 target_compile_options(usdr PRIVATE "-Wall" "-Werror=implicit-function-declaration")
