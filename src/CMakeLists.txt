@@ -29,8 +29,7 @@ include("hwparser/hwparser.cmake")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 find_package(LIBUSB_1 REQUIRED)
 
-set(BUILD_SHARED_LIBS yes)
-
+option(BUILD_SHARED_LIBS "Build shared libraries(otherwise static libraries will be produced)" ON)
 option(ENABLE_VERILATOR "Enable verilator lowlevel bridge" OFF)
 option(ENABLE_SOAPY "Enable SopaySDR support" ON)
 option(ENABLE_GUI  "Enable USDR QT5 simple GUI" ON)
@@ -42,12 +41,15 @@ add_feature_info(SoapySDR ENABLE_SOAPY "SopaySDR plugin")
 add_feature_info(UsdrGUI ENABLE_GUI "USDR QT5 GUI")
 add_feature_info(LibUSB LIBUSB_1_FOUND "USB devices support")
 
+if (NOT BUILD_SHARED_LIBS)
+    add_compile_options(-fPIC)
+endif(NOT BUILD_SHARED_LIBS)
 
 if(ENABLE_VERILATOR)
     add_definitions(-DENABLE_VERILATOR)
 endif(ENABLE_VERILATOR)
 
-# GDB Version <10 can't pase parameters correctly
+# GDB Version <10 can't parse parameters correctly
 add_compile_options(
     "$<$<CONFIG:DEBUG>:-O0;-g>"
     "$<$<CONFIG:RELEASE>:-O3>"
@@ -84,4 +86,5 @@ feature_summary(WHAT DISABLED_FEATURES)
 message(STATUS "usdr version: v${USDR_VERSION}")
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "Install libs: ${CMAKE_INSTALL_LIBDIR}")
+message(STATUS "Shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "######################################################")

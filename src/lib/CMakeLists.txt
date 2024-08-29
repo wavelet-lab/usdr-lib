@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(usdr_lib C)
 
-# Auto generating registor descriptors
+# Auto generating register descriptors
 list(APPEND USDR_LIBRARY_FILES "")
 list(APPEND USDR_INCLUDE_FILES "")
 list(APPEND USDR_LINK_FILES    pthread rt)
@@ -30,7 +30,8 @@ message("DEP - ${USDR_DEPEND_TARGETS}")
 include_directories(${USDR_INCLUDE_FILES})
 include_directories(${USDR_INCLUDE_DIRS})
 
-add_library(usdr SHARED ${USDR_LIBRARY_FILES})
+
+add_library(usdr ${USDR_LIBRARY_FILES})
 target_link_libraries(usdr pthread rt ${USDR_LINK_FILES} usdr-dsp)
 add_dependencies(usdr ${USDR_DEPEND_TARGETS})
 target_compile_options(usdr PRIVATE "-Wall" "-Werror=implicit-function-declaration")
