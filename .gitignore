@@ -3,6 +3,7 @@
 obj-*/
 /debian
 /pkg
+/build
 
 cmake-build-debug/
 
