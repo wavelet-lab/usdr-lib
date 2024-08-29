@@ -65,7 +65,7 @@ else()
         #add_definitions("-mfpu=neon")
     endif()
 
-    add_library(usdr-dsp SHARED ${xdsplib_SRCS})
+    add_library(usdr-dsp ${LIB_TYPE} ${xdsplib_SRCS})
     target_link_libraries(usdr-dsp m pthread)
     target_compile_options(usdr-dsp PRIVATE "-Wall" "-Werror=implicit-function-declaration")
     install(TARGETS usdr-dsp LIBRARY)
