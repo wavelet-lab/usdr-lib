@@ -680,7 +680,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             }
             else
             {
-                uint64_t actual_fref = fref;
+                uint64_t actual_fref = 0;
                 res = usdr_dme_get_uint(dev, "/dm/sdr/refclk/frequency", &actual_fref);
                 if(res)
                 {
