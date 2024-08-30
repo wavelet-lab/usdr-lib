@@ -278,9 +278,10 @@ static void usage(int severity, const char* me)
                                 "[-Y TX_GAIN [0]] "
                                 "[-p RX_PATH ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)] "
                                 "[-P TX_PATH ([tx_auto]|txb1|txb2|txw|txh)] "
-                                "[-u RX_GAIN_PGA] [15] "
-                                "[-U RX_GAIN_VGA] [15] "
-                                "[-a Reference clock path) []] "
+                                "[-u RX_GAIN_PGA [15]] "
+                                "[-U RX_GAIN_VGA [15]] "
+                                "[-a Reference clock path [internal]] "
+                                "[-x Reference clock frequency [0(not set)]] "
                                 "[-B Calibration freq [0]] "
                                 "[-s Sync type [all]] "
                                 "[-Q <flag: Discover and exit>] "
@@ -431,6 +432,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     uint32_t cal_freq = 0;
     bool stop_on_error = true;
     bool tx_from_file = false;
+    uint64_t fref = 0;
 
     //Device parameters
     //                 { endpoint, default_value, ignore flag, stop_on_fail flag }
@@ -458,7 +460,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -485,6 +487,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         //Reference clock path, [internal]|external
         case 'a':
             refclkpath = optarg;
+            break;
+        case 'x':
+            fref = atof(optarg);
             break;
         //Calibration frequency
         case 'B':
@@ -658,15 +663,43 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
-    if (refclkpath) {
+    // set external reference clock
+    if (refclkpath)
+    {
         res = usdr_dme_set_string(dev, "/dm/sdr/refclk/path", refclkpath);
+        if(res)
+        {
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to apply Ext Reference Clock path(%s): errno %d", refclkpath, res);
+        }
+        else if(fref && strcasecmp(refclkpath, "internal"))
+        {
+            res = usdr_dme_set_uint(dev, "/dm/sdr/refclk/frequency", fref);
+            if(res)
+            {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set Ext Reference Clock freq(%" PRIu64 " Hz): errno %d", fref, res);
+            }
+            else
+            {
+                uint64_t actual_fref = fref;
+                res = usdr_dme_get_uint(dev, "/dm/sdr/refclk/frequency", &actual_fref);
+                if(res)
+                {
+                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Unable to get actual Ext Reference Clock freq: errno %d, "
+                                                        "assuming it was set to %" PRIu64 " Hz", res, fref);
+                }
+                else
+                {
+                    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Ext Reference Clock freq set to %" PRIu64
+                                                     " Hz, actual: %" PRIu64 " Hz", fref, actual_fref);
+                }
+            }
+        }
     }
 
     if (!noinit) {
         res = usdr_dme_set_uint(dev, "/dm/power/en", 1);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set power: errno %d", res);
-            // goto dev_close;
         }
 
         //Set sample rate
