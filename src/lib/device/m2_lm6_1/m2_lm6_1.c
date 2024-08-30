@@ -424,6 +424,7 @@ int dev_m2_lm6_1_sdr_refclk_frequency_set(pdevice_t ud, pusdr_vfs_obj_t obj, uin
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
     d->d.fref = value;
+    d->d.lms.fref = d->d.fref;
     return 0;
 }
 
