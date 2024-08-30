@@ -422,15 +422,15 @@ int dev_m2_lm6_1_sdr_tx_antennat_port_cfg_set(pdevice_t ud, pusdr_vfs_obj_t obj,
 
 int dev_m2_lm6_1_sdr_refclk_frequency_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    //struct dev_mp_lm7_1_gps *d = (struct dev_mp_lm7_1_gps *)ud;
-    //d->xdev.lmsstate.fref = value;
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    d->d.fref = value;
     return 0;
 }
 
 int dev_m2_lm6_1_sdr_refclk_frequency_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
-    //struct dev_mp_lm7_1_gps *d = (struct dev_mp_lm7_1_gps *)ud;
-    //*ovalue = d->xdev.lmsstate.fref;
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    *ovalue = d->d.fref;
     return 0;
 }
 

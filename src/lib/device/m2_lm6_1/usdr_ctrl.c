@@ -471,7 +471,7 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
 
     if (ext_clk && ext_fref) {
         if ((ext_fref < 23e6) || (ext_fref > 41e6)) {
-            USDR_LOG("XDEV", USDR_LOG_WARNING, "Optimal LMS6002D reference clock is in 23..41 Mhz\n");
+            USDR_LOG("UDEV", USDR_LOG_WARNING, "Optimal LMS6002D reference clock is in 23..41 Mhz\n");
         }
     }
 
