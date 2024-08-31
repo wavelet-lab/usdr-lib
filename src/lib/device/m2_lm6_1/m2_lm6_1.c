@@ -469,7 +469,7 @@ int dev_m2_lm6_1_sdr_tx_bbloopbackm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 
 int dev_m2_lm6_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    //struct dev_mp_lm7_1_gps *d = (struct dev_mp_lm7_1_gps *)ud;
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
     if (value > 4096) {
         const char* param = (const char*)value;
         if (strcasecmp("internal", param) == 0) {
@@ -481,7 +481,7 @@ int dev_m2_lm6_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
         }
     }
 
-    //d->xdev.refclkpath = value;
+    d->d.refclkpath = value;
     USDR_LOG("UDEV", USDR_LOG_INFO, "LM6: set clk ref path to %d\n", (unsigned)value);
     return 0;
 }
