@@ -482,8 +482,14 @@ int dev_m2_lm6_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
     }
 
     d->d.refclkpath = value;
-    USDR_LOG("UDEV", USDR_LOG_INFO, "LM6: set clk ref path to %d\n", (unsigned)value);
-    return 0;
+    int res = usdr_set_extref(&d->d, value == 1, d->d.fref);
+
+    if(res)
+        USDR_LOG("UDEV", USDR_LOG_ERROR, "LM6: error setting clk ref path to %d: err=%d\n", (unsigned)value, res);
+    else
+        USDR_LOG("UDEV", USDR_LOG_INFO, "LM6: set clk ref path to %d\n", (unsigned)value);
+
+    return res;
 }
 
 

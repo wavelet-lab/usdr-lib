@@ -457,6 +457,16 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
     return 0;
 }
 
+int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool set_flag)
+{
+    int res = 0;
+
+    res = res ? res : si5332_reg_wr(dev, subdev, lsopaddr, IMUX_SEL, set_flag ? IMUX_IN_2 : IMUX_XOSC);
+    res = res ? res : si5332_reg_wr(dev, subdev, lsopaddr, CLKIN_2_CLK_SEL, set_flag ? 1 : 0);
+
+    return res;
+}
+
 // si5332 up to 3 unrelated clocks
 
 int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
