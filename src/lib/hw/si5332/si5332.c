@@ -459,12 +459,26 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
 
 int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool set_flag)
 {
-    int res = 0;
+    const uint8_t program_regs_init[] =
+    {
+        USYS_CTRL, 0x01, //READY
+        IMUX_SEL, set_flag ? IMUX_IN_2 : IMUX_XOSC,
+        CLKIN_2_CLK_SEL, set_flag ? 1 : 0,
+        0xB9, set_flag ? (B9_XOSC_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/) : (B9_IBUF0_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/),
+        USYS_CTRL, 0x02, //ACTIVE
+    };
 
-    res = res ? res : si5332_reg_wr(dev, subdev, lsopaddr, IMUX_SEL, set_flag ? IMUX_IN_2 : IMUX_XOSC);
-    res = res ? res : si5332_reg_wr(dev, subdev, lsopaddr, CLKIN_2_CLK_SEL, set_flag ? 1 : 0);
+    for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
+        int res;
+        uint8_t addr = program_regs_init[2*i + 0];
+        uint8_t val = program_regs_init[2*i + 1];
 
-    return res;
+        res = si5332_reg_wr(dev, subdev, lsopaddr, addr, val);
+        if (res)
+            return res;
+    }
+
+    return 0;
 }
 
 // si5332 up to 3 unrelated clocks
