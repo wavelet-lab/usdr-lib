@@ -168,7 +168,12 @@ void* freq_gen_thread_ci16(void* obj)
             continue;
 
         char* data = ring_buffer_at(tbuff[p], idx);
-        int16_t *iqp = (int16_t *)data;
+
+        tx_header_t* hdr = (tx_header_t*)data;
+        hdr->len = tx_get_samples * sizeof(uint16_t) * 2;
+        hdr->flags = TXF_NONE;
+
+        int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
 
         for (unsigned i = 0; i < tx_get_samples; i++) {
             float ii, qq;
@@ -202,7 +207,12 @@ void* freq_gen_thread_cf32(void* obj)
             continue;
 
         char* data = ring_buffer_at(tbuff[p], idx);
-        float *iqp = (float *)data;
+
+        tx_header_t* hdr = (tx_header_t*)data;
+        hdr->len = tx_get_samples * sizeof(float) * 2;
+        hdr->flags = TXF_NONE;
+
+        float *iqp = (float *)(data + sizeof(tx_header_t));
 
         for (unsigned i = 0; i < tx_get_samples; i++) {
             //float ii, qq; (but we use trick to not do inversion, however, it leads to incorrect phase)
