@@ -329,6 +329,33 @@ enum si5332_omuxx_sel1 {
 
 #define MAKE_OUMUXX(s0, s1)  (((s0) << 0) | ((s1) << 4))
 
+static int si5532_get_state(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, const char* hint, int loops)
+{
+    uint8_t state = 0;
+    int res = 0;
+
+    for(unsigned i = 0; i < loops; ++i)
+    {
+        res = si5332_reg_rd(dev, subdev, lsopaddr, USYS_STAT, &state);
+
+        if(res)
+            return res;
+
+        if(state == 0x01 || state == 0x02 || state == 0x89)
+            break;
+    }
+
+    int tag = (state == 0x01 || state == 0x02) ? USDR_LOG_INFO : USDR_LOG_ERROR;
+    USDR_LOG("5532", tag, "[%s] si5532 state: 0x%02x (%s)", hint, state, state == 0x01 ? "READY" : (state == 0x02 ? "ACTIVE" : "ERROR"));
+    if(state == 0x89)
+    {
+        USDR_LOG("5532", USDR_LOG_ERROR, "The device has not detected an input clock source and can't proceed to ACTIVE state");
+        return -EILSEQ;
+    }
+
+    return res;
+}
+
 int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div, bool ext_in2, bool rv)
 {
     int res;
@@ -441,6 +468,9 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
         USYS_CTRL, 0x02, //ACTIVE
     };
 
+    res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE INIT", 1);
+    if(res)
+        return res;
 
     for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
         uint8_t addr = program_regs_init[2*i + 0];
@@ -454,7 +484,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
     uint32_t oa;
     lowlevel_reg_rd32(dev, subdev, 0xC, &oa);
 
-    return 0;
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER INIT", 100);;
 }
 
 int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool set_flag)
@@ -468,8 +498,14 @@ int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, b
         USYS_CTRL, 0x02, //ACTIVE
     };
 
-    for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
-        int res;
+    int res = 0;
+
+    res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_EX_CLK", 1);
+    if(res)
+        return res;
+
+    for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++)
+    {
         uint8_t addr = program_regs_init[2*i + 0];
         uint8_t val = program_regs_init[2*i + 1];
 
@@ -478,7 +514,7 @@ int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, b
             return res;
     }
 
-    return 0;
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_EX_CLK", 100);
 }
 
 // si5332 up to 3 unrelated clocks
@@ -592,8 +628,11 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
         USYS_CTRL, 0x02, //ACTIVE
     };
 
+    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_LAYOUT", 1);
+    if(res)
+        return res;
+
     for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
-        int res;
         uint8_t addr = program_regs_init[2*i + 0];
         uint8_t val = program_regs_init[2*i + 1];
 
@@ -602,7 +641,7 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
             return res;
     }
 
-    return 0;
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_LAYOUT", 100);
 }
 
 int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool loen, bool txen)
@@ -620,8 +659,11 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
         USYS_CTRL, 0x02, //ACTIVE
     };
 
+    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_PORT3", 1);
+    if(res)
+        return res;
+
     for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
-        int res;
         uint8_t addr = program_regs_init[2*i + 0];
         uint8_t val = program_regs_init[2*i + 1];
 
@@ -629,6 +671,10 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
         if (res)
             return res;
     }
+
+    res = si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_PORT3", 100);
+    if(res)
+        return res;
 
     USDR_LOG("5332", USDR_LOG_INFO, "MXLO_EN=%d TXCLK_EN=%d\n", loen, txen);
     return 0;
