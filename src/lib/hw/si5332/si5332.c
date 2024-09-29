@@ -329,13 +329,16 @@ enum si5332_omuxx_sel1 {
 
 #define MAKE_OUMUXX(s0, s1)  (((s0) << 0) | ((s1) << 4))
 
-static int si5532_get_state(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, const char* hint, int loops)
+static int si5532_get_state(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, const char* hint)
 {
     uint8_t state = 0;
     int res = 0;
+    const static int LOOPS = 100;
 
-    for(unsigned i = 0; i < loops; ++i)
+    for(unsigned i = 0; i < LOOPS; ++i)
     {
+        usleep(10);
+
         res = si5332_reg_rd(dev, subdev, lsopaddr, USYS_STAT, &state);
 
         if(res)
@@ -345,7 +348,7 @@ static int si5532_get_state(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, c
             break;
     }
 
-    int tag = (state == 0x01 || state == 0x02) ? USDR_LOG_INFO : USDR_LOG_ERROR;
+    int tag = (state == 0x01 || state == 0x02) ? USDR_LOG_DEBUG : USDR_LOG_ERROR;
     USDR_LOG("5532", tag, "[%s] si5532 state: 0x%02x (%s)", hint, state, state == 0x01 ? "READY" : (state == 0x02 ? "ACTIVE" : "ERROR"));
     if(state == 0x89)
     {
@@ -468,7 +471,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
         USYS_CTRL, 0x02, //ACTIVE
     };
 
-    res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE INIT", 1);
+    res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE INIT");
     if(res)
         return res;
 
@@ -484,7 +487,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
     uint32_t oa;
     lowlevel_reg_rd32(dev, subdev, 0xC, &oa);
 
-    return si5532_get_state(dev, subdev, lsopaddr, "AFTER INIT", 100);;
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER INIT");;
 }
 
 int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool set_flag)
@@ -500,7 +503,7 @@ int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, b
 
     int res = 0;
 
-    res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_EX_CLK", 1);
+    res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_EX_CLK");
     if(res)
         return res;
 
@@ -514,7 +517,7 @@ int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, b
             return res;
     }
 
-    return si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_EX_CLK", 100);
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_EX_CLK");
 }
 
 // si5332 up to 3 unrelated clocks
@@ -628,7 +631,7 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
         USYS_CTRL, 0x02, //ACTIVE
     };
 
-    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_LAYOUT", 1);
+    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_LAYOUT");
     if(res)
         return res;
 
@@ -641,7 +644,7 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
             return res;
     }
 
-    return si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_LAYOUT", 100);
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_LAYOUT");
 }
 
 int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool loen, bool txen)
@@ -659,7 +662,7 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
         USYS_CTRL, 0x02, //ACTIVE
     };
 
-    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_PORT3", 1);
+    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_PORT3");
     if(res)
         return res;
 
@@ -672,7 +675,7 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
             return res;
     }
 
-    res = si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_PORT3", 100);
+    res = si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_PORT3");
     if(res)
         return res;
 
