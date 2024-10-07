@@ -1,6 +1,7 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
+#include "strings.h"
 #include "si5332.h"
 #include "def_si5332.h"
 
@@ -348,12 +349,12 @@ static int si5532_get_state(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, c
             break;
     }
 
-    int tag = (state == 0x01 || state == 0x02) ? USDR_LOG_DEBUG : USDR_LOG_ERROR;
+    const int tag = (state == 0x01 || state == 0x02) ? USDR_LOG_DEBUG : (strncasecmp(hint, "BEFORE", 6) == 0 ? USDR_LOG_WARNING : USDR_LOG_ERROR);
     USDR_LOG("5532", tag, "[%s] si5532 state: 0x%02x (%s)", hint, state, state == 0x01 ? "READY" : (state == 0x02 ? "ACTIVE" : "ERROR"));
     if(state == 0x89)
     {
-        USDR_LOG("5532", USDR_LOG_ERROR, "The device has not detected an input clock source and can't proceed to ACTIVE state");
-        return -EILSEQ;
+        USDR_LOG("5532", tag, "The device has not detected an input clock source and can't proceed to ACTIVE state");
+        return tag == USDR_LOG_ERROR ? -EILSEQ : 0;
     }
 
     return res;
@@ -387,7 +388,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
        // CLKIN_2_CLK_SEL, 1,
 
         IMUX_SEL, ext_in2 ? IMUX_IN_2 : IMUX_XOSC,
-        CLKIN_2_CLK_SEL, ext_in2 ? 1 : 0,
+        CLKIN_2_CLK_SEL, ext_in2 ? IMUX_INX_CMOS_AC : IMUX_INX_DISABLED,
         CLKIN_3_CLK_SEL, 0,
 
         0x3C, 0,
@@ -496,7 +497,7 @@ int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, b
     {
         USYS_CTRL, 0x01, //READY
         IMUX_SEL, set_flag ? IMUX_IN_2 : IMUX_XOSC,
-        CLKIN_2_CLK_SEL, set_flag ? 1 : 0,
+        CLKIN_2_CLK_SEL, set_flag ? IMUX_INX_CMOS_AC : IMUX_INX_DISABLED,
         0xB9, set_flag ? (B9_XOSC_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/) : (B9_IBUF0_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/),
         USYS_CTRL, 0x02, //ACTIVE
     };
