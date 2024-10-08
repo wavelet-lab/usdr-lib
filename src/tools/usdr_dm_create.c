@@ -522,7 +522,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'Q':
             listdevs = true;
             break;
-        //Device name & options
+        //Device additional options & parameters
         //Format is:
         //  param1=val1,param2=val2,...,paramN=valN
         //Each val may contain subparametes, delimited by ':'
