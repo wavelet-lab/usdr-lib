@@ -42,6 +42,9 @@
 //
 //
 
+enum {
+    USDR_INT_REFCLK = 26000000,
+};
 
 enum usdr_rev000 {
     I2C_BUS_LP8758   = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_PMIC_FPGA),
@@ -461,6 +464,15 @@ int usdr_ctor(lldev_t dev, subdev_t sub, struct usdr_dev *d)
     return 0;
 }
 
+int usdr_set_extref(usdr_dev_t *d, bool ext, uint32_t freq)
+{
+    d->fref = d->lms.fref = (ext) ? freq : USDR_INT_REFCLK;
+
+    // TODO retrigger samplerate / TX / RX
+
+    return si5532_set_ext_clock_sw(d->base.dev, 0, I2C_BUS_SI5332A, ext);
+}
+
 int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
 {
     lldev_t dev = d->base.dev;
@@ -471,13 +483,12 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
 
     if (ext_clk && ext_fref) {
         if ((ext_fref < 23e6) || (ext_fref > 41e6)) {
-            USDR_LOG("XDEV", USDR_LOG_WARNING, "Optimal LMS6002D reference clock is in 23..41 Mhz\n");
+            USDR_LOG("UDEV", USDR_LOG_WARNING, "Optimal LMS6002D reference clock is in 23..41 Mhz\n");
         }
     }
 
-    // Set default internal ref
-    d->refclkpath = 0;
-    d->fref = (ext_clk && ext_fref) ? ext_fref : 26000000;
+    d->refclkpath = ext_clk;
+    d->fref = (ext_clk && ext_fref) ? ext_fref : USDR_INT_REFCLK;
 
     // Antenna band switch configuration
     d->cfg_auto_rx[0].stop_freq = 230e6;

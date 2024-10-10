@@ -23,5 +23,6 @@ int si5332_set_idfreq(lldev_t dev, subdev_t subdev, lsopaddr_t addr,
 
 
 int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool loen, bool txen);
+int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool set_flag);
 
 #endif
