@@ -324,13 +324,6 @@ int board_ext_pciefe_init(lldev_t dev,
         }
     }
 
-    uint16_t dac_reg;
-    res = dac80501_dac_get(dev, subdev, i2ca_dac, &dac_reg);
-    if(res)
-        USDR_LOG("PCIF", USDR_LOG_ERROR, "DAC dac80501_dac_get(init) error=%d\n", res);
-    else
-        USDR_LOG("PCIF", USDR_LOG_INFO, "DAC(init) = %d\n", dac_reg);
-
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_1PPS, GPIO_CFG_ALT0);
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_UART_TX, GPIO_CFG_ALT0);
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_UART_RX, GPIO_CFG_ALT0);
@@ -394,12 +387,6 @@ int board_ext_pciefe_init(lldev_t dev,
         res = board_ext_pciefe_cmd_wr(ob, FECMD_DAC, dac_val);
         if (res)
             return res;
-
-        res = dac80501_dac_get(dev, subdev, i2ca_dac, &dac_reg);
-        if(res)
-            USDR_LOG("PCIF", USDR_LOG_ERROR, "DAC dac80501_dac_get(set) error=%d\n", res);
-        else
-            USDR_LOG("PCIF", USDR_LOG_INFO, "DAC(set) = %d\n", dac_reg);
     }
 
     res = 0;
@@ -511,9 +498,7 @@ int board_ext_pciefe_updfe(board_ext_pciefe_t* ob)
             ob->rxattn == 0 ? V0_FE1_ATTN_IL :
                 ob->rxattn == 1 ? V0_FE1_ATTN_6DB :
                 ob->rxattn == 2 ? V0_FE1_ATTN_12DB : V0_FE1_ATTN_18DB,
-            //Is it correct?..
             ob->trxloopback ? 0 : 1,
-            //
             ob->trxsel == TRX_BAND2 ? V0_FE1_DUPL_PATH_RF3_BAND2 :
                 ob->trxsel == TRX_BAND3 ? V0_FE1_DUPL_PATH_RF5_BAND3 :
                 ob->trxsel == TRX_BAND5 ? V0_FE1_DUPL_PATH_RF1_BAND5 :
@@ -541,9 +526,7 @@ int board_ext_pciefe_updfe(board_ext_pciefe_t* ob)
             ob->rxattn == 0 ? V0_AFE1_ALT_AATTN_IL :
                 ob->rxattn == 1 ? V0_AFE1_ALT_AATTN_6DB :
                 ob->rxattn == 2 ? V0_AFE1_ALT_AATTN_12DB : V0_AFE1_ALT_AATTN_18DB,
-            //Is it correct?..
             ob->trxloopback ? 0 : 1,
-            //
             ob->trxsel == TRX_BAND2 ? V0_AFE1_ALT_ADUPL_PATH_ARF1_BAND2 :
                 ob->trxsel == TRX_BAND3 ? V0_AFE1_ALT_ADUPL_PATH_ARF4_BAND3 :
                 ob->trxsel == TRX_BAND5 ? V0_AFE1_ALT_ADUPL_PATH_ARF5_BAND5 :
