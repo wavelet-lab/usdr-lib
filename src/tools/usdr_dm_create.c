@@ -104,12 +104,14 @@ void* disk_read_thread(void* obj)
     bool interrupt = false;
 
     while (!s_stop && !thread_stop && !interrupt) {
+
         unsigned idx = ring_buffer_pwait(tbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
 
         char* data = ring_buffer_at(tbuff[i], idx);
         tx_header_t* hdr = (tx_header_t*)data;
+
         hdr->len = fread(data + sizeof(tx_header_t), sizeof(char), s_tx_blksz, s_in_file[i]);
         hdr->flags = TXF_NONE;
 
@@ -168,7 +170,12 @@ void* freq_gen_thread_ci16(void* obj)
             continue;
 
         char* data = ring_buffer_at(tbuff[p], idx);
-        int16_t *iqp = (int16_t *)data;
+
+        tx_header_t* hdr = (tx_header_t*)data;
+        hdr->len = tx_get_samples * sizeof(uint16_t) * 2;
+        hdr->flags = TXF_NONE;
+
+        int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
 
         for (unsigned i = 0; i < tx_get_samples; i++) {
             float ii, qq;
@@ -202,7 +209,12 @@ void* freq_gen_thread_cf32(void* obj)
             continue;
 
         char* data = ring_buffer_at(tbuff[p], idx);
-        float *iqp = (float *)data;
+
+        tx_header_t* hdr = (tx_header_t*)data;
+        hdr->len = tx_get_samples * sizeof(float) * 2;
+        hdr->flags = TXF_NONE;
+
+        float *iqp = (float *)(data + sizeof(tx_header_t));
 
         for (unsigned i = 0; i < tx_get_samples; i++) {
             //float ii, qq; (but we use trick to not do inversion, however, it leads to incorrect phase)
@@ -228,12 +240,14 @@ bool print_device_temperature(pdm_dev_t dev)
     int res = usdr_dme_get_uint(dev, "/dm/sensor/temp", &temp);
 
     if (res) {
-        USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Unable to get device temperature: errno %d", res);
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get device temperature: errno %d", res);
         return false;
+    } else if (temp > 65535) {
+        USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "The temperature sensor doen't seem to be supported by your hardware - or your device has already melted)");
     } else {
         USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Temp = %.1f C", temp / 256.0);
-        return true;
     }
+    return true;
 }
 
 enum {
@@ -255,41 +269,42 @@ enum {
  */
 static void usage(int severity, const char* me)
 {
-    USDR_LOG(LOG_TAG, severity, "Usage: %s "
-                                "[-D device] "
-                                "[-f RX_filename [./out.data]] "
-                                "[-I TX_filename ] "
-                                "[-o <flag: cycle TX from file>] "
-                                "[-c count [128]] "
-                                "[-r samplerate [50e6]] "
-                                "[-F format [ci16] | cf32] "
-                                "[-C chmsk [0x1]] "
-                                "[-S TX samples_per_blk [4096]] "
-                                "[-O RX samples_per_blk [4096]] "
-                                "[-t <flag: TX only mode>] "
-                                "[-T <flag: TX+RX mode>] "
-                                "[-N <flag: No TX timestamps>] "
-                                "[-q TDD_FREQ [910e6]] "
-                                "[-e RX_FREQ [900e6]] "
-                                "[-E TX_FREQ [920e6]] "
-                                "[-w RX_BANDWIDTH [1e6]] "
-                                "[-W TX_BANDWIDTH [1e6]] "
-                                "[-y RX_GAIN_LNA [15]] "
-                                "[-Y TX_GAIN [0]] "
-                                "[-p RX_PATH ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)] "
-                                "[-P TX_PATH ([tx_auto]|txb1|txb2|txw|txh)] "
-                                "[-u RX_GAIN_PGA] [15] "
-                                "[-U RX_GAIN_VGA] [15] "
-                                "[-a Reference clock path) []] "
-                                "[-B Calibration freq [0]] "
-                                "[-s Sync type [all]] "
-                                "[-Q <flag: Discover and exit>] "
-                                "[-R RX_LML_MODE [0]] "
-                                "[-A Antenna configuration [0]] "
-                                "[-X <flag: Skip initialization>] "
-                                "[-z <flag: Continue on error>] "
-                                "[-l loglevel [3(INFO)]] "
-                                "[-h <flag: This help>]",
+    USDR_LOG(LOG_TAG, severity, "Usage: %s \n"
+                                "\t[-D device_parameters] \n"
+                                "\t[-f RX_filename [./out.data]] \n"
+                                "\t[-I TX_filename(s) (optionally colon-separated list)] \n"
+                                "\t[-o <flag: cycle TX from file>] \n"
+                                "\t[-c count [128]] \n"
+                                "\t[-r samplerate [50e6]] \n"
+                                "\t[-F format [ci16] | cf32] \n"
+                                "\t[-C chmsk [autodetect]] \n"
+                                "\t[-S TX samples_per_blk [4096]] \n"
+                                "\t[-O RX samples_per_blk [4096]] \n"
+                                "\t[-t <flag: TX only mode>] \n"
+                                "\t[-T <flag: TX+RX mode>] \n"
+                                "\t[-N <flag: No TX timestamps>] \n"
+                                "\t[-q TDD_FREQ [910e6]] \n"
+                                "\t[-e RX_FREQ [900e6]] \n"
+                                "\t[-E TX_FREQ [920e6]] \n"
+                                "\t[-w RX_BANDWIDTH [1e6]] \n"
+                                "\t[-W TX_BANDWIDTH [1e6]] \n"
+                                "\t[-y RX_GAIN_LNA [15]] \n"
+                                "\t[-Y TX_GAIN [0]] \n"
+                                "\t[-p RX_PATH ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)] \n"
+                                "\t[-P TX_PATH ([tx_auto]|txb1|txb2|txw|txh)] \n"
+                                "\t[-u RX_GAIN_PGA [15]] \n"
+                                "\t[-U RX_GAIN_VGA [15]] \n"
+                                "\t[-a Reference clock path [internal]] \n"
+                                "\t[-x Reference clock frequency [internal clock freq]] \n"
+                                "\t[-B Calibration freq [0]] \n"
+                                "\t[-s Sync type [all]] \n"
+                                "\t[-Q <flag: Discover and exit>] \n"
+                                "\t[-R RX_LML_MODE [0]] \n"
+                                "\t[-A Antenna configuration [0]] \n"
+                                "\t[-X <flag: Skip initialization>] \n"
+                                "\t[-z <flag: Continue on error>] \n"
+                                "\t[-l loglevel [3(INFO)]] \n"
+                                "\t[-h <flag: This help>]",
              me);
 }
 
@@ -406,8 +421,11 @@ int main(UNUSED int argc, UNUSED char** argv)
     pthread_t rthread[MAX_CHS];
     unsigned count = 128;
     bool explicit_count = false;
-    const char* filename = "out.data";
-    const char* infilename = "/dev/zero";
+
+    const char* filename_rx = "out.data";
+    const char* filename_tx[MAX_CHS];
+    memset(filename_tx, 0, sizeof(filename_tx[0]) * MAX_CHS);
+
     int opt;
     unsigned chmsk = 0x1;
     bool chmsk_alter = false;
@@ -431,6 +449,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     uint32_t cal_freq = 0;
     bool stop_on_error = true;
     bool tx_from_file = false;
+    uint64_t fref = 0;
 
     //Device parameters
     //                 { endpoint, default_value, ignore flag, stop_on_fail flag }
@@ -458,7 +477,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -482,9 +501,14 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
         //RX VGA gain
         case 'U': dev_data[DD_RX_GAIN_VGA].value = atoi(optarg); dev_data[DD_RX_GAIN_VGA].ignore = false; break;
-        //Reference clock path, [internal]|external
+        //Reference clock source path, [internal]|external
         case 'a':
             refclkpath = optarg;
+            break;
+        //Reference clock (in Hz). Ignored when internal clocking is selected.
+        //If omitted, the default internal ref clock will be used (26MHz typically)
+        case 'x':
+            fref = atof(optarg);
             break;
         //Calibration frequency
         case 'B':
@@ -498,7 +522,15 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'Q':
             listdevs = true;
             break;
-        //Device name
+        //Device additional options & parameters
+        //Format is:
+        //  param1=val1,param2=val2,...,paramN=valN
+        //Each val may contain subparametes, delimited by ':'
+        //For example, if you're using the PCIE Development board V1 revision, you can specify it's dedicated params:
+        //  -Dpciefev1:osc_on
+        //            - this enables the devboard clock, that can be used as 'external' clock for your on-board sdr device.
+        //              (see -a & -x options above)
+        //  See the full devboard parameters list in the documentation.
         case 'D':
             device_name = optarg;
             break;
@@ -508,19 +540,40 @@ int main(UNUSED int argc, UNUSED char** argv)
             usdrlog_setlevel(NULL, loglevel);
             break;
         //Set file name to store RX data (default: ./out.data)
+        //A suffix will be automatically added to the file name when using several RX RF channels
         case 'f':
-            filename = optarg;
+            filename_rx = optarg;
             break;
-        //Set file name to read TX data (produce sine if omitted)
+        //Set file name(s) to read TX data (produce sine if omitted)
+        //Use colon-separated list for several TX RF channels
+        //If the number of channels exceeds the number of files, round-robin file rotation will be applied.
         case 'I':
-            infilename = optarg;
+        {
+            const char* sep = ":";
+            char* pch = strtok(optarg, sep);
+            unsigned i = 0;
+
+            while (pch != NULL && i < MAX_CHS)
+            {
+                USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX file #%u: '%s'", i, pch);
+                filename_tx[i++] = pch;
+                pch = strtok(NULL, sep);
+            }
+
+            if(!i)
+            {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "-I option parsing error!");
+                exit(EXIT_FAILURE);
+            }
+
             tx_from_file = true;
             break;
+        }
         //TX cycling - if filesize/tx_block_sz < count
         case 'o':
             tx_file_cycle = true;
             break;
-        //Block count - how many samples blocks to TX/RX
+        //Block count - TX/RX samples count in one data block
         case 'c':
             count = atoi(optarg);
             explicit_count = true;
@@ -537,9 +590,10 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'F':
             fmt = optarg;
             break;
-        //Channels mask
+        //Channels mask - autodetect if not specified
         case 'C':
-            chmsk = atoi(optarg); chmsk_alter = true;
+            chmsk = atoi(optarg);
+            chmsk_alter = true;
             break;
         //RX buffer size, in samples
         case 'S':
@@ -607,10 +661,13 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Prepare parameters to TX
     if (dotx) {
-        s_in_file[0] = fopen(infilename, "rb+");
-        if (!s_in_file[0]) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open data file(tx) '%s'", infilename);
-            return 3;
+        if(tx_from_file)
+        {
+            s_in_file[0] = fopen(filename_tx[0], "rb+");
+            if (!s_in_file[0]) {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open TX source data file #%u '%s'", 0, filename_tx[0]);
+                return 3;
+            }
         }
 
         if (dev_data[DD_TX_BANDWIDTH].ignore) {
@@ -621,9 +678,9 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Prepare parameters to RX
     if (dorx) {
-        s_out_file[0] = fopen(filename, "wb+c");
+        s_out_file[0] = fopen(filename_rx, "wb+c");
         if (!s_out_file[0]) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create data file(rx) '%s'", filename);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create RX storage data file #%u '%s'", 0, filename_rx);
             return 3;
         }
 
@@ -658,15 +715,43 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
-    if (refclkpath) {
+    // set external reference clock
+    if (refclkpath)
+    {
         res = usdr_dme_set_string(dev, "/dm/sdr/refclk/path", refclkpath);
+        if(res)
+        {
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to apply Ext Reference Clock path(%s): errno %d", refclkpath, res);
+        }
+        else if(fref && strcasecmp(refclkpath, "internal"))
+        {
+            res = usdr_dme_set_uint(dev, "/dm/sdr/refclk/frequency", fref);
+            if(res)
+            {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set Ext Reference Clock freq(%" PRIu64 " Hz): errno %d", fref, res);
+            }
+            else
+            {
+                uint64_t actual_fref = 0;
+                res = usdr_dme_get_uint(dev, "/dm/sdr/refclk/frequency", &actual_fref);
+                if(res)
+                {
+                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Unable to get actual Ext Reference Clock freq: errno %d, "
+                                                        "assuming it was set to %" PRIu64 " Hz", res, fref);
+                }
+                else
+                {
+                    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Ext Reference Clock freq set to %" PRIu64
+                                                     " Hz, actual: %" PRIu64 " Hz", fref, actual_fref);
+                }
+            }
+        }
     }
 
     if (!noinit) {
         res = usdr_dme_set_uint(dev, "/dm/power/en", 1);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set power: errno %d", res);
-            // goto dev_close;
         }
 
         //Set sample rate
@@ -696,10 +781,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = res ? res : usdr_dms_info(usds_rx, &snfo_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get RX data stream info: errno %d", res);
-            if (stop_on_error) goto dev_close;
-            s_rx_blksampl = 0;
-            s_rx_blksz = 0;
-            rx_bufcnt = 0;
+            goto dev_close;
         } else {
             s_rx_blksampl = snfo_rx.pktsyms;
             s_rx_blksz = snfo_rx.pktbszie;
@@ -718,9 +800,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = res ? res : usdr_dms_info(usds_tx, &snfo_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get TX data stream info: errno %d", res);
-            if (stop_on_error) goto dev_close;
-            snfo_tx.channels = 0;
-            snfo_tx.pktsyms = 0;
+            goto dev_close;
         } else {
             s_tx_blksz = snfo_tx.pktbszie;
             s_tx_blksampl = snfo_tx.pktsyms;
@@ -740,6 +820,23 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Create TX buffers and threads
     if (dotx) {
+        unsigned fidx = 1;
+        for (unsigned f = 1; tx_from_file && f < tx_bufcnt; f++) {
+
+            if(!filename_tx[fidx])
+                fidx = 0;
+
+            const char* fname = filename_tx[fidx++];
+
+            s_in_file[f] = fopen(fname, "rb+");
+            if (!s_in_file[f]) {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open TX source data file #%u '%s'", f, fname);
+                return 3;
+            }
+            else
+                USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX source data file #%u '%s' opened OK", f, fname);
+        }
+
         for (unsigned i = 0; i < tx_bufcnt; i++) {
             tbuff[i] = ring_buffer_create(256, sizeof(tx_header_t) + snfo_tx.pktbszie);
 
@@ -771,13 +868,15 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dorx) {
         for (unsigned f = 1; f < rx_bufcnt; f++) {
             char fmod[1024];
-            snprintf(fmod, sizeof(fmod), "%s.%d", filename, f);
+            snprintf(fmod, sizeof(fmod), "%s.%d", filename_rx, f);
 
             s_out_file[f] = fopen(fmod, "wb+c");
             if (!s_out_file[f]) {
-                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create RX storage data file '%s'", fmod);
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create RX storage data file #%u '%s'", f, fmod);
                 return 3;
             }
+            else
+                USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "RX storage data file #%u '%s' created OK", f, fmod);
         }
 
         for (unsigned i = 0; i < rx_bufcnt; i++) {

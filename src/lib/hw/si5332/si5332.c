@@ -1,6 +1,7 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
+#include "strings.h"
 #include "si5332.h"
 #include "def_si5332.h"
 
@@ -329,6 +330,36 @@ enum si5332_omuxx_sel1 {
 
 #define MAKE_OUMUXX(s0, s1)  (((s0) << 0) | ((s1) << 4))
 
+static int si5532_get_state(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, const char* hint)
+{
+    uint8_t state = 0;
+    int res = 0;
+    const static int LOOPS = 100;
+
+    for(unsigned i = 0; i < LOOPS; ++i)
+    {
+        usleep(10);
+
+        res = si5332_reg_rd(dev, subdev, lsopaddr, USYS_STAT, &state);
+
+        if(res)
+            return res;
+
+        if(state == 0x01 || state == 0x02 || state == 0x89)
+            break;
+    }
+
+    const int tag = (state == 0x01 || state == 0x02) ? USDR_LOG_DEBUG : (strncasecmp(hint, "BEFORE", 6) == 0 ? USDR_LOG_WARNING : USDR_LOG_ERROR);
+    USDR_LOG("5532", tag, "[%s] si5532 state: 0x%02x (%s)", hint, state, state == 0x01 ? "READY" : (state == 0x02 ? "ACTIVE" : "ERROR"));
+    if(state == 0x89)
+    {
+        USDR_LOG("5532", tag, "The device has not detected an input clock source and can't proceed to ACTIVE state");
+        return tag == USDR_LOG_ERROR ? -EILSEQ : 0;
+    }
+
+    return res;
+}
+
 int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div, bool ext_in2, bool rv)
 {
     int res;
@@ -357,7 +388,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
        // CLKIN_2_CLK_SEL, 1,
 
         IMUX_SEL, ext_in2 ? IMUX_IN_2 : IMUX_XOSC,
-        CLKIN_2_CLK_SEL, ext_in2 ? 1 : 0,
+        CLKIN_2_CLK_SEL, ext_in2 ? IMUX_INX_CMOS_AC : IMUX_INX_DISABLED,
         CLKIN_3_CLK_SEL, 0,
 
         0x3C, 0,
@@ -441,6 +472,9 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
         USYS_CTRL, 0x02, //ACTIVE
     };
 
+    res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE INIT");
+    if(res)
+        return res;
 
     for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
         uint8_t addr = program_regs_init[2*i + 0];
@@ -454,7 +488,37 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
     uint32_t oa;
     lowlevel_reg_rd32(dev, subdev, 0xC, &oa);
 
-    return 0;
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER INIT");;
+}
+
+int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool set_flag)
+{
+    const uint8_t program_regs_init[] =
+    {
+        USYS_CTRL, 0x01, //READY
+        IMUX_SEL, set_flag ? IMUX_IN_2 : IMUX_XOSC,
+        CLKIN_2_CLK_SEL, set_flag ? IMUX_INX_CMOS_AC : IMUX_INX_DISABLED,
+        0xB9, set_flag ? (B9_XOSC_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/) : (B9_IBUF0_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/),
+        USYS_CTRL, 0x02, //ACTIVE
+    };
+
+    int res = 0;
+
+    res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_EX_CLK");
+    if(res)
+        return res;
+
+    for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++)
+    {
+        uint8_t addr = program_regs_init[2*i + 0];
+        uint8_t val = program_regs_init[2*i + 1];
+
+        res = si5332_reg_wr(dev, subdev, lsopaddr, addr, val);
+        if (res)
+            return res;
+    }
+
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_EX_CLK");
 }
 
 // si5332 up to 3 unrelated clocks
@@ -568,8 +632,11 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
         USYS_CTRL, 0x02, //ACTIVE
     };
 
+    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_LAYOUT");
+    if(res)
+        return res;
+
     for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
-        int res;
         uint8_t addr = program_regs_init[2*i + 0];
         uint8_t val = program_regs_init[2*i + 1];
 
@@ -578,7 +645,7 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
             return res;
     }
 
-    return 0;
+    return si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_LAYOUT");
 }
 
 int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool loen, bool txen)
@@ -596,8 +663,11 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
         USYS_CTRL, 0x02, //ACTIVE
     };
 
+    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_PORT3");
+    if(res)
+        return res;
+
     for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
-        int res;
         uint8_t addr = program_regs_init[2*i + 0];
         uint8_t val = program_regs_init[2*i + 1];
 
@@ -605,6 +675,10 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
         if (res)
             return res;
     }
+
+    res = si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_PORT3");
+    if(res)
+        return res;
 
     USDR_LOG("5332", USDR_LOG_INFO, "MXLO_EN=%d TXCLK_EN=%d\n", loen, txen);
     return 0;

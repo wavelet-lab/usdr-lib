@@ -194,6 +194,8 @@ enum {
 
 };
 
+int usdr_set_extref(usdr_dev_t *d, bool ext, uint32_t freq);
+
 #endif
 
 #endif
