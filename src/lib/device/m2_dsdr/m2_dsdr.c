@@ -25,14 +25,34 @@
 
 #include "../hw/tps6381x/tps6381x.h"
 #include "../hw/lmk05318/lmk05318.h"
+#include "../hw/lp875484/lp875484.h"
+#include "../hw/afe79xx/afe79xx.h"
 
+// Board revisions:
+//  0 - DSDR
+//  1 - Hiper
 
 enum {
     SRF4_FIFOBSZ = 0x10000, // 64kB
 };
 
-enum {
-    I2C_ADDR_LMK = 0x65,
+enum i2c_bus1 {
+    I2C_ADDR_PMIC_0P9 = 0x60, //LP875484
+};
+
+enum i2c_bus2 {
+    // I2C_ADDR_TPS63811 = 0x75, //TPS63811
+    I2C_ADDR_LMK = 0x65, //LMK05318B
+};
+
+enum i2c_idx {
+    // I2C_AFE_PMIC = 1,
+    // I2C_TPS63811 = 2,
+    // I2C_LMK = 3,
+
+    I2C_AFE_PMIC   = MAKE_LSOP_I2C_ADDR(0, 0, I2C_ADDR_PMIC_0P9),
+    I2C_TPS63811   = MAKE_LSOP_I2C_ADDR(0, 1, I2C_DEV_DCDCBOOST),
+    I2C_LMK        = MAKE_LSOP_I2C_ADDR(0, 1, I2C_ADDR_LMK),
 };
 
 // LMK ports
@@ -55,6 +75,10 @@ enum lmk_ports {
     LMK_FPGA_SYSREF = 6,
     LMK_FPGA_1PPS = 7,
 };
+
+// Power dependencies
+// VIOSYS for I2C_ADDR_PMIC_0P9 depends on PWR_EN_2P05
+
 
 static
 const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
@@ -157,13 +181,19 @@ struct dev_m2_dsdr {
     stream_handle_t* rx;
     stream_handle_t* tx;
 };
+typedef struct dev_m2_dsdr dev_m2_dsdr_t;
 
-// enum dev_gpi {
-// };
+
 
 enum dev_gpo {
     IGPO_BANK_LEDS        = 0,
     IGPO_PWR_LMK          = 1,
+    IGPO_PWR_AFE          = 2,
+    IGPO_AFE_RST          = 3,
+};
+
+enum dev_gpi {
+    IGPI_PGOOD           = 16,
 };
 
 static int dev_gpo_set(lldev_t dev, unsigned bank, unsigned data)
@@ -275,34 +305,18 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     int res = 0;
     d->subdev = 0;
 
-    // for (unsigned i = 0; i < pcount; i++) {
-    //     if (strcmp(devparam[i], "lmk") == 0) {
-    //         try_lmk = atoi(devval[i]) == 0 ? false : true;
-    //     }
-    //     if (strcmp(devparam[i], "decim") == 0) {
-    //         int dv = atoi(devval[i]);
-    //         if (dv != 128)
-    //             dv = 2;
+    res = res ? res : dev_gpo_set(dev, IGPO_BANK_LEDS, 1);
 
-    //         d->decim = dv;
-    //     }
-    // }
-
-
-    // res = lowlevel_reg_wr32(dev, 0, M2PCI_REG_STAT_CTRL, (1u << 31) | (0x4bu << 24) | 0x67 | (0x48u << 8) |  (0x4bu << 16));
-    // if (res)
-    //     return res;
-
-    dev_gpo_set(dev, IGPO_BANK_LEDS, 1);
+    if (getenv("USDR_BARE_DEV")) {
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "USDR_BARE_DEV is set, skipping initialization!\n");
+        return res;
+    }
 
     uint32_t hwid, usr2, pg;
     res = res ? res : dev_gpi_get32(dev, IGPI_USR_ACCESS2, &usr2);
     res = res ? res : dev_gpi_get32(dev, IGPI_HWID, &hwid);
 
-    dev_gpo_set(dev, IGPO_PWR_LMK, 0xf);
-
-    res = res ? res : lowlevel_reg_wr32(d->base.dev, d->subdev, M2PCI_REG_STAT_CTRL,
-                                        MAKE_I2C_LUT(0x80 | I2C_ADDR_LMK, 0x80 | I2C_DEV_DCDCBOOST, 0, 0));
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xf);
 
     for (unsigned j = 0; j < 10; j++) {
         usleep(10000);
@@ -313,7 +327,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     for (unsigned j = 0; j < 20; j++) {
         usleep(10000);
-        res = res ? res : tps6381x_init(dev, d->subdev, 2, true, true, 3450);
+        res = res ? res : tps6381x_init(dev, d->subdev, I2C_TPS63811, true, true, 3450);
         if (res == 0)
             break;
     }
@@ -323,15 +337,88 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     for (unsigned j = 0; j < 25; j++) {
         usleep(40000);
-        res = res ? res : lmk05318_create(dev, d->subdev, 3, lowlevel_get_ops(dev)->ls_op, &d->lmk);
+        res = res ? res : lmk05318_create(dev, d->subdev, I2C_LMK, &d->lmk);
         if (res == 0)
             break;
     }
 
-
     res = res ? res : lmk05318_set_out_mux(&d->lmk, LMK_FPGA_SYSREF, false, LVDS);
 
     USDR_LOG("DSDR", USDR_LOG_ERROR, "Configuration: OK [%08x, %08x] res=%d   PG=%08x\n", usr2, hwid, res, pg);
+
+    // return 0;
+    uint32_t pgdat = 0;
+    res = dev_gpi_get32(dev, IGPI_PGOOD, &pgdat);
+    if (!(pgdat & (1 << 0))) {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "2V05 isn't good, giving up!\n");
+        return -EIO;
+    }
+
+    // Initialize AFEPWR
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x1); // Enable VIOSYS, hold RESET
+    usleep(10000);
+    //res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x3); // Enable VIOSYS, hold RESET
+    res = res ? res : lp875484_init(dev, d->subdev, I2C_AFE_PMIC);
+    res = res ? res : lp875484_set_vout(dev, d->subdev, I2C_AFE_PMIC, 900);
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x3); // Enable VIOSYS, release RESET
+    if (res)
+        return res;
+
+    bool afe_pg = false;
+    for (unsigned j = 0; j < 100; j++) {
+        res = lp875484_is_pg(dev, d->subdev, I2C_AFE_PMIC, &afe_pg);
+        if (res)
+            return res;
+
+        if (afe_pg)
+            break;
+
+        usleep(1000);
+    }
+    if (!afe_pg) {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "DCDC 0.9V isn't good, giving up!\n");
+        return -EIO;
+    }
+
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x7); // Enable DCDC 1.2V;
+    // We don't have PG_1v2 routed in this rev
+    // We don't have EN_1v8 routed in this rev
+    // res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0xf);
+
+    // Check PG_1v8
+    for (unsigned j = 0; j < 100; j++) {
+        res = dev_gpi_get32(dev, IGPI_PGOOD, &pgdat);
+        if (pgdat & (1 << 6))
+            break;
+
+        usleep(1000);
+    }
+    if (!(pgdat & (1 << 6))) {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "DCDC 1.8V isn't good, giving up!\n");
+        return -EIO;
+    }
+
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x1f);
+    if (res)
+        return res;
+
+    // Test AFE chip
+    USDR_LOG("DSDR", USDR_LOG_ERROR, "AFE is powered up!\n");
+
+    usleep(100000);
+
+    res = res ? res : dev_gpo_set(dev, IGPO_AFE_RST, 0x0);
+    res = res ? res : dev_gpo_set(dev, IGPO_AFE_RST, 0x1);
+
+    usleep(100000);
+
+    afe79xx_state_t st;
+    res = res ? res : afe79xx_create(dev, d->subdev, 0, &st);
+
+    sleep(1);
+    USDR_LOG("DSDR", USDR_LOG_ERROR, "Initializing AFE...\n");
+
+    res = res ? res : afe79xx_init(&st);
     return 0;
 }
 
