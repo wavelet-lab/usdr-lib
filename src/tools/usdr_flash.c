@@ -206,7 +206,7 @@ int main(int argc, char** argv)
         res = (no_device) ? 0 : xlnx_btstrm_iprgcheck(&image, &file, MASTER_IMAGE_OFF, golden);
         if (res) {
             fprintf(stderr, "Image check failed! res=%d, file revision=%12ld\n", res, get_xilinx_rev_h(file.usr_access2));
-            //return 4;
+            return 4;
         }
 
         //round up to 64k sector
