@@ -346,6 +346,15 @@ int limesdr_setup_stream(limesdr_dev_t *d, bool iq12bit, bool sisosdr, bool trxp
     res = res ? res : limesdr_stop_streaming(d);
     res = res ? res : limesdr_reset_timestamp(d);
 
+    res = res ? res : lms7002m_dc_corr(&d->base.lmsstate, P_TXA_I, 127);
+    res = res ? res : lms7002m_dc_corr(&d->base.lmsstate, P_TXA_Q, 127);
+
+    res = res ? res : lms7002m_dc_corr_en(&d->base.lmsstate,
+                                          d->base.rx_run[0],
+                                          d->base.rx_run[1],
+                                          d->base.tx_run[0],
+                                          d->base.tx_run[1]);
+
     // TODO: ResetStreamBuffers
 
     uint16_t mode;
