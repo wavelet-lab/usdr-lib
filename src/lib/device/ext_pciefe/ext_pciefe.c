@@ -374,7 +374,7 @@ int board_ext_pciefe_init(lldev_t dev,
         ob->trxloopback = res;
     }
     if (get_param_long(&pd[P_ATTN], &p_attn) == 0) {
-        ob->rxattn = p_attn + 3 / 6;
+        ob->rxattn = (p_attn + 3) / 6;
         if (ob->rxattn > 3)
             ob->rxattn = 3;
     }
@@ -413,6 +413,7 @@ int board_ext_pciefe_init(lldev_t dev,
         uart_core_t uc;
         res = (res) ? res : uart_core_init(dev, subdev, DEFAULT_UART_IO, &uc);
         res = (res) ? res : uart_core_rx_collect(&uc, sizeof(b), b, 2250);
+
         if (res > 0)
             res = 0;
         USDR_LOG("M2PE", USDR_LOG_ERROR, "UART: `%s`\n", b);
@@ -539,7 +540,7 @@ int board_ext_pciefe_updfe(board_ext_pciefe_t* ob)
             ob->rxattn == 0 ? V1_FE_ATTN_IL :
                 ob->rxattn == 1 ? V1_FE_ATTN_6DB :
                 ob->rxattn == 2 ? V1_FE_ATTN_12DB : V1_FE_ATTN_18DB,
-            ob->trxloopback ? 0 : 1,
+            (ob->osc_en) ? 0 : 1,
             (ob->pa_en) ? 0 : 1,
             (ob->lna_en) ? 0 : 1,
             (ob->lna_en) ? 0 : 1,

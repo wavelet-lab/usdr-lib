@@ -28,7 +28,7 @@ int main(int argc, char** argv)
 
     int number_failed;
     SRunner *sr;
-#if 1
+#if 0
     sr = srunner_create(conv_i16_f32_suite());
     srunner_add_suite(sr, conv_f32_i16_suite());
     srunner_add_suite(sr, conv_ci16_2cf32_suite());

@@ -1,8 +1,8 @@
 static
 void TEMPLATE_FUNC_NAME(fft_acc_t* __restrict p, unsigned fftsz, float scale, float corr, float* __restrict outa)
 {
-    const __m256 vcorr         = _mm256_set1_ps(corr / HWI16_SCALE_COEF + HWI16_CORR_COEF);
-    const __m256 vscale        = _mm256_set1_ps(scale / HWI16_SCALE_COEF);
+    const __m256 vcorr         = _mm256_set1_ps(corr);
+    const __m256 vscale        = _mm256_set1_ps(scale);
 
     for(unsigned i = 0; i < fftsz; i += 32)
     {

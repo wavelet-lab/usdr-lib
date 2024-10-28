@@ -12,7 +12,7 @@ set(USDR_DEVICE_LIB_FILES
 add_subdirectory(m2_lm6_1)
 add_subdirectory(m2_lm7_1)
 add_subdirectory(m2_lsdr)
-#add_subdirectory(m2_dsdr)
+add_subdirectory(m2_dsdr)
 
 
 add_subdirectory(ext_exm2pe)

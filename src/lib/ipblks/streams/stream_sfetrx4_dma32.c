@@ -61,7 +61,6 @@ struct stream_sfetrx_dma32 {
 
     stream_stats_t stats;
     int fd;
-    int stream_cfg;
     unsigned burst_count;
 };
 typedef struct stream_sfetrx_dma32 stream_sfetrx_dma32_t;
@@ -614,7 +613,6 @@ static int initialize_stream_rx_32(device_t* device,
     strdev->stats.dropped = 0;
 
     strdev->fd = sparams.underlying_fd;
-    strdev->stream_cfg = need_tx_stat;
 
     strdev->burst_mask = ((((uint64_t)1U) << fc.burstspblk) - 1) << (32 - fc.burstspblk);
     strdev->burst_count = fc.burstspblk;

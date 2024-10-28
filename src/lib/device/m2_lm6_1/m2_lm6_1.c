@@ -422,15 +422,16 @@ int dev_m2_lm6_1_sdr_tx_antennat_port_cfg_set(pdevice_t ud, pusdr_vfs_obj_t obj,
 
 int dev_m2_lm6_1_sdr_refclk_frequency_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    //struct dev_mp_lm7_1_gps *d = (struct dev_mp_lm7_1_gps *)ud;
-    //d->xdev.lmsstate.fref = value;
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    d->d.fref = value;
+    d->d.lms.fref = d->d.fref;
     return 0;
 }
 
 int dev_m2_lm6_1_sdr_refclk_frequency_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
-    //struct dev_mp_lm7_1_gps *d = (struct dev_mp_lm7_1_gps *)ud;
-    //*ovalue = d->xdev.lmsstate.fref;
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    *ovalue = d->d.fref;
     return 0;
 }
 
@@ -468,7 +469,7 @@ int dev_m2_lm6_1_sdr_tx_bbloopbackm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 
 int dev_m2_lm6_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    //struct dev_mp_lm7_1_gps *d = (struct dev_mp_lm7_1_gps *)ud;
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
     if (value > 4096) {
         const char* param = (const char*)value;
         if (strcasecmp("internal", param) == 0) {
@@ -480,9 +481,15 @@ int dev_m2_lm6_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
         }
     }
 
-    //d->xdev.refclkpath = value;
-    USDR_LOG("UDEV", USDR_LOG_INFO, "LM6: set clk ref path to %d\n", (unsigned)value);
-    return 0;
+    d->d.refclkpath = value;
+    int res = usdr_set_extref(&d->d, value == 1, d->d.fref);
+
+    if(res)
+        USDR_LOG("UDEV", USDR_LOG_ERROR, "LM6: error setting clk ref path to %d: err=%d\n", (unsigned)value, res);
+    else
+        USDR_LOG("UDEV", USDR_LOG_INFO, "LM6: set clk ref path to %d\n", (unsigned)value);
+
+    return res;
 }
 
 

@@ -10,6 +10,8 @@
 #define WVLT_FASTLOG2_MUL    1.1920928955078125E-7f
 #define WVLT_FASTLOG2_SUB    126.94269504f
 
+typedef float (*wvlt_log2f_fn_t)(float);
+
 /*
  * Log2 Mitchell’s Approximation, max eps about 0.05f
  */

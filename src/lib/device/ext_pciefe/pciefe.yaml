@@ -231,8 +231,8 @@ pages:
                 0b01: 12DB
                 0b11: 18DB
           - bits: "13"
-            name: NLOOPBACK
-            desc: Activate TX - RX loopback, while TX is still active; Inverted
+            name: REFCLK_PATH
+            desc: Reference clock source path; 0 - Internal OSC 25Mhz, 1 - External clock from J9
           - bits: "12"
             name: EN_PA1
             desc: Enable TX power amplifier 1

@@ -1,10 +1,16 @@
 static
 void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
                         fft_rtsa_data_t* __restrict rtsa_data,
-                        float scale, float corr)
+                        float scale_mpy, float corr, fft_diap_t diap, UNUSED const rtsa_hwi16_consts_t* hwi16_consts)
 {
 
 #include "rtsa_update_u16_neon.inc"
+
+#ifdef USE_POLYLOG2
+    wvlt_log2f_fn_t wvlt_log2f_fn = wvlt_polylog2f;
+#else
+    wvlt_log2f_fn_t wvlt_log2f_fn = wvlt_fastlog2;
+#endif
 
     // Attention please!
     // rtsa_depth should be multiple to 16/sizeof(rtsa_pwr_t) here!
@@ -13,44 +19,48 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
     const fft_rtsa_settings_t * st = &rtsa_data->settings;
     const unsigned rtsa_depth = st->rtsa_depth;
     const float charge_rate = (float)st->raise_coef * st->divs_for_dB / st->charging_frame;
-    const unsigned decay_rate_pw2 = (unsigned)(wvlt_fastlog2(st->charging_frame * st->decay_coef) + 0.5);
+    const float32x4_t ch_norm_coef  = vdupq_n_f32(CHARGE_NORM_COEF);
+
+    const unsigned decay_rate_pw2 = (unsigned)(wvlt_log2f_fn(st->charging_frame * st->decay_coef) + 0.5);
+    const int16x8_t decay_shr = vdupq_n_s16((uint8_t)(-decay_rate_pw2));
     const unsigned rtsa_depth_bz = rtsa_depth * sizeof(rtsa_pwr_t);
+    const float scale = scale_mpy * (float)st->divs_for_dB;
 
-    scale /= HWI16_SCALE_COEF;
-    corr = corr / HWI16_SCALE_COEF + HWI16_CORR_COEF;
-
-    const float32x4_t v_corr        = vdupq_n_f32(corr - (float)st->upper_pwr_bound);
+    const float32x4_t v_corr        = vdupq_n_f32((corr - (float)st->upper_pwr_bound) * (float)st->divs_for_dB);
     const float32x4_t max_ind       = vdupq_n_f32((float)(rtsa_depth - 1) - 0.5f);
+#ifdef USE_RTSA_ANTIALIASING
     const float32x4_t f_ones        = vdupq_n_f32(1.0f);
+#endif
     const float32x4_t f_maxcharge   = vdupq_n_f32((float)MAX_RTSA_PWR);
 
     const unsigned discharge_add    = ((unsigned)(DISCHARGE_NORM_COEF) >> decay_rate_pw2);
     const uint16x8_t dch_add_coef   = vdupq_n_u16((uint16_t)discharge_add);
 
-    for (unsigned i = 0; i < fft_size; i += 8)
+    for (unsigned i = diap.from; i < diap.to; i += 8)
     {
-        float32x4_t l2_res0 = vcvtq_f32_u32( vmovl_u16(vld1_u16(&in[i + 0])) );
-        float32x4_t l2_res1 = vcvtq_f32_u32( vmovl_u16(vld1_u16(&in[i + 4])) );
+        uint16x8_t l2 = vld1q_u16(&in[i]);
+
+        float32x4_t l2_res0 = vcvtq_f32_u32( vmovl_u16(vget_low_u16(l2)) );
+        float32x4_t l2_res1 = vcvtq_f32_u32( vmovl_u16(vget_high_u16(l2)) );
 
         // add scale & corr
-        float32x4_t pwr0 = vmlaq_n_f32(v_corr, l2_res0, scale);
-        float32x4_t pwr1 = vmlaq_n_f32(v_corr, l2_res1, scale);
+        float32x4_t pw0 = vmlaq_n_f32(v_corr, l2_res0, scale);
+        float32x4_t pw1 = vmlaq_n_f32(v_corr, l2_res1, scale);
 
         // drop sign
         //
-        float32x4_t p0raw = vabsq_f32(pwr0);
-        float32x4_t p1raw = vabsq_f32(pwr1);
-
-        // multiply to div cost
-        //
-        float32x4_t p0 = vmulq_n_f32(p0raw, (float)st->divs_for_dB);
-        float32x4_t p1 = vmulq_n_f32(p1raw, (float)st->divs_for_dB);
+        float32x4_t p0 = vabsq_f32(pw0);
+        float32x4_t p1 = vabsq_f32(pw1);
 
         // normalize
         //
         float32x4_t pn0 = vminq_f32(p0, max_ind);
         float32x4_t pn1 = vminq_f32(p1, max_ind);
 
+        // discharge all
+        RTSA_U16_DISCHARGE(8);
+
+#ifdef USE_RTSA_ANTIALIASING
         // low bound
         //
         float32x4_t lo0 = vrndq_f32(pn0);
@@ -62,21 +72,15 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         float32x4_t hi1 = vaddq_f32(lo1, f_ones);
 
         //load cells
-        uint16x4_t ipwr_lo0, ipwr_lo1, ipwr_hi0, ipwr_hi1;
+        float32x4_t pwr_lo0, pwr_lo1, pwr_hi0, pwr_hi1;
 
         for(unsigned j = 0; j < 4; ++j)
         {
-            RTSA_GATHER(ipwr_lo0, lo0, 0, j)
-            RTSA_GATHER(ipwr_lo1, lo1, 4, j)
-            RTSA_GATHER(ipwr_hi0, hi0, 0, j)
-            RTSA_GATHER(ipwr_hi1, hi1, 4, j)
+            pwr_lo0[j] = (float)rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)lo0[j]];
+            pwr_lo1[j] = (float)rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)lo1[j]];
+            pwr_hi0[j] = (float)rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)hi0[j]];
+            pwr_hi1[j] = (float)rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)hi1[j]];
         }
-
-
-        float32x4_t pwr_lo0 = vcvtq_f32_u32(vmovl_u16(ipwr_lo0));
-        float32x4_t pwr_lo1 = vcvtq_f32_u32(vmovl_u16(ipwr_lo1));
-        float32x4_t pwr_hi0 = vcvtq_f32_u32(vmovl_u16(ipwr_hi0));
-        float32x4_t pwr_hi1 = vcvtq_f32_u32(vmovl_u16(ipwr_hi1));
 
         // calc charge rates
         //
@@ -85,113 +89,53 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         float32x4_t charge_lo0 = vmulq_n_f32(vsubq_f32(hi0, pn0), charge_rate);
         float32x4_t charge_lo1 = vmulq_n_f32(vsubq_f32(hi1, pn1), charge_rate);
 
-        float32x4_t ch_a_hi0 = vsubq_f32(f_ones, charge_hi0);
-        float32x4_t ch_a_hi1 = vsubq_f32(f_ones, charge_hi1);
-        float32x4_t ch_a_lo0 = vsubq_f32(f_ones, charge_lo0);
-        float32x4_t ch_a_lo1 = vsubq_f32(f_ones, charge_lo1);
-
-        float32x4_t ch_b_hi0 = vmulq_n_f32(charge_hi0, CHARGE_NORM_COEF);
-        float32x4_t ch_b_hi1 = vmulq_n_f32(charge_hi1, CHARGE_NORM_COEF);
-        float32x4_t ch_b_lo0 = vmulq_n_f32(charge_lo0, CHARGE_NORM_COEF);
-        float32x4_t ch_b_lo1 = vmulq_n_f32(charge_lo1, CHARGE_NORM_COEF);
-
         // charge
         //
-        float32x4_t new_pwr_hi0 = vminq_f32( vmlaq_f32(ch_b_hi0, pwr_hi0, ch_a_hi0), f_maxcharge);
-        float32x4_t new_pwr_hi1 = vminq_f32( vmlaq_f32(ch_b_hi1, pwr_hi1, ch_a_hi1), f_maxcharge);
-        float32x4_t new_pwr_lo0 = vminq_f32( vmlaq_f32(ch_b_lo0, pwr_lo0, ch_a_lo0), f_maxcharge);
-        float32x4_t new_pwr_lo1 = vminq_f32( vmlaq_f32(ch_b_lo1, pwr_lo1, ch_a_lo1), f_maxcharge);
+        float32x4_t cdelta_lo0 = vmulq_f32(vsubq_f32(ch_norm_coef, pwr_lo0), charge_lo0);
+        float32x4_t cdelta_hi0 = vmulq_f32(vsubq_f32(ch_norm_coef, pwr_hi0), charge_hi0);
+        float32x4_t cdelta_lo1 = vmulq_f32(vsubq_f32(ch_norm_coef, pwr_lo1), charge_lo1);
+        float32x4_t cdelta_hi1 = vmulq_f32(vsubq_f32(ch_norm_coef, pwr_hi1), charge_hi1);
+
+        pwr_lo0 = vminq_f32(vaddq_f32(pwr_lo0, cdelta_lo0), f_maxcharge);
+        pwr_hi0 = vminq_f32(vaddq_f32(pwr_hi0, cdelta_hi0), f_maxcharge);
+        pwr_lo1 = vminq_f32(vaddq_f32(pwr_lo1, cdelta_lo1), f_maxcharge);
+        pwr_hi1 = vminq_f32(vaddq_f32(pwr_hi1, cdelta_hi1), f_maxcharge);
 
         // store charged
         //
-        ipwr_lo0 = vmovn_u32(vcvtq_u32_f32(new_pwr_lo0));
-        ipwr_lo1 = vmovn_u32(vcvtq_u32_f32(new_pwr_lo1));
-        ipwr_hi0 = vmovn_u32(vcvtq_u32_f32(new_pwr_hi0));
-        ipwr_hi1 = vmovn_u32(vcvtq_u32_f32(new_pwr_hi1));
-
         for(unsigned j = 0; j < 4; ++j)
         {
-            RTSA_SCATTER(lo0, ipwr_lo0, 0, j)
-            RTSA_SCATTER(lo1, ipwr_lo1, 4, j)
-            RTSA_SCATTER(hi0, ipwr_hi0, 0, j)
-            RTSA_SCATTER(hi1, ipwr_hi1, 4, j)
+            rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)lo0[j]] = (uint16_t)pwr_lo0[j];
+            rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)lo1[j]] = (uint16_t)pwr_lo1[j];
+            rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)hi0[j]] = (uint16_t)pwr_hi0[j];
+            rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)hi1[j]] = (uint16_t)pwr_hi1[j];
         }
+#else
+        float32x4_t pwr0, pwr1;
 
-        // discharge all
-        // note - we will discharge cells in the [i, i+8) fft band because those pages are already loaded to cache
-        //
-
-        uint16x8_t d0, d1, d2, d3;
-        uint16x8_t delta0, delta1, delta2, delta3;
-        uint16x8_t delta_norm0, delta_norm1, delta_norm2, delta_norm3;
-        uint16x8_t res0, res1, res2, res3;
-
-        for(unsigned j = i; j < i + 8; ++j)
+        // load cells
+        for(unsigned j = 0; j < 4; ++j)
         {
-            uint16_t* ptr = rtsa_data->pwr + j * rtsa_depth;
-            unsigned n = rtsa_depth_bz;
-
-            while(n >= 64)
-            {
-                d0 = vld1q_u16(ptr + 0);
-                d1 = vld1q_u16(ptr + 8);
-                d2 = vld1q_u16(ptr + 16);
-                d3 = vld1q_u16(ptr + 24);
-
-                RTSA_SH_SWITCH(RTSA_SHIFT4)
-
-                delta_norm0 = vminq_u16(delta0, d0);
-                delta_norm1 = vminq_u16(delta1, d1);
-                delta_norm2 = vminq_u16(delta2, d2);
-                delta_norm3 = vminq_u16(delta3, d3);
-
-                res0 = vsubq_u16(d0, delta_norm0);
-                res1 = vsubq_u16(d1, delta_norm1);
-                res2 = vsubq_u16(d2, delta_norm2);
-                res3 = vsubq_u16(d3, delta_norm3);
-
-                vst1q_u16(ptr + 0 , res0);
-                vst1q_u16(ptr + 8 , res1);
-                vst1q_u16(ptr + 16, res2);
-                vst1q_u16(ptr + 24, res3);
-
-                n -= 64;
-                ptr += 32;
-            }
-
-            while(n >= 32)
-            {
-                d0 = vld1q_u16(ptr + 0);
-                d1 = vld1q_u16(ptr + 8);
-
-                RTSA_SH_SWITCH(RTSA_SHIFT2)
-
-                delta_norm0 = vminq_u16(delta0, d0);
-                delta_norm1 = vminq_u16(delta1, d1);
-
-                res0 = vsubq_u16(d0, delta_norm0);
-                res1 = vsubq_u16(d1, delta_norm1);
-
-                vst1q_u16(ptr + 0 , res0);
-                vst1q_u16(ptr + 8 , res1);
-
-                n -= 32;
-                ptr += 16;
-            }
-
-            while(n >= 16)
-            {
-                d0 = vld1q_u16(ptr + 0);
-                RTSA_SH_SWITCH(RTSA_SHIFT1)
-                delta_norm0 = vminq_u16(delta0, d0);
-                res0 = vsubq_u16(d0, delta_norm0);
-                vst1q_u16(ptr + 0 , res0);
-
-                n -= 16;
-                ptr += 8;
-            }
-            // we definitely have n == 0 here due to rtsa_depth aligning
+            pwr0[j] = (float)rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)pn0[j]];
+            pwr1[j] = (float)rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)pn1[j]];
         }
+
+        // charge
+        //
+        float32x4_t cdelta_p0 = vmulq_n_f32(vsubq_f32(ch_norm_coef, pwr0), charge_rate);
+        float32x4_t cdelta_p1 = vmulq_n_f32(vsubq_f32(ch_norm_coef, pwr1), charge_rate);
+
+        pwr0 = vminq_f32(vaddq_f32(pwr0, cdelta_p0), f_maxcharge);
+        pwr1 = vminq_f32(vaddq_f32(pwr1, cdelta_p1), f_maxcharge);
+
+        // store charged
+        //
+        for(unsigned j = 0; j < 4; ++j)
+        {
+            rtsa_data->pwr[(i + j + 0) * rtsa_depth + (unsigned)pn0[j]] = (uint16_t)pwr0[j];
+            rtsa_data->pwr[(i + j + 4) * rtsa_depth + (unsigned)pn1[j]] = (uint16_t)pwr1[j];
+        }
+#endif
     }
 }
 

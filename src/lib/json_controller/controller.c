@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 #include <stdio.h>
-#include <string.h>
 #include <inttypes.h>
 
 #include "../ipblks/streams/streams.h"
@@ -33,6 +32,9 @@ static const struct idx_list s_method_list[] = {
     { "sdr_ctrl_streaming",   SDR_CRTL_STREAMING },
     { "sdr_get_revision",     SDR_GET_REVISION },
     { "sdr_calibrate",        SDR_CALIBRATE },
+    { "sdr_get_sensor",       SDR_GET_SENSOR },
+    { "parameter_set",        SDR_PARAMETER_SET },
+    { "parameter_get",        SDR_PARAMETER_GET },
     //
     // daemon requests
     //
@@ -60,6 +62,8 @@ static const struct idx_list s_param_list[] = {
     { "param",      SDRC_PARAM },
     { "throttleon", SDRC_THROTTLE_ON },
     { "mode",       SDRC_MODE },
+    { "sensor",     SDRC_SENSOR },
+    { "value",      SDRC_VALUE },
     //
     // daemon request params
     //
@@ -75,6 +79,7 @@ static const struct idx_list s_param_list[] = {
     { "contrast",          SDRC_CONTRAST },
     { "stream_type",       SDRC_STREAM_TYPE },
     { "fft_provider",      SDRC_FFT_PROVIDER },
+    { "compression",       SDRC_COMPRESSION },
 };
 
 static int parse_parameter(const char* parameter)
@@ -166,7 +171,7 @@ int controller_prepare_rpc(char* request, sdr_call_t* psdrc, json_t const* paren
 
                 psdrc->call_data_ptr = idx;
                 psdrc->call_data_size = len;
-            } else if (strcmp(name, "req_ref") == 0 && value != NULL && *value != 0) {
+            } else if (strcmp(name, "id") == 0 && value != NULL && *value != 0) {
                 // request reference -> will be added to reply
                 psdrc->call_req_ref = value;
             }
@@ -273,7 +278,7 @@ void print_rpc_reply(const struct sdr_call* sdrc,
     char wrap_format[256];
 
     if(sdrc->call_req_ref && *sdrc->call_req_ref)
-        snprintf(wrap_format, sizeof(wrap_format), "{\"result\":%d,\"rep_ref\":\"%.64s\",\"details\":{%s}}", res, sdrc->call_req_ref, details_format);
+        snprintf(wrap_format, sizeof(wrap_format), "{\"result\":%d,\"id\":\"%.64s\",\"details\":{%s}}", res, sdrc->call_req_ref, details_format);
     else
         snprintf(wrap_format, sizeof(wrap_format), "{\"result\":%d,\"details\":{%s}}", res, details_format);
 
@@ -587,6 +592,68 @@ int generic_rpc_call(pdm_dev_t dmdev,
             return res;
 
         print_rpc_reply(sdrc, outbuffer, outbufsz, res, "");
+        return 0;
+    }
+    case SDR_GET_SENSOR:
+    {
+        const char* sensor = (pcall->params.parameters_type[SDRC_SENSOR] == SDRC_PARAM_TYPE_STRING) ?
+                                (const char*)pcall->params.parameters_uint[SDRC_SENSOR] : NULL;
+
+        const sensor_type_t snst = sensor_type_from_char(sensor);
+        uint64_t value;
+
+        switch(snst)
+        {
+        case TSNS_SDR_TEMPERATURE:
+        {
+            res = usdr_dme_get_uint(dmdev, "/dm/sensor/temp", &value);
+            if(res)
+                return res;
+
+            print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"sensor\":\"%s\",\"value\":%.1f",  sensor, (float)value / 256.f);
+            break;
+        }
+        default:
+            return -EINVAL;
+        }
+
+        return 0;
+    }
+    case SDR_PARAMETER_SET:
+    {
+        const char* parameter = (pcall->params.parameters_type[SDRC_PARAM] == SDRC_PARAM_TYPE_STRING) ?
+                                    (const char*)pcall->params.parameters_uint[SDRC_PARAM] : NULL;
+
+        if (parameter == NULL) {
+            res = -EINVAL;
+        } else if (pcall->params.parameters_type[SDRC_VALUE] == SDRC_PARAM_TYPE_STRING) {
+            res = usdr_dme_set_string(dmdev, parameter, (const char*)pcall->params.parameters_uint[SDRC_VALUE]);
+        } else if (pcall->params.parameters_type[SDRC_VALUE] == SDRC_PARAM_TYPE_INT) {
+            res = usdr_dme_set_uint(dmdev, parameter, pcall->params.parameters_uint[SDRC_VALUE]);
+        } else {
+            res = -EINVAL;
+        }
+
+        if (res)
+            return res;
+
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "");
+        return 0;
+    }
+    case SDR_PARAMETER_GET:
+    {
+        const char* parameter = (pcall->params.parameters_type[SDRC_PARAM] == SDRC_PARAM_TYPE_STRING) ?
+                                    (const char*)pcall->params.parameters_uint[SDRC_PARAM] : NULL;
+        uint64_t val = ~0ull;
+
+        if (parameter == NULL) {
+            return -EINVAL;
+        }
+        res = usdr_dme_get_uint(dmdev, parameter, &val);
+        if (res)
+            return res;
+
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"parameter\":\"%s\",\"value\":%"PRIu64,  parameter, val);
         return 0;
     }
     default:

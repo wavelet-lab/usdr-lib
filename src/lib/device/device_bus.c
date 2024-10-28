@@ -20,13 +20,13 @@ int device_bus_init(pdevice_t dev, struct device_bus* pdb)
         const char* base_path_pat;
         unsigned* base_array;
     } params[] = {
+        { DNLL_IDX_REGSP_COUNT, SIZEOF_ARRAY(pdb->idxreg_base), &pdb->idx_regsps, DNLLFP_BASE(DN_IDX_REGSP, "%d"), pdb->idxreg_base },
+
         { DNLL_SPI_COUNT, SIZEOF_ARRAY(pdb->spi_base), &pdb->spi_count, DNLLFP_BASE(DN_BUS_SPI, "%d"), pdb->spi_base },
         { DNLL_I2C_COUNT, SIZEOF_ARRAY(pdb->i2c_base), &pdb->i2c_count, DNLLFP_BASE(DN_BUS_I2C, "%d"), pdb->i2c_base },
 
         { DNLL_SPI_COUNT, SIZEOF_ARRAY(pdb->spi_core), &pdb->spi_count, DNLLFP_CORE(DN_BUS_SPI, "%d"), pdb->spi_core },
         { DNLL_I2C_COUNT, SIZEOF_ARRAY(pdb->i2c_core), &pdb->i2c_count, DNLLFP_CORE(DN_BUS_I2C, "%d"), pdb->i2c_core },
-
-        { DNLL_IDX_REGSP_COUNT, SIZEOF_ARRAY(pdb->idxreg_base), &pdb->idx_regsps, DNLLFP_BASE(DN_IDX_REGSP, "%d"), pdb->idxreg_base },
 
         { DNLL_SRX_COUNT, SIZEOF_ARRAY(pdb->srx_base), &pdb->srx_count, DNLLFP_BASE(DN_SRX, "%d"), pdb->srx_base },
         { DNLL_STX_COUNT, SIZEOF_ARRAY(pdb->stx_base), &pdb->stx_count, DNLLFP_BASE(DN_STX, "%d"), pdb->stx_base },
@@ -92,7 +92,8 @@ int device_bus_init(pdevice_t dev, struct device_bus* pdb)
         }
     }
 
-    for (j = 0; j < *params[2].storage_count; j++) {
+    // Initialize indexed registers
+    for (j = 0; j < *params[0].storage_count; j++) {
         snprintf(buffer, sizeof(buffer), DNLLFP_NAME(DN_IDX_REGSP, "%d", DNP_VIRT_BASE), j);
         res = usdr_device_vfs_obj_val_get_u64(dev, buffer, &v);
         if (res) {

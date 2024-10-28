@@ -112,6 +112,7 @@ struct dev_limesdr {
     limesdr_dev_t limedev;
 
     uint32_t debug_lms7002m_last;
+    bool started;
 
     stream_handle_t* rx;
     stream_handle_t* tx;
@@ -249,7 +250,7 @@ int dev_mp_lm7_1_gps_debug_lms7002m_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, u
 
     d->debug_lms7002m_last = ~0u;
     res = lowlevel_spi_tr32(d->base.dev, 0, 0, value & 0xffffffff, &d->debug_lms7002m_last);
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug LMS7/%d REG %08x => %08x\n",
+    USDR_LOG("LMIN", USDR_LOG_WARNING, "%s: Debug LMS7/%d REG %08x => %08x\n",
              lowlevel_get_devname(d->base.dev), chan, (unsigned)value,
              d->debug_lms7002m_last);
     return res;
@@ -357,12 +358,6 @@ int limesdr_device_create_stream(device_t* dev, const char* sid, const char* dfo
 
     if (rx) {
         d->rx = *out_handle;
-
-        //limesdr_setup_stream(&d->limedev, false, true, false);
-        //limesdr_start_streaming(&d->limedev);
-
-        //limesdr_fixup(&d->limedev);
-
     } else {
         d->tx = *out_handle;
     }
@@ -389,7 +384,7 @@ void limesdr_device_destroy(pdevice_t udev)
     struct dev_limesdr *d = (struct dev_limesdr *)udev;
 
     limesdr_dtor(&d->limedev);
-    USDR_LOG("UDEV", USDR_LOG_INFO, "LIMESDR: turnoff\n");
+    USDR_LOG("LMIN", USDR_LOG_INFO, "LIMESDR: turnoff\n");
 
     usdr_device_base_destroy(udev);
 }
@@ -399,10 +394,17 @@ int limesdr_device_stream_sync(device_t* device,
 {
     struct dev_limesdr *d = (struct dev_limesdr *)device;
 
-
-    //limesdr_fixup(&d->limedev);
-    limesdr_setup_stream(&d->limedev, false, true, false);
-
+    if (!strcmp(synctype, "off")) {
+        limesdr_disable_stream(&d->limedev);
+        d->started = false;
+    } else {
+        if (!d->started) {
+            d->started = true;
+            limesdr_setup_stream(&d->limedev, false, true, false);
+        } else {
+            USDR_LOG("LMIN", USDR_LOG_INFO, "Streaming is already enabled\n");
+        }
+    }
 
     return 0;
 }
@@ -439,7 +441,7 @@ int limesdr_device_create(lldev_t dev, device_id_t devid)
     d->base.create_stream = &limesdr_device_create_stream;
     d->base.unregister_stream = &limesdr_device_unregister_stream;
     d->base.timer_op = &limesdr_device_stream_sync;
-
+    d->started = false;
     dev->pdev = &d->base;
     return 0;
 

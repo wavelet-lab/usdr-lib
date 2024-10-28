@@ -11,6 +11,7 @@
 #define I16RND(x) (int16_t)(x)
 
 #define HWI16_SCALE_COEF 1024.f
+#define HWI16_SCALE_N2_COEF 10u
 #define HWI16_CORR_COEF -178.f
 
 union wu_u32b {uint32_t i; uint8_t b[4];};
@@ -145,6 +146,16 @@ struct fft_rtsa_settings
 };
 typedef struct fft_rtsa_settings fft_rtsa_settings_t;
 
+struct rtsa_hwi16_consts
+{
+    float org_scale;        // original scale
+    uint16_t nfft;          // log2(fft_size)
+    uint16_t c0, c1;        // scaling coefs
+    uint16_t ndivs_for_dB;  // log2(divs_for_dB)
+    uint16_t shr0, shr1;    // shifting coefs
+};
+typedef struct rtsa_hwi16_consts rtsa_hwi16_consts_t;
+
 #undef RTSA_FP32
 
 #ifdef RTSA_FP32
@@ -162,28 +173,34 @@ struct fft_rtsa_data
 };
 typedef struct fft_rtsa_data fft_rtsa_data_t;
 
+struct fft_diap
+{
+    unsigned from, to;
+};
+typedef struct fft_diap fft_diap_t;
+
 typedef void (*rtsa_update_function_t)
     (   wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         fft_rtsa_data_t* __restrict rtsa_data,
-        float fcale_mpy, float mine, float corr);
+        float fcale_mpy, float mine, float corr, fft_diap_t diap);
 
 #define DECLARE_TR_FUNC_RTSA_UPDATE(conv_fn) \
 void tr_##conv_fn (wvlt_fftwf_complex* __restrict in, unsigned fft_size, \
                    fft_rtsa_data_t* __restrict rtsa_data, \
-                   float fcale_mpy, float mine, float corr) \
-{ conv_fn( in, fft_size, rtsa_data, fcale_mpy, mine, corr ); }
+                   float fcale_mpy, float mine, float corr, fft_diap_t diap) \
+{ conv_fn( in, fft_size, rtsa_data, fcale_mpy, mine, corr, diap ); }
 
 
 typedef void (*rtsa_update_hwi16_function_t)
     (   uint16_t* __restrict in, unsigned fft_size,
         fft_rtsa_data_t* __restrict rtsa_data,
-        float fcale_mpy, float corr);
+        float fcale_mpy, float corr, fft_diap_t diap, const rtsa_hwi16_consts_t* __restrict hwi16_consts);
 
 #define DECLARE_TR_FUNC_RTSA_UPDATE_HWI16(conv_fn) \
 void tr_##conv_fn (uint16_t* __restrict in, unsigned fft_size, \
                   fft_rtsa_data_t* __restrict rtsa_data, \
-                  float fcale_mpy, float corr) \
-{ conv_fn( in, fft_size, rtsa_data, fcale_mpy, corr ); }
+                  float fcale_mpy, float corr, fft_diap_t diap, const rtsa_hwi16_consts_t* __restrict hwi16_consts) \
+{ conv_fn( in, fft_size, rtsa_data, fcale_mpy, corr, diap, hwi16_consts); }
 
 
 //FFT windows conv
