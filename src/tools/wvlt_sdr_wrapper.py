@@ -6,7 +6,9 @@ import signal
 
 class wvltSDR:
 
-    USDR_DM_CREATE_PATH = '/home/irod/code/usdr-host/usdr-lib/build-src-Desktop-Debug/tools/usdr_dm_create'
+    #please set your custom USDR_DM_CREATE_PATH
+    USDR_DM_CREATE_PATH = './usdr_dm_create'
+
     OPTS = {
         '-D' : [None, None],            #  device_parameters] \n"
         '-f' : [None, './out.data'],    #  RX_filename [./out.data]] \n"
