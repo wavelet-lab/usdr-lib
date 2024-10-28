@@ -663,22 +663,14 @@ int si5332_set_port3_en(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, bool 
         USYS_CTRL, 0x02, //ACTIVE
     };
 
-    int res = si5532_get_state(dev, subdev, lsopaddr, "BEFORE SET_PORT3");
-    if(res)
-        return res;
-
     for (unsigned i = 0; i < (SIZEOF_ARRAY(program_regs_init) / 2); i++) {
         uint8_t addr = program_regs_init[2*i + 0];
         uint8_t val = program_regs_init[2*i + 1];
 
-        res = si5332_reg_wr(dev, subdev, lsopaddr, addr, val);
+        int res = si5332_reg_wr(dev, subdev, lsopaddr, addr, val);
         if (res)
             return res;
     }
-
-    res = si5532_get_state(dev, subdev, lsopaddr, "AFTER SET_PORT3");
-    if(res)
-        return res;
 
     USDR_LOG("5332", USDR_LOG_INFO, "MXLO_EN=%d TXCLK_EN=%d\n", loen, txen);
     return 0;
