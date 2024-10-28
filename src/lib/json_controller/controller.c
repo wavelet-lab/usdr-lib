@@ -33,6 +33,8 @@ static const struct idx_list s_method_list[] = {
     { "sdr_get_revision",     SDR_GET_REVISION },
     { "sdr_calibrate",        SDR_CALIBRATE },
     { "sdr_get_sensor",       SDR_GET_SENSOR },
+    { "parameter_set",        SDR_PARAMETER_SET },
+    { "parameter_get",        SDR_PARAMETER_GET },
     //
     // daemon requests
     //
@@ -61,6 +63,7 @@ static const struct idx_list s_param_list[] = {
     { "throttleon", SDRC_THROTTLE_ON },
     { "mode",       SDRC_MODE },
     { "sensor",     SDRC_SENSOR },
+    { "value",      SDRC_VALUE },
     //
     // daemon request params
     //
@@ -614,6 +617,43 @@ int generic_rpc_call(pdm_dev_t dmdev,
             return -EINVAL;
         }
 
+        return 0;
+    }
+    case SDR_PARAMETER_SET:
+    {
+        const char* parameter = (pcall->params.parameters_type[SDRC_PARAM] == SDRC_PARAM_TYPE_STRING) ?
+                                    (const char*)pcall->params.parameters_uint[SDRC_PARAM] : NULL;
+
+        if (parameter == NULL) {
+            res = -EINVAL;
+        } else if (pcall->params.parameters_type[SDRC_VALUE] == SDRC_PARAM_TYPE_STRING) {
+            res = usdr_dme_set_string(dmdev, parameter, (const char*)pcall->params.parameters_uint[SDRC_VALUE]);
+        } else if (pcall->params.parameters_type[SDRC_VALUE] == SDRC_PARAM_TYPE_INT) {
+            res = usdr_dme_set_uint(dmdev, parameter, pcall->params.parameters_uint[SDRC_VALUE]);
+        } else {
+            res = -EINVAL;
+        }
+
+        if (res)
+            return res;
+
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "");
+        return 0;
+    }
+    case SDR_PARAMETER_GET:
+    {
+        const char* parameter = (pcall->params.parameters_type[SDRC_PARAM] == SDRC_PARAM_TYPE_STRING) ?
+                                    (const char*)pcall->params.parameters_uint[SDRC_PARAM] : NULL;
+        uint64_t val = ~0ull;
+
+        if (parameter == NULL) {
+            return -EINVAL;
+        }
+        res = usdr_dme_get_uint(dmdev, parameter, &val);
+        if (res)
+            return res;
+
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"parameter\":\"%s\",\"value\":%"PRIu64,  parameter, val);
         return 0;
     }
     default:

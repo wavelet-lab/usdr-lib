@@ -36,6 +36,7 @@ enum sdr_call_parameters {
     SDRC_THROTTLE_ON,
     SDRC_MODE,
     SDRC_SENSOR,
+    SDRC_VALUE,
     //
     // daemon request params
     //
@@ -88,6 +89,8 @@ enum sdr_call_type {
     SDR_GET_REVISION,
     SDR_CALIBRATE,
     SDR_GET_SENSOR,
+    SDR_PARAMETER_SET,
+    SDR_PARAMETER_GET,
     //
     // daemon requests
     //
