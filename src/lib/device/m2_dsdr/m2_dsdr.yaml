@@ -1,0 +1,263 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         M2_DSDR
+desc:         DSDR M2 board
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: VIRTUAL
+    usdr_path: /debug/hw/m2dsdr/0/reg
+addr_width:   8
+data_width:   16
+page_prefix:  True
+field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+  - name: V0
+    regs:
+      - addr: 0x00
+        name: U114
+        fields:
+          - bits: "7"
+            name: SW_RX_FILBANK_OUT_V1_CHA
+            desc: SW_RX_FILBANK_OUT_V1_CHA
+          - bits: "6"
+            name: SW_RX_FILBANK_OUT_V2_CHA
+            desc: SW_RX_FILBANK_OUT_V2_CHA
+          - bits: "5"
+            name: SW_RX_FILBANK_OUT_V1_CHB
+            desc: SW_RX_FILBANK_OUT_V1_CHB
+          - bits: "4"
+            name: SW_RX_FILBANK_OUT_V2_CHB
+            desc: SW_RX_FILBANK_OUT_V2_CHB
+          - bits: "3"
+            name: SW_RX_FILBANK_OUT_V2_CHC
+            desc: SW_RX_FILBANK_OUT_V2_CHC
+          - bits: "2"
+            name: SW_RX_FILBANK_OUT_V1_CHC
+            desc: SW_RX_FILBANK_OUT_V1_CHC
+          - bits: "1"
+            name: SW_RX_FILBANK_OUT_V1_CHD
+            desc: SW_RX_FILBANK_OUT_V1_CHD
+          - bits: "0"
+            name: SW_RX_FILBANK_OUT_V2_CHD
+            desc: SW_RX_FILBANK_OUT_V2_CHD
+      - addr: 0x01
+        name: U114
+        fields:
+          - bits: "7"
+            name: SW_RX_FILBANK_OUT_V3_CHA
+            desc: SW_RX_FILBANK_OUT_V3_CHA
+          - bits: "6"
+            name: SW_RX_FILBANK_OUT_V3_CHB
+            desc: SW_RX_FILBANK_OUT_V3_CHB
+          - bits: "5"
+            name: SW_RX_FILBANK_OUT_V3_CHC
+            desc: SW_RX_FILBANK_OUT_V3_CHC
+          - bits: "4"
+            name: SW_RX_FILBANK_OUT_V3_CHD
+            desc: SW_RX_FILBANK_OUT_V3_CHD
+          - bits: "3"
+            name: SW_RX_FILBANK_IN_V3_CHD
+            desc: SW_RX_FILBANK_IN_V3_CHD
+          - bits: "2"
+            name: SW_RX_FILBANK_IN_V3_CHC
+            desc: SW_RX_FILBANK_IN_V3_CHC
+          - bits: "1"
+            name: SW_RX_FILBANK_IN_V3_CHB
+            desc: SW_RX_FILBANK_IN_V3_CHB
+          - bits: "0"
+            name: SW_RX_FILBANK_IN_V3_CHA
+            desc: SW_RX_FILBANK_IN_V3_CHA
+      - addr: 0x02
+        name: U114
+        fields:
+          - bits: "7"
+            name: SW_RX_FILBANK_IN_V2_CHA
+            desc: SW_RX_FILBANK_IN_V2_CHA
+          - bits: "6"
+            name: SW_RX_FILBANK_IN_V1_CHA
+            desc: SW_RX_FILBANK_IN_V1_CHA
+          - bits: "5"
+            name: SW_RX_FILBANK_IN_V2_CHB
+            desc: SW_RX_FILBANK_IN_V2_CHB
+          - bits: "4"
+            name: SW_RX_FILBANK_IN_V1_CHB
+            desc: SW_RX_FILBANK_IN_V1_CHB
+          - bits: "3"
+            name: SW_RX_FILBANK_IN_V2_CHC
+            desc: SW_RX_FILBANK_IN_V2_CHC
+          - bits: "2"
+            name: SW_RX_FILBANK_IN_V1_CHC
+            desc: SW_RX_FILBANK_IN_V1_CHC
+          - bits: "1"
+            name: SW_RX_FILBANK_IN_V2_CHD
+            desc: SW_RX_FILBANK_IN_V2_CHD
+          - bits: "0"
+            name: SW_RX_FILBANK_IN_V1_CHD
+            desc: SW_RX_FILBANK_IN_V1_CHD
+      - addr: 0x00
+        name: U113
+        fields:
+          - bits: "7"
+            name: VBYP_LNA_IF_CHD_RX
+            desc: VBYP_LNA_IF_CHD_RX
+          - bits: "6"
+            name: VSD_LNA_IF_CHD_RX
+            desc: VSD_LNA_IF_CHD_RX
+          - bits: "5"
+            name: VBYP_LNA_IF_CHC_RX
+            desc: VBYP_LNA_IF_CHC_RX
+          - bits: "4"
+            name: VSD_LNA_IF_CHC_RX
+            desc: VSD_LNA_IF_CHC_RX
+          - bits: "3"
+            name: VBYP_LNA_IF_CHB_RX
+            desc: VBYP_LNA_IF_CHB_RX
+          - bits: "2"
+            name: VSD_LNA_IF_CHB_RX
+            desc: VSD_LNA_IF_CHB_RX
+          - bits: "1"
+            name: VBYP_LNA_IF_CHA_RX
+            desc: VBYP_LNA_IF_CHA_RX
+          - bits: "0"
+            name: VSD_LNA_IF_CHA_RX
+            desc: VSD_LNA_IF_CHA_RX
+      - addr: 0x01
+        name: U113
+        fields:
+          - bits: "7"
+            name: SW_OUT_RX_CHB
+            desc: SW_OUT_RX_CHB
+          - bits: "6"
+            name: SW_OUT_RX_CHA
+            desc: SW_OUT_RX_CHA
+          - bits: "5"
+            name: SW_OUT_RX_CHD
+            desc: SW_OUT_RX_CHD
+          - bits: "4"
+            name: SW_OUT_RX_CHC
+            desc: SW_OUT_RX_CHC
+          - bits: "3"
+            name: SW_OUT_TX_CHA
+            desc: SW_OUT_TX_CHA
+          - bits: "2"
+            name: SW_OUT_TX_CHB
+            desc: SW_OUT_TX_CHB
+          - bits: "1"
+            name: SW_OUT_TX_CHC
+            desc: SW_OUT_TX_CHC
+          - bits: "0"
+            name: SW_OUT_TX_CHD
+            desc: SW_OUT_TX_CHD
+      - addr: 0x02
+        name: U113
+        fields:
+          - bits: "7"
+            name: SW_IN_TX_CHD
+            desc: SW_IN_TX_CHD
+          - bits: "6"
+            name: SW_IN_TX_CHC
+            desc: SW_IN_TX_CHC
+          - bits: "5"
+            name: SW_IN_TX_CHB
+            desc: SW_IN_TX_CHB
+          - bits: "4"
+            name: SW_IN_TX_CHA
+            desc: SW_IN_TX_CHA
+          - bits: "3"
+            name: SW_IN_RX_CHD
+            desc: SW_IN_RX_CHD
+          - bits: "2"
+            name: SW_IN_RX_CHC
+            desc: SW_IN_RX_CHC
+          - bits: "1"
+            name: SW_IN_RX_CHB
+            desc: SW_IN_RX_CHB
+          - bits: "0"
+            name: SW_IN_RX_CHA
+            desc: SW_IN_RX_CHA
+      - addr: 0x00
+        name: U115
+        fields:
+          - bits: "7"
+            name: NOT_USED
+            desc: Not used
+          - bits: "6"
+            name: ENABLE_TCXO_LMS8002M
+            desc: Enable LMS8002M temperature compensated crystal oscillator
+          - bits: "5"
+            name: VCC_DIGITAL_1P8V
+            desc: VCC control voltage (+1.8v)
+          - bits: "4"
+            name: VCC_DIGITAL_1P8V
+            desc: VCC control voltage +(1.8v)
+          - bits: "3"
+            name: REF_EN_OSC
+            desc: Enable reference clock oscillator
+          - bits: "2"
+            name: REF_EN_GPS
+            desc: Enable GPS module
+          - bits: "1"
+            name: ENABLE_7.5VIN
+            desc: ENABLE_7.5VIN
+          - bits: "0"
+            name: ENABLE_5VIN
+            desc: ENABLE_5VIN
+      - addr: 0x01
+        name: U115
+        fields:
+          - bits: "7"
+            name: NOT_USED
+            desc: Not used
+          - bits: "6"
+            name: LMS8001B_RX_U2_RESETN
+            desc: LMS8001B_RX_U2_RESETN
+          - bits: "5"
+            name: LMS8001A_RX_U4_RESETN
+            desc: LMS8001A_RX_U4_RESETN
+          - bits: "4"
+            name: LMS8001B_RX_U1_RESETN
+            desc: LMS8001B_RX_U1_RESETN
+          - bits: "3"
+            name: LMS8001A_RX_U3_RESETN
+            desc: LMS8001A_RX_U3_RESETN
+          - bits: "2"
+            name: LMS8001B_TX_U5_RESETN
+            desc: LMS8001B_TX_U5_RESETN
+          - bits: "1"
+            name: LMS8001B_TX_U6_RESETN
+            desc: LMS8001B_TX_U6_RESETN
+          - bits: "0"
+            name: NOT_USED
+            desc: Not used
+      - addr: 0x02
+        name: U115
+        fields:
+          - bits: "7"
+            name: SW_50R_LNAtoPA_CHD
+            desc: SW_50R_LNAtoPA_CHD
+          - bits: "6"
+            name: SW_50R_LNAtoPA_CHC
+            desc: SW_50R_LNAtoPA_CHC
+          - bits: "5"
+            name: SW_50R_LNAtoPA_CHB
+            desc: SW_50R_LNAtoPA_CHB
+          - bits: "4"
+            name: SW_50R_LNAtoPA_CHA
+            desc: SW_50R_LNAtoPA_CHA
+          - bits: "3"
+            name: FAN_PWM0
+            desc: FAN#0 speed control (PWM)
+          - bits: "2"
+            name: FAN_TACH0
+            desc: FAN#0 tachometer
+          - bits: "1"
+            name: FAN_PWM1
+            desc: FAN#1 speed control (PWM)
+          - bits: "0"
+            name: FAN_TACH1
+            desc: FAN#0 tachometer
