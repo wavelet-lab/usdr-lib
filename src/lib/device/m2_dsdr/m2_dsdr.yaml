@@ -37,6 +37,7 @@ pages:
             name: SW_RX_IN_FILTER_CHA
             desc: RX IN filters switch for Channel A
             opts:
+#               V2 V1            V3
 #                 **             *
                 0b0000000000000000: MUTE
                 0b1100000000000000: 400_1000M
@@ -49,6 +50,7 @@ pages:
             name: SW_RX_OUT_FILTER_CHA
             desc: RX OUT filters switch for Channel A
             opts:
+#                 V3     V1 V2
 #                 *       **
                 0b0000000000: MUTE
                 0b0000000011: 400_1000M
@@ -61,6 +63,7 @@ pages:
             name: SW_RX_IN_FILTER_CHB
             desc: RX IN filters switch for Channel B
             opts:
+#               V2 V1         V3
 #                 **          *
                 0b0000000000000: MUTE
                 0b1100000000000: 400_1000M
@@ -73,6 +76,7 @@ pages:
             name: SW_RX_OUT_FILTER_CHB
             desc: RX OUT filters switch for Channel B
             opts:
+#                 V3      V1 V2
 #                 *        **
                 0b00000000000: MUTE
                 0b00000000011: 400_1000M
@@ -85,6 +89,7 @@ pages:
             name: SW_RX_IN_FILTER_CHC
             desc: RX IN filters switch for Channel C
             opts:
+#               V2 V1      V3
 #                 **       *
                 0b0000000000: MUTE
                 0b1100000000: 400_1000M
@@ -97,6 +102,7 @@ pages:
             name: SW_RX_OUT_FILTER_CHC
             desc: RX OUT filters switch for Channel C
             opts:
+#                 V3       V2 V1
 #                 *         **
                 0b000000000000: MUTE
                 0b000000000011: 400_1000M
@@ -109,6 +115,7 @@ pages:
             name: SW_RX_IN_FILTER_CHD
             desc: RX IN filters switch for Channel D
             opts:
+#               V2 V1   V3
 #                 **    *
                 0b0000000: MUTE
                 0b1100000: 400_1000M
@@ -121,6 +128,7 @@ pages:
             name: SW_RX_OUT_FILTER_CHD
             desc: RX OUT filters switch for Channel D
             opts:
+#                 V3        V1 V2
 #                 *          **
                 0b0000000000000: MUTE
                 0b0000000000011: 400_1000M
