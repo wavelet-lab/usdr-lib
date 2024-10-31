@@ -18,170 +18,258 @@ field_macros: True
 pages:
   - name: V0
     regs:
-      - addr: 0x00
-        name: U114
+#
+      - addr: 0x20
+        name: GPIO0
         fields:
-          - bits: "7"
-            name: SW_RX_FILBANK_OUT_V1_CHA
-            desc: SW_RX_FILBANK_OUT_V1_CHA
-          - bits: "6"
-            name: SW_RX_FILBANK_OUT_V2_CHA
-            desc: SW_RX_FILBANK_OUT_V2_CHA
-          - bits: "5"
-            name: SW_RX_FILBANK_OUT_V1_CHB
-            desc: SW_RX_FILBANK_OUT_V1_CHB
-          - bits: "4"
-            name: SW_RX_FILBANK_OUT_V2_CHB
-            desc: SW_RX_FILBANK_OUT_V2_CHB
-          - bits: "3"
-            name: SW_RX_FILBANK_OUT_V2_CHC
-            desc: SW_RX_FILBANK_OUT_V2_CHC
-          - bits: "2"
-            name: SW_RX_FILBANK_OUT_V1_CHC
-            desc: SW_RX_FILBANK_OUT_V1_CHC
-          - bits: "1"
-            name: SW_RX_FILBANK_OUT_V1_CHD
-            desc: SW_RX_FILBANK_OUT_V1_CHD
-          - bits: "0"
-            name: SW_RX_FILBANK_OUT_V2_CHD
-            desc: SW_RX_FILBANK_OUT_V2_CHD
-      - addr: 0x01
-        name: U114
+#
+#       RX filters switching
+#       ---IN---    ---OUT--
+#       V3 V2 V1    V3 V2 V1
+#       --+--+--    --+--+--
+#        0  1  1     0  1  1  = 0.4 - 1.0 GHz
+#        0  1  0     1  0  0  = 1.0 - 2.0 GHz
+#        0  0  1     1  0  1  = 2.0 - 3.5 GHz
+#        1  0  1     0  0  1  = 2.5 - 5.0 GHz
+#        1  0  0     0  1  0  = 3.5 - 7.0 GHz
+#
+          - bits: "8,23,22"
+            name: SW_RX_IN_FILTER_CHA
+            desc: RX IN filters switch for Channel A
+            opts:
+                0b000: SW_FILTER_MUTE
+                0b011: SW_IN_FILTER_400_1000M
+                0b010: SW_IN_FILTER_1000_2000M
+                0b001: SW_IN_FILTER_2000_3500M
+                0b101: SW_IN_FILTER_2500_5000M
+                0b100: SW_IN_FILTER_3500_7100M
+#
+          - bits: "15,6,7"
+            name: SW_RX_OUT_FILTER_CHA
+            desc: RX OUT filters switch for Channel A
+            opts:
+                0b000: SW_FILTER_MUTE
+                0b011: SW_OUT_FILTER_400_1000M
+                0b100: SW_OUT_FILTER_1000_2000M
+                0b101: SW_OUT_FILTER_2000_3500M
+                0b001: SW_OUT_FILTER_2500_5000M
+                0b010: SW_OUT_FILTER_3500_7100M
+#
+          - bits: "9,21,20"
+            name: SW_RX_IN_FILTER_CHB
+            desc: RX IN filters switch for Channel B
+            opts:
+                0b000: SW_FILTER_MUTE
+                0b011: SW_IN_FILTER_400_1000M
+                0b010: SW_IN_FILTER_1000_2000M
+                0b001: SW_IN_FILTER_2000_3500M
+                0b101: SW_IN_FILTER_2500_5000M
+                0b100: SW_IN_FILTER_3500_7100M
+#
+          - bits: "14,4,5"
+            name: SW_RX_OUT_FILTER_CHB
+            desc: RX OUT filters switch for Channel B
+            opts:
+                0b000: SW_FILTER_MUTE
+                0b011: SW_OUT_FILTER_400_1000M
+                0b100: SW_OUT_FILTER_1000_2000M
+                0b101: SW_OUT_FILTER_2000_3500M
+                0b001: SW_OUT_FILTER_2500_5000M
+                0b010: SW_OUT_FILTER_3500_7100M
+#
+          -bits: "10,19,18"
+            name: SW_RX_IN_FILTER_CHC
+            desc: RX IN filters switch for Channel C
+            opts:
+                0b000: SW_FILTER_MUTE
+                0b011: SW_IN_FILTER_400_1000M
+                0b010: SW_IN_FILTER_1000_2000M
+                0b001: SW_IN_FILTER_2000_3500M
+                0b101: SW_IN_FILTER_2500_5000M
+                0b100: SW_IN_FILTER_3500_7100M
+#
+          -bits: "13,3,2"
+            name: SW_RX_OUT_FILTER_CHC
+            desc: RX OUT filters switch for Channel C
+            opts:
+                0b000: SW_FILTER_MUTE
+                0b011: SW_OUT_FILTER_400_1000M
+                0b100: SW_OUT_FILTER_1000_2000M
+                0b101: SW_OUT_FILTER_2000_3500M
+                0b001: SW_OUT_FILTER_2500_5000M
+                0b010: SW_OUT_FILTER_3500_7100M
+#
+          -bits: "11,17,16"
+            name: SW_RX_IN_FILTER_CHD
+            desc: RX IN filters switch for Channel D
+            opts:
+                0b000: SW_FILTER_MUTE
+                0b011: SW_IN_FILTER_400_1000M
+                0b010: SW_IN_FILTER_1000_2000M
+                0b001: SW_IN_FILTER_2000_3500M
+                0b101: SW_IN_FILTER_2500_5000M
+                0b100: SW_IN_FILTER_3500_7100M
+#
+          -bits: "12,0,1"
+            name: SW_RX_OUT_FILTER_CHD
+            desc: RX OUT filters switch for Channel D
+            opts:
+                0b000: SW_FILTER_MUTE
+                0b011: SW_OUT_FILTER_400_1000M
+                0b100: SW_OUT_FILTER_1000_2000M
+                0b101: SW_OUT_FILTER_2000_3500M
+                0b001: SW_OUT_FILTER_2500_5000M
+                0b010: SW_OUT_FILTER_3500_7100M
+#
+      - addr: 0x23
+        name: GPIO1
         fields:
-          - bits: "7"
-            name: SW_RX_FILBANK_OUT_V3_CHA
-            desc: SW_RX_FILBANK_OUT_V3_CHA
-          - bits: "6"
-            name: SW_RX_FILBANK_OUT_V3_CHB
-            desc: SW_RX_FILBANK_OUT_V3_CHB
-          - bits: "5"
-            name: SW_RX_FILBANK_OUT_V3_CHC
-            desc: SW_RX_FILBANK_OUT_V3_CHC
-          - bits: "4"
-            name: SW_RX_FILBANK_OUT_V3_CHD
-            desc: SW_RX_FILBANK_OUT_V3_CHD
-          - bits: "3"
-            name: SW_RX_FILBANK_IN_V3_CHD
-            desc: SW_RX_FILBANK_IN_V3_CHD
-          - bits: "2"
-            name: SW_RX_FILBANK_IN_V3_CHC
-            desc: SW_RX_FILBANK_IN_V3_CHC
-          - bits: "1"
-            name: SW_RX_FILBANK_IN_V3_CHB
-            desc: SW_RX_FILBANK_IN_V3_CHB
-          - bits: "0"
-            name: SW_RX_FILBANK_IN_V3_CHA
-            desc: SW_RX_FILBANK_IN_V3_CHA
-      - addr: 0x02
-        name: U114
+          - bits: "7:6"
+            name: RX_LNA_CTRL_CHD
+            desc: RX LNA control mask for Channel D
+            opts:
+                0b00: LNA_ON_BYPASS_OFF
+                0b01: LNA_OFF_BYPASS_OFF
+                0b10: LNA_OFF_BYPASS_ON
+                0b11: LNA_OFF_BYPASS_ON
+#
+          - bits: "5:4"
+            name: RX_LNA_CTRL_CHC
+            desc: RX LNA control mask for Channel C
+            opts:
+                0b00: LNA_ON_BYPASS_OFF
+                0b01: LNA_OFF_BYPASS_OFF
+                0b10: LNA_OFF_BYPASS_ON
+                0b11: LNA_OFF_BYPASS_ON
+#
+          - bits: "3:2"
+            name: RX_LNA_CTRL_CHB
+            desc: RX LNA control mask for Channel B
+            opts:
+                0b00: LNA_ON_BYPASS_OFF
+                0b01: LNA_OFF_BYPASS_OFF
+                0b10: LNA_OFF_BYPASS_ON
+                0b11: LNA_OFF_BYPASS_ON
+#
+          - bits: "1:0"
+            name: RX_LNA_CTRL_CHA
+            desc: RX LNA control mask for Channel A
+            opts:
+                0b00: LNA_ON_BYPASS_OFF
+                0b01: LNA_OFF_BYPASS_OFF
+                0b10: LNA_OFF_BYPASS_ON
+                0b11: LNA_OFF_BYPASS_ON
+#
+      - addr: 0x24
+        name: GPIO2
         fields:
-          - bits: "7"
-            name: SW_RX_FILBANK_IN_V2_CHA
-            desc: SW_RX_FILBANK_IN_V2_CHA
-          - bits: "6"
-            name: SW_RX_FILBANK_IN_V1_CHA
-            desc: SW_RX_FILBANK_IN_V1_CHA
-          - bits: "5"
-            name: SW_RX_FILBANK_IN_V2_CHB
-            desc: SW_RX_FILBANK_IN_V2_CHB
-          - bits: "4"
-            name: SW_RX_FILBANK_IN_V1_CHB
-            desc: SW_RX_FILBANK_IN_V1_CHB
-          - bits: "3"
-            name: SW_RX_FILBANK_IN_V2_CHC
-            desc: SW_RX_FILBANK_IN_V2_CHC
-          - bits: "2"
-            name: SW_RX_FILBANK_IN_V1_CHC
-            desc: SW_RX_FILBANK_IN_V1_CHC
-          - bits: "1"
-            name: SW_RX_FILBANK_IN_V2_CHD
-            desc: SW_RX_FILBANK_IN_V2_CHD
-          - bits: "0"
-            name: SW_RX_FILBANK_IN_V1_CHD
-            desc: SW_RX_FILBANK_IN_V1_CHD
-      - addr: 0x00
-        name: U113
-        fields:
-          - bits: "7"
-            name: VBYP_LNA_IF_CHD_RX
-            desc: VBYP_LNA_IF_CHD_RX
-          - bits: "6"
-            name: VSD_LNA_IF_CHD_RX
-            desc: VSD_LNA_IF_CHD_RX
-          - bits: "5"
-            name: VBYP_LNA_IF_CHC_RX
-            desc: VBYP_LNA_IF_CHC_RX
-          - bits: "4"
-            name: VSD_LNA_IF_CHC_RX
-            desc: VSD_LNA_IF_CHC_RX
-          - bits: "3"
-            name: VBYP_LNA_IF_CHB_RX
-            desc: VBYP_LNA_IF_CHB_RX
-          - bits: "2"
-            name: VSD_LNA_IF_CHB_RX
-            desc: VSD_LNA_IF_CHB_RX
-          - bits: "1"
-            name: VBYP_LNA_IF_CHA_RX
-            desc: VBYP_LNA_IF_CHA_RX
-          - bits: "0"
-            name: VSD_LNA_IF_CHA_RX
-            desc: VSD_LNA_IF_CHA_RX
-      - addr: 0x01
-        name: U113
-        fields:
-          - bits: "7"
-            name: SW_OUT_RX_CHB
-            desc: SW_OUT_RX_CHB
+#
+          - bits: "8"
+            name: SW_IN_RX_CHA
+            desc: Channel A RX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_IN_RX_HIGH
+                0b1: SW_IN_RX_LOW
           - bits: "6"
             name: SW_OUT_RX_CHA
-            desc: SW_OUT_RX_CHA
-          - bits: "5"
-            name: SW_OUT_RX_CHD
-            desc: SW_OUT_RX_CHD
+            desc: Channel A RX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_RX_LOW
+                0b1: SW_OUT_RX_HIGH
+#
+          - bits: "9"
+            name: SW_IN_RX_CHB
+            desc: Channel B RX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_IN_RX_HIGH
+                0b1: SW_IN_RX_LOW
+          - bits: "7"
+            name: SW_OUT_RX_CHB
+            desc: Channel B RX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_RX_LOW
+                0b1: SW_OUT_RX_HIGH
+#
+          - bits: "10"
+            name: SW_IN_RX_CHC
+            desc: Channel C RX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_IN_RX_HIGH
+                0b1: SW_IN_RX_LOW
           - bits: "4"
             name: SW_OUT_RX_CHC
-            desc: SW_OUT_RX_CHC
+            desc: Channel C RX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_RX_LOW
+                0b1: SW_OUT_RX_HIGH
+#
+          - bits: "11"
+            name: SW_IN_RX_CHD
+            desc: Channel D RX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_IN_RX_HIGH
+                0b1: SW_IN_RX_LOW
+          - bits: "5"
+            name: SW_OUT_RX_CHD
+            desc: Channel D RX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_RX_LOW
+                0b1: SW_OUT_RX_HIGH
+#
+          - bits: "12"
+            name: SW_IN_TX_CHA
+            desc: Channel A TX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_IN_TX_LOW
+                0b1: SW_IN_TX_HIGH
           - bits: "3"
             name: SW_OUT_TX_CHA
-            desc: SW_OUT_TX_CHA
+            desc: Channel A TX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_TX_HIGH
+                0b1: SW_OUT_TX_LOW
+#
+          - bits: "13"
+            name: SW_IN_TX_CHB
+            desc: Channel B TX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_IN_TX_LOW
+                0b1: SW_IN_TX_HIGH
           - bits: "2"
             name: SW_OUT_TX_CHB
-            desc: SW_OUT_TX_CHB
+            desc: Channel B TX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_TX_HIGH
+                0b1: SW_OUT_TX_LOW
+#
+          - bits: "14"
+            name: SW_IN_TX_CHC
+            desc: Channel C TX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_TX_HIGH
+                0b1: SW_OUT_TX_LOW
           - bits: "1"
             name: SW_OUT_TX_CHC
-            desc: SW_OUT_TX_CHC
+            desc: Channel C TX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_TX_HIGH
+                0b1: SW_OUT_TX_LOW
+#
+          - bits: "15"
+            name: SW_IN_TX_CHD
+            desc: Channel D TX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_TX_HIGH
+                0b1: SW_OUT_TX_LOW
           - bits: "0"
             name: SW_OUT_TX_CHD
-            desc: SW_OUT_TX_CHD
-      - addr: 0x02
-        name: U113
-        fields:
-          - bits: "7"
-            name: SW_IN_TX_CHD
-            desc: SW_IN_TX_CHD
-          - bits: "6"
-            name: SW_IN_TX_CHC
-            desc: SW_IN_TX_CHC
-          - bits: "5"
-            name: SW_IN_TX_CHB
-            desc: SW_IN_TX_CHB
-          - bits: "4"
-            name: SW_IN_TX_CHA
-            desc: SW_IN_TX_CHA
-          - bits: "3"
-            name: SW_IN_RX_CHD
-            desc: SW_IN_RX_CHD
-          - bits: "2"
-            name: SW_IN_RX_CHC
-            desc: SW_IN_RX_CHC
-          - bits: "1"
-            name: SW_IN_RX_CHB
-            desc: SW_IN_RX_CHB
-          - bits: "0"
-            name: SW_IN_RX_CHA
-            desc: SW_IN_RX_CHA
-      - addr: 0x00
-        name: U115
+            desc: Channel D TX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: SW_OUT_TX_HIGH
+                0b1: SW_OUT_TX_LOW
+#
+      - addr: 0x26
+        name: GPIO3
         fields:
           - bits: "7"
             name: NOT_USED
@@ -191,10 +279,10 @@ pages:
             desc: Enable LMS8002M temperature compensated crystal oscillator
           - bits: "5"
             name: VCC_DIGITAL_1P8V
-            desc: VCC control voltage (+1.8v)
+            desc: Logical 1 (+1.8v)
           - bits: "4"
             name: VCC_DIGITAL_1P8V
-            desc: VCC control voltage +(1.8v)
+            desc: Logical 1 (+1.8v)
           - bits: "3"
             name: REF_EN_OSC
             desc: Enable reference clock oscillator
@@ -202,62 +290,64 @@ pages:
             name: REF_EN_GPS
             desc: Enable GPS module
           - bits: "1"
-            name: ENABLE_7.5VIN
-            desc: ENABLE_7.5VIN
+            name: ENABLE_7P5VIN
+            desc: Enable +7.5v power supply for TX amps
           - bits: "0"
             name: ENABLE_5VIN
-            desc: ENABLE_5VIN
-      - addr: 0x01
-        name: U115
+            desc: Enable +5v power supply for RX amps
+#
+      - addr: 0x27
+        name: GPIO4
         fields:
           - bits: "7"
             name: NOT_USED
             desc: Not used
           - bits: "6"
-            name: LMS8001B_RX_U2_RESETN
-            desc: LMS8001B_RX_U2_RESETN
+            name: LMS8001B_RX_CHCD_HIGH_RESET
+            desc: RX circuit LMS8001B reset (channels C and D, 2.5-7.1 GHz (HIGH) mode)
           - bits: "5"
-            name: LMS8001A_RX_U4_RESETN
-            desc: LMS8001A_RX_U4_RESETN
+            name: LMS8001A_RX_CHCD_LOW_RESET
+            desc: RX circuit LMS8001A reset (channels C and D, 0.4-3.5 GHz (LOW) mode)
           - bits: "4"
-            name: LMS8001B_RX_U1_RESETN
-            desc: LMS8001B_RX_U1_RESETN
+            name: LMS8001B_RX_CHAB_HIGH_RESET
+            desc: RX circuit LMS8001B reset (channels A and B, 2.5-7.1 GHz (HIGH) mode)
           - bits: "3"
-            name: LMS8001A_RX_U3_RESETN
-            desc: LMS8001A_RX_U3_RESETN
+            name: LMS8001A_RX_CHAB_LOW_RESET
+            desc: RX circuit LMS8001A reset (channels A and B, 0.4-3.5 GHz (LOW) mode)
           - bits: "2"
-            name: LMS8001B_TX_U5_RESETN
-            desc: LMS8001B_TX_U5_RESETN
+            name: LMS8001B_TX_CHAB_HIGH_RESETN
+            desc: TX circuit LMS8001B reset (channels A and B, 2.5-7.1 GHz (HIGH) mode)
           - bits: "1"
-            name: LMS8001B_TX_U6_RESETN
-            desc: LMS8001B_TX_U6_RESETN
+            name: LMS8001B_TX_CHCD_HIGH_RESETN
+            desc: TX circuit LMS8001B reset (channels C and D, 2.5-7.1 GHz (HIGH) mode)
           - bits: "0"
             name: NOT_USED
             desc: Not used
-      - addr: 0x02
-        name: U115
+#
+      - addr: 0x28
+        name: GPIO5
         fields:
           - bits: "7"
             name: SW_50R_LNAtoPA_CHD
-            desc: SW_50R_LNAtoPA_CHD
+            desc: 50 ohm absorptive LNA to PA switch selection, channel D
           - bits: "6"
             name: SW_50R_LNAtoPA_CHC
-            desc: SW_50R_LNAtoPA_CHC
+            desc: 50 ohm absorptive LNA to PA switch selection, channel C
           - bits: "5"
             name: SW_50R_LNAtoPA_CHB
-            desc: SW_50R_LNAtoPA_CHB
+            desc: 50 ohm absorptive LNA to PA switch selection, channel B
           - bits: "4"
             name: SW_50R_LNAtoPA_CHA
-            desc: SW_50R_LNAtoPA_CHA
+            desc: 50 ohm absorptive LNA to PA switch selection, channel A
           - bits: "3"
             name: FAN_PWM0
-            desc: FAN#0 speed control (PWM)
+            desc: FAN0 PWM input
           - bits: "2"
             name: FAN_TACH0
-            desc: FAN#0 tachometer
+            desc: FAN0 tachometer output
           - bits: "1"
             name: FAN_PWM1
-            desc: FAN#1 speed control (PWM)
+            desc: FAN1 PWM input
           - bits: "0"
             name: FAN_TACH1
-            desc: FAN#0 tachometer
+            desc: FAN1 tachometer output
