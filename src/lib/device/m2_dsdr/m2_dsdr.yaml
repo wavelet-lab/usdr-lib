@@ -285,7 +285,7 @@ pages:
             desc: Logical 1 (+1.8v)
           - bits: "3"
             name: REF_EN_OSC
-            desc: Enable reference clock oscillator
+            desc: Enable 25MHz reference clock oscillator
           - bits: "2"
             name: REF_EN_GPS
             desc: Enable GPS module
