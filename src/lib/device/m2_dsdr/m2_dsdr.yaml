@@ -10,7 +10,7 @@ bus:
     type: VIRTUAL
     usdr_path: /debug/hw/m2dsdr/0/reg
 addr_width:   8
-data_width:   16
+data_width:   32
 page_prefix:  True
 field_prefix: [ Page, RegName ]
 field_macros: True
@@ -33,93 +33,101 @@ pages:
 #        1  0  1     0  0  1  = 2.5 - 5.0 GHz
 #        1  0  0     0  1  0  = 3.5 - 7.0 GHz
 #
-          - bits: "8,23,22"
+          - bits: "23,22,8"
             name: SW_RX_IN_FILTER_CHA
             desc: RX IN filters switch for Channel A
             opts:
-                0b000: SW_FILTER_MUTE
-                0b011: SW_IN_FILTER_400_1000M
-                0b010: SW_IN_FILTER_1000_2000M
-                0b001: SW_IN_FILTER_2000_3500M
-                0b101: SW_IN_FILTER_2500_5000M
-                0b100: SW_IN_FILTER_3500_7100M
+#                 **             *
+                0b0000000000000000: MUTE
+                0b1100000000000000: 400_1000M
+                0b1000000000000000: 1000_2000M
+                0b0100000000000000: 2000_3500M
+                0b0100000000000001: 2500_5000M
+                0b0000000000000001: 3500_7100M
 #
-          - bits: "15,6,7"
+          - bits: "15,7,6"
             name: SW_RX_OUT_FILTER_CHA
             desc: RX OUT filters switch for Channel A
             opts:
-                0b000: SW_FILTER_MUTE
-                0b011: SW_OUT_FILTER_400_1000M
-                0b100: SW_OUT_FILTER_1000_2000M
-                0b101: SW_OUT_FILTER_2000_3500M
-                0b001: SW_OUT_FILTER_2500_5000M
-                0b010: SW_OUT_FILTER_3500_7100M
+#                 *       **
+                0b0000000000: MUTE
+                0b0000000011: 400_1000M
+                0b1000000000: 1000_2000M
+                0b1000000010: 2000_3500M
+                0b0000000010: 2500_5000M
+                0b0000000001: 3500_7100M
 #
-          - bits: "9,21,20"
+          - bits: "21,20,9"
             name: SW_RX_IN_FILTER_CHB
             desc: RX IN filters switch for Channel B
             opts:
-                0b000: SW_FILTER_MUTE
-                0b011: SW_IN_FILTER_400_1000M
-                0b010: SW_IN_FILTER_1000_2000M
-                0b001: SW_IN_FILTER_2000_3500M
-                0b101: SW_IN_FILTER_2500_5000M
-                0b100: SW_IN_FILTER_3500_7100M
+#                 **          *
+                0b0000000000000: MUTE
+                0b1100000000000: 400_1000M
+                0b1000000000000: 1000_2000M
+                0b0100000000000: 2000_3500M
+                0b0100000000001: 2500_5000M
+                0b0000000000001: 3500_7100M
 #
-          - bits: "14,4,5"
+          - bits: "14,5,4"
             name: SW_RX_OUT_FILTER_CHB
             desc: RX OUT filters switch for Channel B
             opts:
-                0b000: SW_FILTER_MUTE
-                0b011: SW_OUT_FILTER_400_1000M
-                0b100: SW_OUT_FILTER_1000_2000M
-                0b101: SW_OUT_FILTER_2000_3500M
-                0b001: SW_OUT_FILTER_2500_5000M
-                0b010: SW_OUT_FILTER_3500_7100M
+#                 *        **
+                0b00000000000: MUTE
+                0b00000000011: 400_1000M
+                0b10000000000: 1000_2000M
+                0b10000000010: 2000_3500M
+                0b00000000010: 2500_5000M
+                0b00000000001: 3500_7100M
 #
-          -bits: "10,19,18"
+          - bits: "19,18,10"
             name: SW_RX_IN_FILTER_CHC
             desc: RX IN filters switch for Channel C
             opts:
-                0b000: SW_FILTER_MUTE
-                0b011: SW_IN_FILTER_400_1000M
-                0b010: SW_IN_FILTER_1000_2000M
-                0b001: SW_IN_FILTER_2000_3500M
-                0b101: SW_IN_FILTER_2500_5000M
-                0b100: SW_IN_FILTER_3500_7100M
+#                 **       *
+                0b0000000000: MUTE
+                0b1100000000: 400_1000M
+                0b1000000000: 1000_2000M
+                0b0100000000: 2000_3500M
+                0b0100000001: 2500_5000M
+                0b0000000001: 3500_7100M
 #
-          -bits: "13,3,2"
+          - bits: "13,3,2"
             name: SW_RX_OUT_FILTER_CHC
             desc: RX OUT filters switch for Channel C
             opts:
-                0b000: SW_FILTER_MUTE
-                0b011: SW_OUT_FILTER_400_1000M
-                0b100: SW_OUT_FILTER_1000_2000M
-                0b101: SW_OUT_FILTER_2000_3500M
-                0b001: SW_OUT_FILTER_2500_5000M
-                0b010: SW_OUT_FILTER_3500_7100M
+#                 *         **
+                0b000000000000: MUTE
+                0b000000000011: 400_1000M
+                0b100000000000: 1000_2000M
+                0b100000000001: 2000_3500M
+                0b000000000001: 2500_5000M
+                0b000000000010: 3500_7100M
 #
-          -bits: "11,17,16"
+          - bits: "17,16,11"
             name: SW_RX_IN_FILTER_CHD
             desc: RX IN filters switch for Channel D
             opts:
-                0b000: SW_FILTER_MUTE
-                0b011: SW_IN_FILTER_400_1000M
-                0b010: SW_IN_FILTER_1000_2000M
-                0b001: SW_IN_FILTER_2000_3500M
-                0b101: SW_IN_FILTER_2500_5000M
-                0b100: SW_IN_FILTER_3500_7100M
+#                 **    *
+                0b0000000: MUTE
+                0b1100000: 400_1000M
+                0b1000000: 1000_2000M
+                0b0100000: 2000_3500M
+                0b0100001: 2500_5000M
+                0b0000001: 3500_7100M
 #
-          -bits: "12,0,1"
+          - bits: "12,1,0"
             name: SW_RX_OUT_FILTER_CHD
             desc: RX OUT filters switch for Channel D
             opts:
-                0b000: SW_FILTER_MUTE
-                0b011: SW_OUT_FILTER_400_1000M
-                0b100: SW_OUT_FILTER_1000_2000M
-                0b101: SW_OUT_FILTER_2000_3500M
-                0b001: SW_OUT_FILTER_2500_5000M
-                0b010: SW_OUT_FILTER_3500_7100M
+#                 *          **
+                0b0000000000000: MUTE
+                0b0000000000011: 400_1000M
+                0b1000000000000: 1000_2000M
+                0b1000000000010: 2000_3500M
+                0b0000000000010: 2500_5000M
+                0b0000000000001: 3500_7100M
 #
       - addr: 0x23
         name: GPIO1
@@ -166,107 +174,107 @@ pages:
 #
           - bits: "8"
             name: SW_IN_RX_CHA
-            desc: Channel A RX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel A RX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_IN_RX_HIGH
-                0b1: SW_IN_RX_LOW
+                0b0: HIGH
+                0b1: LOW
           - bits: "6"
             name: SW_OUT_RX_CHA
-            desc: Channel A RX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel A RX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_RX_LOW
-                0b1: SW_OUT_RX_HIGH
+                0b0: LOW
+                0b1: HIGH
 #
           - bits: "9"
             name: SW_IN_RX_CHB
-            desc: Channel B RX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel B RX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_IN_RX_HIGH
-                0b1: SW_IN_RX_LOW
+                0b0: HIGH
+                0b1: LOW
           - bits: "7"
             name: SW_OUT_RX_CHB
-            desc: Channel B RX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel B RX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_RX_LOW
-                0b1: SW_OUT_RX_HIGH
+                0b0: LOW
+                0b1: HIGH
 #
           - bits: "10"
             name: SW_IN_RX_CHC
-            desc: Channel C RX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel C RX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_IN_RX_HIGH
-                0b1: SW_IN_RX_LOW
+                0b0: HIGH
+                0b1: LOW
           - bits: "4"
             name: SW_OUT_RX_CHC
-            desc: Channel C RX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel C RX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_RX_LOW
-                0b1: SW_OUT_RX_HIGH
+                0b0: LOW
+                0b1: HIGH
 #
           - bits: "11"
             name: SW_IN_RX_CHD
-            desc: Channel D RX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel D RX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_IN_RX_HIGH
-                0b1: SW_IN_RX_LOW
+                0b0: HIGH
+                0b1: LOW
           - bits: "5"
             name: SW_OUT_RX_CHD
-            desc: Channel D RX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel D RX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_RX_LOW
-                0b1: SW_OUT_RX_HIGH
+                0b0: LOW
+                0b1: HIGH
 #
           - bits: "12"
             name: SW_IN_TX_CHA
-            desc: Channel A TX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel A TX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_IN_TX_LOW
-                0b1: SW_IN_TX_HIGH
+                0b0: LOW
+                0b1: HIGH
           - bits: "3"
             name: SW_OUT_TX_CHA
-            desc: Channel A TX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel A TX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_TX_HIGH
-                0b1: SW_OUT_TX_LOW
+                0b0: HIGH
+                0b1: LOW
 #
           - bits: "13"
             name: SW_IN_TX_CHB
-            desc: Channel B TX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel B TX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_IN_TX_LOW
-                0b1: SW_IN_TX_HIGH
+                0b0: LOW
+                0b1: HIGH
           - bits: "2"
             name: SW_OUT_TX_CHB
-            desc: Channel B TX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel B TX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_TX_HIGH
-                0b1: SW_OUT_TX_LOW
+                0b0: HIGH
+                0b1: LOW
 #
           - bits: "14"
             name: SW_IN_TX_CHC
-            desc: Channel C TX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel C TX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_TX_HIGH
-                0b1: SW_OUT_TX_LOW
+                0b0: LOW
+                0b1: HIGH
           - bits: "1"
             name: SW_OUT_TX_CHC
-            desc: Channel C TX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel C TX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_TX_HIGH
-                0b1: SW_OUT_TX_LOW
+                0b0: HIGH
+                0b1: LOW
 #
           - bits: "15"
             name: SW_IN_TX_CHD
-            desc: Channel D TX IN selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel D TX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_TX_HIGH
-                0b1: SW_OUT_TX_LOW
+                0b0: LOW
+                0b1: HIGH
           - bits: "0"
             name: SW_OUT_TX_CHD
-            desc: Channel D TX OUT selection: 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            desc: Channel D TX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
             opts:
-                0b0: SW_OUT_TX_HIGH
-                0b1: SW_OUT_TX_LOW
+                0b0: HIGH
+                0b1: LOW
 #
       - addr: 0x26
         name: GPIO3

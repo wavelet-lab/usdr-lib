@@ -17,16 +17,32 @@ class ParserFields:
         self.name = yaml['name']
         self.desc = yaml['desc'] if 'desc' in yaml else yaml['name']
         self.bits_raw = str(yaml['bits'])
-        bits = self.bits_raw.split(':')
-        if len(bits) == 1:
-            bits = self.bits_raw.split('-')
 
-        if len(bits) == 2:
-            self.bits_h, self.bits_l = [ int(b) for b in bits ]
+        bits = self.bits_raw.split(',')
+        if len(bits) > 1:
+            # comma-sepatated list of bits
+            bits_list = [ int(b) for b in bits ]
+            self.bits_h = max(bits_list)
+            self.bits_l = min(bits_list)
+            self.mask = 0;
+            for b in bits_list:
+                self.mask = self.mask | (1 << b)
+            self.vmax = self.mask >> self.bits_l
+            #print(self.name, ".vmax =", "{0:b}".format(self.vmax))
+            #print(self.name, ".mask =", "{0:b}".format(self.mask))
+
         else:
-            self.bits_h = self.bits_l = int(bits[0])
-        self.mask = reduce(lambda x, y: x | y, [ 1 << i for i in range(self.bits_l, self.bits_h + 1)])
-        self.vmax = self.mask >> self.bits_l
+            bits = self.bits_raw.split(':')
+            if len(bits) == 1:
+                bits = self.bits_raw.split('-')
+
+            if len(bits) == 2:
+                self.bits_h, self.bits_l = [ int(b) for b in bits ]
+            else:
+                self.bits_h = self.bits_l = int(bits[0])
+            self.mask = reduce(lambda x, y: x | y, [ 1 << i for i in range(self.bits_l, self.bits_h + 1)])
+            self.vmax = self.mask >> self.bits_l
+
         self.opts = []
         if "opts" in yaml:
             self.opts = [ None ] * (self.vmax + 1)
