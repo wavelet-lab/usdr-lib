@@ -10,7 +10,7 @@ bus:
     type: VIRTUAL
     usdr_path: /debug/hw/m2dsdr/0/reg
 addr_width:   8
-data_width:   32
+data_width:   24
 page_prefix:  True
 field_prefix: [ Page, RegName ]
 field_macros: True
@@ -121,7 +121,7 @@ pages:
                 0b001: 2500_5000M
                 0b010: 3500_7100M
 #
-      - addr: 0x23
+      - addr: 0x21
         name: GPIO1
         fields:
           - bits: "7:6"
@@ -160,7 +160,7 @@ pages:
                 0b10: LNA_OFF_BYPASS_ON
                 0b11: LNA_OFF_BYPASS_ON
 #
-      - addr: 0x24
+      - addr: 0x22
         name: GPIO2
         fields:
 #
@@ -268,7 +268,7 @@ pages:
                 0b0: HIGH
                 0b1: LOW
 #
-      - addr: 0x26
+      - addr: 0x23
         name: GPIO3
         fields:
           - bits: "7"
@@ -296,7 +296,7 @@ pages:
             name: ENABLE_5VIN
             desc: Enable +5v power supply for RX amps
 #
-      - addr: 0x27
+      - addr: 0x24
         name: GPIO4
         fields:
           - bits: "7"
@@ -324,7 +324,7 @@ pages:
             name: NOT_USED
             desc: Not used
 #
-      - addr: 0x28
+      - addr: 0x25
         name: GPIO5
         fields:
           - bits: "7"
