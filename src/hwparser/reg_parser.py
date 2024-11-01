@@ -11,6 +11,40 @@ import yaml
 # Basic YAML file processor and structure builder
 
 class ParserFields:
+    def unpack_bits(self, val, bits_list) -> int:
+
+        if (bits_list is None) or (len(bits_list) == 0):
+            return val
+
+        #print("unpack_bits() input val:", "{:0{}b}".format(val, len(bits_list)), ", bits_list:", bits_list)
+
+        res = 0
+        offs = min(bits_list)
+
+        for idx, b in enumerate(bits_list, start = (1 - len(bits_list))):
+            if val & (1 << -idx):
+                res |= (1 << (b - offs))
+
+        #print("unpack_bits() output res:", "{:0{}b}".format(res, max(bits_list) - min(bits_list) + 1))
+        return res
+
+    def pack_bits(self, val, bits_list) -> int:
+
+        if (bits_list is None) or (len(bits_list) == 0):
+            return val
+
+        #print("pack_bits() input val:", "{:0{}b}".format(val, max(bits_list) - min(bits_list) + 1), ", bits_list:", bits_list)
+
+        res = 0
+        offs = min(bits_list)
+
+        for idx, b in enumerate(bits_list, start = (1 - len(bits_list))):
+            if val & (1 << (b - offs)):
+                res |= (1 << -idx)
+
+        #print("pack_bits() output res:", "{:0{}b}".format(res, len(bits_list)))
+        return res
+
     def __init__(self, yaml, top: ParserTop, page: ParserPages, reg: ParserRegs):
         self.reg = reg
 
@@ -18,6 +52,7 @@ class ParserFields:
         self.desc = yaml['desc'] if 'desc' in yaml else yaml['name']
         self.bits_raw = str(yaml['bits'])
 
+        bits_list = []
         bits = self.bits_raw.split(',')
         if len(bits) > 1:
             # comma-sepatated list of bits
@@ -48,7 +83,7 @@ class ParserFields:
             self.opts = [ None ] * (self.vmax + 1)
             for o in yaml['opts']:
                 #print("%x => %s" % (o, yaml['opts'][o]))
-                self.opts[o] = yaml['opts'][o]
+                self.opts[self.unpack_bits(o, bits_list)] = yaml['opts'][o]
         
         bit_max = top.data_width * reg.ucnt - 1
         if self.bits_h > bit_max:
