@@ -116,9 +116,8 @@ class GenH:
             if len(f.opts) > 0:
                 fname = self.fieldName(f)
                 str += "enum %s_options {\n" % fname.lower()
-                for i, o in enumerate(f.opts):
-                    if o is not None:
-                        str += "%s%s_%s = %d,\n" % (self.TAB, fname, self.normalize(o.upper()), i)
+                for (k, v) in f.opts.items():
+                    str += "%s%s_%s = %d,\n" % (self.TAB, fname, self.normalize(k.upper()), v)
                 str += "};\n"
         return str
 

@@ -120,8 +120,8 @@ class QtBuilderPage(QWidget):
                 
                 if len(field.opts) > 1:
                     part = QComboBox()
-                    for n, v in enumerate(field.opts):
-                        part.addItem("%d -- %s" % (n, v))
+                    for (k, v) in field.opts.items():
+                        part.addItem("%d -- %s" % (v, k))
                         
                     part.currentIndexChanged.connect(lambda index, a = int(reg.addr_l), u = reg.ucnt: self.update_control(index, a, u))
                 elif field.vmax == 1:

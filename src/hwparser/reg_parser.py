@@ -78,12 +78,11 @@ class ParserFields:
             self.mask = reduce(lambda x, y: x | y, [ 1 << i for i in range(self.bits_l, self.bits_h + 1)])
             self.vmax = self.mask >> self.bits_l
 
-        self.opts = []
+        self.opts = {}
         if "opts" in yaml:
-            self.opts = [ None ] * (self.vmax + 1)
             for o in yaml['opts']:
                 #print("%x => %s" % (o, yaml['opts'][o]))
-                self.opts[self.unpack_bits(o, bits_list)] = yaml['opts'][o]
+                self.opts[str(yaml['opts'][o])] = self.unpack_bits(o, bits_list)
         
         bit_max = top.data_width * reg.ucnt - 1
         if self.bits_h > bit_max:
