@@ -83,9 +83,9 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_
         return -EFAULT;
     }
 
-    out->libcapi79xx_create = dlsym(out->dl_handle, LIBCAPI79XX_CREATE_FN);
-    out->libcapi79xx_destroy = dlsym(out->dl_handle, LIBCAPI79XX_DESTROY_FN);
-    out->libcapi79xx_init = dlsym(out->dl_handle, LIBCAPI79XX_INIT_FN);
+    out->libcapi79xx_create = (libcapi79xx_create_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_CREATE_FN);
+    out->libcapi79xx_destroy = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_DESTROY_FN);
+    out->libcapi79xx_init = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_INIT_FN);
     if (!out->libcapi79xx_create ||
         !out->libcapi79xx_destroy ||
         !out->libcapi79xx_init) {

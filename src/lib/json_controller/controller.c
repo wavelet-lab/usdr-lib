@@ -653,7 +653,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         if (res)
             return res;
 
-        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"parameter\":\"%s\",\"value\":%"PRIu64,  parameter, val);
+        print_rpc_reply(sdrc, outbuffer, outbufsz, res, "\"parameter\":\"%s\",\"value\":%" PRIu64,  parameter, val);
         return 0;
     }
     default:
