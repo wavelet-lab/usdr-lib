@@ -315,10 +315,10 @@ pages:
             name: LMS8001A_RX_CHAB_LOW_RESET
             desc: RX circuit LMS8001A reset (channels A and B, 0.4-3.5 GHz (LOW) mode)
           - bits: "2"
-            name: LMS8001B_TX_CHAB_HIGH_RESETN
+            name: LMS8001B_TX_CHAB_HIGH_RESET
             desc: TX circuit LMS8001B reset (channels A and B, 2.5-7.1 GHz (HIGH) mode)
           - bits: "1"
-            name: LMS8001B_TX_CHCD_HIGH_RESETN
+            name: LMS8001B_TX_CHCD_HIGH_RESET
             desc: TX circuit LMS8001B reset (channels C and D, 2.5-7.1 GHz (HIGH) mode)
           - bits: "0"
             name: NOT_USED
@@ -327,18 +327,15 @@ pages:
       - addr: 0x25
         name: GPIO5
         fields:
-          - bits: "7"
-            name: SW_50R_LNAtoPA_CHD
-            desc: 50 ohm absorptive LNA to PA switch selection, channel D
-          - bits: "6"
-            name: SW_50R_LNAtoPA_CHC
-            desc: 50 ohm absorptive LNA to PA switch selection, channel C
-          - bits: "5"
-            name: SW_50R_LNAtoPA_CHB
-            desc: 50 ohm absorptive LNA to PA switch selection, channel B
-          - bits: "4"
-            name: SW_50R_LNAtoPA_CHA
-            desc: 50 ohm absorptive LNA to PA switch selection, channel A
+          - bits: "7:4"
+            name: SW_50R_LNAtoPA
+            desc: 50 ohm absorptive LNA to PA switch selection for channels
+            opts:
+                0b0000: NONE
+                0b0001: CHA
+                0b0010: CHB
+                0b0100: CHC
+                0b1000: CHD
           - bits: "3"
             name: FAN_PWM0
             desc: FAN0 PWM input
@@ -351,3 +348,196 @@ pages:
           - bits: "0"
             name: FAN_TACH1
             desc: FAN1 tachometer output
+#
+      - addr: 0x26
+        name: GPIO6
+        fields:
+          - bits: "12"
+            name: EN_CHD
+            desc: Enable RX LNA & post-attenuator RX_RF amp for channel D
+          - bits: "11"
+            name: LMS8001B_RX_CHCD_SEN
+            desc: RX circuit LMS8001B SPI SEN (channels C and D, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "10"
+            name: PA_EN_CHB
+            desc: Enable TX PA & post-attenuator TX_RF amp for channel B
+          - bits: "9"
+            name: SW_PA_ONOFF_CHC
+            desc: Route post-amped TX to RX for channel C
+          - bits: "8"
+            name: SW_RXTX_CHC
+            desc: Switch TRX antenna to TX(0) or RX(1) mode for channel C
+          - bits: "7"
+            name: PA_EN_CHC
+            desc: Enable TX PA & post-attenuator TX_RF amp for channel C
+          - bits: "6"
+            name: VADJ_EN_CHD
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp for channel D
+          - bits: "5"
+            name: VADJ_EN_CHC
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp for channel C
+          - bits: "4"
+            name: SPI_CLK
+            desc: LMS8001 CLK pin (in)
+          - bits: "3"
+            name: EN_CHC
+            desc: Enable RX LNA & post-attenuator RX_RF amp for channel C
+          - bits: "2"
+            name: LMS8001B_TX_CHAB_SEN
+            desc: TX circuit LMS8001B SPI SEN (channels A and B, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "1"
+            name: REF_GPS_TX
+            desc: GPS module UART TXD
+          - bits: "0"
+            name: SPI_SDO
+            desc: LMS8001 SDO pin (out)
+#
+      - addr: 0x27
+        name: GPIO7
+        fields:
+          - bits: "12"
+            name: LMS8001B_TX_CHCD_SEN
+            desc: TX circuit LMS8001B SPI SEN (channels C and D, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "11"
+            name: SW_RX_TDDFDD_CHC
+            desc: RX TDD-FDD switch (0:FDD, 1:TDD) for channel C
+          - bits: "10"
+            name: SW_RX_TDDFDD_CHD
+            desc: RX TDD-FDD switch (0:FDD, 1:TDD) for channel D
+          - bits: "9"
+            name: SW_RXTX_CHD
+            desc: Switch TRX antenna to TX(0) or RX(1) mode for channel D
+          - bits: "8"
+            name: PA_EN_CHD
+            desc: Enable TX PA & post-attenuator TX_RF amp for channel D
+          - bits: "7"
+            name: SPI_SDIO
+            desc: LMS8001 SDIO pin (in/out)
+          - bits: "6"
+            name: SW_RX_TDDFDD_CHA
+            desc: RX TDD-FDD switch (0:FDD, 1:TDD) for channel A
+          - bits: "5"
+            name: SDA3
+            desc: U114/U113 extenders SDA
+          - bits: "4"
+            name: SW_RXTX_CHB
+            desc: Switch TRX antenna to TX(0) or RX(1) mode for channel B
+          - bits: "3"
+            name: EN_CHB
+            desc: Enable RX LNA & post-attenuator RX_RF amp for channel B
+          - bits: "2"
+            name: SCL3
+            desc: U114/U113 extenders SCL
+          - bits: "1"
+            name: SW_PA_ONOFF_CHD
+            desc: Route post-amped TX to RX for channel D
+          - bits: "0"
+            name: LMS8001A_RX_CHCD_SEN
+            desc: RX circuit LMS8001A SPI SEN (channels C and D, 0.4-3.5 GHz (LOW) mode)
+#
+      - addr: 0x28
+        name: GPIO8
+        fields:
+          - bits: "12"
+            name: SW_PA_ONOFF_CHB
+            desc: Route post-amped TX to RX for channel B
+          - bits: "11"
+            name: SW_RX_TDDFDD_CHB
+            desc: RX TDD-FDD switch (0:FDD, 1:TDD) for channel B
+          - bits: "10"
+            name: LMS8001A_RX_CHAB_SEN
+            desc: RX circuit LMS8001A SPI SEN (channels A and B, 0.4-3.5 GHz (LOW) mode)
+          - bits: "9"
+            name: SW_RXTX_CHA
+            desc: Switch TRX antenna to TX(0) or RX(1) mode for channel A
+          - bits: "8"
+            name: SW_PA_ONOFF_CHA
+            desc: Route post-amped TX to RX for channel A
+          - bits: "7"
+            name: EN_CHA
+            desc: Enable RX LNA & post-attenuator RX_RF amp for channel A
+          - bits: "6"
+            name: VADJ_EN_CHA
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp for channel A
+          - bits: "5"
+            name: PA_EN_CHA
+            desc: Enable TX PA & post-attenuator TX_RF amp for channel A
+          - bits: "4"
+            name: VADJ_EN_CHB
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp for channel B
+          - bits: "3"
+            name: REF_SCL
+            desc: U115 extender SCL
+          - bits: "2"
+            name: REF_SDA
+            desc: U115 exterder SDA
+          - bits: "1"
+            name: LMS8001B_RX_CHAB_SEN
+            desc: RX circuit LMS8001B SPI SEN (channels A and B, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "0"
+            name: REF_BOARD_1PPS
+            desc: 1PPS - from GSM module if GPS enabled, from J26(external 1PPS) otherwise
+#
+      - addr: 0x29
+        name: GPIO9
+        fields:
+          - bits: "0"
+            name: REF_GPS_RX
+            desc: GPS module UART RXD
+#
+      - addr: 0x2a
+        name: GPIO10
+        fields:
+          - bits: "3:0"
+            name: ATT_RX_CHA
+            desc: Channel A RX attenuator settings
+#
+#            V1  |  V2  |  V3  |  V4
+#           8 dB | 4 dB | 2 dB | 1 dB
+#           -----+------+------+------
+#             1  |  1   |  1   |  1   | = 0 dB
+#             1  |  1   |  1   |  0   | = 1 dB
+#             1  |  1   |  0   |  1   | = 2 dB
+#             1  |  0   |  1   |  1   | = 4 dB
+#             0  |  1   |  1   |  1   | = 8 dB
+#             0  |  0   |  0   |  0   | = 15 dB
+# Any combination of the above states will provide an attenuation
+# approximately equal to the sum of the bits selected.
+#
+      - addr: 0x2b
+        name: GPIO11
+        fields:
+          - bits: "3:0"
+            name: ATT_RX_CHB
+            desc: Channel B RX attenuator settings
+#
+      - addr: 0x2c
+        name: GPIO12
+        fields:
+          - bits: "3:0"
+            name: ATT_RX_CHC
+            desc: Channel C RX attenuator settings
+#
+      - addr: 0x2d
+        name: GPIO13
+        fields:
+          - bits: "3:0"
+            name: ATT_RX_CHD
+            desc: Channel D RX attenuator settings
+#
+      - addr: 0x2e
+        name: GPIO14
+        fields:
+          - bits: "3"
+            name: REFCTRL_SEL
+            desc: Referense clock selector switch; 0 - internal 25MHz oscillator, 1 - external clock from J27
+          - bits: "2"
+            name: REF_SEN
+            desc: ADF4002 Load Enable pin. When LE goes high, the data stored in the shift registers is loaded into one of the four latches; the latch is selected using the control bits
+          - bits: "1"
+            name: REF_SCLK
+            desc: ADF4002 Serial Clock Input. This serial clock is used to clock in the serial data to the registers. The data is latched into the 24-bit shift register on the CLK rising edge.
+          - bits: "0"
+            name: REF_SDIO
+            desc: ADF4002 Serial Data Input. The serial data is loaded MSB first with the two LSBs being the control bits.
+#
