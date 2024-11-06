@@ -95,7 +95,7 @@ int usbft601_uram_ls_op(lldev_t dev, subdev_t subdev,
                 tmpbuf_out[i] = ls_op_addr + i;
             }
 
-            res = usbft601_ctrl_transfer(dev, CMD_BRDSPI_RD, (const uint8_t* )tmpbuf_out, meminsz, pin, meminsz, timeout_ms);
+            res = usbft601_ctrl_transfer(dev, CMD_BRDSPI_RD, (const uint8_t* )tmpbuf_out, meminsz, (uint8_t* )pin, meminsz, timeout_ms);
         } else if (pin == NULL || meminsz == 0) {
             if (memoutsz * 2 > sizeof(tmpbuf_out))
                 return -E2BIG;
@@ -107,7 +107,7 @@ int usbft601_uram_ls_op(lldev_t dev, subdev_t subdev,
                 tmpbuf_out[2 * i + 0] = out_s[i];
             }
 
-            res = usbft601_ctrl_transfer(dev, CMD_BRDSPI_WR, (const uint8_t* )tmpbuf_out, memoutsz * 2, pin, meminsz, timeout_ms);
+            res = usbft601_ctrl_transfer(dev, CMD_BRDSPI_WR, (const uint8_t* )tmpbuf_out, memoutsz * 2, (uint8_t* )pin, meminsz, timeout_ms);
         } else {
             return -EINVAL;
         }
@@ -116,13 +116,13 @@ int usbft601_uram_ls_op(lldev_t dev, subdev_t subdev,
     case USDR_LSOP_SPI:
         // TODO split to RD / WR packets
         if (pin == NULL || meminsz == 0 || ((*(const uint32_t*)pout) & 0x80000000) != 0) {
-            res = usbft601_ctrl_transfer(dev, CMD_LMS7002_WR, pout, memoutsz, pin, meminsz, timeout_ms);
+            res = usbft601_ctrl_transfer(dev, CMD_LMS7002_WR, (const uint8_t* )pout, memoutsz, (uint8_t* )pin, meminsz, timeout_ms);
         } else {
             for (unsigned k = 0; k < memoutsz / 4; k++) {
-                const uint32_t* pz = (const uint32_t*)(pout + 4 * k);
+                const uint32_t* pz = (const uint32_t*)((uint8_t*)pout + 4 * k);
                 tmpbuf_out[k] = *pz >> 16;
             }
-            res = usbft601_ctrl_transfer(dev, CMD_LMS7002_RD, (const uint8_t* )tmpbuf_out /*pout*/, memoutsz / 2, pin, meminsz, timeout_ms);
+            res = usbft601_ctrl_transfer(dev, CMD_LMS7002_RD, (const uint8_t* )tmpbuf_out /*pout*/, memoutsz / 2, (uint8_t* )pin, meminsz, timeout_ms);
         }
         break;
 

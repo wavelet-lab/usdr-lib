@@ -20,7 +20,7 @@ option(ENABLE_VERILATOR "Enable verilator lowlevel bridge" OFF)
 add_compile_options(
     #"-Wall"
     #"-Wno-unused-variable" "-Wno-unused-function" "-Wno-vla-cxx-extension"
-    "-Wno-c++11-narrowing" "-Wno-deprecated"
+    "-Wno-c++11-narrowing" "-Wno-deprecated" "-Wno-c99-designator"
     "$<$<CONFIG:DEBUG>:-O0;-gsource-map>"
     "$<$<CONFIG:RELEASE>:-O3>"
 )
@@ -55,6 +55,7 @@ add_subdirectory(../../json_controller json_controller)
 set(CONTROL_LIB_FILES
     "../../lowlevel/usb_uram/usb_uram_generic.c"
     "../../lowlevel/usb_uram/usb_uram_webusb.c"
+    "../../lowlevel/usb_ft601/usb_ft601_generic.c"
     "../../lowlevel/usb_ft601/usb_ft601_webusb.c"
     "../../lowlevel/usdr_lowlevel.c"
     "../webusb.c"
