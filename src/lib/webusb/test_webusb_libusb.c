@@ -130,6 +130,29 @@ int libusb_websdr_create(unsigned loglevel, struct libusb_websdr** out)
     return 0;
 }
 
+static
+    char s_rpc_temperature[] =
+    "{"
+    "\"req_method\":\"sdr_get_sensor\","
+        "\"id\":\"abyr_valg123456\","
+        "\"req_params\": {\"sensor\":\"sdr_temp\"}"
+    "}";
+
+static
+    char s_rpc_get_parameter[] =
+    "{"
+    "\"req_method\":\"sdr_get_parameter\","
+        "\"id\":\"abyr_valg123457\","
+        "\"req_params\": {\"path\":\"/dm/sdr/refclk/frequency\"}"
+    "}";
+
+static
+    char s_rpc_set_parameter[] =
+    "{"
+    "\"req_method\":\"sdr_set_parameter\","
+        "\"id\":\"abyr_valg123459\","
+        "\"req_params\": {\"path\":\"/dm/sdr/refclk/frequency\",\"value\":26000000}"
+    "}";
 
 static
 char s_rpc_init[] =
@@ -147,7 +170,7 @@ static
 char s_rpc_revision[] =
         "{"
         "\"req_method\":\"sdr_get_revision\","
-        "\"id\":\"abyr_valg123456\","
+        "\"id\":\"abyr_valg123458\","
         "\"req_params\": {}"
         "}";
 
@@ -170,6 +193,48 @@ int libusb_websdr_run(struct libusb_websdr* d, unsigned samplerate)
                                  s_rpc_revision,
                                  buffer,
                                  sizeof(buffer));
+
+    printf("RES=%d RPC_Result: `%s`\n", res, buffer);
+    if(res)
+        return res;
+
+#ifdef MANUAL_MODE
+    printf("press any key to continue...\n");
+    getchar();
+#endif
+
+    res = webusb_process_rpc(d->dev,
+                             s_rpc_temperature,
+                             buffer,
+                             sizeof(buffer));
+
+    printf("RES=%d RPC_Result: `%s`\n", res, buffer);
+    if(res)
+        return res;
+
+#ifdef MANUAL_MODE
+    printf("press any key to continue...\n");
+    getchar();
+#endif
+
+    res = webusb_process_rpc(d->dev,
+                             s_rpc_get_parameter,
+                             buffer,
+                             sizeof(buffer));
+
+    printf("RES=%d RPC_Result: `%s`\n", res, buffer);
+    if(res)
+        return res;
+
+#ifdef MANUAL_MODE
+    printf("press any key to continue...\n");
+    getchar();
+#endif
+
+    res = webusb_process_rpc(d->dev,
+                             s_rpc_set_parameter,
+                             buffer,
+                             sizeof(buffer));
 
     printf("RES=%d RPC_Result: `%s`\n", res, buffer);
     if(res)

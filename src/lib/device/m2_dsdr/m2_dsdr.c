@@ -171,12 +171,19 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/debug/clk_info",  { dev_m2_dsdr_debug_clk_info, NULL }},
 };
 
+enum dsdr_type {
+    DSDR_M2_R0 = 0,
+    DSDR_PCIE_HIPER_R0 = 1,
+};
+
 struct dev_m2_dsdr {
     device_t base;
 
     lmk05318_state_t lmk;
 
     subdev_t subdev;
+
+    unsigned type;
 
     stream_handle_t* rx;
     stream_handle_t* tx;
@@ -325,13 +332,14 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
             break;
     }
 
-    for (unsigned j = 0; j < 20; j++) {
-        usleep(10000);
-        res = res ? res : tps6381x_init(dev, d->subdev, I2C_TPS63811, true, true, 3450);
-        if (res == 0)
-            break;
+    if (d->type == DSDR_M2_R0) {
+        for (unsigned j = 0; j < 20; j++) {
+            usleep(10000);
+            res = res ? res : tps6381x_init(dev, d->subdev, I2C_TPS63811, true, true, 3450);
+            if (res == 0)
+                break;
+        }
     }
-
     usleep(40000);
 
 
@@ -383,7 +391,11 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x7); // Enable DCDC 1.2V;
     // We don't have PG_1v2 routed in this rev
     // We don't have EN_1v8 routed in this rev
-    // res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0xf);
+
+    if (d->type == DSDR_PCIE_HIPER_R0) {
+        usleep(25000);
+        res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0xf);
+    }
 
     // Check PG_1v8
     for (unsigned j = 0; j < 100; j++) {
@@ -501,6 +513,7 @@ int usdr_device_m2_dsdr_create(lldev_t dev, device_id_t devid)
     d->rx = NULL;
     d->tx = NULL;
 
+    d->type = DSDR_PCIE_HIPER_R0;
     dev->pdev = &d->base;
     return 0;
 

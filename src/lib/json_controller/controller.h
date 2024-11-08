@@ -37,6 +37,7 @@ enum sdr_call_parameters {
     SDRC_MODE,
     SDRC_SENSOR,
     SDRC_VALUE,
+    SDRC_PATH,
     //
     // daemon request params
     //
