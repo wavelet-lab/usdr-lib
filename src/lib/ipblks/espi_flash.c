@@ -38,7 +38,7 @@ enum espi_core_regs {
 
 #define LOCAL_BLK_LEN 128
 #define LOCAL_MEM_TOP 0
-#define WATCHDOG_LIMIT 100000
+#define WATCHDOG_LIMIT 300000
 #define RDSR_BUSY_BIT (1)
 
 
@@ -248,6 +248,7 @@ static int _espi_flash_erase(lldev_t dev, subdev_t subdev, unsigned cfg_base, ui
 
 	do {
 		if (addr == 0 && size == ~((uint32_t)0)) {
+            USDR_LOG("FLSH", USDR_LOG_NOTE, "Full flash erase!\n");
             res = _espi_flash_cmd_wren(dev, subdev, cfg_base);
 			if (res)
 				return res;
@@ -263,6 +264,7 @@ static int _espi_flash_erase(lldev_t dev, subdev_t subdev, unsigned cfg_base, ui
 				return res;
 
 			//Sector ERASE
+            USDR_LOG("FLSH", USDR_LOG_NOTE, "Sector erase %02x\n", addr);
             res = _espi_flash_sector_erase(dev, subdev, cfg_base, addr);
 			if (res)
 				return res;
@@ -277,6 +279,7 @@ static int _espi_flash_erase(lldev_t dev, subdev_t subdev, unsigned cfg_base, ui
 				return res;
 
 			//Sub sector ERASE
+            USDR_LOG("FLSH", USDR_LOG_NOTE, "SubSector erase %02x\n", addr);
             res = _espi_flash_subsector_erase(dev, subdev, cfg_base, addr);
 			if (res)
 				return res;
