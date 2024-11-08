@@ -105,6 +105,9 @@ struct stream_state {
     //union {
     //    struct stream_core_state_rxbrst rxbrst;
     //} cores;
+    u64 abuffer_no;
+    u64 bbuffer_no;
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
     struct dma_attrs dma_attr;
 #endif
@@ -933,6 +936,8 @@ exit_success:
     
     // Flush non-read events
     usdrdev->streaming[sno].stat_rptr = usdrdev->streaming[sno].stat_wptr;
+    usdrdev->streams[sno]->abuffer_no = 0;
+    usdrdev->streams[sno]->bbuffer_no = 0;
 
     if (usdrdev->dl.stream_core[sno] == USDR_MAKE_COREID(USDR_CS_STREAM, USDR_SC_TXDMA_OLD)) {
     	// Put all available buffers, no OOB data for the first N buffs
@@ -986,7 +991,7 @@ static int validate_snoto(struct usdr_dev *usdrdev, unsigned long snomskto, unsi
 }
 
 static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long snomskto,
-                                     void* oob_out, unsigned *oob_length, int nonblock)
+                                     void* oob_out, unsigned *oob_length, int nonblock, int op_wait)
 {
     int res;
     unsigned sno, to, to_hz;
@@ -1065,9 +1070,21 @@ static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long sno
     if (oob_length) {
     	*oob_length = oobcnt * 16;
     }
-    
+
     // flush_cache_range(vma, start, end);
-    
+    if (op_wait) {
+	for (i = 0; i < cnt; i++) {
+	    u64 bno = usdrdev->streams[sno]->abuffer_no + i;
+	    unsigned idx = bno % usdrdev->streams[sno]->dma_buffs;
+
+	    dev_err(&usdrdev->pdev->dev, "Buffer_W %ld - %d \n", (long)bno, idx);
+	    dma_sync_single_for_cpu(&usdrdev->pdev->dev,
+                                    usdrdev->streams[sno]->dmab[idx].phys,
+                                    usdrdev->streams[sno]->dma_buff_size, DMA_FROM_DEVICE);
+	}
+	usdrdev->streams[sno]->abuffer_no += cnt;
+    }
+
     //dma_sync_single_for_cpu()
     // TODO FLUSH CACHE on non-coherent devices
     // TODO: this works only on non-muxed interrupts!!!
@@ -1080,7 +1097,7 @@ static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long sno
     return cnt;
 }
 
-static int usdr_stream_release_or_post(struct usdr_dev *usdrdev, unsigned long snomskto)
+static int usdr_stream_release_or_post(struct usdr_dev *usdrdev, unsigned long snomskto, int op_release)
 {
     int res;
     unsigned sno, to;
@@ -1089,6 +1106,16 @@ static int usdr_stream_release_or_post(struct usdr_dev *usdrdev, unsigned long s
     res = validate_snoto(usdrdev, snomskto, &to, &sno);
     if (res)
         return res;
+
+    if (op_release) {
+	    u64 bno = usdrdev->streams[sno]->bbuffer_no++;
+	    unsigned idx = bno % usdrdev->streams[sno]->dma_buffs;
+
+	    dev_err(&usdrdev->pdev->dev, "Buffer_R %ld - %d\n", (long)bno, idx);
+	    dma_sync_single_for_device(&usdrdev->pdev->dev,
+                                       usdrdev->streams[sno]->dmab[idx].phys,
+                                       usdrdev->streams[sno]->dma_buff_size, DMA_TO_DEVICE);
+    }
 
     cnfbase = usdrdev->dl.stream_cnf_base[sno];
     usdr_reg_wr32(usdrdev, cnfbase, to);
@@ -1365,7 +1392,7 @@ static long usdrfd_ioctl(struct file *filp,
         return usdr_stream_free(usdrdev, ioctl_param);
     case PCIE_DRIVER_DMA_WAIT:
     case PCIE_DRIVER_DMA_ALLOC:
-        return usdr_stream_wait_or_alloc(usdrdev, ioctl_param, NULL, NULL, filp->f_flags & O_NONBLOCK);
+        return usdr_stream_wait_or_alloc(usdrdev, ioctl_param, NULL, NULL, filp->f_flags & O_NONBLOCK, ioctl_num == PCIE_DRIVER_DMA_WAIT);
     case PCIE_DRIVER_DMA_WAIT_OOB:
     case PCIE_DRIVER_DMA_ALLOC_OOB: {
         struct pcie_driver_woa_oob woaoob;
@@ -1375,7 +1402,7 @@ static long usdrfd_ioctl(struct file *filp,
                 return -EFAULT;
 
         data_max = (sizeof(data) < woaoob.ooblength) ? sizeof(data) : woaoob.ooblength;
-        res = usdr_stream_wait_or_alloc(usdrdev, woaoob.streamnoto, data, &data_max, filp->f_flags & O_NONBLOCK);
+        res = usdr_stream_wait_or_alloc(usdrdev, woaoob.streamnoto, data, &data_max, filp->f_flags & O_NONBLOCK, ioctl_num == PCIE_DRIVER_DMA_WAIT);
 
         if (copy_to_user(woaoob.oobdata, data, data_max))
             return -EFAULT;
@@ -1386,8 +1413,9 @@ static long usdrfd_ioctl(struct file *filp,
 
         return res;
     }
-    case PCIE_DRIVER_DMA_RELEASE_OR_POST:
-        return usdr_stream_release_or_post(usdrdev, ioctl_param);        
+    case PCIE_DRIVER_DMA_RELEASE:
+    case PCIE_DRIVER_DMA_POST:
+        return usdr_stream_release_or_post(usdrdev, ioctl_param, ioctl_num == PCIE_DRIVER_DMA_RELEASE);
     }
     return -EINVAL;
 }

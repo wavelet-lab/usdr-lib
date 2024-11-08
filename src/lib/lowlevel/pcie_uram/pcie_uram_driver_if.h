@@ -161,7 +161,8 @@ struct pcie_driver_woa_oob {
 #define PCIE_DRIVER_DMA_WAIT     _IOW(PCIE_DRIVER_MAGIC, 17, uint32_t)
 #define PCIE_DRIVER_DMA_WAIT_OOB _IOWR(PCIE_DRIVER_MAGIC, 17, struct pcie_driver_woa_oob)
 
-#define PCIE_DRIVER_DMA_RELEASE_OR_POST   _IOW(PCIE_DRIVER_MAGIC, 18, uint32_t)
+// Phased out, not supported any longer
+// #define PCIE_DRIVER_DMA_RELEASE_OR_POST   _IOW(PCIE_DRIVER_MAGIC, 18, uint32_t)
 
 #define PCIE_DRIVER_DMA_ALLOC     _IOW(PCIE_DRIVER_MAGIC, 19, uint32_t)
 #define PCIE_DRIVER_DMA_ALLOC_OOB _IOWR(PCIE_DRIVER_MAGIC, 19, struct pcie_driver_woa_oob)
@@ -172,5 +173,9 @@ struct pcie_driver_woa_oob {
 
 // Request specific deriver ABI version
 #define PCIE_DRIVER_CLAIM_VERSION     _IOW(PCIE_DRIVER_MAGIC, 23, uint32_t)
+
+#define PCIE_DRIVER_DMA_RELEASE       _IOW(PCIE_DRIVER_MAGIC, 24, uint32_t)
+#define PCIE_DRIVER_DMA_POST          _IOW(PCIE_DRIVER_MAGIC, 25, uint32_t)
+
 
 #endif
