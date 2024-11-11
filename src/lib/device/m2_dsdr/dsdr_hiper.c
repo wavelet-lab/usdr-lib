@@ -67,7 +67,7 @@ enum spi_idx {
     SPI_ADF4002 = 7,
 };
 enum spi_cfg {
-    LMS8_DIV = 255,
+    LMS8_DIV = 10,
     ADF4002_DIV = 16, //50 ns Cycle
 
     LMS8_BCNTZ = 3,
