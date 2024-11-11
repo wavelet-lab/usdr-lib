@@ -12,8 +12,6 @@
 #include "../../ipblks/si2c.h"
 
 
-#define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
-#define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
 
 enum {
     DEV_RX_STREAM_NO = 0,

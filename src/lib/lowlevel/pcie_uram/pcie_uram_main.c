@@ -17,6 +17,7 @@
 #include <dirent.h>
 
 #include "../device/device.h"
+#include "../device/device_cores.h"
 #include "../device/device_bus.h"
 #include "../device/device_names.h"
 #include "../device/device_vfs.h"
@@ -24,6 +25,7 @@
 #include "pcie_uram_driver_if.h"
 
 #include "../ipblks/si2c.h"
+#include "../ipblks/spiext.h"
 #include "../ipblks/streams/sfe_tx_4.h"
 
 // ABI version should be synced with the driver
@@ -325,6 +327,7 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
 {
     int res;
     struct pcie_uram_dev* d = (struct pcie_uram_dev*)dev;
+    device_bus_t* pdb = &d->db;
 
     switch (ls_op) {
     case USDR_LSOP_HWREG: {
@@ -336,21 +339,36 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
                     pcie_reg_op_ioctl(d, ls_op_addr, ina, meminsz, outa, memoutsz);
     }
     case USDR_LSOP_SPI: {
-        if (ls_op_addr > d->db.spi_count)
+        uint32_t spi_param;
+        if (SPIEXT_LSOP_GET_BUS(ls_op_addr) >= d->db.spi_count)
             return -EINVAL;
 
-        if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
-            return -EINVAL;
+        // TODO: check if we need this sanity check, since evertyhing is checked in PCI
+        // driver
+        if (pdb->spi_core[SPIEXT_LSOP_GET_BUS(ls_op_addr)] == SPI_CORE_32W) {
+            if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
+                return -EINVAL;
 
-        struct pcie_driver_spi32 iospi = { ls_op_addr, *(const uint32_t*)pout };
+            spi_param = *(const uint32_t*)pout;
+        } else if (pdb->spi_core[SPIEXT_LSOP_GET_BUS(ls_op_addr)] == SPI_CORE_CFGW_CS8) {
+            spi_param = spiext_make_data_reg(memoutsz, pout);
+        } else {
+            return -EINVAL;
+        }
+
+        struct pcie_driver_spi32 iospi = { ls_op_addr, spi_param };
         res = ioctl(d->fd, PCIE_DRIVER_SPI32_TRANSACT, &iospi);
         if (res)
             return -errno;
 
-        USDR_LOG("PCIE", USDR_LOG_NOTE, "SPI%d: DW=%08x => %08x\n",  ls_op_addr, *(const uint32_t*)pout, iospi.dw_io);
+        USDR_LOG("PCIE", USDR_LOG_NOTE, "SPI%d: DW=%08x => %08x\n", SPIEXT_LSOP_GET_BUS(ls_op_addr), *(const uint32_t*)pout, iospi.dw_io);
 
         if (meminsz) {
-            *(uint32_t*)pin = iospi.dw_io;
+            if (pdb->spi_core[SPIEXT_LSOP_GET_BUS(ls_op_addr)] == SPI_CORE_32W) {
+                *(uint32_t*)pin = iospi.dw_io;
+            } else {
+                spiext_parse_data_reg(iospi.dw_io, meminsz, pin);
+            }
         }
         return 0;
     }
@@ -374,8 +392,9 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
 
         usleep(1000);
 
-        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d: W=%d R=%d OUT=%s\n",
-                 ls_op_addr, ioi2c.wcnt, ioi2c.rcnt, _dump_buffer(memoutsz, pout));
+        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d.%d.%d: W=%d R=%d OUT=%s\n",
+                 LSOP_I2C_INSTANCE(ls_op_addr), LSOP_I2C_BUSNO(ls_op_addr),
+                 LSOP_I2C_ADDR(ls_op_addr), ioi2c.wcnt, ioi2c.rcnt, _dump_buffer(memoutsz, pout));
 
         res = ioctl(d->fd, PCIE_DRIVER_SI2C_TRANSACT, &ioi2c);
         if (res)
@@ -384,7 +403,9 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
         if (meminsz <= sizeof(ioi2c.rdb)) {
             memcpy(pin, ioi2c.rdb, meminsz);
         }
-        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d:         => %s\n", ls_op_addr, _dump_buffer(meminsz, pin));
+        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d.%d.%d:         => %s\n",
+                 LSOP_I2C_INSTANCE(ls_op_addr), LSOP_I2C_BUSNO(ls_op_addr),
+                 LSOP_I2C_ADDR(ls_op_addr), _dump_buffer(meminsz, pin));
 
         return 0;
     }
