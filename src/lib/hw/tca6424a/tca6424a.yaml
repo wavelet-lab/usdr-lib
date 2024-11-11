@@ -1,0 +1,69 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         TCA6424A
+desc:         GPIO
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: I2C
+    rd_mask: 0x8000
+    usdr_path: /debug/hw/tca6424a/0/reg
+addr_width:   8
+data_width:   8
+# page_prefix:  True
+# field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+  - name: Top
+    regs:
+      - addr: 0x00
+        name: IP0
+        desc: Input Port 0, read byte
+
+      - addr: 0x01
+        name: IP1
+        desc: Input Port 1, read byte
+
+      - addr: 0x02
+        name: IP2
+        desc: Input Port 2, read byte
+
+      - addr: 0x04
+        name: OP0
+        desc: Output Port 0, rw
+
+      - addr: 0x05
+        name: OP1
+        desc: Output Port 1, rw
+
+      - addr: 0x06
+        name: OP2
+        desc: Output Port 2, rw
+
+      - addr: 0x08
+        name: PI0
+        desc: Polarity Inversion Port 0; 0 - normal; 1 - bit inverted
+
+      - addr: 0x09
+        name: PI1
+        desc: Polarity Inversion Port 1; 0 - normal; 1 - bit inverted
+
+      - addr: 0x0A
+        name: PI2
+        desc: Polarity Inversion Port 2; 0 - normal; 1 - bit inverted
+
+      - addr: 0x0C
+        name: CP0
+        desc: Configuration Port 0; 0 - Output; 1 - Input HiZ
+
+      - addr: 0x0D
+        name: CP1
+        desc: Configuration Port 1; 0 - Output; 1 - Input HiZ
+
+      - addr: 0x0E
+        name: CP2
+        desc: Configuration Port 2; 0 - Output; 1 - Input HiZ
+
