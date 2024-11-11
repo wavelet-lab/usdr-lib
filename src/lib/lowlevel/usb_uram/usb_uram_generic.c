@@ -1,5 +1,6 @@
 #include "usb_uram_generic.h"
 #include "../ipblks/si2c.h"
+#include "../ipblks/spiext.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -162,15 +163,28 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
         return usb_uram_reg_op(dev, ls_op_addr, ina, meminsz, outa, memoutsz);
     }
     case USDR_LSOP_SPI: {
-        if (ls_op_addr >= pdb->spi_count)
-            return -EINVAL;
-        if (pdb->spi_core[ls_op_addr] != SPI_CORE_32W)
+        if (SPIEXT_LSOP_GET_BUS(ls_op_addr) >= pdb->spi_count)
             return -EINVAL;
 
-        if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
-            return -EINVAL;
+        if (pdb->spi_core[ls_op_addr] == SPI_CORE_32W) {
+            if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
+                return -EINVAL;
 
-        res = usb_uram_reg_out(dev, pdb->spi_base[ls_op_addr], *(const uint32_t*)pout);
+            res = usb_uram_reg_out(dev, pdb->spi_base[SPIEXT_LSOP_GET_BUS(ls_op_addr)],
+                                   *(const uint32_t*)pout);
+        } else if (pdb->spi_core[ls_op_addr] == SPI_CORE_CFGW_CS8) {
+            uint32_t spi_tr[2] = {
+                SPIEXT_LSOP_GET_CFG(ls_op_addr),
+                spiext_make_data_reg(memoutsz, pout)
+            };
+
+            //Select CSn on the BUS
+            res = usb_uram_reg_out_n(dev, pdb->spi_base[SPIEXT_LSOP_GET_BUS(ls_op_addr)] - 1,
+                                     spi_tr, 2);
+        } else {
+            return -EINVAL;
+        }
+
         if (res)
             return res;
 

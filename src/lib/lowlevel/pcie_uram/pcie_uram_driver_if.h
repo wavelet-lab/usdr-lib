@@ -75,7 +75,7 @@ struct pcie_driver_devlayout {
 };
 
 struct pcie_driver_spi32 {
-    unsigned busno;
+    unsigned buscfg;
     unsigned dw_io;
 };
 

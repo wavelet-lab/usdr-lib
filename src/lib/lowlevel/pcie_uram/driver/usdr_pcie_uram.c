@@ -29,6 +29,7 @@
 
 #include "./pcie_uram_driver_if.h"
 #include "./si2c.c"
+#include "./spiext.h"
 #include "./device_cores.h"
 
 #define DRV_NAME		"usdr"
@@ -122,9 +123,6 @@ enum {
     MAX_STREAMS = 32, // up to 16 stream of each direction a device
     MAX_BUCKETS = 4,
 };
-
-#define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
-#define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
 
 struct notification_bucket {
     struct usdr_dmabuf db;
@@ -494,7 +492,7 @@ irq_found:
         DEBUG_DEV_OUT(&d->pdev->dev, "BUCKET %d IRQ %d: rptr = %d int suppressed %d times\n", i, irq, b->rptr, j);
     }
     
-    for (j = 0; j < 8; j++) {
+    for (j = 0; j < MAX_INT; j++) {
         if (wakeups & (1u << j)) {
             wake_up_interruptible(&d->irq_ev_wq[j]);
         }
@@ -1222,23 +1220,29 @@ static long usdrfd_ioctl(struct file *filp,
     }
     case PCIE_DRIVER_SPI32_TRANSACT: {
         struct pcie_driver_spi32 sp;
-        unsigned core, base, irq, cnt;
+        unsigned core, base, irq, cnt, busno;
 
         if (copy_from_user(&sp, uptr, sizeof(sp)))
                 return -EFAULT;
-        if (sp.busno >= usdrdev->dl.spi_cnt)
+        busno = SPIEXT_LSOP_GET_BUS(sp.buscfg);
+        if (busno >= usdrdev->dl.spi_cnt)
             return -EINVAL;
 
-        core = usdrdev->dl.spi_core[sp.busno];
-        if (core != SPI_CORE_32W) {
-            dev_err(&usdrdev->pdev->dev, "SPI[%d] core %d isn't supported, update driver!",
-                    sp.busno, core);
+        core = usdrdev->dl.spi_core[busno];
+        base = usdrdev->dl.spi_base[busno];
+        irq = usdrdev->dl.spi_int_number[busno];
+
+        if (core == SPI_CORE_32W) {
+            usdr_reg_wr32(usdrdev, base, sp.dw_io);
+        } else if (core == SPI_CORE_CFGW_CS8) {
+            // NOTE: usdr_reg_wr64 do cpu_to_be64() which reverse DWORD order on PCIe bus
+            __u64 cmd = (((__u64)SPIEXT_LSOP_GET_CFG(sp.buscfg)) << 32) | sp.dw_io;
+            usdr_reg_wr64(usdrdev, base - 1, cmd);
+        } else {
+            dev_err(&usdrdev->pdev->dev, "SPI%d: core %d isn't supported, update driver!",
+                    busno, core);
             return -EINVAL;
         }
-
-        base = usdrdev->dl.spi_base[sp.busno];
-        irq = usdrdev->dl.spi_int_number[sp.busno];
-        usdr_reg_wr32(usdrdev, base, sp.dw_io);
 
         //Wait for completion
         res = wait_event_interruptible_timeout(usdrdev->irq_ev_wq[irq],
@@ -1254,10 +1258,10 @@ static long usdrfd_ioctl(struct file *filp,
 #else
         sp.dw_io = usdrdev->rb_ev_data[irq];
 #endif
-        DEBUG_DEV_OUT(&usdrdev->pdev->dev, "SPI%d Rd:%08x cnt:%d\n",
-                      sp.busno, sp.dw_io, cnt);
+        DEBUG_DEV_OUT(&usdrdev->pdev->dev, "SPI%d: Cfg:%08x Rd:%08x cnt:%d\n",
+                      busno, sp.buscfg, sp.dw_io, cnt);
 
-        if (copy_to_user(uptr + sizeof(sp.busno), &sp.dw_io, sizeof(sp.dw_io)))
+        if (copy_to_user(uptr + sizeof(sp.buscfg), &sp.dw_io, sizeof(sp.dw_io)))
             return -EFAULT;
 
         return 0;

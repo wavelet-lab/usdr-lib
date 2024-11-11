@@ -39,6 +39,7 @@ enum usdr_core_subtype {
 
 enum usdr_bus_cores {
     USDR_BS_SPI_SIMPLE = 0,
+    USDR_BS_SPI_CFG_CS8 = 16,
     USDR_BS_DI2C_SIMPLE = 1,
 
     USDR_LIME_C64_PROTO = 2,
@@ -68,6 +69,12 @@ enum usdr_fe_cores {
 
 #define USDR_CORE_GET_FAMILY(c) ((c) & 0xff)
 #define USDR_CORE_GET_ID(c)     ((c) >> 8)
+
+
+// Prdefined cores
+#define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
+#define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
+#define SPI_CORE_CFGW_CS8     USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_CFG_CS8)
 
 
 #endif

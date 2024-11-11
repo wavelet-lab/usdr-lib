@@ -5,6 +5,7 @@ set(USDR_IPBLKS_LIB_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/si2c.c
     ${CMAKE_CURRENT_SOURCE_DIR}/gpio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/uart.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/spiext.c
 
     ${CMAKE_CURRENT_SOURCE_DIR}/streams/streams.c
     ${CMAKE_CURRENT_SOURCE_DIR}/streams/streams_api.c
