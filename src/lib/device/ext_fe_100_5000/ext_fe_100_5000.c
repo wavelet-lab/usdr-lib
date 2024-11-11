@@ -3,6 +3,7 @@
 
 #include "ext_fe_100_5000.h"
 #include "../ipblks/gpio.h"
+#include "../ipblks/spiext.h"
 
 #include <usdr_logging.h>
 #include <string.h>
@@ -114,29 +115,20 @@ static int s_spi_ext_op(lldev_t dev, subdev_t subdev,
         return -EINVAL;
 
     USDR_LOG("SEXT", USDR_LOG_INFO, "Switching bus %d to %04x on %d port\n",
-             ls_op_addr & 0xff, ls_op_addr >> 16, (ls_op_addr >> 8) & 0xff);
+             SPIEXT_LSOP_GET_BUS(ls_op_addr),
+             SPIEXT_LSOP_GET_CFG(ls_op_addr),
+             SPIEXT_LSOP_GET_CSR(ls_op_addr));
 
-    int res = lowlevel_reg_wr32(dev, subdev, (ls_op_addr >> 8) & 0xff, ls_op_addr >> 16);
+    int res = lowlevel_reg_wr32(dev, subdev, SPIEXT_LSOP_GET_CSR(ls_op_addr), SPIEXT_LSOP_GET_CFG(ls_op_addr));
     if (res)
         return res;
 
     uint32_t spin = 0xcccccccc;
-    uint32_t spout = 0;
-
-    for (unsigned k = 0; k < memoutsz; k++) {
-        spout |= ((unsigned)(((uint8_t*)pout)[k])) << (8 * (k /*+ (4 - memoutsz)*/));
-    }
-
+    uint32_t spout = spiext_make_data_reg(memoutsz, pout);
     res = lowlevel_get_ops(dev)->ls_op(dev, subdev,
                                         ls_op, ls_op_addr & 0xff,
                                         sizeof(spin), &spin, sizeof(spout), &spout);
-
-
-   // lowlevel_reg_rd32(dev, subdev, 1 + ((ls_op_addr >> 8) & 0xff), &spin);
-
-    for (unsigned k = 0; k < meminsz; k++) {
-        ((uint8_t*)pin)[k] = spin >> (8 * k);
-    }
+    spiext_parse_data_reg(spin, meminsz, pin);
     return res;
 }
 
