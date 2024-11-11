@@ -1,0 +1,149 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         DSDR_FECTRL
+desc:         DSDR Hiper fe control
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: VIRTUAL
+    usdr_path: /debug/hw/dsdr_hiper_ctrl/0/reg
+    wr_mask: 0x80000000
+addr_width:   8
+data_width:   24
+page_prefix:  True
+field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+  - name: FPGA_GPO
+    regs:
+#
+      - addr: 0x10
+        name: REFCTRL
+        fields:
+          - bits: "0"
+            name: EXTERNAL
+            desc: Referense clock selector switch; 0 - internal 25MHz oscillator, 1 - external clock from J27
+#
+      - addr: 0x11
+        name: CHA
+        fields:
+          - bits: "7"
+            name: EN_TX
+            desc: Enable TX PA & post-attenuator TX_RF amp
+          - bits: "6"
+            name: EN_VADJ
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
+          - bits: "5"
+            name: CHD
+            desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "2"
+            name: SW_PA_ONOFF
+            desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
+          - bits: "1"
+            name: SW_RX_TDDFDD
+            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+          - bits: "0"
+            name: SW_RXTX
+            desc: Switch TRX antenna to TX(0) or RX(1)
+
+      - addr: 0x12
+        name: CHB
+        fields:
+          - bits: "7"
+            name: EN_TX
+            desc: Enable TX PA & post-attenuator TX_RF amp
+          - bits: "6"
+            name: EN_VADJ
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
+          - bits: "5"
+            name: CHD
+            desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "2"
+            name: SW_PA_ONOFF
+            desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
+          - bits: "1"
+            name: SW_RX_TDDFDD
+            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+          - bits: "0"
+            name: SW_RXTX
+            desc: Switch TRX antenna to TX(0) or RX(1)
+
+      - addr: 0x13
+        name: CHC
+        fields:
+          - bits: "7"
+            name: EN_TX
+            desc: Enable TX PA & post-attenuator TX_RF amp
+          - bits: "6"
+            name: EN_VADJ
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
+          - bits: "5"
+            name: CHD
+            desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "2"
+            name: SW_PA_ONOFF
+            desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
+          - bits: "1"
+            name: SW_RX_TDDFDD
+            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+          - bits: "0"
+            name: SW_RXTX
+            desc: Switch TRX antenna to TX(0) or RX(1)
+
+      - addr: 0x14
+        name: CHD
+        fields:
+          - bits: "7"
+            name: EN_TX
+            desc: Enable TX PA & post-attenuator TX_RF amp
+          - bits: "6"
+            name: EN_VADJ
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
+          - bits: "5"
+            name: CHD
+            desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "2"
+            name: SW_PA_ONOFF
+            desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
+          - bits: "1"
+            name: SW_RX_TDDFDD
+            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+          - bits: "0"
+            name: SW_RXTX
+            desc: Switch TRX antenna to TX(0) or RX(1)
+
+#
+      - addr: 0x15
+        name: ATT_RX_CHA
+        fields:
+          - bits: "3:0"
+            name: VAL
+            desc: Channel A RX attenuator settings; 0 - IL; 15 - 15dB
+#
+      - addr: 0x16
+        name: ATT_RX_CHB
+        fields:
+          - bits: "3:0"
+            name: VAL
+            desc: Channel B RX attenuator settings; 0 - IL; 15 - 15dB
+#
+      - addr: 0x17
+        name: ATT_RX_CHC
+        fields:
+          - bits: "3:0"
+            name: VAL
+            desc: Channel C RX attenuator settings; 0 - IL; 15 - 15dB
+#
+      - addr: 0x18
+        name: ATT_RX_CHD
+        fields:
+          - bits: "3:0"
+            name: VAL
+            desc: Channel D RX attenuator settings; 0 - IL; 15 - 15dB
+#
+
+
+#

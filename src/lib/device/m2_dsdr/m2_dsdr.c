@@ -15,8 +15,6 @@
 #include "../device_cores.h"
 #include "../device_ids.h"
 
-#include "../hw/tmp108/tmp108.h"
-
 #include "../ipblks/streams/sfe_rx_4.h"
 #include "../ipblks/streams/stream_sfetrx4_dma32.h"
 #include "../ipblks/fgearbox.h"
@@ -28,9 +26,27 @@
 #include "../hw/lp875484/lp875484.h"
 #include "../hw/afe79xx/afe79xx.h"
 
+#include "dsdr_hiper.h"
+
 // Board revisions:
 //  0 - DSDR
 //  1 - Hiper
+
+
+// I2C buses
+// I2C3      () -- TCA6424AR ( 0 & 1), TMP114
+// REF/I2C5  () -- TCA6424AR ( 0 ), DAC80501MD, LG77LIC, TMP114
+//
+
+// SPI buses
+// LMS8001 + 6sens  --
+// REF_SDIO         -- ADF4002B
+
+
+// We need digital lock detect
+// ADF4002/IC1 (pin 15) -> GPIO33_3???
+
+
 
 enum {
     SRF4_FIFOBSZ = 0x10000, // 64kB
@@ -43,6 +59,10 @@ enum i2c_bus1 {
 enum i2c_bus2 {
     // I2C_ADDR_TPS63811 = 0x75, //TPS63811
     I2C_ADDR_LMK = 0x65, //LMK05318B
+};
+
+enum spi_bus {
+    SPI_BUS_HIPER_FE = 4,
 };
 
 enum i2c_idx {
@@ -82,14 +102,14 @@ enum lmk_ports {
 
 static
 const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
-    { DNLL_SPI_COUNT, 4 },
-    { DNLL_I2C_COUNT, 1 },
+    { DNLL_SPI_COUNT, 5 },
+    { DNLL_I2C_COUNT, 2 }, // 2
     { DNLL_SRX_COUNT, 1 },
     { DNLL_STX_COUNT, 0 },
     { DNLL_RFE_COUNT, 1 },
     { DNLL_TFE_COUNT, 0 },
     { DNLL_IDX_REGSP_COUNT, 1 },
-    { DNLL_IRQ_COUNT, 8 },
+    { DNLL_IRQ_COUNT, 9 },
 
     // low level buses
     { "/ll/irq/0/core", USDR_MAKE_COREID(USDR_CS_AUX, USDR_AC_PIC32_PCI) },
@@ -106,9 +126,16 @@ const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
     { "/ll/spi/3/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE) },
     { "/ll/spi/3/base", M2PCI_REG_SPI3 },
     { "/ll/spi/3/irq",  M2PCI_INT_SPI_3 },
+    { "/ll/spi/4/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_CFG_CS8) },
+    { "/ll/spi/4/base", REG_SPI_EXT_DATA },
+    { "/ll/spi/4/irq",  M2PCI_INT_SPI_EXT },
+
     { "/ll/i2c/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE) },
     { "/ll/i2c/0/base", M2PCI_REG_I2C },
     { "/ll/i2c/0/irq",  M2PCI_INT_I2C_0 },
+    { "/ll/i2c/1/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE) },
+    { "/ll/i2c/1/base", REG_SPI_I2C2 },
+    { "/ll/i2c/1/irq",  M2PCI_INT_I2C_1 },
     { "/ll/qspi_flash/base", M2PCI_REG_QSPI_FLASH },
 
     // Indexed area map
@@ -187,6 +214,8 @@ struct dev_m2_dsdr {
 
     stream_handle_t* rx;
     stream_handle_t* tx;
+
+    dsdr_hiper_fe_t hiper;
 };
 typedef struct dev_m2_dsdr dev_m2_dsdr_t;
 
@@ -431,6 +460,11 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     USDR_LOG("DSDR", USDR_LOG_ERROR, "Initializing AFE...\n");
 
     res = res ? res : afe79xx_init(&st);
+
+    if (d->type == DSDR_PCIE_HIPER_R0) {
+        //res = res ? res :
+                  dsdr_hiper_fe_create(dev, SPI_BUS_HIPER_FE, &d->hiper);
+    }
     return 0;
 }
 
