@@ -71,6 +71,11 @@ enum spi_idx {
     SPI_LMS8001B_U6_TX_CD_IDX = 5,
     SPI_ADF4002 = 7,
 };
+
+static const char* s_lms8_names[] = {
+    "RX_H_AB", "RX_H_CD", "RX_L_AB", "RX_L_CD", "TX_AB", "TX_CD"
+};
+
 enum spi_cfg {
     LMS8_DIV = 10,
     ADF4002_DIV = 16, //50 ns Cycle
@@ -117,6 +122,19 @@ static int dsdr_hiper_sens1temp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t 
 static int dsdr_hiper_sens2temp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 
 
+static int dsdr_hiper_lms8001_rabl_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_rabl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_rcdl_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_rcdl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_rabh_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_rabh_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_rcdh_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_rcdh_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_tab_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_tab_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_tcd_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_tcd_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
 static const usdr_dev_param_func_t s_fe_parameters[] = {
     { "/debug/hw/lms8001/0/reg" ,  { dsdr_hiper_debug_lms8001_u1_reg_set, dsdr_hiper_debug_lms8001_u1_reg_get }},
     { "/debug/hw/lms8001/1/reg" ,  { dsdr_hiper_debug_lms8001_u2_reg_set, dsdr_hiper_debug_lms8001_u2_reg_get }},
@@ -132,8 +150,81 @@ static const usdr_dev_param_func_t s_fe_parameters[] = {
     { "/dm/sensor/temp2",          { NULL, dsdr_hiper_sens1temp_get }},
     { "/dm/sensor/temp3",          { NULL, dsdr_hiper_sens2temp_get }},
 
+    { "/dm/sdr/0/rx/ab_l/freqency", { dsdr_hiper_lms8001_rabl_reg_set, dsdr_hiper_lms8001_rabl_reg_get }},
+    { "/dm/sdr/0/rx/cd_l/freqency", { dsdr_hiper_lms8001_rcdl_reg_set, dsdr_hiper_lms8001_rcdl_reg_get }},
+    { "/dm/sdr/0/rx/ab_h/freqency", { dsdr_hiper_lms8001_rabh_reg_set, dsdr_hiper_lms8001_rabh_reg_get }},
+    { "/dm/sdr/0/rx/cd_h/freqency", { dsdr_hiper_lms8001_rcdh_reg_set, dsdr_hiper_lms8001_rcdh_reg_get }},
+    { "/dm/sdr/0/tx/ab/freqency", { dsdr_hiper_lms8001_tab_reg_set, dsdr_hiper_lms8001_tab_reg_get }},
+    { "/dm/sdr/0/tx/cd/freqency", { dsdr_hiper_lms8001_tcd_reg_set, dsdr_hiper_lms8001_tcd_reg_get }},
 };
 
+
+static int dsdr_hiper_fe_lms8_set_lo(dsdr_hiper_fe_t* fe, unsigned idx, uint64_t freq)
+{
+    int res = lms8001_tune(&fe->lms8[idx], fe->ref_int_osc, freq);
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_LMS8_%s: [%d] tune to %.3f Mhz result %d\n",
+             s_lms8_names[idx], idx, freq / 1.0e6, res);
+    if (res == 0) {
+        fe->lo_lms8_freq[idx] = freq;
+    }
+    return res;
+}
+
+static int dsdr_hiper_fe_lms8_get_lo(dsdr_hiper_fe_t* fe, unsigned idx, uint64_t* ofreq)
+{
+    *ofreq = fe->lo_lms8_freq[idx];
+    return 0;
+}
+
+int dsdr_hiper_lms8001_rabl_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return dsdr_hiper_fe_lms8_set_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001A_U3_RX_AB_IDX, value);
+}
+int dsdr_hiper_lms8001_rcdl_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return dsdr_hiper_fe_lms8_set_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001A_U4_RX_CD_IDX, value);
+}
+int dsdr_hiper_lms8001_rabh_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return dsdr_hiper_fe_lms8_set_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001B_U1_RX_AB_IDX, value);
+}
+int dsdr_hiper_lms8001_rcdh_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return dsdr_hiper_fe_lms8_set_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001B_U2_RX_CD_IDX, value);
+}
+int dsdr_hiper_lms8001_tab_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return dsdr_hiper_fe_lms8_set_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001B_U5_TX_AB_IDX, value);
+}
+int dsdr_hiper_lms8001_tcd_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return dsdr_hiper_fe_lms8_set_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001B_U6_TX_CD_IDX, value);
+}
+
+int dsdr_hiper_lms8001_rabl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    return dsdr_hiper_fe_lms8_get_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001A_U3_RX_AB_IDX, ovalue);
+}
+int dsdr_hiper_lms8001_rcdl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    return dsdr_hiper_fe_lms8_get_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001A_U4_RX_CD_IDX, ovalue);
+}
+int dsdr_hiper_lms8001_rabh_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    return dsdr_hiper_fe_lms8_get_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001B_U1_RX_AB_IDX, ovalue);
+}
+int dsdr_hiper_lms8001_rcdh_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    return dsdr_hiper_fe_lms8_get_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001B_U2_RX_CD_IDX, ovalue);
+}
+int dsdr_hiper_lms8001_tab_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    return dsdr_hiper_fe_lms8_get_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001B_U5_TX_AB_IDX, ovalue);
+}
+int dsdr_hiper_lms8001_tcd_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    return dsdr_hiper_fe_lms8_get_lo((dsdr_hiper_fe_t*)obj->object, SPI_LMS8001B_U6_TX_CD_IDX, ovalue);
+}
 
 
 static int dsdr_hiper_fe_lms8_reg_set(dsdr_hiper_fe_t* fe, unsigned idx, uint64_t value)
@@ -141,7 +232,7 @@ static int dsdr_hiper_fe_lms8_reg_set(dsdr_hiper_fe_t* fe, unsigned idx, uint64_
     uint32_t v = value;
     int res = lowlevel_spi_tr32(fe->dev, fe->subdev, fe->lms8[idx].lsaddr, v, &fe->debug_lms8001_last[idx]);
 
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug LMS8[%d] REG %08x => %08x\n",
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "%s: Debug LMS8[%d] REG %08x => %08x\n",
              lowlevel_get_devname(fe->dev), idx, (unsigned)value,
              fe->debug_lms8001_last[idx]);
     return res;
@@ -354,6 +445,8 @@ static int dsdr_hiper_initialize_lms8(dsdr_hiper_fe_t* dfe, unsigned addr, lms80
     USDR_LOG("HIPR", USDR_LOG_WARNING, "LMS8001.%08x: version %08x\n", addr, chipver);
 
     res = res ? res : lms8001_create(dfe->dev, dfe->subdev, addr, obj);
+
+    res = res ? res : lms8001_ch_enable(obj, 0xc);
     return res;
 }
 

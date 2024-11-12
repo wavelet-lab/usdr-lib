@@ -10,6 +10,7 @@ struct dsdr_hiper_fe {
     subdev_t subdev;
 
     lms8001_state_t lms8[6];
+    uint64_t lo_lms8_freq[6];
 
     uint32_t debug_lms8001_last[6];
 
