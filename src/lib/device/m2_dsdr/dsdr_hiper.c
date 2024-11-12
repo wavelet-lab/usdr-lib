@@ -33,6 +33,11 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
     return lowlevel_reg_rd32(dev, 0, 16 + (bank / 4), data);
 }
 
+enum osc_defaults {
+    DEF_OSC_GPS_FREQ = 25000000, // U82
+    DEF_OSC_INT_FREQ = 40000000, // VCO1/VCO2
+};
+
 enum {
     IGPO_OFF_ADDR = 4,
     IGPO_OFF_YAML = 16,
@@ -360,6 +365,8 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     dfe->subdev = 0;
 
     USDR_LOG("HIPR", USDR_LOG_WARNING, "Initializing HIPER front end...\n");
+    dfe->ref_int_osc = DEF_OSC_INT_FREQ;
+    dfe->ref_gps_osc = DEF_OSC_GPS_FREQ;
 
     // Reset FE registers
     for (unsigned k = 0; k < IGPO_FE_REG_COUNT; k++) {
@@ -395,9 +402,21 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
         res = res ? res : dsdr_hiper_initialize_lms8(dfe, cfg, &dfe->lms8[k]);
     }
 
-    // ADF4002 (MUX -> DVDD)
-    res = res ? res : lowlevel_spi_tr32(dfe->dev, dfe->subdev, MAKE_SPIEXT_LSOPADR(SPI_ADF4002_CFG, 0, spix_num), 0x33, NULL);
+    // ADF4002 (MUX -> GND -> DVDD readback as a sanity check)
+    // res = res ? res : lowlevel_spi_tr32(dfe->dev, dfe->subdev, MAKE_SPIEXT_LSOPADR(SPI_ADF4002_CFG, 0, spix_num), 0x33, NULL);
 
+
+    // fRAKON = fREF * N / R
+    // RF_IN_a/b <= 40Mhz                     N-cntr
+    // REF_IN    <= 25Mhz (GPS-disciplined)   R-cntr
+    // TODO: find rational numbers for R/N
+    dfe->adf4002_regs[0] = (1 << 20) | (5 << 2); // R-counter to 5
+    dfe->adf4002_regs[1] = (0 << 21) | (8 << 8); // N-counter to 8
+    dfe->adf4002_regs[2] =  (3<<18) | (3<<15) | (8 << 11) | (1 << 7) | (1 << 4); // Digital lock detect
+    dfe->adf4002_regs[3] = (8 << 11) | (1 << 7) | (1 << 4);
+    for (unsigned k = 0; k < 4; k++) {
+        res = res ? res : lowlevel_spi_tr32(dfe->dev, dfe->subdev, MAKE_SPIEXT_LSOPADR(SPI_ADF4002_CFG, 0, spix_num), dfe->adf4002_regs[k] | k , NULL);
+    }
 
     // I2C expander
     uint32_t p[3];
@@ -435,6 +454,16 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
                                               SIZEOF_ARRAY(s_fe_parameters));
     if (res)
         return res;
+
+    for (unsigned h = 0; h < 5; h++) {
+        sleep(1);
+        uint32_t a, b;
+
+        dev_gpi_get32(dev, 24, &a);
+        dev_gpi_get32(dev, 28, &b);
+
+        USDR_LOG("HIPR", USDR_LOG_WARNING, "Cntr %08x %08x / %7d %7d\n", a, b, a & 0xfffffff, b & 0xfffffff);
+    }
 
     memset(dfe->fe_gpo_regs, 0, sizeof(dfe->fe_gpo_regs));
     USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER front end is ready!\n");

@@ -17,6 +17,12 @@ struct dsdr_hiper_fe {
     uint32_t debug_fe_reg_last;
 
     uint32_t debug_exp_reg_last;
+
+    uint32_t adf4002_regs[4];
+    uint32_t debug_adf4002_reg_last;
+
+    uint32_t ref_int_osc;
+    uint32_t ref_gps_osc;
 };
 typedef struct dsdr_hiper_fe dsdr_hiper_fe_t;
 
