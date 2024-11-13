@@ -220,6 +220,8 @@ class GenH:
                     defc += ")"
                     print(defc)
                 else:
+                    raise ValueError('Not supported!')
+
                     value_msk = reduce(lambda x, y: x | y, [x.mask for x in r.fields])
                     value_off = reduce(lambda x, y: min(x, y), [x.bits_l for x in r.fields])
                     if len(r.fields) > 1:
