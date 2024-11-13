@@ -99,16 +99,55 @@ class GenH:
         
         return str
 
+    def generate_setter_expression(self, f, custom_name) -> str:
+        res = ""
+        fname = self.fieldName(f)
+        bwidth = len(f.bits_list)
+        if bwidth > 0:
+            res += "(("
+            for i in range(bwidth):
+                idx = bwidth - i - 1
+                res += "((((%s) >> %d) & 0x1) << %d)" % (custom_name, idx, f.bits_list[i])
+                if idx != 0:
+                    res += " | "
+            res += ") & %s_MSK)" % (fname)
+        else:
+            res += "(((%s) << %s_OFF) & %s_MSK)" % (custom_name, fname, fname)
+
+        return res
+
+    def generate_getter_expression(self, f, custom_name) -> str:
+        res = ""
+        fname = self.fieldName(f)
+        bwidth = len(f.bits_list)
+        if bwidth > 0:
+            res = "("
+            for i in range(bwidth):
+                idx = bwidth - i - 1
+                res += "(((((%s) & %s_MSK) >> %d) & 0x1) << %d)" % (custom_name, fname, f.bits_list[idx], i)
+                if idx != 0:
+                    res += " | "
+            res += ")"
+        else:
+            res += "(((%s) & %s_MSK) >> %s_OFF)" % (custom_name, fname, fname)
+
+        return res
 
     def ser_cf_fmacro(self, reg: reg_parser.ParserRegs) -> str:
         str1 = ""
         str2 = ""
         for f in reg.fields:
             fname = self.fieldName(f)
-            str1 += "#define GET_%s_%s(x) (((x) & %s_MSK) >> %s_OFF)\n" % (self.h_name, fname, fname, fname)
-            str2 += "#define SET_%s_%s(p, f) (p) = ((p) & ~%s_MSK) | (((f) << %s_OFF) & %s_MSK)\n" % (self.h_name, fname, fname, fname, fname)
-        return str1 + str2
 
+            str1 += "#define GET_%s_%s(x) " % (self.h_name, fname)
+            str1 += self.generate_getter_expression(f, "x")
+            str1 += "\n"
+
+            str2 += "#define SET_%s_%s(p, f) (p) = ((p) & ~%s_MSK) | " % (self.h_name, fname, fname)
+            str2 += self.generate_setter_expression(f, "f")
+            str2 += "\n"
+
+        return str1 + str2
 
     def ser_cf_options(self, reg: reg_parser.ParserRegs) -> str:
         str = ""
@@ -116,11 +155,11 @@ class GenH:
             if len(f.opts) > 0:
                 fname = self.fieldName(f)
                 str += "enum %s_options {\n" % fname.lower()
-                for (k, v) in f.opts.items():
-                    str += "%s%s_%s = %d,\n" % (self.TAB, fname, self.normalize(k.upper()), v)
+                for i, o in enumerate(f.opts):
+                    if o is not None:
+                        str += "%s%s_%s = %d,\n" % (self.TAB, fname, self.normalize(o.upper()), i)
                 str += "};\n"
         return str
-
 
     def ser_ch_enum(self, name: str, en_dict: dict, prefix: str = "") -> str:
         str = "enum %s_t {\n" % name
@@ -177,7 +216,7 @@ class GenH:
                     defc = "#define MAKE_%s_%s(%s)" % (self.h_name, name, reduce(lambda x, y: "%s, %s" % (x, y), [x.name.lower() for x in r.fields]))
                     #defc += " ((%s << %d) |" % (name, self.data_width)
                     defc += " %s(%s," % (def_macro, name)
-                    defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s(((%s) << %s) & %s)" % (self.TAB, x.name.lower(), self.fieldName(x) + "_OFF", self.fieldName(x) + "_MSK") for x in r.fields ])
+                    defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s%s" % (self.TAB, self.generate_setter_expression(x, x.name.lower())) for x in r.fields ])
                     defc += ")"
                     print(defc)
                 else:
@@ -185,7 +224,7 @@ class GenH:
                     value_off = reduce(lambda x, y: min(x, y), [x.bits_l for x in r.fields])
                     if len(r.fields) > 1:
                         defc = "#define MAKE_%s_%s_LONG(%s) (" % (self.h_name, name, reduce(lambda x, y: "%s, %s" % (x, y), [x.name.lower() for x in r.fields]))
-                        defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s(((%s) << %s) & %s)" % (self.TAB, x.name.lower(), self.fieldName(x) + "_OFF", self.fieldName(x) + "_MSK") for x in r.fields ])
+                        defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s%s" % (self.TAB, self.generate_setter_expression(x, x.name.lower())) for x in r.fields ])
                         defc += ")"
                         print(defc)
 

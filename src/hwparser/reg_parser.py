@@ -52,17 +52,20 @@ class ParserFields:
         self.desc = yaml['desc'] if 'desc' in yaml else yaml['name']
         self.bits_raw = str(yaml['bits'])
 
-        bits_list = []
+        self.bits_list = []
         bits = self.bits_raw.split(',')
         if len(bits) > 1:
             # comma-sepatated list of bits
-            bits_list = [ int(b) for b in bits ]
-            self.bits_h = max(bits_list)
-            self.bits_l = min(bits_list)
+            self.bits_list = [ int(b) for b in bits ]
+            self.bits_h = max(self.bits_list)
+            self.bits_l = min(self.bits_list)
+
             self.mask = 0;
-            for b in bits_list:
-                self.mask = self.mask | (1 << b)
-            self.vmax = self.mask >> self.bits_l
+            for b in self.bits_list:
+                self.mask |= (1 << b)
+
+            self.vmax = reduce(lambda x, y: x | y, [ 1 << i for i in range(len(self.bits_list))])
+
             #print(self.name, ".vmax =", "{0:b}".format(self.vmax))
             #print(self.name, ".mask =", "{0:b}".format(self.mask))
 
@@ -78,12 +81,13 @@ class ParserFields:
             self.mask = reduce(lambda x, y: x | y, [ 1 << i for i in range(self.bits_l, self.bits_h + 1)])
             self.vmax = self.mask >> self.bits_l
 
-        self.opts = {}
+        self.opts = []
         if "opts" in yaml:
+            self.opts = [ None ] * (self.vmax + 1)
             for o in yaml['opts']:
                 #print("%x => %s" % (o, yaml['opts'][o]))
-                self.opts[str(yaml['opts'][o])] = self.unpack_bits(o, bits_list)
-        
+                self.opts[o] = yaml['opts'][o]
+
         bit_max = top.data_width * reg.ucnt - 1
         if self.bits_h > bit_max:
             raise Exception('Maximum bit %d in description is more that %d bit in "%s::%s" register' % (self.bits_h, bit_max, reg.name, self.name))

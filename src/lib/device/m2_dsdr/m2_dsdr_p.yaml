@@ -37,7 +37,7 @@ pages:
             name: EN_VADJ
             desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
           - bits: "5"
-            name: CHD
+            name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
           - bits: "2"
             name: SW_PA_ONOFF
@@ -59,7 +59,7 @@ pages:
             name: EN_VADJ
             desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
           - bits: "5"
-            name: CHD
+            name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
           - bits: "2"
             name: SW_PA_ONOFF
@@ -81,7 +81,7 @@ pages:
             name: EN_VADJ
             desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
           - bits: "5"
-            name: CHD
+            name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
           - bits: "2"
             name: SW_PA_ONOFF
@@ -103,7 +103,7 @@ pages:
             name: EN_VADJ
             desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
           - bits: "5"
-            name: CHD
+            name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
           - bits: "2"
             name: SW_PA_ONOFF
