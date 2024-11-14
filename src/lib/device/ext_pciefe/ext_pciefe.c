@@ -177,6 +177,7 @@ static const struct path_map known_path[] = {
 int board_ext_pciefe_init(lldev_t dev,
                           unsigned subdev,
                           unsigned gpio_base,
+                          unsigned uart_base,
                           const char* params,
                           const char* compat,
                           unsigned i2c_loc,
@@ -411,7 +412,7 @@ int board_ext_pciefe_init(lldev_t dev,
         // check uart
         char b[2048];
         uart_core_t uc;
-        res = (res) ? res : uart_core_init(dev, subdev, DEFAULT_UART_IO, &uc);
+        res = (res) ? res : uart_core_init(dev, subdev, uart_base, &uc);
         res = (res) ? res : uart_core_rx_collect(&uc, sizeof(b), b, 2250);
 
         if (res > 0)

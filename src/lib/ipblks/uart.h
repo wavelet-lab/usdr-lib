@@ -25,10 +25,6 @@ struct uart_core {
 };
 typedef struct uart_core uart_core_t;
 
-enum {
-    DEFAULT_UART_IO = 23,
-};
-
 int uart_core_init(lldev_t lldev, subdev_t subdev, unsigned base, uart_core_t* puac);
 
 int uart_core_rx_get(uart_core_t* puac, unsigned max_buf, char* data);

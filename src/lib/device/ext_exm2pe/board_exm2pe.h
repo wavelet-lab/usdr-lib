@@ -25,6 +25,7 @@ typedef struct board_exm2pe board_exm2pe_t;
 int board_exm2pe_init(lldev_t dev,
                       unsigned subdev,
                       unsigned gpio_base,
+                      unsigned int uart_base,
                       const char *params,
                       const char *compat,
                       unsigned i2c_loc,
