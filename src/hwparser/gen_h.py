@@ -220,7 +220,10 @@ class GenH:
                     defc += ")"
                     print(defc)
                 else:
-                    # raise ValueError('Not supported!')
+                    # comma sep bit-list fields are not supported here
+                    for f in r.fields:
+                        if f.bits_list and len(f.bits_list) > 0:
+                            raise ValueError('Bulk reg operations are not supported for the comma-separated bitlist fields!')
 
                     value_msk = reduce(lambda x, y: x | y, [x.mask for x in r.fields])
                     value_off = reduce(lambda x, y: min(x, y), [x.bits_l for x in r.fields])
