@@ -12,7 +12,9 @@
 #include "../hw/tmp114/tmp114.h"
 #include "../hw/dac80501/dac80501.h"
 #include "../hw/tca6424a/tca6424a.h"
+#include "../hw/adf4002b/adf4002b.h"
 
+#include "../ipblks/uart.h"
 #include "../ipblks/spiext.h"
 
 #include "../device_vfs.h"
@@ -135,6 +137,17 @@ static int dsdr_hiper_lms8001_tab_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uin
 static int dsdr_hiper_lms8001_tcd_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dsdr_hiper_lms8001_tcd_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
+static int dsdr_hiper_meas_clk40_int_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_meas_clk40_pps_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_meas_adfmux_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
+
+static int dsdr_hiper_dacvctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_dacvctcxo_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
+static int dsdr_hiper_adf4002b_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_adf4002b_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
 static const usdr_dev_param_func_t s_fe_parameters[] = {
     { "/debug/hw/lms8001/0/reg" ,  { dsdr_hiper_debug_lms8001_u1_reg_set, dsdr_hiper_debug_lms8001_u1_reg_get }},
     { "/debug/hw/lms8001/1/reg" ,  { dsdr_hiper_debug_lms8001_u2_reg_set, dsdr_hiper_debug_lms8001_u2_reg_get }},
@@ -156,7 +169,60 @@ static const usdr_dev_param_func_t s_fe_parameters[] = {
     { "/dm/sdr/0/rx/cd_h/freqency", { dsdr_hiper_lms8001_rcdh_reg_set, dsdr_hiper_lms8001_rcdh_reg_get }},
     { "/dm/sdr/0/tx/ab/freqency", { dsdr_hiper_lms8001_tab_reg_set, dsdr_hiper_lms8001_tab_reg_get }},
     { "/dm/sdr/0/tx/cd/freqency", { dsdr_hiper_lms8001_tcd_reg_set, dsdr_hiper_lms8001_tcd_reg_get }},
+
+    { "/dm/sdr/0/clk40_int",       { NULL, dsdr_hiper_meas_clk40_int_get }},
+    { "/dm/sdr/0/clk40_pps",       { NULL, dsdr_hiper_meas_clk40_pps_get }},
+    { "/dm/sdr/0/clkadfmux",       { NULL, dsdr_hiper_meas_adfmux_get }},
+
+    { "/dm/sdr/0/dacvctcxo",       { dsdr_hiper_dacvctcxo_set, dsdr_hiper_dacvctcxo_get }},
+
+    { "/debug/hw/adf4002b/0/reg",  { dsdr_hiper_adf4002b_reg_set, dsdr_hiper_adf4002b_reg_get }  },
+
 };
+
+int dsdr_hiper_adf4002b_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dsdr_hiper_fe_t* hiper = (dsdr_hiper_fe_t*)obj->object;
+    int res;
+    unsigned addr = (value >> 24) & 0x3;
+    unsigned data = value & 0xfffffc;
+
+    hiper->debug_adf4002_reg_last = ~0u;
+
+    if (value & 0x80000000) {
+        USDR_LOG("HIPR", USDR_LOG_WARNING, "AFD4002B %08x => %08x\n", addr, data);
+        res = adf4002b_reg_set(hiper->dev, hiper->subdev, hiper->adf4002_spiidx, addr, data);
+        if (res)
+            return res;
+
+        hiper->adf4002_regs[addr] = value;
+    } else {
+        hiper->debug_adf4002_reg_last = hiper->adf4002_regs[addr];
+    }
+    return 0;
+}
+
+int dsdr_hiper_adf4002b_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dsdr_hiper_fe_t* hiper = (dsdr_hiper_fe_t*)obj->object;
+    *ovalue = hiper->debug_adf4002_reg_last;
+    return 0;
+}
+
+int dsdr_hiper_dacvctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dsdr_hiper_fe_t* hiper = (dsdr_hiper_fe_t*)obj->object;
+    return dac80501_dac_set(hiper->dev, hiper->subdev, I2C_DAC, value);
+}
+
+int dsdr_hiper_dacvctcxo_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dsdr_hiper_fe_t* hiper = (dsdr_hiper_fe_t*)obj->object;
+    uint16_t v = 0;
+    int res = dac80501_dac_get(hiper->dev, hiper->subdev, I2C_DAC, &v);
+    *ovalue = v;
+    return res;
+}
 
 
 static int dsdr_hiper_fe_lms8_set_lo(dsdr_hiper_fe_t* fe, unsigned idx, uint64_t freq)
@@ -449,7 +515,7 @@ static int dsdr_hiper_initialize_lms8(dsdr_hiper_fe_t* dfe, unsigned addr, lms80
     res = res ? res : lms8001_ch_enable(obj, 0xc);
     return res;
 }
-
+#include <stdio.h>
 int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* dfe)
 {
     int res = 0;
@@ -498,6 +564,7 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     // ADF4002 (MUX -> GND -> DVDD readback as a sanity check)
     // res = res ? res : lowlevel_spi_tr32(dfe->dev, dfe->subdev, MAKE_SPIEXT_LSOPADR(SPI_ADF4002_CFG, 0, spix_num), 0x33, NULL);
 
+    usleep(10000);
 
     // fRAKON = fREF * N / R
     // RF_IN_a/b <= 40Mhz                     N-cntr
@@ -505,11 +572,14 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     // TODO: find rational numbers for R/N
     dfe->adf4002_regs[0] = (1 << 20) | (5 << 2); // R-counter to 5
     dfe->adf4002_regs[1] = (0 << 21) | (8 << 8); // N-counter to 8
-    dfe->adf4002_regs[2] =  (3<<18) | (3<<15) | (8 << 11) | (1 << 7) | (1 << 4); // Digital lock detect
-    dfe->adf4002_regs[3] = (8 << 11) | (1 << 7) | (1 << 4);
-    for (unsigned k = 0; k < 4; k++) {
-        res = res ? res : lowlevel_spi_tr32(dfe->dev, dfe->subdev, MAKE_SPIEXT_LSOPADR(SPI_ADF4002_CFG, 0, spix_num), dfe->adf4002_regs[k] | k , NULL);
+    dfe->adf4002_regs[2] = (3 << 18) | (3 << 15) | (8 << 11) | (1 << 7) | (1 << 4); // Digital lock detect
+    dfe->adf4002_regs[3] = (3 << 18) | (3 << 15) | (8 << 11) | (1 << 7) | (1 << 4);
+    dfe->adf4002_spiidx = MAKE_SPIEXT_LSOPADR(SPI_ADF4002_CFG, 0, spix_num);
+    for (unsigned k = 3; k < 4; k--) {
+        //res = res ? res : lowlevel_spi_tr32(dfe->dev, dfe->subdev, dfe->adf4002_spiidx, dfe->adf4002_regs[k] | k , NULL);
+        res = res ? res : adf4002b_reg_set(dfe->dev, dfe->subdev, dfe->adf4002_spiidx, k, dfe->adf4002_regs[k]);
     }
+
 
     // I2C expander
     uint32_t p[3];
@@ -558,9 +628,42 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
         USDR_LOG("HIPR", USDR_LOG_WARNING, "Cntr %08x %08x / %7d %7d\n", a, b, a & 0xfffffff, b & 0xfffffff);
     }
 
+    {
+        // check uart
+        char b[8192];
+        uart_core_t uc;
+        res = (res) ? res : uart_core_init(dfe->dev, dfe->subdev, REG_UART_TRX, &uc);
+        res = (res) ? res : uart_core_rx_collect(&uc, sizeof(b), b, 2250);
+        USDR_LOG("HIPR", USDR_LOG_ERROR, "UART: `%s`\n", b);
+    }
+
     memset(dfe->fe_gpo_regs, 0, sizeof(dfe->fe_gpo_regs));
     USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER front end is ready!\n");
     return 0;
+}
+
+int dsdr_hiper_meas_clk40_int_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    uint32_t a = 0;
+    int res = dev_gpi_get32(((dsdr_hiper_fe_t*)obj->object)->dev, 24, &a);
+    *ovalue = a & 0xfffffff;
+    return res;
+}
+
+int dsdr_hiper_meas_clk40_pps_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    uint32_t a = 0;
+    int res = dev_gpi_get32(((dsdr_hiper_fe_t*)obj->object)->dev, 28, &a);
+    *ovalue = a  & 0xfffffff;
+    return res;
+}
+
+int dsdr_hiper_meas_adfmux_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    uint32_t a = 0;
+    int res = dev_gpi_get32(((dsdr_hiper_fe_t*)obj->object)->dev, 32, &a);
+    *ovalue = a  & 0xfffffff;
+    return res;
 }
 
 int dsdr_hiper_fe_destroy(dsdr_hiper_fe_t* dfe)

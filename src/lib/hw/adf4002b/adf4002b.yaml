@@ -1,0 +1,144 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         ADF4002B
+desc:         Phase Detector/Frequency Synthesizer
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: SPI
+    wr_mask: 0x80000000
+    usdr_path: /debug/hw/adf4002b/0/reg
+addr_width:   8
+data_width:   24
+# page_prefix:  True
+# field_prefix: [ Page, RegName ]
+field_macros: True
+
+x-muxcontrol-opts: &muxcontrol-opts
+    0b000: Tri State
+    0b001: Dig LD
+    0b010: N Div Out
+    0b011: DVdd
+    0b100: R Div Out
+    0b101: OpenD LD
+    0b110: SDO
+    0b111: DGND
+
+pages:
+  - name: Top
+    regs:
+      - addr: 0x00
+        name: REG0
+        fields:
+          - bits: "20"
+            name: LOCK_DET_PREC
+            desc: 0 - THREE CONSECUTIVE CYCLES OF PHASE DELAY LESS THAN 15ns MUST OCCUR BEFORE LOCK DETECT IS SET. 1 - FIVE CONSECUTIVE CYCLES OF PHASE DELAY LESS THAN 15ns MUST OCCUR BEFORE LOCK DETECT IS SET.
+          - bits: "17:16"
+            name: ANTIB_PW
+            desc: ANTIBACKLASH PULSE WIDTH
+            opts:
+                0b00: 2.9ns
+                0b01: NA
+                0b10: 6.0ns
+                0b11: 2.9ns
+          - bits: "15:2"
+            name: R
+            desc: 14-BIT REFERENCE COUNTER
+#
+      - addr: 0x01
+        name: REG1
+        fields:
+          - bits: "21"
+            name: CP_GAIN_1
+            desc: "FS = 0: 0 - CP1, 1 - CP2; FS = 1: 0 = CP1, 1 - CP2 for fastlock"
+          - bits: "20:8"
+            name: "N"
+            desc: 13-BIT N COUNTER
+#
+      - addr: 0x02
+        name: REG2
+        fields:
+          - bits: "21,3"
+            name: PDN
+            desc: Power done mode, when CE PIN is high
+            opts:
+                0b00: Normal
+                0b10: Normal
+                0b01: Async PD
+                0b11: Sync PD
+          - bits: "20:18"
+            name: CUR_CP_2
+            desc: CP Current for setting 2
+          - bits: "17:15"
+            name: CUR_CP_1
+            desc: CP Current for setting 1
+          - bits: "14:11"
+            name: PFD_TIMEOUT
+            desc: PFD timeout in X * 4 - 1 cycles
+          - bits: "10:9"
+            name: FASTLOCK
+            desc: FASTLOCK MODE
+            opts:
+                0b00: Disabled
+                0b01: Disabled
+                0b10: FS_MODE_1
+                0b11: FS_MODE_2
+          - bits: "8"
+            name: CP_TRI_STATE
+            desc: 0 - Normal, 1 - HiZ
+          - bits: "7"
+            name: PD_POLARITY
+            desc: 0 - Negative, 1 - Positive
+          - bits: "6:4"
+            name: MUXOUT
+            desc: Mux control
+            opts:
+                <<: *muxcontrol-opts
+          - bits: "2"
+            name: CNTR_RST
+            desc: COUNTER OPERATION; 0 - Normal; 1 - R and N held in reset
+#
+      - addr: 0x03
+        name: REG3
+        fields:
+          - bits: "21,3"
+            name: PDN
+            desc: Power done mode, when CE PIN is high
+            opts:
+                0b00: Normal
+                0b10: Normal
+                0b01: Async PD
+                0b11: Sync PD
+          - bits: "20:18"
+            name: CUR_CP_2
+            desc: CP Current for setting 2
+          - bits: "17:15"
+            name: CUR_CP_1
+            desc: CP Current for setting 1
+          - bits: "14:11"
+            name: PFD_TIMEOUT
+            desc: PFD timeout in X * 4 - 1 cycles
+          - bits: "10:9"
+            name: FASTLOCK
+            desc: FASTLOCK MODE
+            opts:
+                0b00: Disabled
+                0b01: Disabled
+                0b10: FS_MODE_1
+                0b11: FS_MODE_2
+          - bits: "8"
+            name: CP_TRI_STATE
+            desc: 0 - Normal, 1 - HiZ
+          - bits: "7"
+            name: PD_POLARITY
+            desc: 0 - Negative, 1 - Positive
+          - bits: "6:4"
+            name: MUXOUT
+            desc: Mux control
+            opts:
+                <<: *muxcontrol-opts
+          - bits: "2"
+            name: CNTR_RST
+            desc: COUNTER OPERATION; 0 - Normal; 1 - R and N held in reset
