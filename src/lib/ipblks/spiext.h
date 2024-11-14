@@ -11,6 +11,7 @@
 #if defined(__EMSCRIPTEN__)
 #include <stdint.h>
 #include <errno.h>
+typedef uint8_t __u8;
 #else
 #include <linux/types.h>
 #include <linux/errno.h>

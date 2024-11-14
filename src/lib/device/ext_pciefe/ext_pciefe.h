@@ -80,6 +80,7 @@ typedef struct board_ext_pciefe board_ext_pciefe_t;
 int board_ext_pciefe_init(lldev_t dev,
                           unsigned subdev,
                           unsigned gpio_base,
+                          unsigned uart_base,
                           const char *params,
                           const char *compat,
                           unsigned i2c_loc,
