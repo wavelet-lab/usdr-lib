@@ -9,7 +9,7 @@ processors:   [ c ]
 bus:
     type: SPI
     wr_mask: 0x80000000
-    usdr_path: /debug/hw/lms8001/0/reg
+    usdr_path: /debug/hw/lms8001/*/reg
 addr_width:   16
 data_width:   16
 page_prefix:  True

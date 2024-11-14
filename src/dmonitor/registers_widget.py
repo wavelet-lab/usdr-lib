@@ -14,6 +14,7 @@ import conn_pipe
 import yaml
 import glob
 import errno
+import re
 
 from conn_pipe import ConnDebugPipe
 
@@ -220,7 +221,9 @@ class ParserCollection:
 
     def find_hw_parser(self, pf):
         for p in self.parsers:
-            if pf in p.path:
+            pattern = '^\s*' + str(p.path).replace('*', '([a-zA-Z0-9]+)') + '\s*$'
+            res = re.match(pattern, pf)
+            if res is not None:
                 return p
 
         return None
