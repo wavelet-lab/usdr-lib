@@ -176,7 +176,10 @@ class ParserTop:
         self.rd_mask = None
         self.verbose = verbose
         self.enums = {}
+        self.bus_type = "virtual"
         if 'bus' in yaml:
+            if 'type' in yaml['bus']:
+                self.bus_type = str(yaml['bus']['type']).lower()
             if 'usdr_path' in yaml['bus']:
                 self.path = yaml['bus']['usdr_path']
             if 'wr_mask' in yaml['bus']:
