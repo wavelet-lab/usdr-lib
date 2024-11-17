@@ -22,6 +22,7 @@ typedef struct board_ext_supersync board_ext_supersync_t;
 int board_ext_supersync_init(lldev_t dev,
                              unsigned subdev,
                              unsigned gpio_base,
+                             const char *compat,
                              unsigned i2cloc,
                              board_ext_supersync_t* ob);
 

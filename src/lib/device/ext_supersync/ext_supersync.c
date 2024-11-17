@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <usdr_logging.h>
+#include <string.h>
 
 enum {
     GPIO_SDA     = GPIO0,
@@ -27,11 +28,15 @@ enum {
 int board_ext_supersync_init(lldev_t dev,
                              unsigned subdev,
                              unsigned gpio_base,
+                             const char* compat,
                              unsigned i2cloc,
                              board_ext_supersync_t* ob)
 {
     int res = 0;
     unsigned i2ca = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2cloc), LSOP_I2C_BUSNO(i2cloc), I2C_ADDR_LMK);
+
+    if ((strcmp(compat, "m2a+e") != 0) && (strcmp(compat, "m2e") != 0) && (strcmp(compat, "m2a") != 0) && (strcmp(compat, "m2m") != 0))
+        return -ENODEV;
 
     // Configure external SDA/SCL
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_SDA, GPIO_CFG_IN);
