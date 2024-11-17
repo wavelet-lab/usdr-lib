@@ -33,7 +33,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries(otherwise static libraries will
 option(ENABLE_VERILATOR "Enable verilator lowlevel bridge" OFF)
 option(ENABLE_SOAPY "Enable SopaySDR support" ON)
 option(ENABLE_GUI  "Enable USDR QT5 simple GUI" ON)
-option(ENABLE_TESTS  "Enable tests" OFF)
+option(ENABLE_TESTS  "Enable tests" ON)
 
 
 add_feature_info(VerilatorBridge ENABLE_VERILATOR "Verilator support for emulated devices")
