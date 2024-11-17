@@ -244,7 +244,7 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, unsi
 
 void* device_fe_to(struct dev_fe* obj, const char* type)
 {
-    if (strcmp(s_fe_names[obj->type], type) != 0) {
+    if (!obj || strcmp(s_fe_names[obj->type], type) != 0) {
         return NULL;
     }
 
