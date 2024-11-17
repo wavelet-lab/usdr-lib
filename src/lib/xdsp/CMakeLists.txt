@@ -6,7 +6,6 @@ set(xdsplib_funcs_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/intfft.c
     ${CMAKE_CURRENT_SOURCE_DIR}/filter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/nco.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/trig.c
 )
 
 set(xdsplib_conv_SRCS
@@ -29,6 +28,7 @@ set(xdsplib_conv_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/rtsa_functions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/fft_window_functions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/fmquad.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/trig.c
 )
 
 if(WVLT_ARCH_X86 OR WVLT_ARCH_X86_64)
