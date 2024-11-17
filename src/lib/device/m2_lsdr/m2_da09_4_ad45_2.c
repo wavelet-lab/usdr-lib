@@ -42,16 +42,15 @@ enum {
 // dual ADC + clk_gen + DAC
 
 enum BUSIDX_m2_da09_4_ad45_2_rev000 {
-    I2C_BUS_SI549 = 0,
-    I2C_BUS_TPS6594 = 1,
-    I2C_BUS_TPS6594_WD = 2,
-    I2C_BUS_TMP108 = 3,
+    I2C_BUS_SI549 = MAKE_LSOP_I2C_ADDR(0, 0, 0x67),
+    I2C_BUS_TPS6594 = MAKE_LSOP_I2C_ADDR(0, 0, 0x48),
+    I2C_BUS_TMP108 = MAKE_LSOP_I2C_ADDR(0, 1, 0x4b),
 
     SPI_ADS42LBX9_0 = 0,
     SPI_ADS42LBX9_1 = 1,
     SPI_LMK04832 = 2,
     SPI_DAC = 3,
-    SPI_EXTERNAL = 4,
+    SPI_EXTERNAL = 4, //SPI to external frontend
 };
 
 // dual ADC, and DAC
@@ -82,7 +81,7 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
     { "/ll/spi/3/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE) },
     { "/ll/spi/3/base", M2PCI_REG_SPI3 },
     { "/ll/spi/3/irq",  M2PCI_INT_SPI_3 },
-    { "/ll/spi/4/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE) },
+    { "/ll/spi/4/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE) }, //USDR_BS_SPI_CFG_CS8
     { "/ll/spi/4/base", REG_SPI_EXT_DATA },
     { "/ll/spi/4/irq",  M2PCI_INT_SPI_EXT },
 
@@ -154,6 +153,9 @@ const usdr_dev_param_func_t s_fparams_m2_da09_4_ad45_2_rev000[] = {
 
     { "/dm/sdr/0/rx/freqency",  { dev_m2_d09_4_ad45_2_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/bandwidth", { dev_m2_d09_4_ad45_2_sdr_rx_bandwidth_set, NULL }},
+
+    { "/dm/sdr/0/rx/path",      { dev_m2_d09_4_ad45_2_dummy, NULL }},
+    { "/dm/sdr/0/tx/path",      { dev_m2_d09_4_ad45_2_dummy, NULL }},
 
     { "/dm/sdr/channels",       { NULL, NULL }},
 
@@ -672,7 +674,6 @@ int dev_m2_d09_4_ad45_2_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
     uint32_t *rates = (uint32_t *)(uintptr_t)value;
     uint32_t rx_rate = rates[0];
     // uint32_t tx_rate = rates[1];
-
     // uint32_t adc_rate = rates[2];
     // uint32_t dac_rate = rates[3];
 
@@ -885,6 +886,15 @@ static int dev_m2_d09_4_ad45_2_debug_rxtime_get(pdevice_t ud, pusdr_vfs_obj_t ob
 static
 void usdr_device_m2_d09_4_ad45_2_destroy(pdevice_t udev)
 {
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)udev;
+    lldev_t dev = d->base.dev;
+
+    si549_enable(dev, 0, I2C_BUS_SI549, false);
+    tps6594_vout_ctrl(dev, 0, I2C_BUS_TPS6594, TPS6594_LDO4, false);
+
+    ads42lbx9_ctrl(dev, 0, SPI_ADS42LBX9_0, false, false, true, false);
+    ads42lbx9_ctrl(dev, 0, SPI_ADS42LBX9_1, false, false, true, false);
+
     usdr_device_base_destroy(udev);
 }
 
@@ -924,10 +934,6 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
         return 0;
     }
 
-    res = lowlevel_reg_wr32(dev, 0, M2PCI_REG_STAT_CTRL, (1u << 31) | (0x4bu << 24) | 0x67 | (0x48u << 8) |  (0x4bu << 16));
-    if (res)
-        return res;
-
     uint32_t data = 0xdeaddead;
     lowlevel_reg_rd32(dev, 0, 0, &data);
     if (data == 0xffffffff) {
@@ -935,7 +941,7 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
         return -EIO;
     }
 
-    res = lowlevel_reg_wr32(dev, 0, M2PCI_REG_STAT_CTRL, (1u << 31) | (0x4bu << 24) | 0x67 | (0x48u << 8) |  (0x4bu << 16));
+    res = tps6594_check(dev, 0, I2C_BUS_TPS6594);
     if (res)
         return res;
 
@@ -961,7 +967,7 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
 
     usleep(1000);
 
-    res = si549_enable(dev, 0, 0, false);
+    res = si549_enable(dev, 0, I2C_BUS_SI549, false);
     if (res)
         return res;
 
