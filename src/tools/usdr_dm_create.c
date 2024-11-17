@@ -378,7 +378,7 @@ static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nf
  * RX packet & put it to the circular buffer
  * Returns true on success, false on error
  */
-static bool do_receive(pusdr_dms_t strm, unsigned iteration)
+static bool do_receive(pusdr_dms_t strm, unsigned iteration, usdr_dms_recv_nfo_t* rxstat)
 {
     void* buffers[MAX_CHS];
     int res = 0;
@@ -393,7 +393,7 @@ static bool do_receive(pusdr_dms_t strm, unsigned iteration)
     }
 
     //Core RX function - read data to buffers...
-    res = usdr_dms_recv(strm, buffers, 2250, NULL);
+    res = usdr_dms_recv(strm, buffers, 2250, rxstat);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX error, unable to recv data: errno %d, i = %d", res, iteration);
         return false;
@@ -450,6 +450,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     bool stop_on_error = true;
     bool tx_from_file = false;
     uint64_t fref = 0;
+    unsigned statistics = 1;
 
     //Device parameters
     //                 { endpoint, default_value, ignore flag, stop_on_fail flag }
@@ -477,7 +478,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -501,6 +502,10 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
         //RX VGA gain
         case 'U': dev_data[DD_RX_GAIN_VGA].value = atoi(optarg); dev_data[DD_RX_GAIN_VGA].ignore = false; break;
+        //Statistics option
+        case 'j':
+            statistics = atoi(optarg);
+            break;
         //Reference clock source path, [internal]|external
         case 'a':
             refclkpath = optarg;
@@ -787,6 +792,8 @@ int main(UNUSED int argc, UNUSED char** argv)
             s_rx_blksz = snfo_rx.pktbszie;
             rx_bufcnt = snfo_rx.channels;
         }
+    } else {
+        memset(&snfo_rx, 0, sizeof(snfo_rx));
     }
 
     //Open TX data stream
@@ -806,6 +813,8 @@ int main(UNUSED int argc, UNUSED char** argv)
             s_tx_blksampl = snfo_tx.pktsyms;
             tx_bufcnt = snfo_tx.channels;
         }
+    } else {
+        memset(&snfo_tx, 0, sizeof(snfo_tx));
     }
 
     USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Configured RX %d (%d bytes) x %d buffs  TX %d x %d buffs  ===  CH_MASK %x FMT %s",
@@ -964,14 +973,57 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
     //TX & RX
+    usdr_dms_recv_nfo_t rxstat;
+
+    struct timespec tp, tp_prev;
+    clock_gettime(CLOCK_REALTIME, &tp_prev);
+
+    uint64_t pkt_rx_time = 1000000000ULL * snfo_rx.pktsyms / rate;
+    uint64_t s_rx_time = tp_prev.tv_sec * 1000000000ULL + tp_prev.tv_nsec;
+    uint64_t logprev = s_rx_time;
+    uint64_t exp_rx_ts = 0;
+    uint64_t overruns_sps = 0;
+    uint64_t overruns_cnt = 0;
+
     for (unsigned i = 0; !s_stop && (i < count); i++)
     {
         if(dotx && !do_transmit(usds_tx, &stm, &snfo_tx, nots, i))
             goto stop;
 
-        if(dorx && !do_receive(usds_rx, i))
+        if(dorx && !do_receive(usds_rx, i, &rxstat))
             goto stop;
+
+        if (statistics) {
+            clock_gettime(CLOCK_REALTIME, &tp);
+
+            if (dorx) {
+                uint64_t curtime = tp.tv_sec * 1000000000ULL + tp.tv_nsec;
+                uint64_t took = curtime - (tp_prev.tv_sec * 1000000000ULL + tp_prev.tv_nsec);
+                if (i == 0) { //Alternative
+                    s_rx_time = curtime;
+                }
+
+                s_rx_time += pkt_rx_time;
+                int64_t lag = curtime - s_rx_time;
+
+                if (exp_rx_ts != rxstat.fsymtime) {
+                    overruns_cnt++;
+                    overruns_sps += rxstat.fsymtime - exp_rx_ts;
+                }
+                exp_rx_ts = rxstat.fsymtime + snfo_rx.pktsyms;
+
+                if ((statistics > 1) || (logprev + 1000000000ULL < curtime)) {
+                    fprintf(stderr, "RX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns OVR:%ld / %ld\n", i, count, rxstat.fsymtime, rxstat.totlost, took, lag,
+                            overruns_cnt, overruns_sps / snfo_rx.pktsyms);
+                    logprev = logprev + 1000000000ULL;
+                }
+            }
+
+            tp_prev = tp;
+        }
     }
+
+    fprintf(stderr, "RX Overruns %ld (samples %ld)\n", overruns_cnt, overruns_sps);
 
 stop:
     usdr_dme_get_uint(dev, "/dm/debug/rxtime", temp);
