@@ -77,13 +77,13 @@ struct usdr_dms_recv_nfo {
     uint64_t extra;
     struct usdr_dms_frame_nfo parts[0];
 };
-
+typedef struct usdr_dms_recv_nfo usdr_dms_recv_nfo_t;
 
 //
 int usdr_dms_recv(pusdr_dms_t stream,
                   void **stream_buffs,
                   unsigned timeout_ms,
-                  struct usdr_dms_recv_nfo* nfo);
+                  usdr_dms_recv_nfo_t *nfo);
 
 int usdr_dms_send(pusdr_dms_t stream,
                   const void **stream_buffs,
