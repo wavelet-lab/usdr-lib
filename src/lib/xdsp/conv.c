@@ -97,7 +97,7 @@ transform_info_t get_transform_fn(const char* from,
                                   unsigned inveccnt,
                                   unsigned outveccnt)
 {
-    if(isCI16(to) && isCI12(from))
+    if((isCI16(to) && isCI12(from)) || (isCI16(from) && isCI12(to)))
     {
         return s_tr_none; //TODO!!!! implement transforms for ci16@ci12!
     }
