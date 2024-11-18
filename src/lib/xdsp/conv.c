@@ -97,6 +97,11 @@ transform_info_t get_transform_fn(const char* from,
                                   unsigned inveccnt,
                                   unsigned outveccnt)
 {
+    if(isCI16(to) && isCI12(from))
+    {
+        return s_tr_none; //TODO!!!! implement transforms for ci16@ci12!
+    }
+
     if (inveccnt == 1 && outveccnt == 2 && isCI16(from) && isCF32(to)) {
         transform_info_t l_conv_ci16_2f32 = { conv_get_ci16_2cf32(), tr_conv_i16_f32_sz };
         return l_conv_ci16_2f32;
