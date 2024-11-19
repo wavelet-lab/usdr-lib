@@ -8,7 +8,7 @@
 #define MULI16_NORM(x, y) (int16_t)(((((int32_t)(x) * (y)) >> 14) + 1) >> 1)
 
 VWLT_ATTRIBUTE(optimize("O3"))
-void isincos_gen86(const int16_t *pph, int16_t* psin, int16_t *pcos)
+void isincos_generic(const int16_t *pph, int16_t* psin, int16_t *pcos)
 {
     int16_t ph = *pph;
 #ifdef CORR_32768

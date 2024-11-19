@@ -25,7 +25,7 @@ START_TEST(test_isincos_sincos) {
     int fci = (int) (fc * 32767);
     int16_t os, oc;
 
-    isincos_gen86(&phase, &os, &oc);
+    isincos_generic(&phase, &os, &oc);
 
     ck_assert_int_lt(os, fsi + ERROR);
     ck_assert_int_gt(os, fsi - ERROR);
@@ -90,7 +90,7 @@ START_TEST(test_isincos_ssse3) {
     isincos_ssse3(&vph, &vsin, &vcos);
 
     int16_t os, oc;
-    isincos_gen86(&phase, &os, &oc);
+    isincos_generic(&phase, &os, &oc);
 
     ck_assert_int_eq(os, (int16_t) _mm_extract_epi16(vsin, 0));
     ck_assert_int_eq(os, (int16_t) _mm_extract_epi16(vsin, 1));
@@ -146,7 +146,7 @@ START_TEST(test_isincos_avx2) {
     isincos_avx2(&vph, &vsin, &vcos);
 
     int16_t os, oc;
-    isincos_gen86(&phase, &os, &oc);
+    isincos_generic(&phase, &os, &oc);
 
     ck_assert_int_eq(os, (int16_t) _mm256_extract_epi16(vsin, 0));
     ck_assert_int_eq(os, (int16_t) _mm256_extract_epi16(vsin, 1));
