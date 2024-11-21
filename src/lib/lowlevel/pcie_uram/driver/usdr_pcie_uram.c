@@ -1078,7 +1078,7 @@ static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long sno
             u64 bno = usdrdev->streams[sno]->abuffer_no + i;
             unsigned idx = bno % usdrdev->streams[sno]->dma_buffs;
 
-            dev_err(&usdrdev->pdev->dev, "Buffer_W %ld - %d \n", (long)bno, idx);
+            //dev_err(&usdrdev->pdev->dev, "Buffer_W %ld - %d \n", (long)bno, idx);
             dma_sync_single_for_cpu(&usdrdev->pdev->dev,
                                     usdrdev->streams[sno]->dmab[idx].phys,
                                     usdrdev->streams[sno]->dma_buff_size, DMA_FROM_DEVICE);
@@ -1112,7 +1112,7 @@ static int usdr_stream_release_or_post(struct usdr_dev *usdrdev, unsigned long s
 	    u64 bno = usdrdev->streams[sno]->bbuffer_no++;
 	    unsigned idx = bno % usdrdev->streams[sno]->dma_buffs;
 
-	    dev_err(&usdrdev->pdev->dev, "Buffer_R %ld - %d\n", (long)bno, idx);
+        //dev_err(&usdrdev->pdev->dev, "Buffer_R %ld - %d\n", (long)bno, idx);
 	    dma_sync_single_for_device(&usdrdev->pdev->dev,
                                    usdrdev->streams[sno]->dmab[idx].phys,
                                    usdrdev->streams[sno]->dma_buff_size, DMA_TO_DEVICE);
@@ -1418,7 +1418,7 @@ static long usdrfd_ioctl(struct file *filp,
                 return -EFAULT;
 
         data_max = (sizeof(data) < woaoob.ooblength) ? sizeof(data) : woaoob.ooblength;
-        res = usdr_stream_wait_or_alloc(usdrdev, woaoob.streamnoto, data, &data_max, filp->f_flags & O_NONBLOCK, ioctl_num == PCIE_DRIVER_DMA_WAIT);
+        res = usdr_stream_wait_or_alloc(usdrdev, woaoob.streamnoto, data, &data_max, filp->f_flags & O_NONBLOCK, ioctl_num == PCIE_DRIVER_DMA_WAIT_OOB);
 
         if (copy_to_user(woaoob.oobdata, data, data_max))
             return -EFAULT;
