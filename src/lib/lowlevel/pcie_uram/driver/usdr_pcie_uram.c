@@ -74,6 +74,9 @@ enum device_flags {
     DEV_EXCLUSIVE = 4,
 
     DEV_READY_MASK = DEV_VALID | DEV_INITIALIZED,
+
+    // Do not call DMA sync on fully cache coherent systems (extra optimization)
+    DEV_NO_DMA_SYNC = 16,
 };
 
 struct usdr_dmabuf {
@@ -156,7 +159,7 @@ struct usdr_dev {
 	void __iomem *bar_addr;
 	
 	unsigned devno;
-        unsigned dev_mask;
+    unsigned dev_mask;
 
         struct pcie_driver_devlayout dl;
     
@@ -1070,17 +1073,17 @@ static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long sno
     }
 
     // flush_cache_range(vma, start, end);
-    if (op_wait) {
-	for (i = 0; i < cnt; i++) {
-	    u64 bno = usdrdev->streams[sno]->abuffer_no + i;
-	    unsigned idx = bno % usdrdev->streams[sno]->dma_buffs;
+    if (op_wait && ((usdrdev->dev_mask & DEV_NO_DMA_SYNC) == 0)) {
+        for (i = 0; i < cnt; i++) {
+            u64 bno = usdrdev->streams[sno]->abuffer_no + i;
+            unsigned idx = bno % usdrdev->streams[sno]->dma_buffs;
 
-	    dev_err(&usdrdev->pdev->dev, "Buffer_W %ld - %d \n", (long)bno, idx);
-	    dma_sync_single_for_cpu(&usdrdev->pdev->dev,
+            dev_err(&usdrdev->pdev->dev, "Buffer_W %ld - %d \n", (long)bno, idx);
+            dma_sync_single_for_cpu(&usdrdev->pdev->dev,
                                     usdrdev->streams[sno]->dmab[idx].phys,
                                     usdrdev->streams[sno]->dma_buff_size, DMA_FROM_DEVICE);
-	}
-	usdrdev->streams[sno]->abuffer_no += cnt;
+        }
+        usdrdev->streams[sno]->abuffer_no += cnt;
     }
 
     //dma_sync_single_for_cpu()
@@ -1105,14 +1108,14 @@ static int usdr_stream_release_or_post(struct usdr_dev *usdrdev, unsigned long s
     if (res)
         return res;
 
-    if (op_release) {
+    if (op_release && ((usdrdev->dev_mask & DEV_NO_DMA_SYNC) == 0)) {
 	    u64 bno = usdrdev->streams[sno]->bbuffer_no++;
 	    unsigned idx = bno % usdrdev->streams[sno]->dma_buffs;
 
 	    dev_err(&usdrdev->pdev->dev, "Buffer_R %ld - %d\n", (long)bno, idx);
 	    dma_sync_single_for_device(&usdrdev->pdev->dev,
-                                       usdrdev->streams[sno]->dmab[idx].phys,
-                                       usdrdev->streams[sno]->dma_buff_size, DMA_TO_DEVICE);
+                                   usdrdev->streams[sno]->dmab[idx].phys,
+                                   usdrdev->streams[sno]->dma_buff_size, DMA_TO_DEVICE);
     }
 
     cnfbase = usdrdev->dl.stream_cnf_base[sno];
@@ -1178,6 +1181,10 @@ static long usdrfd_ioctl(struct file *filp,
         return 0;
 
     case PCIE_DRIVER_CLAIM:
+
+        // Reset I2C cache state
+        memset(usdrdev->i2cc, 0, sizeof(usdrdev->i2cc));
+        memset(usdrdev->i2clut, 0, sizeof(usdrdev->i2clut));
         return 0;
 
     case PCIE_DRIVER_SET_DEVLAYOUT:
@@ -1191,6 +1198,9 @@ static long usdrfd_ioctl(struct file *filp,
                     return res;
 
             usdrdev->dev_mask |= DEV_INITIALIZED;
+#ifdef CONFIG_X86
+            usdrdev->dev_mask |= DEV_NO_DMA_SYNC;
+#endif
         }
         return 0;
     case PCIE_DRIVER_HWREG_RD32: {
@@ -1317,15 +1327,14 @@ static long usdrfd_ioctl(struct file *filp,
 
         base = usdrdev->dl.i2c_base[i2cinst];
         irq = usdrdev->dl.i2c_int_number[i2cinst];
+
+        // TODO: Protect i2cc structure
         idx = si2c_update_lut_idx(&usdrdev->i2cc[4 * i2cinst], i2caddr, i2cbus);
         lut = si2c_get_lut(&usdrdev->i2cc[4 * i2cinst]);
         res = si2c_make_ctrl_reg(idx, si2c.wrb, si2c.wcnt, si2c.rcnt, &cmd);
         if (res) {
             return res;
         }
-
-        DEBUG_DEV_OUT(&usdrdev->pdev->dev, "I2C[%d.%d.%02x] W:%d,R:%d,CMD:%08x,LUT:%08x\n",
-                      i2cinst, i2cbus, i2caddr, si2c.wcnt, si2c.rcnt, cmd, lut);
 
         if (usdrdev->i2clut[i2cinst] == lut) {
             usdr_reg_wr32(usdrdev, base, cmd);
@@ -1335,6 +1344,9 @@ static long usdrfd_ioctl(struct file *filp,
             usdr_reg_wr64(usdrdev, base - 1, cmd_lut);
             usdrdev->i2clut[i2cinst] = lut;
         }
+
+        DEBUG_DEV_OUT(&usdrdev->pdev->dev, "I2C[%d.%d.%02x] W:%d,R:%d,CMD:%08x,LUT:%08x\n",
+                      i2cinst, i2cbus, i2caddr, si2c.wcnt, si2c.rcnt, cmd, lut);
 
         if (si2c.rcnt > 0) {
             unsigned dout, cnt;
