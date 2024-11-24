@@ -142,21 +142,11 @@ static int _configure_cfftlpwri16(lldev_t dev,
 
     unsigned fft_size = 512; // Assume FFT512 as a default frame size
     unsigned bps = 16;
-
-    if (psc->spburst % fft_size) {
-        USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: For this DSP function burst size should be multiple of %d!\n",
-                 fft_size);
-    }
-
     unsigned bwords = (bps * psc->spburst + 63) / 64;
     if (bwords == 0) {
         return -EINVAL;
     }
-
     unsigned bursts = psc->burstspblk;
-    if (bursts != 0 && bursts != 1)
-        return -EINVAL;
-
     unsigned samplerperbursts = psc->spburst;
     unsigned fifo_capacity = cfg_fifomaxbytes / (bwords * 8);
 
@@ -166,7 +156,57 @@ static int _configure_cfftlpwri16(lldev_t dev,
         return -EINVAL;
     }
 
-    bursts = 1;
+    if (bursts == 0) {
+        for (bursts = 1; bursts <= MAX_BURSTS_IN_BUFF; bursts++) {
+            if (bwords % bursts)
+                continue;
+
+            if (samplerperbursts % bursts)
+                continue;
+
+            if ((samplerperbursts / bursts) % fft_size)
+                continue;
+
+            fifo_capacity = cfg_fifomaxbytes / ((bwords / bursts) * 8);
+            if (fifo_capacity <= 1)
+                continue;
+
+            if ((samplerperbursts / bursts) > (1u << IPBLK_PARAM_BWORDS))
+                continue;
+
+            if ((bwords / bursts) <= (1u << SFE_CMD_BF_BWORDS_WIDTH))
+                break;
+
+            // Current implementation limits maximum burst size
+            if ((samplerperbursts / bursts) * bps / 8 > (cfg_fifomaxbytes / 3))
+                continue;
+        }
+
+        if (bursts > MAX_BURSTS_IN_BUFF) {
+            USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: %d samples @%s can't be represented with any burst count, capacity %d (FIFO is %d)!\n",
+                     psc->spburst, psc->sfmt, fifo_capacity, cfg_fifomaxbytes);
+            return -EINVAL;
+        }
+
+        bwords /= bursts;
+        samplerperbursts /= bursts;
+    } else {
+        //check snity
+        if (bursts > MAX_BURSTS_IN_BUFF)
+            return -EINVAL;
+        if (samplerperbursts > (1u << IPBLK_PARAM_BWORDS))
+            return -EINVAL;
+        if (bwords > (1u << SFE_CMD_BF_BWORDS_WIDTH))
+            return -EINVAL;
+    }
+
+    if (samplerperbursts % fft_size) {
+        USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: For this DSP function burst size should be multiple of %d, requested %d x %d!\n",
+                 fft_size, samplerperbursts, bursts);
+        return -EINVAL;
+    }
+
+
     USDR_LOG("STRM", USDR_LOG_INFO, "SFERX4: Stream FFT%d configured in %d words (%d samples) X %d bursts (%d bits per sym); fifo capacity %d (FMT:%x)\n",
              fft_size, bwords, samplerperbursts, bursts, bps, fifo_capacity, 1);
 
