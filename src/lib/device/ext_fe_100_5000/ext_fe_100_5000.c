@@ -219,7 +219,8 @@ int max2871_band_sel(unsigned freq_khz, max2871_corr_t* corr)
     else if (freq_khz >= 93750)   { rfc = 0; rf_div = 32; reg4 = (0x60850424 | (5<<20) | (3<<3)); } // Att-0dB,    Reg4 APwr=3,DIVA=32,MTLD=1
     else return -EINVAL;
 
-    modls = F_PFD_KHZ / (rf_div * F_STEP_KHZ);                    // 20000/(2*10)=1000
+    // TODO estimate inacuracy to compensate in NCO later!!!
+    modls = 4095; // F_PFD_KHZ / (rf_div * F_STEP_KHZ);                    // 20000/(2*10)=1000
     f_vco = freq_khz * F_STEP_KHZ * rf_div;                     // 234567*10*2=4691340 [Hz]
     intgr = f_vco / F_PFD_KHZ;                                    // 4691340/20000=234 {234,567}
     fract = ((f_vco - intgr * F_PFD_KHZ) * modls) / F_PFD_KHZ;    // ((4691340-234*20000)*1000)/20000=567
