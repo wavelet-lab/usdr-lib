@@ -2,7 +2,7 @@ version: '3'
 
 tasks:
 
-  buildbox:
+  run:
     internal: true
     interactive: true
     env:
@@ -10,85 +10,104 @@ tasks:
       DEBIAN_FRONTEND: "noninteractive"
     cmds:
       - docker build --platform {{.PLATFORM}} -t {{.DOCKER_IMAGE}} -f {{.DOCKER_FILE}} .
-      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work/work -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml -v ~/.gnupg:/mnt/gnupg {{.DOCKER_IMAGE}}
-      - docker exec -ti $(docker ps -lq) /bin/bash
+      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work/source:ro -v $(pwd)/output:/work/output -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml:ro -v ~/.gnupg:/mnt/gnupg:ro {{.DOCKER_IMAGE}}
+      - silent: true
+        cmd: |
+          if ! [ -n "{{.INTERACTIVE}}" ]; then
+            CMD="{{.COMMAND}}"
+          else
+            echo "==> Starting interactive mode!"
+            CMD="/bin/bash"
+          fi
+          
+          docker exec -ti $(docker ps -lq) ${CMD}
 
   ubuntu1804-amd64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/amd64
           DOCKER_IMAGE: buildbox-ubuntu1804-amd64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu1804
+          COMMAND: task deb-ubuntu-bionic
 
   ubuntu2004-amd64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/amd64
           DOCKER_IMAGE: buildbox-ubuntu2004-amd64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2004
+          COMMAND: task deb-ubuntu
 
   ubuntu2204-amd64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/amd64
           DOCKER_IMAGE: buildbox-ubuntu2204-amd64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2204
+          COMMAND: task deb-ubuntu
 
   ubuntu2404-amd64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/amd64
           DOCKER_IMAGE: buildbox-ubuntu2404-amd64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2404
+          COMMAND: task deb-ubuntu
 
   debian12-amd64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/amd64
           DOCKER_IMAGE: buildbox-debian12-amd64
           DOCKER_FILE: docker/Dockerfile.buildbox.debian12
+          COMMAND: task deb-debian-bookworm
 
   ubuntu1804-aarch64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/arm64
           DOCKER_IMAGE: buildbox-ubuntu1804-aarch64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu1804
+          COMMAND: task deb-ubuntu-bionic
 
   ubuntu2004-aarch64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/arm64
           DOCKER_IMAGE: buildbox-ubuntu2004-aarch64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2004
+          COMMAND: task deb-ubuntu
 
   ubuntu2204-aarch64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/arm64
           DOCKER_IMAGE: buildbox-ubuntu2204-aarch64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2204
+          COMMAND: task deb-ubuntu
 
   ubuntu2404-aarch64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/arm64
           DOCKER_IMAGE: buildbox-ubuntu2404-aarch64
           DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2404
+          COMMAND: task deb-ubuntu
 
   debian12-aarch64:
     cmds:
-      - task: buildbox
+      - task: run
         vars:
           PLATFORM: linux/arm64
           DOCKER_IMAGE: buildbox-debian12-aarch64
           DOCKER_FILE: docker/Dockerfile.buildbox.debian12
+          COMMAND: task deb-debian-bookworm

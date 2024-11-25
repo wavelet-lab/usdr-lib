@@ -1,53 +1,55 @@
 version: '3'
 
 tasks:
+
+  clean:
+    desc: Clean the build environment
+    cmds:
+      - rm -rf /work/build
+      - rm -rf /work/output/*
+      - mkdir -p /work/build
+
+  deb:
+    desc: Build the debian packages
+    internal: true
+    deps:
+      - clean
+    dir: /work/build/source
+    cmds:
+      - cp -ra /work/source /work/build/
+      - ln -s packaging/{{.FOLDER}} debian
+      - debuild -us -uc -eDH_VERBOSE=1
+      - cp -ra /work/build/*.deb /work/output/
+
   deb-ubuntu:
     desc: Build the debian packages for Ubuntu
-    dir: /work/work
     cmds:
-      - rm -f debian
-      - ln -s packaging/ubuntu debian
-      - debuild -us -uc -eDH_VERBOSE=1
+      - task: deb
+        vars:
+          FOLDER: ubuntu
 
   deb-ubuntu-bionic:
     desc: Build the debian packages for Ubuntu Bionic(18.04)
-    dir: /work/work
     cmds:
-      - rm -f debian
-      - ln -s packaging/ubuntu-bionic debian
-      - debuild -us -uc -eDH_VERBOSE=1
+      - task: deb
+        vars:
+          FOLDER: ubuntu-bionic
 
   deb-debian-bookworm:
     desc: Build the debian packages for Debian Bookworm(12)
-    dir: /work/work
     cmds:
-      - rm -f debian
-      - ln -s packaging/debian-bookworm debian
-      - debuild -us -uc -eDH_VERBOSE=1
-
-  deb-clean:
-    desc: Cleans after the debian package build
-    cmds:
-      - rm -f /work/*.deb /work/*.ddeb /work/*.dsc /work/*.changes /work/*.tar.gz /work/*.build /work/*.buildinfo
-      - rm -rf /work/work/debian
-      - rm -rf /work/work/obj-*
-
-  build:
-    desc: Build the project
-    preconditions:
-      - test -d /work/build
-    dir: /work/build
-    cmds:
-      - rm -rf /work/build/.*
-      - rm -rf /work/build/*
-      - cmake /work/work/src
-      - make VERBOSE=1
+      - task: deb
+        vars:
+          FOLDER: debian-bookworm
 
   ppa:
     desc: Upload the debian package to the ppa
+    deps:
+      - clean
     preconditions:
       - test -d /mnt/gnupg
       - test -d debian/
+    dir: /work/build/source
     cmds:
       - rm -rf /root/.gnupg
       - cp -ra /mnt/gnupg /root/.gnupg 2>/dev/null | true
