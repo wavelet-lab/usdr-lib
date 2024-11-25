@@ -2,10 +2,14 @@ version: '3'
 
 includes:
 
-  buildbox:
-    taskfile: ./Taskfile.buildbox.yaml
+  box:
+    taskfile: ./Taskfile.box.yaml
     optional: true
 
-  d:
-    taskfile: /Taskfile.yaml
-    optional: true
+tasks:
+
+  clean:
+    desc: Clean the build environment
+    cmds:
+      - rm -rf /work/build
+      - rm -rf /work/output/*
