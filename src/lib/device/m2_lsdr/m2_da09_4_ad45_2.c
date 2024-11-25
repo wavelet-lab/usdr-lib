@@ -142,6 +142,11 @@ static int dev_m2_d09_4_ad45_2_dummy(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
     return 0;
 }
 
+static int dev_m2_d09_4_ad45_2_sdr_fe_lo1(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_d09_4_ad45_2_sdr_fe_lo2(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_d09_4_ad45_2_sdr_fe_ifsel(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_d09_4_ad45_2_sdr_fe_band(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static
 const usdr_dev_param_func_t s_fparams_m2_da09_4_ad45_2_rev000[] = {
     { "/dm/rate/master",        { dev_m2_d09_4_ad45_2_rate_set, NULL }},
@@ -167,6 +172,11 @@ const usdr_dev_param_func_t s_fparams_m2_da09_4_ad45_2_rev000[] = {
     { "/debug/lldev",     { NULL, dev_m2_d09_4_ad45_2_debug_lldev_get}},
     { "/dm/sdr/refclk/path", { dev_m2_d09_4_ad45_2_dummy, NULL}},
     { "/debug/clk_info",  { dev_m2_d09_4_ad45_2_debug_clk_info, NULL }},
+
+    { "/dm/sdr/0/fe/lo1",      { dev_m2_d09_4_ad45_2_sdr_fe_lo1, NULL }},
+    { "/dm/sdr/0/fe/lo2",      { dev_m2_d09_4_ad45_2_sdr_fe_lo2, NULL }},
+    { "/dm/sdr/0/fe/ifsel",    { dev_m2_d09_4_ad45_2_sdr_fe_ifsel, NULL }},
+    { "/dm/sdr/0/fe/band",     { dev_m2_d09_4_ad45_2_sdr_fe_band, NULL }},
 };
 
 struct dev_m2_d09_4_ad45_2 {
@@ -187,6 +197,12 @@ struct dev_m2_d09_4_ad45_2 {
     uint8_t active_adc; //Enabled ADCs
     stream_handle_t* rx;
     stream_handle_t* tx;
+
+    // fe
+    uint64_t fe_lo1_khz;
+    uint64_t fe_lo2_khz;
+    unsigned fe_ifsel;
+    unsigned fe_band;
 };
 
 enum dev_gpi {
@@ -625,6 +641,50 @@ static int dev_m2_d09_4_ad45_2_pga(struct dev_m2_d09_4_ad45_2 *d, unsigned value
 }
 
 
+int dev_m2_d09_4_ad45_2_sdr_fe_lo1(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+    ext_fe_100_5000_t* f;
+    if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
+        d->fe_lo1_khz = value / 1000;
+        return ext_fe_100_5000_rf_manual(f, d->fe_lo1_khz, d->fe_lo2_khz, d->fe_band, d->fe_ifsel);
+    }
+    return -EINVAL;
+}
+int dev_m2_d09_4_ad45_2_sdr_fe_lo2(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+    ext_fe_100_5000_t* f;
+    if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
+        d->fe_lo2_khz = value / 1000;
+        return ext_fe_100_5000_rf_manual(f, d->fe_lo1_khz, d->fe_lo2_khz, d->fe_band, d->fe_ifsel);
+    }
+    return -EINVAL;
+}
+
+int dev_m2_d09_4_ad45_2_sdr_fe_ifsel(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+    ext_fe_100_5000_t* f;
+    if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
+        d->fe_ifsel = value;
+        return ext_fe_100_5000_rf_manual(f, d->fe_lo1_khz, d->fe_lo2_khz, d->fe_band, d->fe_ifsel);
+    }
+    return -EINVAL;
+}
+
+int dev_m2_d09_4_ad45_2_sdr_fe_band(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+    ext_fe_100_5000_t* f;
+    if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
+        d->fe_band = value;
+        return ext_fe_100_5000_rf_manual(f, d->fe_lo1_khz, d->fe_lo2_khz, d->fe_band, d->fe_ifsel);
+    }
+    return -EINVAL;
+}
+
+
 int dev_m2_d09_4_ad45_2_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
@@ -642,6 +702,8 @@ int dev_m2_d09_4_ad45_2_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint6
 int dev_m2_d09_4_ad45_2_gainpga_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
+
+    USDR_LOG("LSDR", USDR_LOG_ERROR, "GainPGA: %d\n", (unsigned)value);
     return dev_m2_d09_4_ad45_2_pga(d, value);
 }
 
@@ -663,6 +725,7 @@ int dev_m2_d09_4_ad45_2_gainlna_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, ui
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)ud;
     ext_fe_100_5000_t* f;
     if ((f = (ext_fe_100_5000_t*)device_fe_to(d->fe, "fe1005000"))) {
+        USDR_LOG("LSDR", USDR_LOG_ERROR, "GainLNA: %d\n", (unsigned)value);
         return ext_fe_100_5000_set_lna(f, value);
     } else {
         return -EINVAL;
@@ -1072,9 +1135,12 @@ int usdr_device_m2_d09_4_ad45_2_unregister_stream(device_t* dev, stream_handle_t
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)dev;
     if (stream == d->rx) {
+        d->rx->ops->destroy(d->rx);
         d->rx = NULL;
+    } else {
+        return -EINVAL;
     }
-    return -EINVAL;
+    return 0;
 }
 
 static
@@ -1105,8 +1171,14 @@ int usdr_device_m2_d09_4_ad45_2_create(lldev_t dev, device_id_t devid)
     d->base.unregister_stream = &usdr_device_m2_d09_4_ad45_2_unregister_stream;
     d->base.timer_op = &sfetrx4_stream_sync;
     d->active_adc = 0;
+    d->decim = 2;
     d->rx = NULL;
     d->tx = NULL;
+
+    d->fe_lo1_khz = 0;
+    d->fe_lo2_khz = 0;
+    d->fe_ifsel = 0;
+    d->fe_band = 0;
 
     dev->pdev = &d->base;
     return 0;

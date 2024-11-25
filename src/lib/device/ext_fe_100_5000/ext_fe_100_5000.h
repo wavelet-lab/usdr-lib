@@ -57,4 +57,7 @@ int ext_fe_100_5000_set_attenuator(ext_fe_100_5000_t* ob, unsigned atten0_25db);
 int ext_fe_100_5000_set_lna(ext_fe_100_5000_t* ob, unsigned lna);
 
 
+int ext_fe_100_5000_rf_manual(ext_fe_100_5000_t* ob, uint64_t lo1_freq_khz, uint64_t lo2_freq_khz, unsigned band, unsigned ifsel);
+
+
 #endif

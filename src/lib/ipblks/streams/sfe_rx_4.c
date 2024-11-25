@@ -178,8 +178,8 @@ static int _configure_cfftlpwri16(lldev_t dev,
                 break;
 
             // Current implementation limits maximum burst size
-            if ((samplerperbursts / bursts) * bps / 8 > (cfg_fifomaxbytes / 3))
-                continue;
+            // if ((samplerperbursts / bursts) * bps / 8 > (cfg_fifomaxbytes / 3))
+            //     continue;
         }
 
         if (bursts > MAX_BURSTS_IN_BUFF) {
