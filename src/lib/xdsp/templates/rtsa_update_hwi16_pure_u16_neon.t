@@ -49,8 +49,10 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     for (unsigned i = diap.from; i < diap.to; i += 16)
     {
-        uint16x8_t s0 = vld1q_u16(&in[i + 0]);
-        uint16x8_t s1 = vld1q_u16(&in[i + 8]);
+        const unsigned k = i - diap.from;
+
+        uint16x8_t s0 = vld1q_u16(&in[k + 0]);
+        uint16x8_t s1 = vld1q_u16(&in[k + 8]);
 
         uint16x8_t p0 = vmulq_n_u16(vshlq_u16(vsubq_u16(s0, v_c0), shr0), hwi16_consts->org_scale);
                    p0 = vabdq_u16(vshlq_u16(p0, shr1), v_c1);

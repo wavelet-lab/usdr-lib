@@ -56,10 +56,12 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
 
     for (unsigned i = diap.from; i < diap.to; i += 64)
     {
-        __m256i s0 = _mm256_load_si256((__m256i*)&in[i +  0]);
-        __m256i s1 = _mm256_load_si256((__m256i*)&in[i + 16]);
-        __m256i s2 = _mm256_load_si256((__m256i*)&in[i + 32]);
-        __m256i s3 = _mm256_load_si256((__m256i*)&in[i + 48]);
+        const unsigned k = i - diap.from;
+
+        __m256i s0 = _mm256_load_si256((__m256i*)&in[k +  0]);
+        __m256i s1 = _mm256_load_si256((__m256i*)&in[k + 16]);
+        __m256i s2 = _mm256_load_si256((__m256i*)&in[k + 32]);
+        __m256i s3 = _mm256_load_si256((__m256i*)&in[k + 48]);
 
         __m256i p0 = _mm256_mullo_epi16(_mm256_srl_epi16(_mm256_subs_epu16(s0, v_c0), shr0), v_scale);
                 p0 = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_srl_epi16(p0, shr1), v_c1));

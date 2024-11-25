@@ -27,10 +27,11 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
 
     for(unsigned i = diap.from; i < diap.to; ++i)
     {
+        const unsigned k = i - diap.from;
 #ifdef USE_POLYLOG2
-        float p = fcale_mpy * wvlt_polylog2f(in[i][0]*in[i][0] + in[i][1]*in[i][1] + mine) + corr;
+        float p = fcale_mpy * wvlt_polylog2f(in[k][0]*in[k][0] + in[k][1]*in[k][1] + mine) + corr;
 #else
-        float p = fcale_mpy * wvlt_fastlog2(in[i][0]*in[i][0] + in[i][1]*in[i][1] + mine) + corr;
+        float p = fcale_mpy * wvlt_fastlog2(in[k][0]*in[k][0] + in[k][1]*in[k][1] + mine) + corr;
 #endif
         p -= st->upper_pwr_bound;
         p = fabs(p);
