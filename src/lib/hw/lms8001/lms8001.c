@@ -967,6 +967,8 @@ int lms8001_smart_tune(lms8001_state_t* m, unsigned tune_flags, uint64_t flo, in
         return res;
 
     // Setup (enable or disable) quadrature generation
+    SET_LMS8001_PLL_PROFILE_0_PLL_LODIST_CFG_N_PLL_LODIST_EN_OUT_n(curr->LODIST_CFG, m->chan_mask);
+
     SET_LMS8001_PLL_PROFILE_0_PLL_LODIST_CFG_N_PLL_LODIST_FSP_OUT0_FQD_n(curr->LODIST_CFG, iq_gen ? 0 : 1);
     SET_LMS8001_PLL_PROFILE_0_PLL_LODIST_CFG_N_PLL_LODIST_FSP_OUT1_FQD_n(curr->LODIST_CFG, iq_gen ? 0 : 1);
     SET_LMS8001_PLL_PROFILE_0_PLL_LODIST_CFG_N_PLL_LODIST_FSP_OUT2_FQD_n(curr->LODIST_CFG, iq_gen ? 0 : 1);
