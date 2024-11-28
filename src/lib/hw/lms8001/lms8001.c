@@ -872,7 +872,7 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
 
     // Check LO range (that was inside setLOFREQ)
     res = (res) ? res : _lms8001_check_lo_range(flo, iq_gen);
-    res = (res) ? res : _lms8001_calc_vco(flo, &pll_s);
+    res = (res) ? res : _lms8001_calc_vco(iq_gen ? (flo << 1) : flo, &pll_s);
     if (res) {
         return res;
     }
@@ -952,7 +952,7 @@ int lms8001_smart_tune(lms8001_state_t* m, unsigned tune_flags, uint64_t flo, in
     int res;
 
     // Set IQ gen for freq < 520 Mhz
-    if (flo < LMS8_MIN_IQ) {
+    if (flo < LMS8_MIN_NIQ) {
         tune_flags |= LMS8001_IQ_GEN;
     }
 
