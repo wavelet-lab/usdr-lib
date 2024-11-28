@@ -407,7 +407,7 @@ static int _lms8001_vco_tune(lms8001_state_t* m, uint64_t fvco, int fref, uint32
     int VCO_sel_final_val =  GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_VCO_SEL_FINAL_VAL(rb);
     int freq_sel_final_val = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_FREQ_FINAL_VAL(rb);
 
-    int VCO_final = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_FREQ_FINAL(rb);
+    int VCO_final = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_VCO_SEL_FINAL(rb);
     int freq_final = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_FREQ_FINAL(rb);
 
     if ((FCAL_start == 0) && (VCO_sel_final_val == 1) && (freq_sel_final_val == 1)) {
