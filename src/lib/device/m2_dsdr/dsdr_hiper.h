@@ -27,7 +27,14 @@ struct dsdr_hiper_fe {
     uint32_t ref_gps_osc;
 
 
-
+    // LMS8001 smart tune parameter
+    uint32_t lms8st_loopbw;
+    uint32_t lms8st_phasemargin;
+    uint32_t lms8st_bwef_1000;
+    uint32_t lms8st_flock_n;
+    uint32_t lms8st_iq_gen;
+    uint32_t lms8st_int_mod;
+    uint32_t lms8st_enabled;
     // High level control
 
 };

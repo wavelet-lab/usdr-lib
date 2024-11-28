@@ -5374,6 +5374,25 @@ pages:
             mode: RW
             dflt: 0b000000
             desc: Charge pump offset (bleeding) current used during fast lock.
+      - addr: 0x410e
+        name: PLL_FLOCK_CFG3_n
+        fields:
+          - bits: '14:11'
+            name: FLOCK_LODIST_EN_OUT_n
+            mode: RW
+            dflt: 0b0000
+            desc: LO distribution enable signals used during fast lock.
+          - bits: '10'
+            name: FLOCK_VCO_SPDUP_n
+            mode: RW
+            dflt: 0b0
+            desc: VCO speedup used during fast lock.
+          - bits: '9:0'
+            name: FLOCK_N_n
+            mode: RW
+            dflt: 0b0110010000
+            desc: Duration of fast lock in PLL reference frequency clock cycles
+
   - name: PLL_PROFILE_1
     regs:
       - addr: 0x4110
@@ -5808,6 +5827,25 @@ pages:
             mode: RW
             dflt: 0b000000
             desc: Charge pump offset (bleeding) current used during fast lock.
+      - addr: 0x411e
+        name: PLL_FLOCK_CFG3_n
+        fields:
+          - bits: '14:11'
+            name: FLOCK_LODIST_EN_OUT_n
+            mode: RW
+            dflt: 0b0000
+            desc: LO distribution enable signals used during fast lock.
+          - bits: '10'
+            name: FLOCK_VCO_SPDUP_n
+            mode: RW
+            dflt: 0b0
+            desc: VCO speedup used during fast lock.
+          - bits: '9:0'
+            name: FLOCK_N_n
+            mode: RW
+            dflt: 0b0110010000
+            desc: Duration of fast lock in PLL reference frequency clock cycles.
+
   - name: PLL_PROFILE_2
     regs:
       - addr: 0x4120
@@ -6242,6 +6280,24 @@ pages:
             mode: RW
             dflt: 0b000000
             desc: Charge pump offset (bleeding) current used during fast lock.
+      - addr: 0x412e
+        name: PLL_FLOCK_CFG3_n
+        fields:
+          - bits: '14:11'
+            name: FLOCK_LODIST_EN_OUT_n
+            mode: RW
+            dflt: 0b0000
+            desc: LO distribution enable signals used during fast lock.
+          - bits: '10'
+            name: FLOCK_VCO_SPDUP_n
+            mode: RW
+            dflt: 0b0
+            desc: VCO speedup used during fast lock.
+          - bits: '9:0'
+            name: FLOCK_N_n
+            mode: RW
+            dflt: 0b0110010000
+            desc: Duration of fast lock in PLL reference frequency clock cycles.
   - name: PLL_PROFILE_3
     regs:
       - addr: 0x4130
@@ -6676,6 +6732,24 @@ pages:
             mode: RW
             dflt: 0b000000
             desc: Charge pump offset (bleeding) current used during fast lock.
+      - addr: 0x413e
+        name: PLL_FLOCK_CFG3_n
+        fields:
+          - bits: '14:11'
+            name: FLOCK_LODIST_EN_OUT_n
+            mode: RW
+            dflt: 0b0000
+            desc: LO distribution enable signals used during fast lock.
+          - bits: '10'
+            name: FLOCK_VCO_SPDUP_n
+            mode: RW
+            dflt: 0b0
+            desc: VCO speedup used during fast lock.
+          - bits: '9:0'
+            name: FLOCK_N_n
+            mode: RW
+            dflt: 0b0110010000
+            desc: Duration of fast lock in PLL reference frequency clock cycles.
   - name: PLL_PROFILE_4
     regs:
       - addr: 0x4140
@@ -7110,6 +7184,24 @@ pages:
             mode: RW
             dflt: 0b000000
             desc: Charge pump offset (bleeding) current used during fast lock.
+      - addr: 0x414e
+        name: PLL_FLOCK_CFG3_n
+        fields:
+          - bits: '14:11'
+            name: FLOCK_LODIST_EN_OUT_n
+            mode: RW
+            dflt: 0b0000
+            desc: LO distribution enable signals used during fast lock.
+          - bits: '10'
+            name: FLOCK_VCO_SPDUP_n
+            mode: RW
+            dflt: 0b0
+            desc: VCO speedup used during fast lock.
+          - bits: '9:0'
+            name: FLOCK_N_n
+            mode: RW
+            dflt: 0b0110010000
+            desc: Duration of fast lock in PLL reference frequency clock cycles.
   - name: PLL_PROFILE_5
     regs:
       - addr: 0x4150
@@ -7544,6 +7636,24 @@ pages:
             mode: RW
             dflt: 0b000000
             desc: Charge pump offset (bleeding) current used during fast lock.
+      - addr: 0x415e
+        name: PLL_FLOCK_CFG3_n
+        fields:
+          - bits: '14:11'
+            name: FLOCK_LODIST_EN_OUT_n
+            mode: RW
+            dflt: 0b0000
+            desc: LO distribution enable signals used during fast lock.
+          - bits: '10'
+            name: FLOCK_VCO_SPDUP_n
+            mode: RW
+            dflt: 0b0
+            desc: VCO speedup used during fast lock.
+          - bits: '9:0'
+            name: FLOCK_N_n
+            mode: RW
+            dflt: 0b0110010000
+            desc: Duration of fast lock in PLL reference frequency clock cycles.
   - name: PLL_PROFILE_6
     regs:
       - addr: 0x4160
@@ -7978,3 +8088,21 @@ pages:
             mode: RW
             dflt: 0b000000
             desc: Charge pump offset (bleeding) current used during fast lock.
+      - addr: 0x416e
+        name: PLL_FLOCK_CFG3_n
+        fields:
+          - bits: '14:11'
+            name: FLOCK_LODIST_EN_OUT_n
+            mode: RW
+            dflt: 0b0000
+            desc: LO distribution enable signals used during fast lock.
+          - bits: '10'
+            name: FLOCK_VCO_SPDUP_n
+            mode: RW
+            dflt: 0b0
+            desc: VCO speedup used during fast lock.
+          - bits: '9:0'
+            name: FLOCK_N_n
+            mode: RW
+            dflt: 0b0110010000
+            desc: Duration of fast lock in PLL reference frequency clock cycles.

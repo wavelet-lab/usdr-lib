@@ -148,6 +148,22 @@ static int dsdr_hiper_dacvctcxo_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t*
 static int dsdr_hiper_adf4002b_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dsdr_hiper_adf4002b_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
+
+static int dsdr_hiper_lms8001_smart_tune_loopbw_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_smart_tune_loopbw_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_smart_tune_phasemargin_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_smart_tune_phasemargin_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_smart_tune_bwef_1000_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_smart_tune_bwef_1000_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_smart_tune_flock_n_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_smart_tune_flock_n_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_smart_tune_iq_gen_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_smart_tune_iq_gen_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_smart_tune_int_mod_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_smart_tune_int_mod_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dsdr_hiper_lms8001_smart_tune_enabled_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_lms8001_smart_tune_enabled_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
 static const usdr_dev_param_func_t s_fe_parameters[] = {
     { "/debug/hw/lms8001/0/reg" ,  { dsdr_hiper_debug_lms8001_u1_reg_set, dsdr_hiper_debug_lms8001_u1_reg_get }},
     { "/debug/hw/lms8001/1/reg" ,  { dsdr_hiper_debug_lms8001_u2_reg_set, dsdr_hiper_debug_lms8001_u2_reg_get }},
@@ -162,6 +178,14 @@ static const usdr_dev_param_func_t s_fe_parameters[] = {
     { "/dm/sensor/temp1",          { NULL, dsdr_hiper_sens0temp_get }},
     { "/dm/sensor/temp2",          { NULL, dsdr_hiper_sens1temp_get }},
     { "/dm/sensor/temp3",          { NULL, dsdr_hiper_sens2temp_get }},
+
+    { "/dm/sdr/0/smart_tune/loopbw", { dsdr_hiper_lms8001_smart_tune_loopbw_set, dsdr_hiper_lms8001_smart_tune_loopbw_get }},
+    { "/dm/sdr/0/smart_tune/phasemargin", { dsdr_hiper_lms8001_smart_tune_phasemargin_set, dsdr_hiper_lms8001_smart_tune_phasemargin_get }},
+    { "/dm/sdr/0/smart_tune/bwef_1000", { dsdr_hiper_lms8001_smart_tune_bwef_1000_set, dsdr_hiper_lms8001_smart_tune_bwef_1000_get }},
+    { "/dm/sdr/0/smart_tune/flock_n", { dsdr_hiper_lms8001_smart_tune_flock_n_set, dsdr_hiper_lms8001_smart_tune_flock_n_get }},
+    { "/dm/sdr/0/smart_tune/iq_gen", { dsdr_hiper_lms8001_smart_tune_iq_gen_set, dsdr_hiper_lms8001_smart_tune_iq_gen_get }},
+    { "/dm/sdr/0/smart_tune/int_mod", { dsdr_hiper_lms8001_smart_tune_int_mod_set, dsdr_hiper_lms8001_smart_tune_int_mod_get }},
+    { "/dm/sdr/0/smart_tune/enabled", { dsdr_hiper_lms8001_smart_tune_enabled_set, dsdr_hiper_lms8001_smart_tune_enabled_get }},
 
     { "/dm/sdr/0/rx/ab_l/freqency", { dsdr_hiper_lms8001_rabl_reg_set, dsdr_hiper_lms8001_rabl_reg_get }},
     { "/dm/sdr/0/rx/cd_l/freqency", { dsdr_hiper_lms8001_rcdl_reg_set, dsdr_hiper_lms8001_rcdl_reg_get }},
@@ -225,11 +249,81 @@ int dsdr_hiper_dacvctcxo_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue
 }
 
 
+int dsdr_hiper_lms8001_smart_tune_loopbw_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    ((dsdr_hiper_fe_t*)obj->object)->lms8st_loopbw = value; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_loopbw_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    *ovalue = ((dsdr_hiper_fe_t*)obj->object)->lms8st_loopbw; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_phasemargin_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    ((dsdr_hiper_fe_t*)obj->object)->lms8st_phasemargin = value; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_phasemargin_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    *ovalue = ((dsdr_hiper_fe_t*)obj->object)->lms8st_phasemargin; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_bwef_1000_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    ((dsdr_hiper_fe_t*)obj->object)->lms8st_bwef_1000 = value; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_bwef_1000_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    *ovalue = ((dsdr_hiper_fe_t*)obj->object)->lms8st_bwef_1000; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_flock_n_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    ((dsdr_hiper_fe_t*)obj->object)->lms8st_flock_n = value; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_flock_n_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    *ovalue = ((dsdr_hiper_fe_t*)obj->object)->lms8st_flock_n; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_iq_gen_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    ((dsdr_hiper_fe_t*)obj->object)->lms8st_iq_gen = value; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_iq_gen_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    *ovalue = ((dsdr_hiper_fe_t*)obj->object)->lms8st_iq_gen; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_int_mod_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    ((dsdr_hiper_fe_t*)obj->object)->lms8st_int_mod = value; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_int_mod_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    *ovalue = ((dsdr_hiper_fe_t*)obj->object)->lms8st_int_mod; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_enabled_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    ((dsdr_hiper_fe_t*)obj->object)->lms8st_enabled = value; return 0;
+}
+int dsdr_hiper_lms8001_smart_tune_enabled_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    *ovalue = ((dsdr_hiper_fe_t*)obj->object)->lms8st_enabled; return 0;
+}
+
+
 static int dsdr_hiper_fe_lms8_set_lo(dsdr_hiper_fe_t* fe, unsigned idx, uint64_t freq)
 {
-    int res = lms8001_tune(&fe->lms8[idx], fe->ref_int_osc, freq);
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_LMS8_%s: [%d] tune to %.3f Mhz result %d\n",
-             s_lms8_names[idx], idx, freq / 1.0e6, res);
+    int res;
+    if (fe->lms8st_enabled) {
+        float bwef = fe->lms8st_bwef_1000 / 1000.0;
+        res = lms8001_smart_tune(&fe->lms8[idx],
+                                     (fe->lms8st_iq_gen > 0 ? LMS8001_IQ_GEN : 0) | (fe->lms8st_int_mod > 0 ? LMS8001_INT_MODE : 0) | LMS8001_SELF_BIAS_XBUF,
+                                     freq, fe->ref_int_osc,
+                                     fe->lms8st_loopbw, fe->lms8st_phasemargin, bwef, fe->lms8st_flock_n);
+
+        USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_LMS8_%s: [%d] smart tune to %.3f Mhz result %d (loopbw=%.3f khz ph=%d bwef=%.2f flock_N=%d)\n",
+                 s_lms8_names[idx], idx, freq / 1.0e6, res,
+                 fe->lms8st_loopbw / 1000.0, fe->lms8st_phasemargin, bwef, fe->lms8st_flock_n);
+    } else {
+        res = lms8001_tune(&fe->lms8[idx], fe->ref_int_osc, freq);
+    }
+
     if (res == 0) {
         fe->lo_lms8_freq[idx] = freq;
     }
@@ -295,8 +389,16 @@ int dsdr_hiper_lms8001_tcd_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* 
 
 static int dsdr_hiper_fe_lms8_reg_set(dsdr_hiper_fe_t* fe, unsigned idx, uint64_t value)
 {
-    uint32_t v = value;
-    int res = lowlevel_spi_tr32(fe->dev, fe->subdev, fe->lms8[idx].lsaddr, v, &fe->debug_lms8001_last[idx]);
+    uint16_t rb = 0xffff;
+    //int res = lowlevel_spi_tr32(fe->dev, fe->subdev, fe->lms8[idx].lsaddr, v, &fe->debug_lms8001_last[idx]);
+
+    int res;
+    if ((value >> 31) & 1) {
+        res = lms8001_reg_set(&fe->lms8[idx], value >> 16, value);
+    } else {
+        res = lms8001_reg_get(&fe->lms8[idx], value >> 16, &rb);
+        fe->debug_lms8001_last[idx] = rb;
+    }
 
     USDR_LOG("HIPR", USDR_LOG_WARNING, "%s: Debug LMS8[%d] REG %08x => %08x\n",
              lowlevel_get_devname(fe->dev), idx, (unsigned)value,
@@ -636,6 +738,14 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
         res = (res) ? res : uart_core_rx_collect(&uc, sizeof(b), b, 2250);
         USDR_LOG("HIPR", USDR_LOG_ERROR, "UART: `%s`\n", b);
     }
+
+    dfe->lms8st_loopbw = 300000;
+    dfe->lms8st_phasemargin = 50;
+    dfe->lms8st_bwef_1000 = 2000;
+    dfe->lms8st_flock_n = 100;
+    dfe->lms8st_iq_gen = 0;
+    dfe->lms8st_int_mod = 0;
+    dfe->lms8st_enabled = 0;
 
     memset(dfe->fe_gpo_regs, 0, sizeof(dfe->fe_gpo_regs));
     USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER front end is ready!\n");
