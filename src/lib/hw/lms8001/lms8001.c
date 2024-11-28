@@ -137,8 +137,9 @@ static lms8001_pll_settings_t _lms8001_calc_pll(uint64_t fvco, unsigned fref, ui
 
 // TODO: Add profile
 int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out)
-{ 
+{
     lms8001_vco_settings_t st;
+    uint16_t rb;
     int res = _lms8001_calc_vco(out, &st);
     if (res)
         return res;
@@ -174,8 +175,11 @@ int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out)
         MAKE_LMS8001_PLL_PROFILE_0_PLL_FRACMODH_n(pll.nfrac >> 16),
 
         // Auto calibration
-        MAKE_LMS8001_PLL_CONFIGURATION_PLL_CFG(1, 1, 0, 1, 1, 0, 0),
-        MAKE_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO1(0, 1, 7, 0),
+        MAKE_LMS8001_PLL_CONFIGURATION_PLL_CFG(0, 3, 0, 1, 1, 0, 0), // Reset PLL
+        MAKE_LMS8001_PLL_CONFIGURATION_PLL_CFG(1, 3, 0, 1, 1, 0, 0), // Calibration ON
+        MAKE_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO1(0, 2, 7, 0),
+        MAKE_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO2(4, 128),
+        MAKE_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO3(250, 5),
 
         // Enable (divider disabled)
         MAKE_LMS8001_PLL_PROFILE_0_PLL_ENABLE_n(1, 0, 1, 1, 1, 1, 1, 1, st.divi == 0 ? 0 : 1, 0, 1, 1, 1),
@@ -187,7 +191,30 @@ int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out)
         MAKE_LMS8001_PLL_PROFILE_0_PLL_LODIST_CFG_n(state->chan_mask, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0),
     };
 
-    res = lms8001_spi_post(state, pll_regs, SIZEOF_ARRAY(pll_regs));
+    res = res ? res : lms8001_spi_post(state, pll_regs, SIZEOF_ARRAY(pll_regs));
+    res = res ? res : usleep(5000);
+    res = res ? res : lms8001_spi_get(state, PLL_CONFIGURATION_PLL_CAL_AUTO0, &rb);
+    if (res)
+        return res;
+
+    int fcst = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_FCAL_START(rb);
+    int vco_sel_v =  GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_VCO_SEL_FINAL_VAL(rb);
+    int freq_sel_v = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_FREQ_FINAL_VAL(rb);
+
+    int cal_vco = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_VCO_SEL_FINAL(rb);
+    int cal_freq = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_FREQ_FINAL(rb);
+
+    if (!(fcst == 0 && vco_sel_v == 1 && freq_sel_v == 1)) {
+        USDR_LOG("8001", USDR_LOG_ERROR, "Can't perform VCO autocalibration! VCO = %.3f Mhz REF = %.3f Mhz\n", st.fvco / 1.0e6, fref / 1.0e6);
+        return -ERANGE;
+    }
+
+    uint32_t pll_regs2[] = {
+        MAKE_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_n(0, 1, 2, cal_vco, 1),
+        MAKE_LMS8001_PLL_PROFILE_0_PLL_VCO_FREQ_n(cal_freq),
+        MAKE_LMS8001_PLL_CONFIGURATION_PLL_CFG(1, 3, 0, 0, 1, 0, 0),  // Calibration OFF
+    };
+    res = res ? res : lms8001_spi_post(state, pll_regs2, SIZEOF_ARRAY(pll_regs2));
     return res;
 }
 
