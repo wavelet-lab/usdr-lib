@@ -29,6 +29,13 @@ enum {
     LMS_LDO_1P25 = 101,
 };
 
+
+#define TEMPSENS_T0  -105.45
+#define TEMPSENS_T1  1.2646
+#define TEMPSENS_T2  -0.000548
+
+
+
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -591,6 +598,8 @@ static int _lms8001_center_vtune(lms8001_state_t* m, uint64_t fvco, int fref, ui
     SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AMP_n(curr->VCO_CFG, amp_init);
     SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AAC_EN_n(curr->VCO_CFG, aac_en_init);
     SET_LMS8001_PLL_PROFILE_0_PLL_VCO_FREQ_N_VCO_FREQ_n(curr->VCO_FREQ, freq_init);
+
+
     uint32_t lms_init3[] = {
         _mk_pav(m, PLL_PROFILE_0_PLL_VCO_CFG_n, curr->VCO_CFG),
         _mk_pav(m, PLL_PROFILE_0_PLL_VCO_FREQ_n, curr->VCO_FREQ),
@@ -1077,7 +1086,25 @@ int lms8001_reg_get(lms8001_state_t* m, uint16_t addr, uint16_t* oval)
 }
 
 
+int lms8001_temp_start(lms8001_state_t* m)
+{
+    uint32_t lms_init[] = {
+        MAKE_LMS8001_CHIPCONFIG_TEMP_SENS(1, 1, 1, 0),
+    };
+    return lms8001_spi_post(m, lms_init, SIZEOF_ARRAY(lms_init));
+}
 
+int lms8001_temp_get(lms8001_state_t* m, int* temp256)
+{
+    uint16_t rb;
+    int res = lms8001_spi_get(m, CHIPCONFIG_TEMP_SENS, &rb);
+    if (res)
+        return res;
+
+    int v = GET_LMS8001_CHIPCONFIG_TEMP_SENS_TEMP_READ(rb);
+    *temp256 = 256.0 * (TEMPSENS_T0 + TEMPSENS_T1 * v + TEMPSENS_T2 * v * v);
+    return 0;
+}
 
 
 

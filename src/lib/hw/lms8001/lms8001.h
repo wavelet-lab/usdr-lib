@@ -91,4 +91,9 @@ int lms8001_reg_get(lms8001_state_t* m, uint16_t addr, uint16_t* oval);
 
 int lms8001_smart_tune(lms8001_state_t* m, unsigned tune_flags, uint64_t flo, int fref, int loopbw, float phasemargin, float bwef, int flock_N);
 
+
+int lms8001_temp_start(lms8001_state_t* m);
+int lms8001_temp_get(lms8001_state_t* m, int *temp256);
+
+
 #endif
