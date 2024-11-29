@@ -43,8 +43,10 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     {
         // load 8 complex pairs = 16 floats = 64b = 512bits
         //
-        float32x4x2_t e0 = vld2q_f32(&in[i + 0][0]);
-        float32x4x2_t e1 = vld2q_f32(&in[i + 4][0]);
+        const unsigned k = i - diap.from;
+
+        float32x4x2_t e0 = vld2q_f32(&in[k + 0][0]);
+        float32x4x2_t e1 = vld2q_f32(&in[k + 4][0]);
 
         float32x4_t summ0 = vmlaq_f32(vmlaq_f32(v_mine, e0.val[0], e0.val[0]), e0.val[1], e0.val[1]);
         float32x4_t summ1 = vmlaq_f32(vmlaq_f32(v_mine, e1.val[0], e1.val[0]), e1.val[1], e1.val[1]);

@@ -1,0 +1,69 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+name: si549
+revision: 0.0.1
+processors:
+  - c
+bus:
+  type: I2C
+  wr_mask: 0x800000
+  usdr_path: /debug/hw/si549/*/reg
+addr_width: 16
+data_width: 8
+
+pages:
+  - name: Common
+    regs:
+      - addr: 0
+        name: DEVICE
+        fields:
+          - bits: "7:0"
+            name: TYPE
+            desc: Read only value of 49 (dec) which represents the device type (Si549).
+      - addr: 7
+        name: CFG
+        fields:
+          - bits: 7
+            name: RESET
+            desc: Set to 1 to reset device. Self clearing.
+          - bits: 3
+            name: MS_ICAL2
+            desc: Set to 1 to initiate FCAL. Self clearing.
+      - addr: 17
+        name: ODC
+        fields:
+          - bits: 0
+            name: OE
+            desc: Set to 0 to disable the output clock, or set to 1 to enable the output clock
+      - addr: "24:23"
+        name: DIV
+        fields:
+          - bits: "14:12"
+            name: LS
+            opts:
+                0: DIV1
+                1: DIV2
+                2: DIV4
+                3: DIV8
+                4: DIV16
+                5: DIV32
+                6: DIV32A
+                7: DIV32B
+          - bits: "10:0"
+            name: HS
+      - addr: "31:26"
+        name: FBDIV
+      - addr: 69
+        name: FCAL_OVR
+        fields:
+          - bits: 7
+            name: FCAL_OVR
+            desc: FCAL Override: If set to 1, FCAL is bypassed. Clear to 0 to allow FCAL.
+          - bits: 1
+            name: RESERVED
+            desc: Must be 1
+      - addr: "233:231"
+        name: ADPLL_DELTA_M
+      - addr: 255
+        name: PAGE

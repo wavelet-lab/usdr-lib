@@ -264,6 +264,23 @@ uint8_t tps6594_ldo4_vout(unsigned vout_mv)
     return 0x74;
 }
 
+
+int tps6594_check(lldev_t dev, subdev_t subdev, lsopaddr_t addr)
+{
+    uint8_t r[3];
+    int res = 0;
+
+    res = res ? res :tps6594_reg_rd(dev, subdev, addr, DEV_REV, &r[0]);
+    res = res ? res :tps6594_reg_rd(dev, subdev, addr, NVM_CODE_1, &r[1]);
+    res = res ? res :tps6594_reg_rd(dev, subdev, addr, NVM_CODE_2, &r[2]);
+
+    if (res)
+        return res;
+
+    USDR_LOG("6594", USDR_LOG_INFO, "REV:%02x CODE:%02x_%02x\n", r[0], r[1], r[2]);
+    return 0;
+}
+
 int tps6594_vout_set(lldev_t dev, subdev_t subdev, lsopaddr_t addr,
                      unsigned ch, unsigned vout)
 {

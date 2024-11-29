@@ -92,7 +92,7 @@ int usdr_dms_sync(pdm_dev_t device,
 int usdr_dms_recv(pusdr_dms_t stream,
                   void **stream_buffs,
                   unsigned timeout_ms,
-                  struct usdr_dms_recv_nfo* nfo)
+                  usdr_dms_recv_nfo_t* nfo)
 {
     struct stream_handle* h = (struct stream_handle*)stream;
     return h->ops->recv(h, (char**)stream_buffs, timeout_ms, nfo);

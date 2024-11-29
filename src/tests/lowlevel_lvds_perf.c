@@ -32,6 +32,12 @@ enum {
     M2PCI_REG_STAT_CTRL = 0,
 };
 
+enum {
+    I2C_BUS_SI549 = MAKE_LSOP_I2C_ADDR(0, 0, 0x67),
+    I2C_BUS_TPS6594 = MAKE_LSOP_I2C_ADDR(0, 0, 0x48),
+    I2C_BUS_TMP108 = MAKE_LSOP_I2C_ADDR(0, 1, 0x4b),
+};
+
 enum dev_gpi {
     IGPI_BANK_ADC_CLK_HI = 24 + 0,
     IGPI_BANK_ADC_CLK_LO = 24 + 1,
@@ -111,7 +117,7 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
     return lowlevel_reg_rd32(dev, M2PCI_REG_STAT_CTRL, 16 + (bank / 4), data);
 }
 
-int check_adc_clk(lldev_t dev, unsigned fmean[4], unsigned fdiv[4])
+int check_adc_clk(lldev_t dev, unsigned fmean[4], unsigned fdiv[4], unsigned verbose)
 {
     int res;
     unsigned adc, stat;
@@ -135,7 +141,9 @@ int check_adc_clk(lldev_t dev, unsigned fmean[4], unsigned fdiv[4])
             unsigned gen = masked >> 24;
             uint64_t freq = ((masked & 0xffffff) * 100000000ul) / (1u<<20);
 
-            USDR_LOG("0944", USDR_LOG_ERROR, "ADC_CLK[%d] = %08d (%08x %08x)\n", adc, (unsigned)freq, stat, masked);
+            if (verbose > 2) {
+                USDR_LOG("0944", USDR_LOG_ERROR, "ADC_CLK[%d] = %08d (%08x %08x)\n", adc, (unsigned)freq, stat, masked);
+            }
             if (k > 4) {
                 if (prev[adc] != gen && m[adc] < 100) {
                     fmeas[m[adc]++][adc] = freq;
@@ -328,7 +336,8 @@ int check_pbrs(lldev_t dev, int longtest,
                unsigned gooda[32], unsigned goodb[32], unsigned goodc[32], unsigned goodd[32])
 {
     int res;
-unsigned g = 0;
+    unsigned g = 0;
+
     //for (unsigned g = 0; g < 12; g++) {
     for (unsigned step = 0; !s_exit_event && (step < 32); step++) {
         res = dev_gpo_set(dev, IGPO_BANK_ADC_CHMSK, 0xf);
@@ -465,14 +474,24 @@ int main(int argc, char** argv)
     int res, opt;
     lldev_t dev;
     unsigned rate = 50e6;
-    unsigned ratemax = 250e6;
+    unsigned ratemax = 50e6;
+    unsigned rateinter = 5e6;
     usdrlog_setlevel(NULL, USDR_LOG_TRACE);
     usdrlog_enablecolorize(NULL);
-    unsigned iten = 0; // Iterate over smaplerate
+    unsigned iten = 100; // Iterate over smaplerate
     unsigned cont = 0; // Continous test
     unsigned longtest = 0;
-    while ((opt = getopt(argc, argv, "l:w:r:R:ic:L:")) != -1) {
+    unsigned loglevel = 2;
+    unsigned verbosity = 1;
+
+    while ((opt = getopt(argc, argv, "l:w:r:R:ic:L:I:v:")) != -1) {
         switch (opt) {
+        case 'v':
+            verbosity = atoi(optarg);
+            break;
+        case 'I':
+            rateinter = atof(optarg);
+            break;
         case 'L':
             longtest = atoi(optarg);
             break;
@@ -480,7 +499,7 @@ int main(int argc, char** argv)
             iten = 1;
             break;
         case 'l':
-            usdrlog_setlevel(NULL, atoi(optarg));
+            loglevel = atoi(optarg);
             break;
         case 'r':
             rate = atof(optarg);
@@ -498,6 +517,8 @@ int main(int argc, char** argv)
         }
     }
 
+    usdrlog_setlevel(NULL, loglevel);
+
     res = lowlevel_create(0, NULL, NULL, &dev, 0, NULL, 0);
     if (res) {
         fprintf(stderr, "Unable to create: errno %d\n", res);
@@ -506,7 +527,7 @@ int main(int argc, char** argv)
 
     fprintf(stderr, "Device was created!\n");
 
-    res = tps6594_vout_ctrl(dev, 0, 1, TPS6594_LDO4, true);
+    res = tps6594_vout_ctrl(dev, 0, I2C_BUS_TPS6594, TPS6594_LDO4, true);
     if (res) {
         fprintf(stderr, "Op failed: errno %d\n", res);
         return 2;
@@ -526,17 +547,18 @@ int main(int argc, char** argv)
     signal(SIGINT,  sig_term);
 
     int set = 0;
-    do {
     double crate = rate;
+
+    do {
     do {
         if (iten || set == 0) {
-            res = si549_set_freq(dev, 0, 0, crate);
+            res = si549_set_freq(dev, 0, I2C_BUS_SI549, crate);
             if (res) {
                 fprintf(stderr, "Op failed: errno %d\n", res);
                 return 2;
             }
             usleep(10000);
-            res = si549_enable(dev, 0, 0, true);
+            res = si549_enable(dev, 0, I2C_BUS_SI549, true);
             if (res)
                 return res;
 
@@ -579,7 +601,7 @@ int main(int argc, char** argv)
         if (res)
             return res;
 
-        res = check_adc_clk(dev, fmean, fdiv);
+        res = check_adc_clk(dev, fmean, fdiv, verbosity);
         if (res) {
             goto failed;
         }
@@ -588,11 +610,23 @@ int main(int argc, char** argv)
         if (res)
             return res;
 
+        double errmin = 1e3;
         for (unsigned adc = 0; adc < 4; adc++) {
             if (fmean[adc] == 0)
                 continue;
-            fprintf(stderr, "R=%5.1f MHz ADC[%d] CLK=%8d  DIV=%8d\n", crate / 1e6, adc, fmean[adc], fdiv[adc]);
+
+            double error = (crate - fmean[adc]) / crate * 1e6;
+            fprintf(stderr, "R=%5.1f MHz ADC[%d] CLK=%8d  DIV=%8d ERROR=%3.1f ppm\n", crate / 1e6, adc, fmean[adc], fdiv[adc], error);
+
+            if (errmin > error)
+                errmin = error;
         }
+
+        if (errmin > 200) {
+            fprintf(stderr, "R=%5.1f MHz ERROR %.3f ppm, giving up\n", crate / 1e6, errmin);
+            // continue;
+        }
+
 #if 0
         res = check_adc_msk(dev, longtest, gooda, goodb);
         if (res) {
@@ -636,12 +670,12 @@ int main(int argc, char** argv)
             fprintf(stderr, "INTERRUPTED!\n");
             goto failed;
         }
-    } while (iten && ((crate += 2e6) < ratemax));
+    } while (iten && ((crate += rateinter) < ratemax));
     } while (cont-- != 0);
 
     fprintf(stderr, "DONE!\n");
 failed:
-    tps6594_vout_ctrl(dev, 0, 1, TPS6594_LDO4, false);
+   // tps6594_vout_ctrl(dev, 0, I2C_BUS_TPS6594, TPS6594_LDO4, false);
     lowlevel_destroy(dev);
     return res;
 }

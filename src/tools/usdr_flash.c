@@ -132,7 +132,7 @@ int main(int argc, char** argv)
 
     res = (no_device) ? 0 : espi_flash_get_id(dev, 0, 10, &fid, fid_str, sizeof(fid_str));
     if (res) {
-        fprintf(stderr, "Failed to get flash ID!\n");
+        fprintf(stderr, "Failed to get flash ID (%s)!\n", fid_str);
         return 2;
     }
     if (!no_device) {

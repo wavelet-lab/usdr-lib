@@ -632,8 +632,8 @@ int pcie_uram_recv_dma_release(lldev_t dev, subdev_t subdev, stream_t channel, v
     if (channel > DBMAX_SRX + DBMAX_STX)
         return -EINVAL;
 
-    // TODO: don't call ioctl() on mmaped interface
-    res = ioctl(d->fd, PCIE_DRIVER_DMA_RELEASE_OR_POST, channel);
+    // TODO: don't call ioctl() on mmaped cache coherent interface
+    res = ioctl(d->fd, PCIE_DRIVER_DMA_RELEASE, channel);
     if (res) {
         res = -errno;
         if (res != -EAGAIN) {
@@ -666,6 +666,8 @@ int pcie_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, vo
                  d->scache[channel].cfg_bufsize, sz);
         return -EINVAL;
     }
+
+    // TODO: Call to flush DMA buffers on non-coherent systems
 
     return sfe_tx4_push_ring_buffer(dev, subdev,
                                     cnf_base, samples, timestamp);

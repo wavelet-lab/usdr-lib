@@ -18,6 +18,8 @@ enum tps6594_ch {
     TPS6594_LDO4,
 };
 
+int tps6594_check(lldev_t dev, subdev_t subdev, lsopaddr_t addr);
+
 int tps6594_reg_dump(lldev_t dev, subdev_t subdev, lsopaddr_t addr);
 
 int tps6594_vout_set(lldev_t dev, subdev_t subdev, lsopaddr_t addr,

@@ -62,10 +62,12 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
     {
         // load 8*4 = 32 floats = 16 complex pairs
         //
-        __m256 e0 = _mm256_load_ps(&in[i +  0][0]);
-        __m256 e1 = _mm256_load_ps(&in[i +  4][0]);
-        __m256 e2 = _mm256_load_ps(&in[i +  8][0]);
-        __m256 e3 = _mm256_load_ps(&in[i + 12][0]);
+        const unsigned k = i - diap.from;
+
+        __m256 e0 = _mm256_load_ps(&in[k +  0][0]);
+        __m256 e1 = _mm256_load_ps(&in[k +  4][0]);
+        __m256 e2 = _mm256_load_ps(&in[k +  8][0]);
+        __m256 e3 = _mm256_load_ps(&in[k + 12][0]);
 
         // mul, sqr
         //

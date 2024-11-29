@@ -26,7 +26,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
             rtsa_discharge_u16(&pwr[j], decay_rate_pw2);
         }
 
-        float p = scale * (float)in[i] + corr;
+        float p = scale * (float)in[i - diap.from] + corr;
 
         p -= st->upper_pwr_bound;
         p = fabs(p);

@@ -29,16 +29,16 @@ class LongSpinBox(QAbstractSpinBox):
 
     def text(self):
         return str(self.int_value)
-    
+
     def value(self):
         return self.int_value
-    
+
     def setValue(self, val):
         if val < self.minimum:
             val = self.minimum
         elif val > self.maximum:
             val = self.maximum
-        
+
         if self.int_value != val:
             self.int_value = val
             self.lineEdit().setText(self.text())
@@ -50,7 +50,7 @@ class LongSpinBox(QAbstractSpinBox):
     def stepUp(self):
         print("UP")
         self.setValue(self.int_value + 1)
-    
+
     def stepDown(self):
         print("DOWN")
         self.setValue(self.int_value - 1)
@@ -74,7 +74,7 @@ class QtBuilderPage(QWidget):
         self.reg_cnt = {}
         self.reg_big = {}
         self.ignore = False
-        
+
         for i, reg in enumerate(page.regs):
             hidx = 0
             if reg.ucnt == 1:
@@ -93,7 +93,7 @@ class QtBuilderPage(QWidget):
             label.setToolTip(reg.name)
             self.layout.addWidget(label, i, hidx, 1, 1)
             hidx += 1
-            
+
             lw = QWidget()
             lv = QHBoxLayout()
             self.raw_lcds[reg.addr_l] = []
@@ -103,13 +103,13 @@ class QtBuilderPage(QWidget):
                 raw.setToolTip("Addr: 0x%02x" % (reg.addr_l + l))
                 raw.setMinimumHeight(40)
                 raw.setHexMode()
-                raw.setNumDigits(top.data_width / 4)
+                raw.setNumDigits(top.data_width // 4)
                 self.raw_lcds[reg.addr_l].append(raw)
                 lv.addWidget(raw)
             lw.setLayout(lv)
             self.layout.addWidget(lw, i, hidx, 1, 1)
             hidx += 1
-            
+
             fuis = []
             # Parse bit fields
             for j, field in enumerate(reg.fields):
@@ -117,12 +117,12 @@ class QtBuilderPage(QWidget):
                 fname.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 fname.setToolTip("Bits[%d:%d]" % (field.bits_h, field.bits_l))
                 self.layout.addWidget(fname, i + 0, hidx + 2 * j + 0)
-                
+
                 if len(field.opts) > 1:
                     part = QComboBox()
                     for n, v in enumerate(field.opts):
                         part.addItem("%d -- %s" % (n, v))
-                        
+
                     part.currentIndexChanged.connect(lambda index, a = int(reg.addr_l), u = reg.ucnt: self.update_control(index, a, u))
                 elif field.vmax == 1:
                     part = QCheckBox()
@@ -134,7 +134,7 @@ class QtBuilderPage(QWidget):
                 part.setToolTip(field.desc)
                 self.layout.addWidget(part,  i + 0, hidx + 2 * j + 1)
                 fuis.append((part, field))
-                
+
             self.reg_updates[reg.addr_l] = fuis
             self.reg_cnt[reg.addr_l] = reg.ucnt
             self.reg_big[reg.addr_l] = reg.big
@@ -144,7 +144,7 @@ class QtBuilderPage(QWidget):
     def update_control(self, value, addr, ucnt):
         if self.ignore:
             return
-        
+
         big = self.reg_big[addr]
         newVal = 0
         for i in range(ucnt):
@@ -159,12 +159,12 @@ class QtBuilderPage(QWidget):
             if isinstance(ui, QCheckBox):
                 v = 1 << f.bits_l if ui.isChecked() else 0
             elif isinstance(ui, QComboBox):
-                v = ui.currentIndex() << f.bits_l
+                v = f.unpack_bits(ui.currentIndex(), f.bits_list) << f.bits_l
             else:
                 v = ui.value() << f.bits_l
 
             newVal |= v
-        
+
         print("Update register %04x x %d => %d" % (addr, ucnt, newVal))
         for i in range(ucnt):
             if big:
@@ -174,16 +174,16 @@ class QtBuilderPage(QWidget):
 
             self.raw_lcds[addr][i].display(v)
             self.top.actor[addr + i] = v
-        
+
     def update_filed(self, value, ui, field):
         v = (value & field.mask) >> field.bits_l
         if isinstance(ui, QCheckBox):
             ui.setChecked(v)
         elif isinstance(ui, QComboBox):
-            ui.setCurrentIndex(v)
+            ui.setCurrentIndex(field.pack_bits(v, field.bits_list))
         else:
             ui.setValue(v)
-        
+
     def page_changed(self):
         self.ignore = True
         for addr in self.reg_updates:
@@ -203,16 +203,18 @@ class QtBuilderPage(QWidget):
             for ui, field in fields:
                 self.update_filed(value, ui, field)
         self.ignore = False
-        
 
-class QtBuilderTop:
+
+class QtBuilderTop(QWidget):
     def __init__(self, conf, actor):
+        super(QtBuilderTop, self).__init__()
         self.tab = QTabWidget()
         self.tab.currentChanged.connect(self.page_changed)
         self.b_pgs = []
         self.actor = actor
         self.data_width = conf.data_width
         self.addr_width = conf.addr_width
+        self.current = 0
 
         for page in conf.pages:
             pgw = QtBuilderPage(conf, page, self)
@@ -227,11 +229,21 @@ class QtBuilderTop:
             q.setFrameShadow(QFrame.Plain)
             q.setFrameShape(QFrame.NoFrame)
             q.setWidget(pgw)
-            
+
 
             self.tab.addTab(q, page.name)
+
+        self.lv = QVBoxLayout()
+        self.lv.addWidget(self.tab)
+        self.setLayout(self.lv)
+
+
+    def update(self):
+        self.b_pgs[self.current].page_changed()
+
 
     def page_changed(self, page):
         print("Page changed to %d" % page)
         self.b_pgs[page].page_changed()
+        self.current = page
 
