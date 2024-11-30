@@ -5,9 +5,13 @@
 
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QRegExpValidator, QPalette, QColor
+from PyQt5.QtGui import QRegExpValidator, QPalette, QColor, QIcon
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QRegExp
 import math
+import configparser
+import re
+import time
+
 
 class LongSpinBox(QAbstractSpinBox):
     valueChanged = pyqtSignal(int)
@@ -74,6 +78,7 @@ class QtBuilderPage(QWidget):
         self.reg_cnt = {}
         self.reg_big = {}
         self.ignore = False
+        self.conf = conf
 
         for i, reg in enumerate(page.regs):
             hidx = 0
@@ -184,8 +189,13 @@ class QtBuilderPage(QWidget):
         else:
             ui.setValue(v)
 
-    def page_changed(self):
+    def page_changed(self, dump = False)->dict:
+
         self.ignore = True
+        addr_size_chars = math.ceil(self.conf.addr_width / 4)
+        val_size_chars  = math.ceil(self.conf.data_width / 4)
+        dump_dict = {}
+
         for addr in self.reg_updates:
             fields = self.reg_updates[addr]
             ucnt = self.reg_cnt[addr]
@@ -200,9 +210,17 @@ class QtBuilderPage(QWidget):
                 else:
                     value = value | (rv << (i * self.top.data_width))
 
+                if(dump):
+                    dump_dict['0x%0*x' % (addr_size_chars, addr + i)] = '0x%0*x' % (val_size_chars, rv)
+
             for ui, field in fields:
                 self.update_filed(value, ui, field)
         self.ignore = False
+        return dump_dict
+
+
+    def page_dump(self)->str:
+        return self.page_changed(dump = True)
 
 
 class QtBuilderTop(QWidget):
@@ -215,6 +233,7 @@ class QtBuilderTop(QWidget):
         self.data_width = conf.data_width
         self.addr_width = conf.addr_width
         self.current = 0
+        self.conf = conf
 
         for page in conf.pages:
             pgw = QtBuilderPage(conf, page, self)
@@ -233,7 +252,20 @@ class QtBuilderTop(QWidget):
 
             self.tab.addTab(q, page.name)
 
+        saveAction = QAction(QIcon("img/save.png"), 'Save', self)
+        saveAction.setShortcut('Ctrl+S')
+        saveAction.triggered.connect(self.save_button_clicked)
+
+        loadAction = QAction(QIcon("img/load.png"), 'Load', self)
+        loadAction.setShortcut('Ctrl+L')
+        loadAction.triggered.connect(self.load_button_clicked)
+
+        toolbar = QToolBar()
+        toolbar.addAction(saveAction)
+        toolbar.addAction(loadAction)
+
         self.lv = QVBoxLayout()
+        self.lv.addWidget(toolbar)
         self.lv.addWidget(self.tab)
         self.setLayout(self.lv)
 
@@ -241,9 +273,96 @@ class QtBuilderTop(QWidget):
     def update(self):
         self.b_pgs[self.current].page_changed()
 
-
     def page_changed(self, page):
         print("Page changed to %d" % page)
         self.b_pgs[page].page_changed()
         self.current = page
 
+
+    def get_ini_section_name(self)->str:
+        ini_section_name = self.conf.ini_section;
+        names = self.actor.path.split('/')
+
+        if(not ini_section_name):
+            ini_section_name = '%s_registers_%s' % (names[3], names[4])
+        else:
+            ini_section_name = '%s_%s' % (ini_section_name, names[4])
+
+        return ini_section_name
+
+    def load_button_clicked(self)->None:
+        print("LOAD [%s] regs from ini file" % self.actor.path)
+
+        inifile_name, _unused = QFileDialog.getOpenFileName(self, caption = "Load Registers Set for " + self.actor.path, directory="./", filter="Ini Files (*.ini)")
+        if not inifile_name:
+            return
+
+        ini_section_name = self.get_ini_section_name()
+
+        found = False
+        regcnt = 0
+        f = open(inifile_name, 'r')
+
+        while(True):
+            line = f.readline()
+            if(not line):
+                break
+
+            line = line.rstrip('\n').strip()
+
+            if(found):
+
+                if re.match('^\[(.*)\]$', line) is not None:
+                    break
+
+                parts = line.split('=')
+                if(len(parts) != 2):
+                    continue
+
+                try:
+                    addr = int(parts[0], 16)
+                    val  = int(parts[1], 16)
+                except ValueError:
+                    continue
+
+                self.actor[addr] = val
+                time.sleep(0.01)
+                regcnt += 1
+                #print('loaded 0x%04x=0x%04x' % (addr, val))
+            else:
+                found = ('[%s]' % ini_section_name) == line
+                if(found):
+                    print('LOAD: found section [%s] in file "%s"' % (ini_section_name, inifile_name))
+
+        if(not found):
+            print('LOAD: section [%s] not found in file "%s", registers were not loaded!' % (ini_section_name, inifile_name))
+        else:
+            print('LOAD: %d registers were loaded from "%s".[%s]' % (regcnt, inifile_name, ini_section_name))
+            self.update()
+
+        f.close()
+
+    def save_button_clicked(self)->None:
+        print("SAVE [%s] regs to ini file" % self.actor.path)
+
+        inifile_name, _unused = QFileDialog.getSaveFileName(self, caption = "Save Registers Set for " + self.actor.path, filter="Ini Files (*.ini)", directory="./")
+        if not inifile_name:
+            return
+
+        ini_section_name = self.get_ini_section_name()
+
+        dump_dict = {}
+        for page in self.b_pgs:
+            dump_dict.update(page.page_dump())
+
+        config = configparser.ConfigParser()
+        config.read(inifile_name)
+
+        if not config.has_section(ini_section_name):
+            config.add_section(ini_section_name)
+
+        for addr, val in dump_dict.items():
+            config[ini_section_name][addr] = val
+
+        with open(inifile_name, 'w') as configfile:
+            config.write(configfile)
