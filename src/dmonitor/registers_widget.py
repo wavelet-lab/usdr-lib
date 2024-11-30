@@ -190,10 +190,12 @@ class RegActor:
 
     def __setitem__(self, addr, value):
         pipe.seti64(self.path, self.make_reg(addr, value) | self.wr_mask, )
+        print("WR%s[%04x]<=%04x" % (self.path, addr, value))
+
 
     def __getitem__(self, addr):
         r = pipe.setgeti64(self.path, (self.make_reg(addr, -1) & ~self.wr_mask) | self.rd_mask) & self.data_mask
-        print("RD%s[%02x]=>%04x" % (self.path, addr, r))
+        print("RD%s[%04x]=>%04x" % (self.path, addr, r))
         return r
 
 
