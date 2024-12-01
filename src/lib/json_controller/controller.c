@@ -46,6 +46,7 @@ static const struct idx_list s_method_list[] = {
     { "sdr_start_rx_rtsa_stream", SDR_RX_START_RTSA_STREAM },
     { "sdr_stop_rx_stream",       SDR_RX_STOP_STREAM },
     { "sdr_control_rx_stream",    SDR_RX_CONTROL_STREAM },
+    { "sdr_get_rx_stream_stats",  SDR_GET_RX_STREAM_STATS },
 };
 
 static const struct idx_list s_param_list[] = {
