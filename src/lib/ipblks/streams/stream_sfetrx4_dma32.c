@@ -166,7 +166,7 @@ int _sfetrx4_stream_recv(stream_handle_t* str,
     if (nfo) {
         nfo->fsymtime = stream->r_ts;
         nfo->totsyms = stream->pkt_symbs;
-        nfo->totlost = 0;
+        nfo->totlost = stream->stats.dropped;
         nfo->extra = (oob_size >= 16) ? oob_data[1] : 0;
     }
 
