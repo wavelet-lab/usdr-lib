@@ -52,6 +52,6 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, enum xo_type_opt
                          bool xo_doubler_enabled, bool xo_fdet_bypass);
 int lmk05318_tune_apll1(lmk05318_state_t* d, uint32_t freq,
                         uint32_t xo_fref, enum xo_type_options xo_type,
-                        bool xo_doubler_enabled, bool xo_fdet_bypass,
+                        bool xo_doubler_enabled, bool xo_fdet_bypass, bool dpll_mode,
                         unsigned *last_div);
 #endif

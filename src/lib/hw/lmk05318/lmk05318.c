@@ -210,7 +210,7 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, enum xo_type_opt
 
 int lmk05318_tune_apll1(lmk05318_state_t* d, uint32_t freq,
                         uint32_t xo_fref, enum xo_type_options xo_type,
-                        bool xo_doubler_enabled, bool xo_fdet_bypass,
+                        bool xo_doubler_enabled, bool xo_fdet_bypass, bool dpll_mode,
                         unsigned *last_div)
 {
     if (freq < 1e6) {
@@ -236,6 +236,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, uint32_t freq,
     uint32_t regs[] = {
         MAKE_LMK05318_PLL1_CTRL0(1),
         MAKE_LMK05318_XO_CONFIG(APLL1_DIVIDER_MAX),
+        MAKE_LMK05318_PLL1_MODE(dpll_mode ? 1 : 0),
         MAKE_LMK05318_PLL1_NDIV_BY0(n),
         MAKE_LMK05318_PLL1_NDIV_BY1(n),
         MAKE_LMK05318_PLL1_NUM_BY0(num),
