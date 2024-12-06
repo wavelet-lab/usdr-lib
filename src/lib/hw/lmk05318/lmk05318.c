@@ -235,7 +235,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, uint32_t freq,
 
     uint32_t regs[] = {
         MAKE_LMK05318_PLL1_CTRL0(1),
-        MAKE_LMK05318_XO_CONFIG(APLL1_DIVIDER_MAX),
+        MAKE_LMK05318_XO_CONFIG(APLL1_DIVIDER_MAX - 1),
         MAKE_LMK05318_PLL1_MODE(dpll_mode ? 1 : 0),
         MAKE_LMK05318_PLL1_NDIV_BY0(n),
         MAKE_LMK05318_PLL1_NDIV_BY1(n),
