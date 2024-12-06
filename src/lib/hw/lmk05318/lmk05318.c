@@ -5,13 +5,15 @@
 #include <inttypes.h>
 
 #include "lmk05318.h"
-#include "def_lmk05318.h"
 #include "lmk05318_rom.h"
 
 #include <usdr_logging.h>
 
 enum {
     VCO_APLL1 = 2500000000ull,
+    VCO_APLL1_MIN = 2499750000ull,
+    VCO_APLL1_MAX = 2500250000ull,
+
     VCO_APLL2_MIN = 5500000000ull,
     VCO_APLL2_MAX = 6250000000ull,
 
@@ -22,6 +24,12 @@ enum {
     APLL2_PD_MAX = 150000000,
 
     OUT_FREQ_MAX = 800000000ull,
+
+    XO_FREF_MAX = 100000000ull,
+    XO_FREF_MIN = 10000000ull,
+
+    APLL1_DIVIDER_MIN = 1,
+    APLL1_DIVIDER_MAX = 32,
 };
 
 
@@ -103,6 +111,12 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmk05318_stat
 
     out->fref_pll2_div_rp = 3;
     out->fref_pll2_div_rs = (((VCO_APLL1 + APLL2_PD_MAX - 1) / APLL2_PD_MAX) + out->fref_pll2_div_rp - 1) / out->fref_pll2_div_rp;
+
+    out->xo.fref = 0;
+    out->xo.doubler_enabled = false;
+    out->xo.fdet_bypass = false;
+    out->xo.type = XO_TYPE_DC_DIFF_EXT;
+
     USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 initialized\n");
     return 0;
 }
@@ -110,7 +124,8 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmk05318_stat
 
 int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div)
 {
-    const unsigned pre_div = 2;
+    const unsigned apll2_post_div = 2;
+
     unsigned fref = VCO_APLL1 / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
     if (fref < APLL2_PD_MIN || fref > APLL2_PD_MAX) {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 PFD should be in range [%" PRIu64 ";%" PRIu64 "] but got %d!\n",
@@ -125,23 +140,110 @@ int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div)
         return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));;
     }
 
-    unsigned div = ((VCO_APLL2_MAX / pre_div)) / freq;
-    uint64_t fvco = (uint64_t)freq * div * pre_div;
+    unsigned div = ((VCO_APLL2_MAX / apll2_post_div)) / freq;
+    uint64_t fvco = (uint64_t)freq * div * apll2_post_div;
     unsigned n = fvco / fref;
     unsigned num = (fvco - n * (uint64_t)fref) * (1ull << 24) / fref;
     int res;
 
-    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 FREQ=%u FVCO=%lld N=%d NUM=%d DIV=%d\n", freq, (long long)fvco, n, num, div);
+    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 FREQ=%u FVCO=%" PRIu64 " N=%d NUM=%d DIV=%d\n", freq, fvco, n, num, div);
 
     uint32_t regs[] = {
         MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
-        MAKE_LMK05318_PLL2_CTRL2(pre_div - 1, pre_div - 1),
+        MAKE_LMK05318_PLL2_CTRL2(apll2_post_div - 1, apll2_post_div - 1),
         MAKE_LMK05318_PLL2_NDIV_BY0(n),
         MAKE_LMK05318_PLL2_NDIV_BY1(n),
         MAKE_LMK05318_PLL2_NUM_BY0(num),
         MAKE_LMK05318_PLL2_NUM_BY1(num),
         MAKE_LMK05318_PLL2_NUM_BY2(num),
         MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 0),
+    };
+
+    res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    if (res)
+        return res;
+
+    *last_div = div;
+    return 0;
+}
+
+int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, enum xo_type_options xo_type,
+                         bool xo_doubler_enabled, bool xo_fdet_bypass)
+{
+    if(xo_fref < XO_FREF_MIN || xo_fref > XO_FREF_MAX)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 XO input fref should be in range [%" PRIu64 ";%" PRIu64 "] but got %d!\n",
+                 (uint64_t)XO_FREF_MIN, (uint64_t)XO_FREF_MAX, xo_fref);
+        return -EINVAL;
+    }
+
+    switch((int)xo_type)
+    {
+    case XO_TYPE_DC_DIFF_EXT:
+    case XO_TYPE_AC_DIFF_EXT:
+    case XO_TYPE_AC_DIFF_INT_100:
+    case XO_TYPE_HCSL_INT_50:
+    case XO_TYPE_CMOS:
+    case XO_TYPE_SE_INT_50:
+        break;
+    default:
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 XO input type %d is not supported!\n", (int)xo_type);
+        return -EINVAL;
+    }
+
+    uint32_t regs[] = {
+        MAKE_LMK05318_XO_CLKCTL1(xo_doubler_enabled ? 1 : 0, xo_fdet_bypass ? 1 : 0),
+        MAKE_LMK05318_XO_CLKCTL2(xo_type)
+    };
+
+    int res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    if(res)
+        return res;
+
+    d->xo.fref = xo_fref;
+    d->xo.doubler_enabled = xo_doubler_enabled;
+    d->xo.type = xo_type;
+    d->xo.fdet_bypass = xo_fdet_bypass;
+
+    return 0;
+}
+
+int lmk05318_tune_apll1(lmk05318_state_t* d, uint32_t freq,
+                        uint32_t xo_fref, enum xo_type_options xo_type,
+                        bool xo_doubler_enabled, bool xo_fdet_bypass,
+                        unsigned *last_div)
+{
+    if (freq < 1e6) {
+        // Disable
+        uint32_t regs[] = {
+            MAKE_LMK05318_PLL1_CTRL0(1),
+        };
+        return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));;
+    }
+
+    int res = lmk05318_set_xo_fref(d, xo_fref, xo_type, xo_doubler_enabled, xo_fdet_bypass);
+    if(res)
+        return res;
+
+    unsigned fref = (d->xo.fref / APLL1_DIVIDER_MAX) * (d->xo.doubler_enabled ? 2 : 1);
+    unsigned div = VCO_APLL1_MAX / freq;
+    uint64_t fvco = (uint64_t)freq * div;
+    unsigned n = fvco / fref;
+    uint64_t num = (fvco - n * (uint64_t)fref) * (1ull << 40) / fref;
+
+    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL1 FREQ=%u FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 " DIV=%d\n", freq, fvco, n, num, div);
+
+    uint32_t regs[] = {
+        MAKE_LMK05318_PLL1_CTRL0(1),
+        MAKE_LMK05318_XO_CONFIG(APLL1_DIVIDER_MAX),
+        MAKE_LMK05318_PLL1_NDIV_BY0(n),
+        MAKE_LMK05318_PLL1_NDIV_BY1(n),
+        MAKE_LMK05318_PLL1_NUM_BY0(num),
+        MAKE_LMK05318_PLL1_NUM_BY1(num),
+        MAKE_LMK05318_PLL1_NUM_BY2(num),
+        MAKE_LMK05318_PLL1_NUM_BY3(num),
+        MAKE_LMK05318_PLL1_NUM_BY4(num),
+        MAKE_LMK05318_PLL1_CTRL0(0),
     };
 
     res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
