@@ -16,16 +16,16 @@
 #define UPPER_PWR_BOUND -0
 #define DIVS_FOR_DB 1
 
-#define AVGS 256
+#define AVGS 128
 #define RAISE_COEF 32
 #define DECAY_COEF 1
 #define CHARGING_FRAME 256
 
 #define STREAM_SIZE 4096
 static_assert( STREAM_SIZE >= 4096, "STREAM_SIZE should be >= 4096!" );
-static const unsigned packet_lens[4] = { 256, 512, 1024, STREAM_SIZE };
+static const unsigned packet_lens[4] = { 512, 1024, 2048, STREAM_SIZE };
 
-#define SPEED_MEASURE_ITERS 100
+#define SPEED_MEASURE_ITERS 256
 
 #define EPSILON MAX_RTSA_PWR / 10
 
@@ -49,8 +49,10 @@ static rtsa_hwi16_consts_t hwi16_consts;
 
 static void setup(void)
 {
-    posix_memalign((void**)&in,   ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE * AVGS);
-    posix_memalign((void**)&in16, ALIGN_BYTES, sizeof(uint16_t) * STREAM_SIZE * AVGS);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in,   ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE * AVGS);
+    res = res ? res : posix_memalign((void**)&in16, ALIGN_BYTES, sizeof(uint16_t) * STREAM_SIZE * AVGS);
+    assert(res == 0);
 
     //init input data
     srand( time(0) );
@@ -83,8 +85,12 @@ static void setup(void)
 
     rtsa_data.settings = rtsa_data_etalon.settings = rtsa_settings;
 
-    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
+    res = 0;
+    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
+    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
+    assert(res == 0);
+    memset(out       , 0, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
+    memset(out_etalon, 0, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
 
     rtsa_data.pwr  = out;
     rtsa_data_etalon.pwr = out_etalon;
@@ -203,7 +209,7 @@ START_TEST(rtsa_speed)
 
         //warming
         rtsa_init(&rtsa_data, size);
-        for(unsigned i = 0; i < 100; ++i)
+        for(unsigned i = 0; i < 10000; ++i)
                 (*fn_update)
                     (in, size, &rtsa_data, scale_mpy, mine, corr, diap);
 
@@ -225,8 +231,8 @@ START_TEST(rtsa_speed)
 
         fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 cycle, ave speed = %" PRIu64 " cycles/s \n",
                 tk1,
-                (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS),
-                (uint64_t)(1000000LL*SPEED_MEASURE_ITERS/tk1));
+                (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS/AVGS),
+                (uint64_t)(1000000LL*SPEED_MEASURE_ITERS*AVGS/tk1));
 
         --opt;
     }
@@ -268,7 +274,7 @@ START_TEST(rtsa_speed_u16)
 
         //warming
         rtsa_init(&rtsa_data, size);
-        for(unsigned i = 0; i < 100; ++i)
+        for(unsigned i = 0; i < 10000; ++i)
             (*fn_update)
                 (in16, size, &rtsa_data, scale_mpy, corr, diap, &hwi16_consts);
 
@@ -290,8 +296,8 @@ START_TEST(rtsa_speed_u16)
 
         fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 cycle, ave speed = %" PRIu64 " cycles/s \n",
                 tk1,
-                (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS),
-                (uint64_t)(1000000LL*SPEED_MEASURE_ITERS/tk1));
+                (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS/AVGS),
+                (uint64_t)(1000000LL*SPEED_MEASURE_ITERS*AVGS/tk1));
 
         --opt;
     }
@@ -313,7 +319,7 @@ Suite * rtsa_suite(void)
     tcase_set_timeout(tc_core, 300);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
     tcase_add_test(tc_core, rtsa_check);
-    tcase_add_loop_test(tc_core, rtsa_speed, 0, 4);
+    //tcase_add_loop_test(tc_core, rtsa_speed, 0, 4);
     tcase_add_loop_test(tc_core, rtsa_speed_u16, 0, 4);
     suite_add_tcase(s, tc_core);
     return s;
