@@ -7,6 +7,8 @@
 #include <usdr_lowlevel.h>
 #include "def_lmk05318.h"
 
+#define MAX_OUT_PORTS 8
+
 struct lmk05318_state {
     lldev_t dev;
     unsigned subdev;
@@ -36,11 +38,34 @@ enum lmk05318_type {
 };
 
 typedef struct lmk05318_state lmk05318_state_t;
+typedef enum lmk05318_type lmk05318_type_t;
+
+struct lmk05318_out_config
+{
+    unsigned port; //0..7
+    bool solved;
+
+    struct
+    {
+        uint32_t freq;
+        unsigned freq_delta_plus, freq_delta_minus;
+        bool revert_phase;
+        lmk05318_type_t type;
+    } wanted;
+
+    struct
+    {
+        uint32_t freq;
+        uint64_t out_div;
+        enum lmk05318_out_pll_sel_t mux;
+    } result;
+};
+typedef struct lmk05318_out_config lmk05318_out_config_t;
 
 int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmk05318_state_t* out);
 
 int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div);
-int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, unsigned div);
+int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t div);
 int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype);
 
 

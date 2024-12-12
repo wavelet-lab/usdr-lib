@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include <inttypes.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "lmk05318.h"
 #include "lmk05318_rom.h"
@@ -30,6 +32,9 @@ enum {
 
     APLL1_DIVIDER_MIN = 1,
     APLL1_DIVIDER_MAX = 32,
+
+    APLL2_PDIV_MIN = 2,
+    APLL2_PDIV_MAX = 7,
 };
 
 
@@ -256,7 +261,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, uint32_t freq,
 }
 
 
-int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, unsigned udiv)
+int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
 {
     if (port > 7)
         return -EINVAL;
@@ -299,5 +304,150 @@ int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned
         (port == 6) ? MAKE_LMK05318_OUTCTL_6(mux, ot) : MAKE_LMK05318_OUTCTL_7(mux, ot),
     };
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+}
+
+static unsigned max_odiv(unsigned port)
+{
+    switch(port)
+    {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6: return 256;
+    case 7: return 4 * 256;
+    }
+    return 1;
+}
+
+#define MAX(a, b) (a) > (b) ? (a) : (b)
+#define MIN(a, b) (a) < (b) ? (a) : (b)
+
+int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* outs, unsigned n_outs)
+{
+    struct range
+    {
+        uint64_t min, max;
+    };
+    typedef struct range range_t;
+
+    int res = 0;
+
+    if(!outs || !n_outs || n_outs > MAX_OUT_PORTS)
+        return -EINVAL;
+
+    //validate dup ports
+    {
+        bool p[MAX_OUT_PORTS] = {0,0,0,0,0,0,0,0};
+        for(unsigned i = 0; i < n_outs; ++i)
+        {
+            lmk05318_out_config_t* out = outs + i;
+            if(out->port > MAX_OUT_PORTS - 1)
+                return -EINVAL;
+            if(p[out->port])
+                return -EINVAL;
+            p[out->port] = true;
+        }
+    }
+
+    //validate port0/port1 & port2/port3 have equal freqs
+    {
+        range_t* port[4] = {NULL, NULL, NULL, NULL};
+        for(unsigned i = 0; i < n_outs; ++i)
+        {
+            lmk05318_out_config_t* out = outs + i;
+            const range_t r = {out->wanted.freq - out->wanted.freq_delta_minus, out->wanted.freq + out->wanted.freq_delta_plus};
+            switch(out->port)
+            {
+            case 0:
+            case 1:
+            case 2:
+            case 3:
+                port[out->port] = malloc(sizeof(range_t)); *port[out->port] = r; break;
+            }
+        }
+
+        res = (port[0] && port[1] && memcmp(port[0], port[1], 16)) || (port[2] && port[3] && memcmp(port[2], port[3], 16)) ?
+            -EINVAL : 0;
+
+        for(unsigned i = 0; i < 4; ++i) free(port[i]);
+        if(res)
+            return res;
+    }
+
+    //first we try routing ports to APLL1
+    for(unsigned i = 0; i < n_outs; ++i)
+    {
+        lmk05318_out_config_t* out = outs + i;
+        out->solved = false;
+
+        const range_t out_freq = {out->wanted.freq - out->wanted.freq_delta_minus, out->wanted.freq + out->wanted.freq_delta_plus};
+        const range_t out_pre_div_freq = {out_freq.min, out_freq.max * max_odiv(out->port)};
+
+        if(VCO_APLL1 >= out_pre_div_freq.min && VCO_APLL1 <= out_pre_div_freq.max)
+        {
+            const uint64_t div = (uint64_t)VCO_APLL1 / out->wanted.freq;
+            const uint32_t freq = VCO_APLL1 / div;
+            if(freq >= out_freq.min && freq <= out_freq.max)
+            {
+                out->solved = true;
+                out->result.out_div = div;
+                out->result.freq    = freq;
+                out->result.mux = out->wanted.revert_phase ? OUT_PLL_SEL_APLL1_P1_INV : OUT_PLL_SEL_APLL1_P1;
+            }
+        }
+
+        //we cannot revert phase for ports NOT linked to APLL1
+        if(!out->solved && out->wanted.revert_phase)
+            return -EINVAL;
+    }
+
+    //second - try routing to APLL2
+
+    //check if all the requested freqs can be potentially solved
+    range_t f_vco2[MAX_OUT_PORTS] = {{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};
+
+    for(unsigned i = 0; i < n_outs; ++i)
+    {
+        lmk05318_out_config_t* out = outs + i;
+        if(out->solved)
+            continue;
+
+        const range_t out_freq = {out->wanted.freq - out->wanted.freq_delta_minus, out->wanted.freq + out->wanted.freq_delta_plus};
+        const range_t out_pre_div_freq = {out_freq.min * APLL2_PDIV_MIN, out_freq.max * max_odiv(out->port) * APLL2_PDIV_MAX};
+
+        uint64_t eff_min = MAX(out_pre_div_freq.min, VCO_APLL2_MIN);
+        uint64_t eff_max = MIN(out_pre_div_freq.max, VCO_APLL2_MAX);
+
+        if(eff_min > eff_max)
+            return -EINVAL;
+
+        //narrow fvco2 band
+        f_vco2[out->port].min = eff_min;
+        f_vco2[out->port].max = eff_max;
+    }
+
+    //now we find the complete fvco2 intersection
+    uint64_t f_vco2_min = VCO_APLL2_MIN;
+    uint64_t f_vco2_max = VCO_APLL2_MAX;
+
+    for(unsigned i = 0; i < n_outs; ++i)
+    {
+        if(!f_vco2[i].min && !f_vco2[i].min)
+            continue;
+
+        f_vco2_min = MAX(f_vco2_min, f_vco2[i].min);
+        f_vco2_max = MIN(f_vco2_max, f_vco2[i].max);
+    }
+
+    if(f_vco2_min > f_vco2_max)
+        return -EINVAL;
+
+    //next we go to bisect, first with PD1, second - with PD2
+
+
+    return res;
 }
 
