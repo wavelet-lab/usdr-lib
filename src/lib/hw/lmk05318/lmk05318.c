@@ -1,13 +1,17 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
+#include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
+#include "def_lmk05318.h"
 #include "lmk05318.h"
 #include "lmk05318_rom.h"
+#include "lmk05318_solver.h"
 
 #include <usdr_logging.h>
 
@@ -172,7 +176,7 @@ int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div)
     return 0;
 }
 
-int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, enum xo_type_options xo_type,
+int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, int xo_type,
                          bool xo_doubler_enabled, bool xo_fdet_bypass)
 {
     if(xo_fref < XO_FREF_MIN || xo_fref > XO_FREF_MAX)
@@ -214,7 +218,7 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, enum xo_type_opt
 }
 
 int lmk05318_tune_apll1(lmk05318_state_t* d, uint32_t freq,
-                        uint32_t xo_fref, enum xo_type_options xo_type,
+                        uint32_t xo_fref, int xo_type,
                         bool xo_doubler_enabled, bool xo_fdet_bypass, bool dpll_mode,
                         unsigned *last_div)
 {
@@ -306,83 +310,309 @@ int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
-static unsigned max_odiv(unsigned port)
+//idx is NOT a port but OD index (0..5)
+static unsigned max_odiv(unsigned idx)
 {
-    switch(port)
+    assert(idx < 6);
+
+    switch(idx)
     {
     case 0:
     case 1:
     case 2:
     case 3:
-    case 4:
-    case 5:
-    case 6: return 256;
-    case 7: return 4 * 256;
+    case 4: return 256;
+    case 5: return 4 * 256;
     }
     return 1;
 }
 
-#define MAX(a, b) (a) > (b) ? (a) : (b)
-#define MIN(a, b) (a) < (b) ? (a) : (b)
+/***************************************************************************************************************************/
 
-int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* outs, unsigned n_outs)
+static int comp_u64(const void * elem1, const void * elem2)
 {
-    struct range
+    const uint64_t* f = (uint64_t*)elem1;
+    const uint64_t* s = (uint64_t*)elem2;
+
+    if(*f < *s) return -1;
+    if(*f > *s) return  1;
+    return 0;
+}
+
+static int comp_intersection_desc(const void * elem1, const void * elem2)
+{
+    const intersection_t* f = (intersection_t*)elem1;
+    const intersection_t* s = (intersection_t*)elem2;
+
+    if(f->count < s->count) return  1;
+    if(f->count > s->count) return -1;
+    return 0;
+}
+
+int lmk05318_range_solver(const range_t* diaps, unsigned diaps_num, range_solution_t* solution)
+{
+    assert(diaps_num <= DIAP_MAX);
+    char logtmp[2048];
+    unsigned loglen;
+
+    USDR_LOG("5318", USDR_LOG_DEBUG, "input ranges:->");
+    for(unsigned i = 0; i < diaps_num; ++i)
     {
-        uint64_t min, max;
-    };
-    typedef struct range range_t;
+        USDR_LOG("5318", USDR_LOG_DEBUG, "%d -> %lu : %lu", i, diaps[i].min, diaps[i].max);
+    }
 
-    int res = 0;
-
-    if(!outs || !n_outs || n_outs > MAX_OUT_PORTS)
-        return -EINVAL;
-
-    //validate dup ports
+    // get wrapper points (ends of our diaps)
+    uint64_t wrapper_points[diaps_num * 2];
+    for(unsigned i = 0; i < diaps_num * 2; i += 2)
     {
-        bool p[MAX_OUT_PORTS] = {0,0,0,0,0,0,0,0};
-        for(unsigned i = 0; i < n_outs; ++i)
+        wrapper_points[i + 0] = diaps[i >> 1].min;
+        wrapper_points[i + 1] = diaps[i >> 1].max;
+    }
+
+    qsort(wrapper_points, diaps_num * 2, sizeof(uint64_t), comp_u64);
+
+
+    USDR_LOG("5318", USDR_LOG_DEBUG, "wrap points:-> ");
+    for(unsigned i = 0; i < diaps_num * 2; ++i)
+    {
+        USDR_LOG("5318", USDR_LOG_DEBUG, "%lu, ", wrapper_points[i]);
+    }
+
+    //and remove dups
+    uint64_t uniq_wrapper_points[diaps_num * 2];
+    unsigned uniq_wrapper_points_num = 0;
+    for(unsigned i = 0; i < diaps_num * 2; ++i)
+    {
+        if(i == 0 ||  wrapper_points[i] != wrapper_points[i-1])
         {
-            lmk05318_out_config_t* out = outs + i;
-            if(out->port > MAX_OUT_PORTS - 1)
-                return -EINVAL;
-            if(p[out->port])
-                return -EINVAL;
-            p[out->port] = true;
+            uniq_wrapper_points[uniq_wrapper_points_num++] = wrapper_points[i];
         }
     }
 
-    //validate port0/port1 & port2/port3 have equal freqs
+    loglen = snprintf(logtmp, sizeof(logtmp), "uniq wrap points:-> ");
+    for(unsigned i = 0; i < uniq_wrapper_points_num; ++i)
     {
-        range_t* port[4] = {NULL, NULL, NULL, NULL};
-        for(unsigned i = 0; i < n_outs; ++i)
+        loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen, "%lu, ", uniq_wrapper_points[i]);
+    }
+    USDR_LOG("5318", USDR_LOG_DEBUG, "%s", logtmp);
+
+    //build intersections within the intervals between wrapper points
+    const unsigned intervals_count = uniq_wrapper_points_num - 1;
+    intersection_t intersections[intervals_count];
+    for(unsigned i = 0; i < intervals_count; ++i)
+    {
+        intersection_t* is = intersections + i;
+        const uint64_t min = uniq_wrapper_points[i + 0];
+        const uint64_t max = uniq_wrapper_points[i + 1];
+
+        //initialize the insersection struct
+        is->count = 0;
+        memset(is->diap_idxs, 0, sizeof(is->diap_idxs));
+        is->range.min = min;
+        is->range.max = max;
+
+        //here is our moving point - in the middle of the diapason
+        const uint64_t point = (max + min) >> 1;
+
+        //check how many diaps it intersects
+        for(unsigned j = 0; j < diaps_num; ++j)
         {
-            lmk05318_out_config_t* out = outs + i;
-            const range_t r = {out->wanted.freq - out->wanted.freq_delta_minus, out->wanted.freq + out->wanted.freq_delta_plus};
-            switch(out->port)
+            if(point >= diaps[j].min && point <= diaps[j].max)
             {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-                port[out->port] = malloc(sizeof(range_t)); *port[out->port] = r; break;
+                is->diap_idxs[is->count++] = j;
             }
         }
-
-        res = (port[0] && port[1] && memcmp(port[0], port[1], 16)) || (port[2] && port[3] && memcmp(port[2], port[3], 16)) ?
-            -EINVAL : 0;
-
-        for(unsigned i = 0; i < 4; ++i) free(port[i]);
-        if(res)
-            return res;
     }
 
-    //first we try routing ports to APLL1
+    //sort it desc to get the most massive intersection on the top
+    qsort(intersections, intervals_count, sizeof(intersection_t), comp_intersection_desc);
+
+    USDR_LOG("5318", USDR_LOG_DEBUG, "intersects:->");
+    loglen = 0;
+    for(unsigned i = 0; i < intervals_count; ++i)
+    {
+        intersection_t* is = intersections + i;
+        loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen, "diaps {");
+        for(unsigned j = 0; j < is->count; ++j)
+            loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen, "%d,", is->diap_idxs[j]);
+        loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen,"} have %d intersections in range[%lu, %lu]", is->count, is->range.min, is->range.max);
+        USDR_LOG("5318", USDR_LOG_DEBUG, "%s", logtmp);
+    }
+
+    //reduce to find a complete solution
+    for(unsigned z = 0; z < intervals_count; ++z)
+    {
+        intersection_t* main_is = intersections + z;
+
+        if(!main_is->count)
+            break;
+
+        //after sort assume the first intersect is the best, and exclude these diaps from the others
+        unsigned excludes[diaps_num];
+        unsigned excludes_count = main_is->count;
+        memcpy(excludes, intersections + z, excludes_count * sizeof(unsigned));
+
+        for(unsigned i = z + 1; i < intervals_count; ++i)
+        {
+            intersection_t* is = intersections + i;
+            unsigned tmp_arr[diaps_num];
+            unsigned tmp_n = 0;
+
+            for(unsigned j = 0; j < is->count; ++j)
+            {
+                bool is_in = false;
+                for(unsigned k = 0; k < excludes_count; ++k)
+                {
+                    if(excludes[k] == is->diap_idxs[j])
+                    {
+                        is_in = true;
+                        break;
+                    }
+                }
+                if(!is_in)
+                    tmp_arr[tmp_n++] = is->diap_idxs[j];
+            }
+
+            //hint - if we going to collapse this intersection part, and we see it is == to the current
+            if(!tmp_n && main_is->count == is->count)
+            {
+                //and the diap ranges of them are adjacent
+                if(main_is->range.min == is->range.max || main_is->range.max == is->range.min)
+                {
+                    //merge them to one diapason
+                    main_is->range.min = MIN(main_is->range.min, is->range.min);
+                    main_is->range.max = MAX(main_is->range.max, is->range.max);
+                }
+            }
+
+            is->count = tmp_n;
+            memcpy(is->diap_idxs, tmp_arr, tmp_n * sizeof(unsigned));
+        }
+
+        //sort it again to proceed for the next loop
+        qsort(intersections + z, intervals_count - z, sizeof(intersection_t), comp_intersection_desc);
+
+        USDR_LOG("5318", USDR_LOG_DEBUG, "intersects(%d):->", z);
+        loglen = 0;
+        for(unsigned i = 0; i < intervals_count; ++i)
+        {
+            intersection_t* is = intersections + i;
+            loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen, "diaps {");
+            for(unsigned j = 0; j < is->count; ++j)
+                loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen, "%d,", is->diap_idxs[j]);
+            loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen,"} have %d intersections in range[%lu, %lu]",
+                               is->count, is->range.min, is->range.max);
+
+            USDR_LOG("5318", USDR_LOG_DEBUG, "%s", logtmp);
+        }
+    }
+
+    //we need only 2 effective diapasons due to only 2 PDs - PD1 and PD2
+    static const unsigned MAX_RANGES_IN_SOLUTION = 2;
+
+    solution->count = 0;
+    unsigned total = 0;
+
+    for(unsigned i = 0; i < MAX_RANGES_IN_SOLUTION; ++i)
+    {
+        intersection_t* is = intersections + i;
+        solution->is[i] = *is;
+        ++solution->count;
+
+        total += is->count;
+        if(total >= diaps_num)
+            break;
+    }
+
+    assert(total <= diaps_num);
+
+    if(total == diaps_num)
+    {
+        USDR_LOG("5318", USDR_LOG_DEBUG, "SOLUTION FOUND!->");
+        loglen = 0;
+        for(unsigned j = 0; j < solution->count; ++j)
+        {
+            intersection_t* is = solution->is + j;
+            loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen, "diaps {");
+            for(unsigned k = 0; k < is->count; ++k)
+                loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen, "%d,", is->diap_idxs[k]);
+            loglen += snprintf(logtmp + loglen, sizeof(logtmp) - loglen,"} have %d intersections in range[%lu, %lu]",
+                               is->count, is->range.min, is->range.max);
+
+            USDR_LOG("5318", USDR_LOG_DEBUG, "%s", logtmp);
+        }
+        return 0;
+    }
+
+    USDR_LOG("5318", USDR_LOG_DEBUG, "NO SOLUTION FOUND!");
+    return -EINVAL;
+}
+
+/***************************************************************************************************************************/
+
+static int lmk05318_check_solution(lmk05318_out_config_t* out, uint64_t fvco2, unsigned pdiv, uint64_t odiv)
+{
+    const range_t wanted = {out->wanted.freq - out->wanted.freq_delta_minus, out->wanted.freq + out->wanted.freq_delta_plus};
+    const uint32_t freq = fvco2 / pdiv / odiv;
+
+    if(freq < wanted.min)
+        return -1;
+    else if(freq > wanted.max)
+        return 1;
+    else
+        return 0;
+}
+
+int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs)
+{
+    int res = 0;
+
+    if(!_outs || !n_outs || n_outs > MAX_OUT_PORTS)
+        return -EINVAL;
+
+    // internally we have only _6_ out divs and freqs (0==1 and 2==3), except output type, but it does not matter here
+    lmk05318_out_config_t outs[MAX_OUT_PORTS - 2];
+    memset(outs, 0, sizeof(outs));
+
     for(unsigned i = 0; i < n_outs; ++i)
     {
-        lmk05318_out_config_t* out = outs + i;
-        out->solved = false;
+        lmk05318_out_config_t* out = _outs + i;
 
+        if(out->port > MAX_OUT_PORTS - 1)
+            return -EINVAL;
+
+        unsigned port;
+        if(out->port < 2)
+            port = 0;
+        else if(out->port < 4)
+            port = 1;
+        else
+            port = out->port - 2;
+
+        lmk05318_out_config_t* norm_out = outs + port;
+
+        // check dup ports and 0-1 2-3 equality
+        if(norm_out->wanted.freq &&
+            (norm_out->wanted.freq != out->wanted.freq ||
+             norm_out->wanted.freq_delta_plus != out->wanted.freq_delta_plus ||
+             norm_out->wanted.freq_delta_minus != out->wanted.freq_delta_minus ||
+             norm_out->wanted.revert_phase != out->wanted.revert_phase
+            ))
+            return -EINVAL;
+
+        *norm_out = *out;
+        norm_out->solved = false;
+    }
+
+    //now outs[] contains effective ports ordered (0..5) config.
+    //some elems may be not initialized (wanted.freq == 0) and should not be processed.
+    for(unsigned i = 0; i < MAX_OUT_PORTS - 2; ++i)
+        outs[i].solved = outs[i].wanted.freq == 0;
+
+    //first we try routing ports to APLL1
+    for(unsigned i = 0; i < MAX_OUT_PORTS - 2; ++i)
+    {
+        lmk05318_out_config_t* out = outs + i;
         const range_t out_freq = {out->wanted.freq - out->wanted.freq_delta_minus, out->wanted.freq + out->wanted.freq_delta_plus};
         const range_t out_pre_div_freq = {out_freq.min, out_freq.max * max_odiv(out->port)};
 
@@ -404,10 +634,44 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* outs, unsigned n
             return -EINVAL;
     }
 
+    /*
+        Now we have up to 6 equations with 6 + 1 + 1 = 8 vars (6 * OD + PD + Fvco2)
+        The base equation: Fout_i = Fvco2 / PD1_2 / ODi
+
+        We'll have 2 large iterations - one for PD1 and second for PD2
+        So 1) we find out all the possible solutions for PD1(/2../7) and Fvco2(VCO_APLL2_MIN..VCO_APLL2_MAX)
+              if we have the whole solution -> return OK
+              if we have NO new solutions -> abort, because PD1 and PD2 have equal params, and it's quite useless to continue
+              if we have a partial solution -> commit Fvco2 and go to PD2
+           2) we find out all the possible solutions for PD2(/2../7). Fvco2 is fixed.
+              if we solved all the outs -> return ok
+              abort otherwise
+    */
+
+
+    uint64_t fvco2_max = VCO_APLL2_MAX;
+    uint64_t fvco2_min = VCO_APLL2_MIN;
+    uint64_t fvco2 = VCO_APLL2_MAX;
+    unsigned pdiv = APLL2_PDIV_MAX;
+
+    for(unsigned i = 0; i < MAX_OUT_PORTS - 2; ++i)
+    {
+        if(outs[i].solved)
+            continue;
+
+        int res = lmk05318_check_solution(&outs[i], fvco2, pdiv, max_odiv(i));
+        if(res > 0)
+        {
+            fvco2 = (fvco2_max - fvco2_min) / 2;
+        }
+    }
+
     //second - try routing to APLL2
 
     //check if all the requested freqs can be potentially solved
-    range_t f_vco2[MAX_OUT_PORTS] = {{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};
+    //and narrow up Fvco2 effective range
+    uint64_t f_vco2_min = VCO_APLL2_MIN;
+    uint64_t f_vco2_max = VCO_APLL2_MAX;
 
     for(unsigned i = 0; i < n_outs; ++i)
     {
@@ -418,34 +682,40 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* outs, unsigned n
         const range_t out_freq = {out->wanted.freq - out->wanted.freq_delta_minus, out->wanted.freq + out->wanted.freq_delta_plus};
         const range_t out_pre_div_freq = {out_freq.min * APLL2_PDIV_MIN, out_freq.max * max_odiv(out->port) * APLL2_PDIV_MAX};
 
-        uint64_t eff_min = MAX(out_pre_div_freq.min, VCO_APLL2_MIN);
-        uint64_t eff_max = MIN(out_pre_div_freq.max, VCO_APLL2_MAX);
+        f_vco2_min = MAX(out_pre_div_freq.min, f_vco2_min);
+        f_vco2_max = MIN(out_pre_div_freq.max, f_vco2_max);
 
-        if(eff_min > eff_max)
+        if(f_vco2_min > f_vco2_max)
             return -EINVAL;
-
-        //narrow fvco2 band
-        f_vco2[out->port].min = eff_min;
-        f_vco2[out->port].max = eff_max;
     }
 
-    //now we find the complete fvco2 intersection
-    uint64_t f_vco2_min = VCO_APLL2_MIN;
-    uint64_t f_vco2_max = VCO_APLL2_MAX;
+    uint64_t fvco = f_vco2_min;
+    unsigned pdiv1 = APLL2_PDIV_MIN;
 
-    for(unsigned i = 0; i < n_outs; ++i)
+    for(; fvco <= f_vco2_max; ++fvco)
     {
-        if(!f_vco2[i].min && !f_vco2[i].min)
-            continue;
+        int res[MAX_OUT_PORTS - 2];
 
-        f_vco2_min = MAX(f_vco2_min, f_vco2[i].min);
-        f_vco2_max = MIN(f_vco2_max, f_vco2[i].max);
+        for(unsigned i = 0; i < MAX_OUT_PORTS - 2; ++i)
+        {
+            lmk05318_out_config_t* out = outs + i;
+            if(out->solved)
+                continue;
+
+            unsigned odiv = 1;
+            for(; odiv <= max_odiv(i); ++odiv)
+            {
+                res[i] = lmk05318_check_solution(&outs[i], fvco, pdiv1, odiv);
+                if(res[i] <= 0) //fvco2 matches or too low
+                    break;
+            }
+
+            bool need_increase_pd1 = res[i] > 0; //fvco2 too high
+        }
+
+
+
     }
-
-    if(f_vco2_min > f_vco2_max)
-        return -EINVAL;
-
-    //next we go to bisect, first with PD1, second - with PD2
 
 
     return res;

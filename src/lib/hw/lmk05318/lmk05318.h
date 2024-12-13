@@ -5,7 +5,6 @@
 #define LMK05318_H
 
 #include <usdr_lowlevel.h>
-#include "def_lmk05318.h"
 
 #define MAX_OUT_PORTS 8
 
@@ -23,7 +22,7 @@ struct lmk05318_state {
 
     struct {
         uint32_t fref;
-        enum xo_type_options type;
+        int type;
         bool doubler_enabled;
         bool fdet_bypass;
     } xo;
@@ -57,7 +56,7 @@ struct lmk05318_out_config
     {
         uint32_t freq;
         uint64_t out_div;
-        enum lmk05318_out_pll_sel_t mux;
+        int mux;
     } result;
 };
 typedef struct lmk05318_out_config lmk05318_out_config_t;
@@ -73,10 +72,10 @@ int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out);
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);
 
-int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, enum xo_type_options xo_type,
+int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, int xo_type,
                          bool xo_doubler_enabled, bool xo_fdet_bypass);
 int lmk05318_tune_apll1(lmk05318_state_t* d, uint32_t freq,
-                        uint32_t xo_fref, enum xo_type_options xo_type,
+                        uint32_t xo_fref, int xo_type,
                         bool xo_doubler_enabled, bool xo_fdet_bypass, bool dpll_mode,
                         unsigned *last_div);
 #endif
