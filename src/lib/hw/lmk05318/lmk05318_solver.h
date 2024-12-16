@@ -14,19 +14,4 @@ struct range
 };
 typedef struct range range_t;
 
-struct intersection
-{
-    unsigned diap_idxs[DIAP_MAX];
-    unsigned count;
-    range_t range;
-};
-typedef struct intersection intersection_t;
-
-struct range_solution
-{
-    unsigned count;
-    intersection_t is[DIAP_MAX * 2];
-};
-typedef struct range_solution range_solution_t;
-
 #endif // LMK05318_SOLVER_H
