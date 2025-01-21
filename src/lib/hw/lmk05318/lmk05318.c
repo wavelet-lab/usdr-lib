@@ -346,16 +346,6 @@ static range_t lmk05318_get_freq_range(const lmk05318_out_config_t* cfg)
     return r;
 }
 
-/*
- * The main formula for the valid div:
- *      (int)[f_in/(f_out + eps) != (int)[f_in/(f_out - eps)]
- * it means that we have a natural int divider value somewhere between [f-eps; f+eps] - the most obvious it's (int)(f_out + eps) + 1
- *
- * This function returns:
- *      odiv value - if it can be solved
- *      0 - otherwise
- */
-
 enum {
     freq_too_low = -1,
     freq_too_high = 1,
@@ -366,36 +356,24 @@ enum {
 VWLT_ATTRIBUTE(optimize("-Ofast"))
 static inline int lmk05318_get_output_divider(const lmk05318_out_config_t* cfg, uint64_t ifreq, uint64_t* div)
 {
-    if(cfg->freq_min == cfg->freq_max)
-    {
-        const uint32_t f = cfg->freq_min;
+    *div = ifreq / cfg->wanted.freq;
 
-        *div = ifreq / f;
-
-        if(*div > cfg->max_odiv)
-            return freq_too_high;
-
-        if(*div < 1)
-            return freq_too_low;
-
-        if(*div * f == ifreq)
-            return freq_ok;
-
-        return freq_invalid;
-    }
-
-    const uint64_t div_min = ifreq / cfg->freq_max;
-    const uint64_t div_max = ifreq / cfg->freq_min;
-
-    if(div_min > cfg->max_odiv)
+    if(*div > cfg->max_odiv)
         return freq_too_high;
-    if(div_max < 1)
+
+    if(*div < 1)
         return freq_too_low;
 
-    if(div_min != div_max)
-    {
-        *div = div_min + 1;
+    double f = (double)ifreq / *div;
+
+    if(f <= cfg->freq_max && f >= cfg->freq_min)
         return freq_ok;
+
+    if(*div <= cfg->max_odiv - 1)
+    {
+        f = (double)ifreq / ++(*div);
+        if(f <= cfg->freq_max && f >= cfg->freq_min)
+            return freq_ok;
     }
 
     return freq_invalid;
@@ -570,7 +548,6 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
 
 
     //second - try routing to APLL2
-    //it's HELL
     unsigned cnt_to_solve = 0;
     USDR_LOG("5318", USDR_LOG_DEBUG,"Need to solve via APLL2:");
     for(unsigned i = 0; i < MAX_REAL_PORTS; ++i)
@@ -729,9 +706,9 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
 
     if(pd_group_count > 1)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "Solution via two PDs is not yet supported properly!");
+        USDR_LOG("5318", USDR_LOG_ERROR, "Solution via two PDs is not yet supported yet!");
+        return -EINVAL;
     }
-
 
     bool all_done = false;
     uint64_t f_in;
@@ -739,7 +716,6 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     unsigned pd2 = 0;
 
     // Bisect search for PD1
-    // Here is the Abyss
     pd_array_t* pPD1 = &pd_group[0];
 
     for(pd1 = pPD1->pd_range.min; !all_done && pd1 <= pPD1->pd_range.max; ++pd1)
@@ -752,15 +728,15 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
         while (f_in_min <= f_in_max)
         {
             f_in = f_in_min + ((f_in_max - f_in_min) >> 1);
-            USDR_LOG("5318", USDR_LOG_DEBUG, "BISECT f_mid:%" PRIu64 " fvco2:%" PRIu64 "", f_in, f_in * pd1);
+            //USDR_LOG("5318", USDR_LOG_DEBUG, "BISECT f_mid:%" PRIu64 " fvco2:%" PRIu64 "", f_in, f_in * pd1);
 
             int direction_flag = 0;
             bool all_freqs_invalid = false;
 
             direction_flag = bisect_finder(outs, pd_group, pd_group_count, pd1, &pd2, f_in, &all_freqs_invalid);
 
-            USDR_LOG("5318", USDR_LOG_DEBUG, "BISECT direction_flag:%d, %s", direction_flag,
-                     all_freqs_invalid ? "invalid point!" : (direction_flag == 0 ? "all found" : (direction_flag > 0 ? "go left(down)" : "go right(up)")));
+            //USDR_LOG("5318", USDR_LOG_DEBUG, "BISECT direction_flag:%d, %s", direction_flag,
+            //         all_freqs_invalid ? "invalid point!" : (direction_flag == 0 ? "all found" : (direction_flag > 0 ? "go left(down)" : "go right(up)")));
 
             uint64_t f = 0;
             if(all_freqs_invalid)
