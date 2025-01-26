@@ -44,7 +44,7 @@ int main()
     cfg[3].wanted.type = OUT_OFF;
 
     cfg[4].port = 4;
-    cfg[4].wanted.freq = 312500000;
+    cfg[4].wanted.freq = 31250000;
     cfg[4].wanted.freq_delta_minus = DELTA_MINUS;
     cfg[4].wanted.freq_delta_plus = DELTA_PLUS;
     cfg[4].wanted.revert_phase = false;
@@ -70,6 +70,15 @@ int main()
     cfg[7].wanted.freq_delta_plus = DELTA_PLUS;
     cfg[7].wanted.revert_phase = true;
     cfg[7].wanted.type = OUT_OFF;
+
+//    VCO_APLL2_MIN = 5500000000ull,
+//    VCO_APLL2_MAX = 6250000000ull,
+/*
+    uint64_t f = 5659995555ull;
+    cfg[2].wanted.freq = cfg[3].wanted.freq =   f/7/256;
+    cfg[5].wanted.freq =                        f/2/4;
+    cfg[6].wanted.freq =                        f/7/17;
+*/
 
     int res = lmk05318_solver(NULL, cfg, 8);
     if(res)

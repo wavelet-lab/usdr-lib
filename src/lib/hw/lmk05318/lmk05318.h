@@ -44,8 +44,8 @@ typedef enum lmk05318_type lmk05318_type_t;
 struct lmk05318_out_config
 {
     unsigned port; //0..7
-    bool solved;
 
+    // these fields are inputs
     struct
     {
         uint32_t freq;
@@ -54,6 +54,7 @@ struct lmk05318_out_config
         lmk05318_type_t type;
     } wanted;
 
+    // these fields are results
     struct
     {
         double freq;
@@ -61,11 +62,13 @@ struct lmk05318_out_config
         int mux;
     } result;
 
-    //
+    //*
+    // these fields are for internal use, do not fill them
+    bool solved;
     uint64_t max_odiv;
     uint32_t freq_min, freq_max;
     uint32_t pd_min, pd_max;
-    //
+    //*
 };
 typedef struct lmk05318_out_config lmk05318_out_config_t;
 
