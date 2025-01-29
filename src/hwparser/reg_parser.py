@@ -163,6 +163,7 @@ class ParserTop:
     def __init__(self, yaml, verbose = False):
         self.raw_yaml = yaml
         self.name = yaml['name']
+        self.ini_section = yaml['ini_section'] if 'ini_section' in yaml else None
         self.desc = yaml['desc'] if 'desc' in yaml else yaml['name']
         self.reg_prefix = yaml['reg_prefix'] if 'reg_prefix' in yaml else ''
         self.page_prefix = bool(yaml['page_prefix']) if 'page_prefix' in yaml else False
