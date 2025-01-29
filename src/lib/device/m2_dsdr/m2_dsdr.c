@@ -130,13 +130,24 @@ const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
     { "/ll/spi/4/base", REG_SPI_EXT_DATA },
     { "/ll/spi/4/irq",  M2PCI_INT_SPI_EXT },
 
+    { "/ll/qspi/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_QSPIA24_R0) },
+    { "/ll/qspi/0/base", M2PCI_REG_QSPI_FLASH },
+    { "/ll/qspi/0/irq",  -1 },
+    { "/ll/qspi_flash/base", M2PCI_REG_QSPI_FLASH },
+
     { "/ll/i2c/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE) },
     { "/ll/i2c/0/base", M2PCI_REG_I2C },
     { "/ll/i2c/0/irq",  M2PCI_INT_I2C_0 },
     { "/ll/i2c/1/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE) },
     { "/ll/i2c/1/base", REG_SPI_I2C2 },
     { "/ll/i2c/1/irq",  M2PCI_INT_I2C_1 },
-    { "/ll/qspi_flash/base", M2PCI_REG_QSPI_FLASH },
+
+    { "/ll/gpio/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_GPIO15_SIMPLE) },
+    { "/ll/gpio/0/base", M2PCI_REG_GPIO_S },
+    { "/ll/gpio/0/irq",  -1 },
+    { "/ll/uart/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_UART_SIMPLE) },
+    { "/ll/uart/0/base", REG_UART_TRX },
+    { "/ll/uart/0/irq",  -1 },
 
     // Indexed area map
     { "/ll/idx_regsp/0/base", M2PCI_REG_WR_BADDR },

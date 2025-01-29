@@ -88,6 +88,17 @@ int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objec
 int usdr_device_vfs_obj_val_get_u64(pdevice_t dev, const char* fullpath, uint64_t *ovalue);
 int usdr_device_vfs_obj_val_set_by_path(pdevice_t dev, const char* fullpath, uint64_t ovalue);
 
+struct usdr_core_info {
+    const char* path;
+    unsigned busno;
+    unsigned core;
+    unsigned base;
+    int irq;
+};
+typedef struct usdr_core_info usdr_core_info_t;
+
+int usdr_device_vfs_link_get_corenfo(pdevice_t dev, const char* fullpath, const char *linkpath, usdr_core_info_t *nfo);
+
 static inline int usdr_device_vfs_obj_val_get_u32(pdevice_t dev, const char* fullpath, uint32_t *ovalue)
 {
     uint64_t v;

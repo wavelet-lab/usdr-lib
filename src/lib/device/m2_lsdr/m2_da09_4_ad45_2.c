@@ -89,6 +89,10 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
     { "/ll/i2c/0/base", M2PCI_REG_I2C },
     { "/ll/i2c/0/irq",  M2PCI_INT_I2C_0 },
 
+    { "/ll/gpio/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_GPIO15_SIMPLE) },
+    { "/ll/gpio/0/base", M2PCI_REG_GPIO_S },
+    { "/ll/gpio/0/irq",  -1 },
+
     { "/ll/qspi_flash/base", M2PCI_REG_QSPI_FLASH },
 
     // Indexed area map
@@ -114,6 +118,12 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
 
     { "/ll/sdr/max_sw_rx_chans",  1 },
     { "/ll/sdr/max_sw_tx_chans",  0 },
+
+    // Frontend interface
+    { "/ll/fe/0/gpio_busno/0", 0 },
+    { "/ll/fe/0/spi_busno/0", 4},
+    { "/ll/fe/0/i2c_busno/0", -1},
+
 };
 
 static int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
