@@ -8,6 +8,8 @@
 #include <usdr_logging.h>
 
 enum fgearbox_firs {
+    FGBOX_BP = 1,
+
     FGBOX_X2 = 2,
     FGBOX_X3 = 3,
     FGBOX_X4 = 4,
