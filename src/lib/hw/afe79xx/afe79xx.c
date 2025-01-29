@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <usdr_logging.h>
 #include <dlfcn.h>
+#include <stdlib.h>
+
 
 enum afe79xx_regs {
     CHIP_TYPE = 3,
@@ -33,6 +35,8 @@ static int afe79xx_rd(afe79xx_state_t* d, uint16_t regno, uint8_t* odata)
 
 int capi79xx_spi_reg_write(libcapi79xx_t* dev, uint16_t addr, uint8_t data)
 {
+    USDR_LOG("79xx", USDR_LOG_WARNING, "AFE_WR[%04x] <= %02x\n", addr, data);
+
     afe79xx_state_t* d = container_of(dev, afe79xx_state_t, capi);
     return afe79xx_wr(d, addr, data);
 }
@@ -50,6 +54,40 @@ int capi79xx_give_sysref_pulse(libcapi79xx_t* dev)
 }
 
 
+static int _dummy_create(libcapi79xx_t* o, enum afe79xx_chip_type chip)
+{
+    return 0;
+}
+static int _dummy_destroy(libcapi79xx_t* o)
+{
+    return 0;
+}
+static int _dummy_init(libcapi79xx_t* o, const char* configuration)
+{
+    return 0;
+}
+static int _dummy_upd_nco(libcapi79xx_t* o, unsigned type, unsigned ch, uint64_t freq, unsigned ncono, unsigned band)
+{
+    return 0;
+}
+static int _dummy_get_nco(libcapi79xx_t* o, unsigned type, unsigned ch, uint64_t* freq, unsigned ncono, unsigned band)
+{
+    *freq = 700e6;
+    return 0;
+}
+
+
+int afe79xx_create_dummy(afe79xx_state_t* out)
+{
+    out->libcapi79xx_create = &_dummy_create;
+    out->libcapi79xx_destroy = &_dummy_destroy;
+    out->libcapi79xx_init = &_dummy_init;
+
+    out->libcapi79xx_upd_nco = _dummy_upd_nco;
+    out->libcapi79xx_get_nco = _dummy_get_nco;
+
+    return 0;
+}
 
 int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_t* out)
 {
@@ -67,8 +105,13 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_
             return res;
     }
 
-    USDR_LOG("79xx", USDR_LOG_WARNING, "AFE79XX Type = %02x ChipID = %02x%02x Ver = %02x VendorID = %02x%02x\n",
-             reg_id[0], reg_id[1], reg_id[2], reg_id[3], reg_id[4], reg_id[5]);
+    const char* nl = getenv("AFECAPI");
+    if (nl) {
+        afe79xxlib = nl;
+    }
+
+    USDR_LOG("79xx", USDR_LOG_WARNING, "AFE79XX Type = %02x ChipID = %02x%02x Ver = %02x VendorID = %02x%02x LIB=`%s`\n",
+             reg_id[0], reg_id[1], reg_id[2], reg_id[3], reg_id[4], reg_id[5], afe79xxlib);
 
     out->capi.spi_reg_write = &capi79xx_spi_reg_write;
     out->capi.spi_reg_read = &capi79xx_spi_reg_read;
@@ -86,9 +129,12 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_
     out->libcapi79xx_create = (libcapi79xx_create_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_CREATE_FN);
     out->libcapi79xx_destroy = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_DESTROY_FN);
     out->libcapi79xx_init = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_INIT_FN);
-    if (!out->libcapi79xx_create ||
-        !out->libcapi79xx_destroy ||
-        !out->libcapi79xx_init) {
+
+    out->libcapi79xx_upd_nco = (libcapi79xx_upd_nco_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_UPD_NCO_FN);
+    out->libcapi79xx_get_nco = (libcapi79xx_get_nco_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_GET_NCO_FN);
+
+    if (!out->libcapi79xx_create || !out->libcapi79xx_destroy || !out->libcapi79xx_init ||
+        !out->libcapi79xx_upd_nco || !out->libcapi79xx_get_nco) {
         USDR_LOG("79xx", USDR_LOG_ERROR, "Broken CAPI AFE79XX NDA LIB `%s`!\n",
                  afe79xxlib);
 
@@ -100,7 +146,7 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_
     return out->libcapi79xx_create(&out->capi, AFE7903);
 }
 
-int afe79xx_init(afe79xx_state_t* afe)
+int afe79xx_init(afe79xx_state_t* afe, const char* configuration)
 {
-    return afe->libcapi79xx_init(&afe->capi);
+    return afe->libcapi79xx_init(&afe->capi, configuration);
 }
