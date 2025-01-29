@@ -7,6 +7,9 @@ obj-*/
 
 cmake-build-debug/
 
+# OS specific
+.DS_Store
+
 # Prerequisites
 *.d
 
