@@ -89,6 +89,37 @@ enum spi_cfg {
 };
 
 
+// 1300 Mhz passband
+// 1474.56 -- 2949.12  N2 zone
+// -50dB suppression zone: 1749 .. 2398  (~650Mhz)
+enum rx_bpf {
+    BPF_F1_MHZ = 1200,
+    BPF_F1_DB = -50,
+
+    BPF_F2_MHZ = 1450,
+    BPF_F2_DB = -3,
+
+    BPF_F2F_MHZ = 1540,
+    BPF_F2F_DB = -1, // -1.33
+
+    BPF_F3F_MHZ = 2840,
+    BPF_F3F_DB = -1,
+
+    BPF_F3_MHZ = 2900,
+    BPF_F3_DB = -3,
+
+    BPF_F4_MHZ = 3500,
+    BPF_F4_DB = -50,
+};
+
+enum bb_clean_zone {
+    RX_N2_CLEAN_MIN = 1750,
+    RX_N2_CLEAN_MAX = 2400,
+};
+
+
+
+
 
 
 static int dsdr_hiper_debug_lms8001_u1_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
