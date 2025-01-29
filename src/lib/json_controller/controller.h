@@ -103,6 +103,7 @@ enum sdr_call_type {
     SDR_RX_START_RTSA_STREAM,
     SDR_RX_STOP_STREAM,
     SDR_RX_CONTROL_STREAM,
+    SDR_GET_RX_STREAM_STATS,
 };
 
 enum {

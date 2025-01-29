@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include "device_vfs.h"
+#include "device_names.h"
 #include <fnmatch.h>
 
 static int _usdr_device_vfs_get_by_path(device_t *base, const char* fullpath, pusdr_vfs_obj_t *obj);
@@ -178,13 +179,13 @@ int usdr_device_vfs_obj_val_get_u64(pdevice_t dev, const char* fullpath, uint64_
 }
 
 
-int _oapi_vfs_set_i64_func(vfs_object_t* obj, uint64_t value)
+static int _oapi_vfs_set_i64_func(vfs_object_t* obj, uint64_t value)
 {
     usdr_vfs_obj_ops_t* ops = (usdr_vfs_obj_ops_t* )obj->data.obj;
     return ops->val_set ? ops->val_set((pdevice_t)obj->object, obj, value) : -ENOENT;
 }
 
-int _oapi_vfs_get_i64_func(vfs_object_t* obj, uint64_t* ovalue)
+static int _oapi_vfs_get_i64_func(vfs_object_t* obj, uint64_t* ovalue)
 {
     usdr_vfs_obj_ops_t* ops = (usdr_vfs_obj_ops_t* )obj->data.obj;
     return ops->val_get ? ops->val_get((pdevice_t)obj->object, obj, ovalue) : -ENOENT;
@@ -210,4 +211,67 @@ int usdr_vfs_obj_param_init_array_param(pdevice_t dev,
     }
 
     return 0;
+}
+
+static int _usdr_device_vfs_concat(pdevice_t dev, const char* path, const char* entity, unsigned max, char* out)
+{
+    snprintf(out, max, "%s/%s", path, entity);
+    return 0;
+}
+
+static int _usdr_device_vfs_concatidx(pdevice_t dev, const char* path, unsigned index, unsigned max, char* out)
+{
+    snprintf(out, max, "%s/%d", path, index);
+    return 0;
+}
+
+
+int usdr_device_vfs_link_get_corenfo(pdevice_t dev, const char* fullpath, const char* linkpath, usdr_core_info_t *nfo)
+{
+    int res;
+    uint64_t val;
+    char srch_path[VFS_MAX_PATH];
+    char lnk_path[VFS_MAX_PATH];
+    const char* basepath;
+
+    res = usdr_device_vfs_obj_val_get_u64(dev, fullpath, &val);
+    if (res == -ENOENT) {
+        // Link is unavailable, assume it's a basename
+        basepath = fullpath;
+        nfo->path = basepath;
+        nfo->busno = ~0u;
+    } else if (res == 0) {
+        // TODO: Type checking! but assume with page is non-valid pointer, so backing up to link
+        if (val < 4096) {
+            res = _usdr_device_vfs_concatidx(dev, linkpath, val, sizeof(srch_path), srch_path);
+            if (res)
+                return res;
+
+            basepath = lnk_path;
+            nfo->path = NULL;
+            nfo->busno = val;
+        } else {
+            basepath = (const char*)(uintptr_t)val;
+            nfo->path = basepath;
+            nfo->busno = ~0u;
+        }
+    } else {
+        return res;
+    }
+
+    res = 0;
+
+    res = res ? res : _usdr_device_vfs_concat(dev, nfo->path, DNP_BASE, sizeof(srch_path), srch_path);
+    res = res ? res : usdr_device_vfs_obj_val_get_u64(dev, basepath, &val);
+    nfo->base = res ? ~0u : val;
+
+    res = res ? res : _usdr_device_vfs_concat(dev, nfo->path, DNP_CORE, sizeof(srch_path), srch_path);
+    res = res ? res : usdr_device_vfs_obj_val_get_u64(dev, basepath, &val);
+    nfo->core = res ? ~0u : val;
+
+    res = res ? res : _usdr_device_vfs_concat(dev, nfo->path, DNP_IRQ, sizeof(srch_path), srch_path);
+    res = res ? res : usdr_device_vfs_obj_val_get_u64(dev, basepath, &val);
+    nfo->irq = res ? -1 : val;
+
+    return res;
 }

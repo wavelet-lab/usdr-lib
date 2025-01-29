@@ -26,7 +26,8 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
             rtsa_discharge_u16(&pwr[j], decay_rate_pw2);
         }
 
-        float p = fcale_mpy * wvlt_log2f_fn(in[i][0]*in[i][0] + in[i][1]*in[i][1] + mine) + corr;
+        const unsigned k = i - diap.from;
+        float p = fcale_mpy * wvlt_log2f_fn(in[k][0]*in[k][0] + in[k][1]*in[k][1] + mine) + corr;
 
         p -= st->upper_pwr_bound;
         p = fabs(p);

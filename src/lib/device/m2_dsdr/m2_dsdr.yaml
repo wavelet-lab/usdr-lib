@@ -1,0 +1,577 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         M2_DSDR
+desc:         DSDR M2 board
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: VIRTUAL
+    usdr_path: /debug/hw/m2dsdr/0/reg
+addr_width:   8
+data_width:   24
+page_prefix:  True
+field_prefix: [ Page, RegName ]
+field_macros: True
+
+pages:
+  - name: V0
+    regs:
+#
+      - addr: 0x20
+        name: SW_RX_FILTER
+        fields:
+#
+#       RX filters switching
+#       ---IN---    ---OUT--
+#       V3 V2 V1    V3 V2 V1
+#       --+--+--    --+--+--
+#        0  1  1     0  1  1  = 0.4 - 1.0 GHz
+#        0  1  0     1  0  0  = 1.0 - 2.0 GHz
+#        0  0  1     1  0  1  = 2.0 - 3.5 GHz
+#        1  0  1     0  0  1  = 2.5 - 5.0 GHz
+#        1  0  0     0  1  0  = 3.5 - 7.0 GHz
+#
+          - bits: "8,23,22"
+            name: IN_CHA
+            desc: RX IN filters switch for Channel A
+            opts:
+                0b000: MUTE0
+                0b011: 400_1000M
+                0b010: 1000_2000M
+                0b001: 2000_3500M
+                0b101: 2500_5000M
+                0b100: 3500_7100M
+                0b110: MUTE1
+                0b111: MUTE2
+#
+          - bits: "15,6,7"
+            name: OUT_CHA
+            desc: RX OUT filters switch for Channel A
+            opts:
+                0b000: MUTE0
+                0b011: 400_1000M
+                0b100: 1000_2000M
+                0b101: 2000_3500M
+                0b001: 2500_5000M
+                0b010: 3500_7100M
+                0b110: MUTE1
+                0b111: MUTE2
+#
+          - bits: "9,21,20"
+            name: IN_CHB
+            desc: RX IN filters switch for Channel B
+            opts:
+                0b000: MUTE0
+                0b011: 400_1000M
+                0b010: 1000_2000M
+                0b001: 2000_3500M
+                0b101: 2500_5000M
+                0b100: 3500_7100M
+                0b110: MUTE1
+                0b111: MUTE2
+#
+          - bits: "14,4,5"
+            name: OUT_CHB
+            desc: RX OUT filters switch for Channel B
+            opts:
+                0b000: MUTE0
+                0b011: 400_1000M
+                0b100: 1000_2000M
+                0b101: 2000_3500M
+                0b001: 2500_5000M
+                0b010: 3500_7100M
+                0b110: MUTE1
+                0b111: MUTE2
+#
+          - bits: "10,19,18"
+            name: IN_CHC
+            desc: RX IN filters switch for Channel C
+            opts:
+                0b000: MUTE0
+                0b011: 400_1000M
+                0b010: 1000_2000M
+                0b001: 2000_3500M
+                0b101: 2500_5000M
+                0b100: 3500_7100M
+                0b110: MUTE1
+                0b111: MUTE2
+#
+          - bits: "13,3,2"
+            name: OUT_CHC
+            desc: RX OUT filters switch for Channel C
+            opts:
+                0b000: MUTE0
+                0b011: 400_1000M
+                0b100: 1000_2000M
+                0b101: 2000_3500M
+                0b001: 2500_5000M
+                0b010: 3500_7100M
+                0b110: MUTE1
+                0b111: MUTE2
+#
+          - bits: "11,17,16"
+            name: IN_CHD
+            desc: RX IN filters switch for Channel D
+            opts:
+                0b000: MUTE0
+                0b011: 400_1000M
+                0b010: 1000_2000M
+                0b001: 2000_3500M
+                0b101: 2500_5000M
+                0b100: 3500_7100M
+                0b110: MUTE1
+                0b111: MUTE2
+#
+          - bits: "12,0,1"
+            name: OUT_CHD
+            desc: RX OUT filters switch for Channel D
+            opts:
+                0b000: MUTE0
+                0b011: 400_1000M
+                0b100: 1000_2000M
+                0b101: 2000_3500M
+                0b001: 2500_5000M
+                0b010: 3500_7100M
+                0b110: MUTE1
+                0b111: MUTE2
+#
+      - addr: 0x21
+        name: RX_LNA_CTRL
+        fields:
+          - bits: "7:6"
+            name: CHD
+            desc: RX LNA control mask for Channel D
+            opts:
+                0b00: LNA_ON_BYPASS_OFF
+                0b01: LNA_OFF_BYPASS_OFF
+                0b10: LNA_OFF_BYPASS_ON
+                0b11: LNA_OFF_BYPASS_ON
+#
+          - bits: "5:4"
+            name: CHC
+            desc: RX LNA control mask for Channel C
+            opts:
+                0b00: LNA_ON_BYPASS_OFF
+                0b01: LNA_OFF_BYPASS_OFF
+                0b10: LNA_OFF_BYPASS_ON
+                0b11: LNA_OFF_BYPASS_ON
+#
+          - bits: "3:2"
+            name: CHB
+            desc: RX LNA control mask for Channel B
+            opts:
+                0b00: LNA_ON_BYPASS_OFF
+                0b01: LNA_OFF_BYPASS_OFF
+                0b10: LNA_OFF_BYPASS_ON
+                0b11: LNA_OFF_BYPASS_ON
+#
+          - bits: "1:0"
+            name: CHA
+            desc: RX LNA control mask for Channel A
+            opts:
+                0b00: LNA_ON_BYPASS_OFF
+                0b01: LNA_OFF_BYPASS_OFF
+                0b10: LNA_OFF_BYPASS_ON
+                0b11: LNA_OFF_BYPASS_ON
+#
+      - addr: 0x22
+        name: ROUTE
+        fields:
+          - bits: "8"
+            name: IN_RX_CHA
+            desc: Channel A RX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: HIGH
+                0b1: LOW
+          - bits: "6"
+            name: OUT_RX_CHA
+            desc: Channel A RX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: LOW
+                0b1: HIGH
+#
+          - bits: "9"
+            name: IN_RX_CHB
+            desc: Channel B RX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: HIGH
+                0b1: LOW
+          - bits: "7"
+            name: OUT_RX_CHB
+            desc: Channel B RX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: LOW
+                0b1: HIGH
+#
+          - bits: "10"
+            name: IN_RX_CHC
+            desc: Channel C RX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: HIGH
+                0b1: LOW
+          - bits: "4"
+            name: OUT_RX_CHC
+            desc: Channel C RX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: LOW
+                0b1: HIGH
+#
+          - bits: "11"
+            name: IN_RX_CHD
+            desc: Channel D RX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: HIGH
+                0b1: LOW
+          - bits: "5"
+            name: OUT_RX_CHD
+            desc: Channel D RX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: LOW
+                0b1: HIGH
+#
+          - bits: "12"
+            name: IN_TX_CHA
+            desc: Channel A TX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: LOW
+                0b1: HIGH
+          - bits: "3"
+            name: OUT_TX_CHA
+            desc: Channel A TX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: HIGH
+                0b1: LOW
+#
+          - bits: "13"
+            name: IN_TX_CHB
+            desc: Channel B TX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: LOW
+                0b1: HIGH
+          - bits: "2"
+            name: OUT_TX_CHB
+            desc: Channel B TX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: HIGH
+                0b1: LOW
+#
+          - bits: "14"
+            name: IN_TX_CHC
+            desc: Channel C TX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: LOW
+                0b1: HIGH
+          - bits: "1"
+            name: OUT_TX_CHC
+            desc: Channel C TX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: HIGH
+                0b1: LOW
+#
+          - bits: "15"
+            name: IN_TX_CHD
+            desc: Channel D TX IN selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: LOW
+                0b1: HIGH
+          - bits: "0"
+            name: OUT_TX_CHD
+            desc: Channel D TX OUT selection, 2.5-7.1 GHz (HIGH) or 0.4-3.5 GHz (LOW)
+            opts:
+                0b0: HIGH
+                0b1: LOW
+#
+      - addr: 0x23
+        name: MISC0
+        fields:
+          - bits: "7"
+            name: NOT_USED7
+            desc: Not used
+          - bits: "6"
+            name: ENABLE_TCXO_LMS8002M
+            desc: Enable LMS8002M temperature compensated crystal oscillator
+          - bits: "5"
+            name: VCC_DIGITAL_1P8V
+            desc: Logical 1 (+1.8v)
+          - bits: "4"
+            name: VCC_DIGITAL_1P8V
+            desc: Logical 1 (+1.8v)
+          - bits: "3"
+            name: REF_EN_OSC
+            desc: Enable 25MHz reference clock oscillator
+          - bits: "2"
+            name: REF_EN_GPS
+            desc: Enable GPS module
+          - bits: "1"
+            name: ENABLE_7P5VIN
+            desc: Enable +7.5v power supply for TX amps
+          - bits: "0"
+            name: ENABLE_5VIN
+            desc: Enable +5v power supply for RX amps
+#
+      - addr: 0x24
+        name: LMS8001_RESET
+        fields:
+          - bits: "7"
+            name: NOT_USED7
+            desc: Not used
+          - bits: "6"
+            name: HIGH_RX_CHCD
+            desc: RX circuit LMS8001B reset (channels C and D, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "5"
+            name: LOW_RX_CHCD
+            desc: RX circuit LMS8001A reset (channels C and D, 0.4-3.5 GHz (LOW) mode)
+          - bits: "4"
+            name: HIGH_RX_CHAB
+            desc: RX circuit LMS8001B reset (channels A and B, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "3"
+            name: LOW_RX_CHAB
+            desc: RX circuit LMS8001A reset (channels A and B, 0.4-3.5 GHz (LOW) mode)
+          - bits: "2"
+            name: HIGH_TX_CHAB
+            desc: TX circuit LMS8001B reset (channels A and B, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "1"
+            name: HIGH_TX_CHCD
+            desc: TX circuit LMS8001B reset (channels C and D, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "0"
+            name: NOT_USED0
+            desc: Not used
+#
+      - addr: 0x25
+        name: SW_50R_LNAtoPA
+        fields:
+          - bits: "3"
+            name: CHD
+            desc: 50 ohm absorptive LNA to PA switch selection, channel D
+          - bits: "2"
+            name: CHC
+            desc: 50 ohm absorptive LNA to PA switch selection, channel C
+          - bits: "1"
+            name: CHB
+            desc: 50 ohm absorptive LNA to PA switch selection, channel B
+          - bits: "0"
+            name: CHA
+            desc: 50 ohm absorptive LNA to PA switch selection, channel A
+#
+      - addr: 0x26
+        name: FAN
+        fields:
+          - bits: "3"
+            name: 0_PWM
+            desc: FAN0 PWM input
+          - bits: "2"
+            name: 0_TACH
+            desc: FAN0 tachometer output
+          - bits: "1"
+            name: 1_PWM
+            desc: FAN1 PWM input
+          - bits: "0"
+            name: 1_TACH
+            desc: FAN1 tachometer output
+#
+      - addr: 0x27
+        name: CHA
+        fields:
+          - bits: "7"
+            name: EN_TX
+            desc: Enable TX PA & post-attenuator TX_RF amp
+          - bits: "6"
+            name: EN_VADJ
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
+          - bits: "5"
+            name: EN_RX
+            desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "2"
+            name: SW_PA_ONOFF
+            desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
+          - bits: "1"
+            name: SW_RX_TDDFDD
+            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+          - bits: "0"
+            name: SW_RXTX
+            desc: Switch TRX antenna to TX(0) or RX(1)
+#
+      - addr: 0x28
+        name: CHB
+        fields:
+          - bits: "7"
+            name: EN_TX
+            desc: Enable TX PA & post-attenuator TX_RF amp
+          - bits: "6"
+            name: EN_VADJ
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
+          - bits: "5"
+            name: EN_RX
+            desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "2"
+            name: SW_PA_ONOFF
+            desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
+          - bits: "1"
+            name: SW_RX_TDDFDD
+            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+          - bits: "0"
+            name: SW_RXTX
+            desc: Switch TRX antenna to TX(0) or RX(1)
+#
+      - addr: 0x29
+        name: CHC
+        fields:
+          - bits: "7"
+            name: EN_TX
+            desc: Enable TX PA & post-attenuator TX_RF amp
+          - bits: "6"
+            name: EN_VADJ
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
+          - bits: "5"
+            name: EN_RX
+            desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "2"
+            name: SW_PA_ONOFF
+            desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
+          - bits: "1"
+            name: SW_RX_TDDFDD
+            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+          - bits: "0"
+            name: SW_RXTX
+            desc: Switch TRX antenna to TX(0) or RX(1)
+#
+      - addr: 0x2a
+        name: CHD
+        fields:
+          - bits: "7"
+            name: EN_TX
+            desc: Enable TX PA & post-attenuator TX_RF amp
+          - bits: "6"
+            name: EN_VADJ
+            desc: supply +1.2v adjustment voltage to TX PA & post-attenuator RX_RF amp
+          - bits: "5"
+            name: EN_RX
+            desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "2"
+            name: SW_PA_ONOFF
+            desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
+          - bits: "1"
+            name: SW_RX_TDDFDD
+            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+          - bits: "0"
+            name: SW_RXTX
+            desc: Switch TRX antenna to TX(0) or RX(1)
+#
+      - addr: 0x2b
+        name: LMS8001
+        fields:
+          - bits: "8"
+            name: LOW_RX_CHAB_SEN
+            desc: RX circuit LMS8001A SPI SEN (channels A and B, 0.4-3.5 GHz (LOW) mode)
+          - bits: "7"
+            name: LOW_RX_CHCD_SEN
+            desc: RX circuit LMS8001A SPI SEN (channels C and D, 0.4-3.5 GHz (LOW) mode)
+          - bits: "6"
+            name: HIGH_RX_CHAB_SEN
+            desc: RX circuit LMS8001B SPI SEN (channels A and B, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "5"
+            name: HIGH_RX_CHCD_SEN
+            desc: RX circuit LMS8001B SPI SEN (channels C and D, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "4"
+            name: HIGH_TX_CHAB_SEN
+            desc: TX circuit LMS8001B SPI SEN (channels A and B, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "3"
+            name: HIGH_TX_CHCD_SEN
+            desc: TX circuit LMS8001B SPI SEN (channels C and D, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "2"
+            name: SPI_CLK
+            desc: LMS8001 CLK pin (in)
+          - bits: "1"
+            name: SPI_SDO
+            desc: LMS8001 SDO pin (out)
+          - bits: "0"
+            name: SPI_SDIO
+            desc: LMS8001 SDIO pin (in/out)
+#
+      - addr: 0x2c
+        name: GPS
+        fields:
+          - bits: "2"
+            name: TX
+            desc: GPS module UART TXD
+          - bits: "1"
+            name: RX
+            desc: GPS module UART RXD
+          - bits: "0"
+            name: 1PPS
+            desc: 1PPS - from GSM module if GPS enabled, from J26(external 1PPS) otherwise
+#
+      - addr: 0x2d
+        name: EXTENDER
+        fields:
+          - bits: "3"
+            name: SDA3
+            desc: U114/U113 extenders SDA
+          - bits: "2"
+            name: SCL3
+            desc: U114/U113 extenders SCL
+          - bits: "1"
+            name: REF_SCL
+            desc: U115 extender SCL
+          - bits: "0"
+            name: REF_SDA
+            desc: U115 exterder SDA
+#
+      - addr: 0x2e
+        name: ATT_CHA
+        fields:
+          - bits: "3:0"
+            name: RX_LEVEL
+            desc: Channel A RX attenuator settings
+#
+#            V1  |  V2  |  V3  |  V4
+#           8 dB | 4 dB | 2 dB | 1 dB
+#           -----+------+------+------
+#             1  |  1   |  1   |  1   | = 0 dB
+#             1  |  1   |  1   |  0   | = 1 dB
+#             1  |  1   |  0   |  1   | = 2 dB
+#             1  |  0   |  1   |  1   | = 4 dB
+#             0  |  1   |  1   |  1   | = 8 dB
+#             0  |  0   |  0   |  0   | = 15 dB
+# Any combination of the above states will provide an attenuation
+# approximately equal to the sum of the bits selected.
+#
+      - addr: 0x2f
+        name: ATT_CHB
+        fields:
+          - bits: "3:0"
+            name: RX_LEVEL
+            desc: Channel B RX attenuator settings
+#
+      - addr: 0x30
+        name: ATT_CHC
+        fields:
+          - bits: "3:0"
+            name: RX_LEVEL
+            desc: Channel C RX attenuator settings
+#
+      - addr: 0x31
+        name: ATT_CHD
+        fields:
+          - bits: "3:0"
+            name: RX_LEVEL
+            desc: Channel D RX attenuator settings
+#
+      - addr: 0x32
+        name: MISC1
+        fields:
+          - bits: "3"
+            name: REFCTRL_SEL
+            desc: Referense clock selector switch; 0 - internal 25MHz oscillator, 1 - external clock from J27
+          - bits: "2"
+            name: REF_SEN
+            desc: ADF4002 Load Enable pin. When LE goes high, the data stored in the shift registers is loaded into one of the four latches; the latch is selected using the control bits
+          - bits: "1"
+            name: REF_SCLK
+            desc: ADF4002 Serial Clock Input. This serial clock is used to clock in the serial data to the registers. The data is latched into the 24-bit shift register on the CLK rising edge.
+          - bits: "0"
+            name: REF_SDIO
+            desc: ADF4002 Serial Data Input. The serial data is loaded MSB first with the two LSBs being the control bits.
+#

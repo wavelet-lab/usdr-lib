@@ -18,12 +18,18 @@ struct afe79xx_state {
     libcapi79xx_create_fn_t libcapi79xx_create;
     libcapi79xx_destroy_fn_t libcapi79xx_destroy;
     libcapi79xx_init_fn_t libcapi79xx_init;
+
+    libcapi79xx_upd_nco_fn_t libcapi79xx_upd_nco;
+    libcapi79xx_get_nco_fn_t libcapi79xx_get_nco;
+
 };
 typedef struct afe79xx_state afe79xx_state_t;
 
 
 int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_t* out);
-int afe79xx_init(afe79xx_state_t* afe);
+int afe79xx_init(afe79xx_state_t* afe, const char *configuration);
 
+
+int afe79xx_create_dummy(afe79xx_state_t* afe);
 
 #endif

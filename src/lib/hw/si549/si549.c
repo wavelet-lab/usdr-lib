@@ -41,6 +41,8 @@ int si549_set_freq(lldev_t dev, subdev_t subdev, lsopaddr_t addr,
     if ((output < si549_Fout_min) || (output > si549_Fout_max))
         return -ERANGE;
 
+    int res;
+    uint8_t id;
     uint64_t fvco;
     unsigned lsdiv;
     unsigned lsdiv_rv;
@@ -72,24 +74,33 @@ int si549_set_freq(lldev_t dev, subdev_t subdev, lsopaddr_t addr,
     frem /= si549_xtal;
     fbdiv_frac = frem;
 
+    res = si549_reg_rd(dev, subdev, addr, 0, &id);
+    if (res)
+        return res;
+
+    if (id != 0x31) {
+        USDR_LOG("S549", USDR_LOG_WARNING, "Si549 Incorrect DEVICE_TYPE=%02x!\n", id);
+        return -EIO;
+    }
+
     USDR_LOG("S549", USDR_LOG_INFO, "Si549 LSDIV=%d/%d, HSDIV=%d, VCO=%" PRIu64 " FBDIV=%u/%u\n", lsdiv, lsdiv_rv, hsdiv, fvco, fbdiv, fbdiv_frac);
-    si549_reg_wr(dev, subdev, addr, 255, 0);
-    si549_reg_wr(dev, subdev, addr, 69, 0);
-    si549_reg_wr(dev, subdev, addr, 17, 0);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 255, 0);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 69, 0);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 17, 0);
 
-    si549_reg_wr(dev, subdev, addr, 23, hsdiv & 0xff);
-    si549_reg_wr(dev, subdev, addr, 24, ((lsdiv_rv) << 4) | ((hsdiv >> 8) & 0x7));
-    si549_reg_wr(dev, subdev, addr, 26, fbdiv_frac & 0xff);
-    si549_reg_wr(dev, subdev, addr, 27, (fbdiv_frac >> 8) & 0xff);
-    si549_reg_wr(dev, subdev, addr, 28, (fbdiv_frac >> 16) & 0xff);
-    si549_reg_wr(dev, subdev, addr, 29, (fbdiv_frac >> 24) & 0xff);
-    si549_reg_wr(dev, subdev, addr, 30, fbdiv & 0xff);
-    si549_reg_wr(dev, subdev, addr, 31, (fbdiv >> 8) & 0xff);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 23, hsdiv & 0xff);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 24, ((lsdiv_rv) << 4) | ((hsdiv >> 8) & 0x7));
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 26, fbdiv_frac & 0xff);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 27, (fbdiv_frac >> 8) & 0xff);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 28, (fbdiv_frac >> 16) & 0xff);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 29, (fbdiv_frac >> 24) & 0xff);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 30, fbdiv & 0xff);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 31, (fbdiv >> 8) & 0xff);
 
-    si549_reg_wr(dev, subdev, addr, 7, 8);
-    si549_reg_wr(dev, subdev, addr, 17, 1);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 7, 8);
+    res = res ? res : si549_reg_wr(dev, subdev, addr, 17, 1);
 
-    return 0;
+    return res;
 }
 
 int si549_enable(lldev_t dev, subdev_t subdev, lsopaddr_t addr, bool enable)

@@ -166,7 +166,7 @@ int _sfetrx4_stream_recv(stream_handle_t* str,
     if (nfo) {
         nfo->fsymtime = stream->r_ts;
         nfo->totsyms = stream->pkt_symbs;
-        nfo->totlost = 0;
+        nfo->totlost = stream->stats.dropped;
         nfo->extra = (oob_size >= 16) ? oob_data[1] : 0;
     }
 
@@ -636,7 +636,8 @@ static int initialize_stream_tx_32(device_t* device,
                                    struct parsed_data_format pfmt,
                                    stream_sfetrx_dma32_t** outu,
                                    bool need_fd,
-                                   bool data_lane_bifurcation)
+                                   bool data_lane_bifurcation,
+                                   bool dont_check_fw)
 {
     int res;
     stream_sfetrx_dma32_t* strdev;
@@ -656,16 +657,18 @@ static int initialize_stream_tx_32(device_t* device,
     if (logicchs > 2)
         return -EINVAL;
 
-    uint64_t fwid;
-    res = usdr_device_vfs_obj_val_get_u64(device, "/dm/revision", &fwid);
-    if (res) {
-        USDR_LOG("DSTR", USDR_LOG_ERROR, "Unable to check comatability firmware!\n");
-    }
-    if (get_xilinx_rev_h(fwid & 0xffffffff) < get_xilinx_rev_h(MINIM_FWID_COMPAT)) {
-        USDR_LOG("DSTR", USDR_LOG_ERROR, "You're running outdated firmware, please update! CurrentID=%08x MinimalID=%08x\n",
-                 (uint32_t)(fwid & 0xffffffff),
-                 MINIM_FWID_COMPAT);
-        return -ECONNRESET;
+    if (!dont_check_fw) {
+        uint64_t fwid;
+        res = usdr_device_vfs_obj_val_get_u64(device, "/dm/revision", &fwid);
+        if (res) {
+            USDR_LOG("DSTR", USDR_LOG_ERROR, "Unable to check comatability firmware!\n");
+        }
+        if (get_xilinx_rev_h(fwid & 0xffffffff) < get_xilinx_rev_h(MINIM_FWID_COMPAT)) {
+            USDR_LOG("DSTR", USDR_LOG_ERROR, "You're running outdated firmware, please update! CurrentID=%08x MinimalID=%08x\n",
+                     (uint32_t)(fwid & 0xffffffff),
+                     MINIM_FWID_COMPAT);
+            return -ECONNRESET;
+        }
     }
 
     unsigned bits_per_single_sym = 32; // We support I/Q 16 bit for now only
@@ -807,6 +810,7 @@ int create_sfetrx4_stream(device_t* device,
     bool need_fd = (flags & DMS_FLAG_NEED_FD) == DMS_FLAG_NEED_FD;
     bool need_tx_stat = (flags & DMS_FLAG_NEED_TX_STAT) == DMS_FLAG_NEED_TX_STAT;
     bool bifurcation = (flags & DMS_FLAG_BIFURCATION) == DMS_FLAG_BIFURCATION;
+    bool dontcheck = (flags & DMS_DONT_CHECK_FWID) == DMS_DONT_CHECK_FWID;
     char dfmt[256];
     int res;
 
@@ -828,7 +832,7 @@ int create_sfetrx4_stream(device_t* device,
         res = initialize_stream_tx_32(device, channels, pktsyms,
                                        sx_base, sx_cfg_base, pfmt,
                                        (stream_sfetrx_dma32_t** )outu,
-                                       need_fd, bifurcation);
+                                       need_fd, bifurcation, dontcheck);
         break;
     default:
         return -EINVAL;

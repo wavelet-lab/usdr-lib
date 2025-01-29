@@ -150,7 +150,18 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, unsi
     const unsigned gpiobase = 3;
     const unsigned uartbase = 54;
     const unsigned spiext_cfg = 58;
+
     memset(&dfe, 0, sizeof(dfe));
+
+    usdr_core_info_t fe_gpio;
+    usdr_core_info_t fe_uart;
+    uint64_t spi_busno  = ~0ul;
+    uint64_t i2c_busno  = ~0ul;
+
+    usdr_device_vfs_link_get_corenfo(base, "/ll/fe/0/gpio_busno/0", "/ll/gpio", &fe_gpio);
+    usdr_device_vfs_link_get_corenfo(base, "/ll/fe/0/uart_busno/0", "/ll/uart", &fe_uart);
+    usdr_device_vfs_obj_val_get_u64(base, "/ll/fe/0/spi_busno/0", &spi_busno);
+    usdr_device_vfs_obj_val_get_u64(base, "/ll/fe/0/i2c_busno/0", &i2c_busno);
 
     for (i = 0; i < FET_COUNT; i++) {
         const char* hint_strip = NULL;
@@ -169,7 +180,7 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, unsi
         switch (i) {
         case FET_PICE_BREAKOUT: res = board_exm2pe_init(dev, 0, gpiobase, uartbase, hint_strip, compat, def_i2c_loc, &dfe.fe.exm2pe); break;
         case FET_PCIE_DEVBOARD: res = board_ext_pciefe_init(dev, 0, gpiobase, uartbase, hint_strip, compat, def_i2c_loc, &dfe.fe.devboard); break;
-        case FET_PCIE_SUPER_SYNC: res = board_ext_supersync_init(dev, 0, gpiobase, def_i2c_loc, &dfe.fe.supersync); break;
+        case FET_PCIE_SUPER_SYNC: res = board_ext_supersync_init(dev, 0, gpiobase, compat, def_i2c_loc, &dfe.fe.supersync); break;
         case FET_PCIE_SIMPLE_SYNC: res = board_ext_simplesync_init(dev, 0, gpiobase, compat, def_i2c_loc, &dfe.fe.simplesync); break;
         case FET_PCIE_FE1005000: res = ext_fe_100_5000_init(dev, 0, gpiobase, spiext_cfg, 4, hint_strip, compat, &dfe.fe.fe_100_5000); break;
         default: return -EIO;
@@ -244,7 +255,7 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, unsi
 
 void* device_fe_to(struct dev_fe* obj, const char* type)
 {
-    if (strcmp(s_fe_names[obj->type], type) != 0) {
+    if (!obj || strcmp(s_fe_names[obj->type], type) != 0) {
         return NULL;
     }
 

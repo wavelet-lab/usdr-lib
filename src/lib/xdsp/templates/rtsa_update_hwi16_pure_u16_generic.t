@@ -42,7 +42,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
             rtsa_discharge_u16(&pwr[j], decay_rate_pw2);
         }
 
-        uint16_t tmp = (in[i] - hwi16_consts->c0);
+        uint16_t tmp = (in[i - diap.from] - hwi16_consts->c0);
         tmp = tmp >> hwi16_consts->shr0;
         tmp *= (uint16_t)hwi16_consts->org_scale;
         int16_t pi = (tmp >> hwi16_consts->shr1) - hwi16_consts->c1;

@@ -5,9 +5,13 @@
 
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QRegExpValidator, QPalette, QColor
+from PyQt5.QtGui import QRegExpValidator, QPalette, QColor, QIcon
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QRegExp
 import math
+import configparser
+import re
+import time
+
 
 class LongSpinBox(QAbstractSpinBox):
     valueChanged = pyqtSignal(int)
@@ -29,16 +33,16 @@ class LongSpinBox(QAbstractSpinBox):
 
     def text(self):
         return str(self.int_value)
-    
+
     def value(self):
         return self.int_value
-    
+
     def setValue(self, val):
         if val < self.minimum:
             val = self.minimum
         elif val > self.maximum:
             val = self.maximum
-        
+
         if self.int_value != val:
             self.int_value = val
             self.lineEdit().setText(self.text())
@@ -50,7 +54,7 @@ class LongSpinBox(QAbstractSpinBox):
     def stepUp(self):
         print("UP")
         self.setValue(self.int_value + 1)
-    
+
     def stepDown(self):
         print("DOWN")
         self.setValue(self.int_value - 1)
@@ -74,7 +78,8 @@ class QtBuilderPage(QWidget):
         self.reg_cnt = {}
         self.reg_big = {}
         self.ignore = False
-        
+        self.conf = conf
+
         for i, reg in enumerate(page.regs):
             hidx = 0
             if reg.ucnt == 1:
@@ -93,7 +98,7 @@ class QtBuilderPage(QWidget):
             label.setToolTip(reg.name)
             self.layout.addWidget(label, i, hidx, 1, 1)
             hidx += 1
-            
+
             lw = QWidget()
             lv = QHBoxLayout()
             self.raw_lcds[reg.addr_l] = []
@@ -103,13 +108,13 @@ class QtBuilderPage(QWidget):
                 raw.setToolTip("Addr: 0x%02x" % (reg.addr_l + l))
                 raw.setMinimumHeight(40)
                 raw.setHexMode()
-                raw.setNumDigits(top.data_width / 4)
+                raw.setNumDigits(top.data_width // 4)
                 self.raw_lcds[reg.addr_l].append(raw)
                 lv.addWidget(raw)
             lw.setLayout(lv)
             self.layout.addWidget(lw, i, hidx, 1, 1)
             hidx += 1
-            
+
             fuis = []
             # Parse bit fields
             for j, field in enumerate(reg.fields):
@@ -117,12 +122,12 @@ class QtBuilderPage(QWidget):
                 fname.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 fname.setToolTip("Bits[%d:%d]" % (field.bits_h, field.bits_l))
                 self.layout.addWidget(fname, i + 0, hidx + 2 * j + 0)
-                
+
                 if len(field.opts) > 1:
                     part = QComboBox()
                     for n, v in enumerate(field.opts):
                         part.addItem("%d -- %s" % (n, v))
-                        
+
                     part.currentIndexChanged.connect(lambda index, a = int(reg.addr_l), u = reg.ucnt: self.update_control(index, a, u))
                 elif field.vmax == 1:
                     part = QCheckBox()
@@ -134,7 +139,7 @@ class QtBuilderPage(QWidget):
                 part.setToolTip(field.desc)
                 self.layout.addWidget(part,  i + 0, hidx + 2 * j + 1)
                 fuis.append((part, field))
-                
+
             self.reg_updates[reg.addr_l] = fuis
             self.reg_cnt[reg.addr_l] = reg.ucnt
             self.reg_big[reg.addr_l] = reg.big
@@ -144,7 +149,7 @@ class QtBuilderPage(QWidget):
     def update_control(self, value, addr, ucnt):
         if self.ignore:
             return
-        
+
         big = self.reg_big[addr]
         newVal = 0
         for i in range(ucnt):
@@ -159,12 +164,12 @@ class QtBuilderPage(QWidget):
             if isinstance(ui, QCheckBox):
                 v = 1 << f.bits_l if ui.isChecked() else 0
             elif isinstance(ui, QComboBox):
-                v = ui.currentIndex() << f.bits_l
+                v = f.unpack_bits(ui.currentIndex(), f.bits_list) << f.bits_l
             else:
                 v = ui.value() << f.bits_l
 
             newVal |= v
-        
+
         print("Update register %04x x %d => %d" % (addr, ucnt, newVal))
         for i in range(ucnt):
             if big:
@@ -174,18 +179,23 @@ class QtBuilderPage(QWidget):
 
             self.raw_lcds[addr][i].display(v)
             self.top.actor[addr + i] = v
-        
+
     def update_filed(self, value, ui, field):
         v = (value & field.mask) >> field.bits_l
         if isinstance(ui, QCheckBox):
             ui.setChecked(v)
         elif isinstance(ui, QComboBox):
-            ui.setCurrentIndex(v)
+            ui.setCurrentIndex(field.pack_bits(v, field.bits_list))
         else:
             ui.setValue(v)
-        
-    def page_changed(self):
+
+    def page_changed(self, dump = False)->dict:
+
         self.ignore = True
+        addr_size_chars = math.ceil(self.conf.addr_width / 4)
+        val_size_chars  = math.ceil(self.conf.data_width / 4)
+        dump_dict = {}
+
         for addr in self.reg_updates:
             fields = self.reg_updates[addr]
             ucnt = self.reg_cnt[addr]
@@ -200,19 +210,30 @@ class QtBuilderPage(QWidget):
                 else:
                     value = value | (rv << (i * self.top.data_width))
 
+                if(dump):
+                    dump_dict['0x%0*x' % (addr_size_chars, addr + i)] = '0x%0*x' % (val_size_chars, rv)
+
             for ui, field in fields:
                 self.update_filed(value, ui, field)
         self.ignore = False
-        
+        return dump_dict
 
-class QtBuilderTop:
+
+    def page_dump(self)->str:
+        return self.page_changed(dump = True)
+
+
+class QtBuilderTop(QWidget):
     def __init__(self, conf, actor):
+        super(QtBuilderTop, self).__init__()
         self.tab = QTabWidget()
         self.tab.currentChanged.connect(self.page_changed)
         self.b_pgs = []
         self.actor = actor
         self.data_width = conf.data_width
         self.addr_width = conf.addr_width
+        self.current = 0
+        self.conf = conf
 
         for page in conf.pages:
             pgw = QtBuilderPage(conf, page, self)
@@ -227,11 +248,121 @@ class QtBuilderTop:
             q.setFrameShadow(QFrame.Plain)
             q.setFrameShape(QFrame.NoFrame)
             q.setWidget(pgw)
-            
+
 
             self.tab.addTab(q, page.name)
+
+        saveAction = QAction(QIcon("img/save.png"), 'Save', self)
+        saveAction.setShortcut('Ctrl+S')
+        saveAction.triggered.connect(self.save_button_clicked)
+
+        loadAction = QAction(QIcon("img/load.png"), 'Load', self)
+        loadAction.setShortcut('Ctrl+L')
+        loadAction.triggered.connect(self.load_button_clicked)
+
+        toolbar = QToolBar()
+        toolbar.addAction(saveAction)
+        toolbar.addAction(loadAction)
+
+        self.lv = QVBoxLayout()
+        self.lv.addWidget(toolbar)
+        self.lv.addWidget(self.tab)
+        self.setLayout(self.lv)
+
+
+    def update(self):
+        self.b_pgs[self.current].page_changed()
 
     def page_changed(self, page):
         print("Page changed to %d" % page)
         self.b_pgs[page].page_changed()
+        self.current = page
 
+
+    def get_ini_section_name(self)->str:
+        ini_section_name = self.conf.ini_section;
+        names = self.actor.path.split('/')
+
+        if(not ini_section_name):
+            ini_section_name = '%s_registers_%s' % (names[3], names[4])
+        else:
+            ini_section_name = '%s_%s' % (ini_section_name, names[4])
+
+        return ini_section_name
+
+    def load_button_clicked(self)->None:
+        print("LOAD [%s] regs from ini file" % self.actor.path)
+
+        inifile_name, _unused = QFileDialog.getOpenFileName(self, caption = "Load Registers Set for " + self.actor.path, directory="./", filter="Ini Files (*.ini)")
+        if not inifile_name:
+            return
+
+        ini_section_name = self.get_ini_section_name()
+
+        found = False
+        regcnt = 0
+        f = open(inifile_name, 'r')
+
+        while(True):
+            line = f.readline()
+            if(not line):
+                break
+
+            line = line.rstrip('\n').strip()
+
+            if(found):
+
+                if re.match('^\[(.*)\]$', line) is not None:
+                    break
+
+                parts = line.split('=')
+                if(len(parts) != 2):
+                    continue
+
+                try:
+                    addr = int(parts[0], 16)
+                    val  = int(parts[1], 16)
+                except ValueError:
+                    continue
+
+                self.actor[addr] = val
+                time.sleep(0.01)
+                regcnt += 1
+                #print('loaded 0x%04x=0x%04x' % (addr, val))
+            else:
+                found = ('[%s]' % ini_section_name) == line
+                if(found):
+                    print('LOAD: found section [%s] in file "%s"' % (ini_section_name, inifile_name))
+
+        if(not found):
+            print('LOAD: section [%s] not found in file "%s", registers were not loaded!' % (ini_section_name, inifile_name))
+        else:
+            print('LOAD: %d registers were loaded from "%s".[%s]' % (regcnt, inifile_name, ini_section_name))
+            self.update()
+
+        f.close()
+
+    def save_button_clicked(self)->None:
+        print("SAVE [%s] regs to ini file" % self.actor.path)
+
+        inifile_name, _unused = QFileDialog.getSaveFileName(self, caption = "Save Registers Set for " + self.actor.path, filter="Ini Files (*.ini)", directory="./")
+        if not inifile_name:
+            return
+
+        ini_section_name = self.get_ini_section_name()
+
+        dump_dict = {}
+        for page in self.b_pgs:
+            dump_dict.update(page.page_dump())
+
+        config = configparser.ConfigParser()
+        config.read(inifile_name)
+
+        if not config.has_section(ini_section_name):
+            config.add_section(ini_section_name)
+
+        for addr, val in dump_dict.items():
+            config[ini_section_name][addr] = val
+
+        with open(inifile_name, 'w') as configfile:
+            config.write(configfile)

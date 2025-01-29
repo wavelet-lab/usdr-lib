@@ -8,6 +8,8 @@
 #include <usdr_logging.h>
 
 enum fgearbox_firs {
+    FGBOX_BP = 1,
+
     FGBOX_X2 = 2,
     FGBOX_X3 = 3,
     FGBOX_X4 = 4,
@@ -27,5 +29,6 @@ typedef enum fgearbox_firs fgearbox_firs_t;
 
 int fgearbox_load_fir(lldev_t dev, unsigned gport, fgearbox_firs_t fir);
 
+int fgearbox_load_fir_i(lldev_t dev, unsigned gport, fgearbox_firs_t fir);
 
 #endif

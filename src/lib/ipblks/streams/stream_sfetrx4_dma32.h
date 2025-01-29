@@ -14,6 +14,7 @@ enum {
 
 enum {
     DMS_FLAG_BIFURCATION = 65536,
+    DMS_DONT_CHECK_FWID  = 131072,
 };
 
 struct sfetrx4_config

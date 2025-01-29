@@ -65,10 +65,13 @@ int lmk05318_reg_wr_n(lmk05318_state_t* d, const uint32_t* regs, unsigned count)
     return 0;
 }
 
-int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmk05318_state_t* out)
+int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int flags, lmk05318_state_t* out)
 {
     int res;
     uint8_t dummy[4];
+
+    const uint32_t* lmk_init = flags ? lmk05318_rom_49152_12288_384 : lmk05318_rom;
+    unsigned lmk_init_sz = flags ? SIZEOF_ARRAY(lmk05318_rom_49152_12288_384) : SIZEOF_ARRAY(lmk05318_rom);
 
     out->dev = dev;
     out->subdev = subdev;
@@ -85,7 +88,7 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmk05318_stat
     }
 
     // Do the initialization
-    res = lmk05318_reg_wr_n(out, lmk05318_rom, SIZEOF_ARRAY(lmk05318_rom));
+    res = lmk05318_reg_wr_n(out, lmk_init, lmk_init_sz);
     if (res)
         return res;
 
@@ -93,9 +96,13 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmk05318_stat
     uint32_t regs[] = {
         lmk05318_rom[0] | (1 << RESET_SW_OFF),
         lmk05318_rom[0] | (0 << RESET_SW_OFF),
+
+        MAKE_LMK05318_XO_CONFIG(flags > 1 ? 1 : 0),
+
         MAKE_LMK05318_PLL1_CTRL0(0),
         MAKE_LMK05318_PLL1_CTRL0(1),
         MAKE_LMK05318_PLL1_CTRL0(0),
+
     };
     res = lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));
     if (res)
@@ -198,3 +205,37 @@ int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
+int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk)
+{
+    uint8_t los[3];
+    int res = 0;
+    unsigned losval;
+
+    res = res ? res : lmk05318_reg_rd(d, INT_FLAG0, &los[0]);
+    res = res ? res : lmk05318_reg_rd(d, INT_FLAG1, &los[1]);
+    res = res ? res : lmk05318_reg_rd(d, BAW_LOCKDET_PPM_MAX_BY1, &los[2]);
+
+    if (res)
+        return res;
+
+    losval = ((los[0] & LOS_XO_POL_MSK) ? LMK05318_LOS_XO : 0) |
+             ((los[0] & LOL_PLL1_POL_MSK) ? LMK05318_LOL_PLL1 : 0) |
+             ((los[0] & LOL_PLL2_POL_MSK) ? LMK05318_LOL_PLL2 : 0) |
+             ((los[0] & LOS_FDET_XO_POL_MSK) ? LMK05318_LOS_FDET_XO : 0) |
+             ((los[1] & LOPL_DPLL_POL_MSK) ? LMK05318_LOPL_DPLL : 0) |
+             ((los[1] & LOFL_DPLL_POL_MSK) ? LMK05318_LOFL_DPLL : 0);
+
+
+    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 LOS_MAK=[%s%s%s%s%s%s%s] %02x:%02x:%02x\n",
+            (los[0] & LOS_XO_POL_MSK) ? "XO" : "",
+            (los[0] & LOL_PLL1_POL_MSK) ? " PLL1" : "",
+            (los[0] & LOL_PLL2_POL_MSK) ? " PLL2" : "",
+            (los[0] & LOS_FDET_XO_POL_MSK) ? " XO_FDET" : "",
+            (los[1] & LOPL_DPLL_POL_MSK) ? " DPLL_P" : "",
+            (los[1] & LOFL_DPLL_POL_MSK) ? " DPLL_F" : "",
+            (los[2] & BAW_LOCK_MSK) ? "" : " BAW",
+            los[0], los[1], los[2]);
+
+    *los_msk = losval;
+    return 0;
+}

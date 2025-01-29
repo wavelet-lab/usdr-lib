@@ -73,7 +73,12 @@ const usdr_dev_param_constant_t s_params_m2_lm7_1_rev000[] = {
     { "/ll/idx_regsp/0/base", M2PCI_REG_WR_BADDR },
     { "/ll/idx_regsp/0/virt_base", VIRT_CFG_SFX_BASE },
 
-    { "/ll/gpio/0/base",   M2PCI_WR_GPIO_CB },
+    { "/ll/gpio/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_GPIO15_SIMPLE) },
+    { "/ll/gpio/0/base", M2PCI_REG_GPIO_S },
+    { "/ll/gpio/0/irq",  -1 },
+    { "/ll/uart/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_UART_SIMPLE) },
+    { "/ll/uart/0/base", REG_UART_TRX },
+    { "/ll/uart/0/irq",  -1 },
 
     { "/ll/drp/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_DRP_PHY_V0) },
     { "/ll/drp/0/base", REG_CFG_PHY_0 },
@@ -110,6 +115,13 @@ const usdr_dev_param_constant_t s_params_m2_lm7_1_rev000[] = {
 
     { "/ll/poll_event/in",  M2PCI_INT_RX },
     { "/ll/poll_event/out", M2PCI_INT_TX },
+
+    // Frontend interface
+    { "/ll/fe/0/gpio_busno/0", 0},
+    { "/ll/fe/0/uart_busno/0", 0},
+
+    { "/ll/fe/0/spi_busno/0", -1},
+    { "/ll/fe/0/i2c_busno/0", -1},
 };
 
 static int dev_m2_lm7_1_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);

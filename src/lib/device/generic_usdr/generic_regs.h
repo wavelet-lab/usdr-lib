@@ -11,7 +11,7 @@ enum REGS_generic_usdr_r000 {
     M2PCI_REG_STAT_CTRL = 0,
     M2PCI_REG_I2C = 1,
     M2PCI_REG_SPI0 = 2,
-    M2PCI_WR_GPIO_CB = 3,
+    M2PCI_REG_GPIO_S = 3,
 
     M2PCI_REG_WR_RXDMA_CONFIRM = 4,
     M2PCI_REG_WR_RXDMA_CONTROL = 5,
@@ -55,6 +55,9 @@ enum REGS_generic_usdr_r000 {
     REG_CFG_PHY_1       = 57,
     REG_SPI_EXT_CFG     = 58,
     REG_SPI_EXT_DATA    = 59,
+
+    REG_SPI_I2C2_CFG    = 60,
+    REG_SPI_I2C2        = 61
 };
 
 // New register layout
@@ -70,6 +73,7 @@ enum INTS_generic {
     M2PCI_INT_SPI_3  = 5,
     M2PCI_INT_I2C_0  = 6,
     M2PCI_INT_SPI_EXT= 7,
+    M2PCI_INT_I2C_1  = 8,
 };
 
 enum VIRT_BUS_ADDRS {
@@ -87,6 +91,9 @@ enum {
     I2C_DEV_EXTDAC    = 0x48, //7'b100_1000;
     I2C_DEV_TMP114B   = 0x49, //7'b100_1001;
     I2C_DEV_TMP108A_A0_SDA   = 0x4A, //7'b100_1010;
+    I2C_DEV_DAC80501M_A0_GND = 0x48, //7'b100_1000;
+    I2C_DEV_DAC80501M_A0_VDD = 0x49, //7'b100_1001;
+    I2C_DEV_DAC80501M_A0_SDA = 0x4A, //7'b100_1001;
     I2C_DEV_DAC80501M_A0_SCL = 0x4B, //7'b100_1011;
     I2C_DEV_TMP114NB  = 0x4E, //7'b100_1110;
     I2C_DEV_CLKGEN    = 0x6A, //7'b110_1010;
