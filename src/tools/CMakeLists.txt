@@ -20,3 +20,8 @@ install(TARGETS usdr_dm_create RUNTIME)
 add_executable(usdr_dm_sensors usdr_dm_sensors.c)
 target_link_libraries(usdr_dm_sensors usdr)
 install(TARGETS usdr_dm_sensors RUNTIME)
+
+list(APPEND WVLT_SCRIPTS
+    wvlt_sdr_wrapper.py
+)
+configure_file(${WVLT_SCRIPTS} . USE_SOURCE_PERMISSIONS COPYONLY)
