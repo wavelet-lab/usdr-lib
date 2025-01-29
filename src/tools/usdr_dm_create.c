@@ -877,7 +877,11 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dorx) {
         for (unsigned f = 1; f < rx_bufcnt; f++) {
             char fmod[1024];
-            snprintf(fmod, sizeof(fmod), "%s.%d", filename_rx, f);
+            if (strcmp(filename_rx, "/dev/null") != 0) {
+                snprintf(fmod, sizeof(fmod), "%s.%d", filename_rx, f);
+            } else {
+                snprintf(fmod, sizeof(fmod), "%s", filename_rx);
+            }
 
             s_out_file[f] = fopen(fmod, "wb+c");
             if (!s_out_file[f]) {
