@@ -1101,7 +1101,7 @@ int lms8001_temp_get(lms8001_state_t* m, int* temp256)
     if (res)
         return res;
 
-    int v = GET_LMS8001_CHIPCONFIG_TEMP_SENS_TEMP_READ(rb);
+    float v = GET_LMS8001_CHIPCONFIG_TEMP_SENS_TEMP_READ(rb);
     *temp256 = 256.0 * (TEMPSENS_T0 + TEMPSENS_T1 * v + TEMPSENS_T2 * v * v);
     return 0;
 }
