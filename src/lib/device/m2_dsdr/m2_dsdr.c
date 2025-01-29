@@ -29,9 +29,21 @@
 #include "dsdr_hiper.h"
 
 // Board revisions:
-//  0 - DSDR
-//  1 - Hiper
+//  1 - DSDR
+//  2 - Hiper
+//
 
+enum dsdr_type {
+    DSDR_KCU116_EVM = 0xce,
+    DSDR_M2_R0 = 0xc2,
+    DSDR_PCIE_HIPER_R0 = 0xcf,
+};
+
+enum dsdr_jesdv {
+    DSDR_JESD204B_810_245 = 1,
+    DSDR_JESD204C_6664_245 = 7,
+    DSDR_JESD204C_6664_491 = 3,
+};
 
 // I2C buses
 // I2C3      () -- TCA6424AR ( 0 & 1), TMP114
@@ -78,13 +90,13 @@ enum i2c_idx {
 // LMK ports
 // -------------------------
 // port 0: N/C
-// port 1: LMK_AFEREF
-// port 2: LMK_SYSREF
+// port 1: LMK_AFEREF                                 |   AFECLK 491.52
+// port 2: LMK_SYSREF                                 |   SYSREF   3.84
 // port 3: N/C
-// port 4: FPGA_GT_ETHREF    => BANK224 / REF1
-// port 5: FPGA_GT_AFEREF    => BANK226 / REF1
-// port 6: FPGA_SYSREF       => BANK65  / T24_U24
-// port 7: FPGA_1PPS         => BANK65  / T25_U25
+// port 4: FPGA_GT_ETHREF    => BANK224 / REF1        |
+// port 5: FPGA_GT_AFEREF    => BANK226 / REF1        |   GTHCLK 122.88 / 245.76
+// port 6: FPGA_SYSREF       => BANK65  / T24_U24     |   SYSREF   3.84
+// port 7: FPGA_1PPS         => BANK65  / T25_U25     |   SYSCLK 122.88 / 245.76
 
 enum lmk_ports {
     LMK_PORT_AFEREF = 1,
@@ -385,7 +397,8 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     for (unsigned j = 0; j < 25; j++) {
         usleep(40000);
-        res = res ? res : lmk05318_create(dev, d->subdev, I2C_LMK, &d->lmk);
+        res = res ? res : lmk05318_create(dev, d->subdev, I2C_LMK,
+                                          (d->type == DSDR_PCIE_HIPER_R0) ? 2 : 1 /* TODO FIXME!!! */, &d->lmk);
         if (res == 0)
             break;
     }
