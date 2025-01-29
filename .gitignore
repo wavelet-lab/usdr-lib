@@ -2,7 +2,7 @@
 .idea/
 obj-*/
 /debian
-/pkg
+/output
 /build
 
 cmake-build-debug/
