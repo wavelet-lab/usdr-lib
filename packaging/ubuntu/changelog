@@ -1,5 +1,5 @@
-usdr (0.9.8~noble0) noble; urgency=low
+usdr (0.9.9~noble0) noble; urgency=low
 
   * Fixes and improvements
 
- -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Sun, 14 Jul 2024 00:00:00 +0000
+ -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Sun, 30 Jan 2025 00:00:00 +0000
