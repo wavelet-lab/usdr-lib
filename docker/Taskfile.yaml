@@ -56,4 +56,4 @@ tasks:
       - rm -rf /root/.gnupg/S.* /root/.gnupg/public-keys.d/.* /root/.gnupg/public-keys.d/*.lock
       - gpg-agent --daemon
       - debuild -S
-      - dput ppa:wavelet-lab/usdr-lib /work/*.changes
+      - dput ppa:wavelet-lab/usdr-lib /work/build/*.changes
