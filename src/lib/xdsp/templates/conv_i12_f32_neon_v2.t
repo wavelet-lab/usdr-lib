@@ -12,11 +12,10 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     const uint8_t *in = (const uint8_t*)indata_p;
     float* out = (float*)outdata_p;
 
-    uint8x8x4_t y;
-    y.val[3] = vdup_n_u8(0);
+    uint8x16_t y0, y1, y2;
 
     const uint8x16_t lk0 = {0x80,0x00,0x01,0x02, 0x80,0x03,0x04,0x05, 0x80,0x06,0x07,0x08, 0x80,0x09,0x0a,0x0b};
-    const uint8x16_t lk1 = {0x80,0x0c,0x0d,0x0e, 0x80,0x0f,0x10,0x11, 0x80,0x12,0x13,0x14, 0x80,0x15,0x16,0x17};
+    const uint8x16_t lk1 = {0x80,0x04,0x05,0x06, 0x80,0x07,0x08,0x09, 0x80,0x0a,0x0b,0x0c, 0x80,0x0d,0x0e,0x0f};
 
     const uint64x2_t mask0 = vdupq_n_u64(0xfff00000fff00000);
     const uint64x2_t mask1 = vdupq_n_u64(0x0000fff00000fff0);
@@ -32,6 +31,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 *  | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 | 15| 14| 13| 12| 11| 10| 9 | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 *  | 17| 16| 15| 14| 13| 12| 11| 10| 0f| 0e| 0d| 0c| 0b| 0a| 9 | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+*  | f   e   d   c   b   a   9   8   7   6   5   4   3   2   1   0
 *
 *  | f7  | f6  | 0 | f5  | f4  | 0 | f3  | f2  | 0 | f1  | f0  | 0 |    r0
 *  | f15 | f14 | 0 | f13 | f12 | 0 | f11 | f10 | 0 | f9  | f8  | 0 |    r1
@@ -42,12 +42,10 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 */
 
 
-#define CONVERT_I12_F32_BLOCK(reg) \
+#define CONVERT_I12_F32_BLOCK(reg0, reg1) \
     {   \
-        uint8x16x2_t* preg = (uint8x16x2_t*)&reg; \
-        \
-        uint64x2_t r0 = vreinterpretq_u64_u8(vqtbl2q_u8(*preg, lk0)); \
-        uint64x2_t r1 = vreinterpretq_u64_u8(vqtbl2q_u8(*preg, lk1)); \
+        uint64x2_t r0 = vreinterpretq_u64_u8(vqtbl1q_u8(reg0, lk0)); \
+        uint64x2_t r1 = vreinterpretq_u64_u8(vqtbl1q_u8(reg1, lk1)); \
         \
         uint64x2_t r0_0 = vandq_u64(r0, mask0); \
         uint64x2_t r0_1 = vandq_u64(vshrq_n_u64(r0, 4), mask1); \
@@ -67,26 +65,28 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 // CONVERT_I12_F32_BLOCK end
 
 
-    if(i >= 24)
+    if(i >= 48)
     {
-        y.val[0] = vld1_u8(in +  0);
-        y.val[1] = vld1_u8(in +  8);
-        y.val[2] = vld1_u8(in + 16);
-        in += 24;
+        y0 = vld1q_u8(in +  0);
+        y1 = vld1q_u8(in + 16);
+        y2 = vld1q_u8(in + 32);
+        in += 48;
 
-        for(; i >= 2*24; i -= 24)
+        for(; i >= 2*48; i -= 48)
         {
-            CONVERT_I12_F32_BLOCK(y);
+            CONVERT_I12_F32_BLOCK(y0, vcombine_u8(vget_high_u8(y0), vget_low_u8(y1)));
+            CONVERT_I12_F32_BLOCK(vcombine_u8(vget_high_u8(y1), vget_low_u8(y2)), y2);
 
-            y.val[0] = vld1_u8(in +  0);
-            y.val[1] = vld1_u8(in +  8);
-            y.val[2] = vld1_u8(in + 16);
-            in += 24;
+            y0 = vld1q_u8(in +  0);
+            y1 = vld1q_u8(in + 16);
+            y2 = vld1q_u8(in + 32);
+            in += 48;
         }
 
-        i -= 24;
+        i -= 48;
 
-        CONVERT_I12_F32_BLOCK(y);
+        CONVERT_I12_F32_BLOCK(y0, vcombine_u8(vget_high_u8(y0), vget_low_u8(y1)));
+        CONVERT_I12_F32_BLOCK(vcombine_u8(vget_high_u8(y1), vget_low_u8(y2)), y2);
     }
 
 #undef CONVERT_I12_F32_BLOCK
