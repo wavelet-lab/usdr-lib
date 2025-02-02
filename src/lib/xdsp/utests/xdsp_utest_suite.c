@@ -43,7 +43,10 @@ int main(int argc, char** argv)
     srunner_add_suite(sr, conv_f32_i12_suite());
     srunner_add_suite(sr, conv_2cf32_ci12_suite());
 #else
-    sr = srunner_create(rtsa_suite());
+    sr = srunner_create(conv_i12_f32_suite());
+    //srunner_add_suite(sr, conv_ci12_2cf32_suite());
+    //srunner_add_suite(sr, conv_f32_i12_suite());
+    //srunner_add_suite(sr, conv_2cf32_ci12_suite());
 #endif
     srunner_set_fork_status (sr, CK_NOFORK);
     srunner_run_all(sr, (argc > 1) ? CK_VERBOSE : CK_NORMAL);
