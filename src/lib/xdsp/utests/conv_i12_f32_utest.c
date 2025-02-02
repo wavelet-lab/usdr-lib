@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "../conv_i12_f32_2.h"
 
-#undef DEBUG_PRINT
+#define DEBUG_PRINT
 
 #define IN_STREAM_SIZE_BZ (132u)                    // (6 + 3 + 2)*12 = 132 bytes
 #define WORD_COUNT (IN_STREAM_SIZE_BZ * 8u / 12u)   // 88 i12 words
@@ -104,7 +104,9 @@ START_TEST(conv_i12_f32_check)
         v *= CONV_SCALE;
         v = (i % 4) ? v : -v;
 
-        fprintf(stderr, "\ni=%u\tout=%.6f\texpected=%.6f", i, out[i], v);
+	int16_t i12 = (int16_t)(out[i] / CONV_SCALE) >> 4;
+
+        fprintf(stderr, "\ni=%u\ti12=%d\tout=%.6f\texpected=%.6f", i, i12, out[i], v);
 #ifdef ck_assert_float_eq
         ck_assert_float_eq(v, out[i]);
 #else
@@ -123,8 +125,8 @@ START_TEST(conv_i12_f32_check_simd)
     void* pout = (void*)out;
     last_fn_name = NULL;
 
-    const size_t bzin  = SPEED_SIZE_BZ;
-    const size_t bzout = SPEED_WORD_COUNT * sizeof(float);
+    const size_t bzin  = IN_STREAM_SIZE_BZ;
+    const size_t bzout = WORD_COUNT * sizeof(float);
 
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
 
@@ -150,9 +152,10 @@ START_TEST(conv_i12_f32_check_simd)
             int res = memcmp(out, out_etalon, bzout);
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
-            for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)
+            for(int i = 0; res && i < WORD_COUNT; ++i)
             {
-                fprintf(stderr, "i = %d : in = %d, out = %.6f, etalon = %.6f\n", i, in[i], out[i], out_etalon[i]);
+                int16_t i12 = (int16_t)(out[i] / CONV_SCALE) >> 4;
+                fprintf(stderr, "i = %d : i12 = %d, out = %.6f, etalon = %.6f -> %s\n", i, i12, out[i], out_etalon[i], (out[i] == out_etalon[i] ? "OK" : "BAD"));
             }
 #endif
             ck_assert_int_eq( res, 0 );
