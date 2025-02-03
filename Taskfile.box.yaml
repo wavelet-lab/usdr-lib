@@ -3,6 +3,10 @@ version: '3'
 tasks:
 
   run:
+    summary: |
+      Use this task to run the build environment in a container.
+      Results will be saved in the ./output directory.
+      To run the build environment in interactive mode, use set INTERACTIVE=true.
     internal: true
     interactive: true
     env:
