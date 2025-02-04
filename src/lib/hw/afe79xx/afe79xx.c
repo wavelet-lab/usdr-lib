@@ -128,7 +128,7 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_
 
     out->libcapi79xx_create = (libcapi79xx_create_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_CREATE_FN);
     out->libcapi79xx_destroy = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_DESTROY_FN);
-    out->libcapi79xx_init = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_INIT_FN);
+    out->libcapi79xx_init = (libcapi79xx_init_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_INIT_FN);
 
     out->libcapi79xx_upd_nco = (libcapi79xx_upd_nco_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_UPD_NCO_FN);
     out->libcapi79xx_get_nco = (libcapi79xx_get_nco_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_GET_NCO_FN);
