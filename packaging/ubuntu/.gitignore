@@ -8,9 +8,7 @@ usdr-*/
 soapysdr-module-usdr/
 files
 lib*/
-libusdr-dev.install
 usdr-dkms.install
 usdr-dkms.postinst
 usdr-dkms.postrm
 usdr-dkms.dkms
-usdr-dev.install
