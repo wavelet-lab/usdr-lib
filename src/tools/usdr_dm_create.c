@@ -312,7 +312,7 @@ static void usage(int severity, const char* me)
  * Get packet from the circular buffer & TX
  * Returns true on success, false on error or EOF
  */
-static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nfo, bool nots, unsigned iteration)
+static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nfo, bool nots, unsigned iteration, unsigned* olen, usdr_dms_send_stat_t* st)
 {
     int res = 0;
     void* buffers[MAX_CHS];
@@ -349,10 +349,12 @@ static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nf
     USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "*** pktbszie=%u pktsyms=%u", nfo->pktbszie, nfo->pktsyms);
     USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "*** sample_bitsize=%u sample_cnt=%u", sample_bitsize, sample_cnt);
 
+    *olen = sample_cnt;
+
     if(sample_cnt)
     {
         //Core TX function - transmit data from tx provider thread via circular buffer
-        res = usdr_dms_send(strm, (const void**)buffers, sample_cnt, nots ? UINT64_MAX : *ts, 32250);
+        res = usdr_dms_send_stat(strm, (const void**)buffers, sample_cnt, nots ? UINT64_MAX : *ts, 32250, st);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, iteration);
             return false;
@@ -978,6 +980,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //TX & RX
     usdr_dms_recv_nfo_t rxstat;
+    usdr_dms_send_stat_t txstat;
 
     struct timespec tp, tp_prev;
     clock_gettime(CLOCK_REALTIME, &tp_prev);
@@ -985,13 +988,20 @@ int main(UNUSED int argc, UNUSED char** argv)
     uint64_t pkt_rx_time = 1000000000ULL * snfo_rx.pktsyms / rate;
     uint64_t s_rx_time = tp_prev.tv_sec * 1000000000ULL + tp_prev.tv_nsec;
     uint64_t logprev = s_rx_time;
+
+
+    uint64_t s_tx_time = tp_prev.tv_sec * 1000000000ULL + tp_prev.tv_nsec;
+    uint64_t logprev_tx = s_tx_time;
+
     uint64_t exp_rx_ts = 0;
     uint64_t overruns_sps = 0;
     uint64_t overruns_cnt = 0;
 
+    unsigned tx_samples_cnt;
+
     for (unsigned i = 0; !s_stop && (i < count); i++)
     {
-        if(dotx && !do_transmit(usds_tx, &stm, &snfo_tx, nots, i))
+        if(dotx && !do_transmit(usds_tx, &stm, &snfo_tx, nots, i, &tx_samples_cnt, &txstat))
             goto stop;
 
         if(dorx && !do_receive(usds_rx, i, &rxstat))
@@ -1020,6 +1030,25 @@ int main(UNUSED int argc, UNUSED char** argv)
                     fprintf(stderr, "RX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns OVR:%ld / %ld\n", i, count, rxstat.fsymtime, rxstat.totlost, took, lag,
                             overruns_cnt, overruns_sps / snfo_rx.pktsyms);
                     logprev = logprev + 1000000000ULL;
+                }
+            }
+
+            if (dotx) {
+                uint64_t pkt_tx_time = 1000000000ULL * tx_samples_cnt / rate;
+
+                uint64_t curtime = tp.tv_sec * 1000000000ULL + tp.tv_nsec;
+                uint64_t took = curtime - (tp_prev.tv_sec * 1000000000ULL + tp_prev.tv_nsec);
+                if (i == 0) { //Alternative
+                    s_tx_time = curtime;
+                }
+
+                s_tx_time += pkt_tx_time;
+                int64_t lag = curtime - s_tx_time;
+
+                if ((statistics > 1) || (logprev_tx + 1000000000ULL < curtime)) {
+                    fprintf(stderr, "TX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns UND:%ld -- %08x FIFO: %d  len:%d\n", i, count, 0, 0, took, lag,
+                            txstat.underruns, txstat.ktime, txstat.fifo_used, tx_samples_cnt);
+                    logprev_tx = logprev_tx + 1000000000ULL;
                 }
             }
 

@@ -25,7 +25,8 @@ struct stream_ops {
                 const char **stream_buffs,
                 unsigned samples,
                 dm_time_t timestamp,
-                unsigned timeout_ms);
+                unsigned timeout_ms,
+                usdr_dms_send_stat_t* stat);
 
     int (*stat)(stream_handle_t*, usdr_dms_nfo_t* nfo);
 

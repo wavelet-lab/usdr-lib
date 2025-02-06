@@ -79,6 +79,18 @@ struct usdr_dms_recv_nfo {
 };
 typedef struct usdr_dms_recv_nfo usdr_dms_recv_nfo_t;
 
+struct usdr_dms_send_stat {
+    dm_time_t lhwtime;
+    dm_time_t opkttime;
+    unsigned ktime;
+    unsigned underruns;
+
+    uint8_t fifo_used; // 0 -- EMPTY; 255 -- FULL
+    uint8_t reserved[3];
+
+};
+typedef struct usdr_dms_send_stat usdr_dms_send_stat_t;
+
 //
 int usdr_dms_recv(pusdr_dms_t stream,
                   void **stream_buffs,
@@ -90,6 +102,13 @@ int usdr_dms_send(pusdr_dms_t stream,
                   unsigned samples,
                   dm_time_t timestamp,
                   unsigned timeout);
+
+int usdr_dms_send_stat(pusdr_dms_t stream,
+                       const void **stream_buffs,
+                       unsigned samples,
+                       dm_time_t timestamp,
+                       unsigned timeout,
+                       usdr_dms_send_stat_t* stat);
 
 int usdr_dms_destroy(pusdr_dms_t stream);
 
