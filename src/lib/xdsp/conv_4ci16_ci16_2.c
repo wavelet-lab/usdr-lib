@@ -15,14 +15,14 @@ VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 #include "templates/conv_4ci16_ci16_avx2.t"
 DECLARE_TR_FUNC_4_1(conv_4ci16_ci16_avx2)
 #endif
-/*
+
 #ifdef WVLT_NEON
 #define TEMPLATE_FUNC_NAME conv_4ci16_ci16_neon
 VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/conv_4ci16_ci16_neon.t"
-DECLARE_TR_FUNC_2_1(conv_4ci16_ci16_neon)
+DECLARE_TR_FUNC_4_1(conv_4ci16_ci16_neon)
 #endif
-*/
+
 conv_function_t conv_get_4ci16_ci16_c(generic_opts_t cpu_cap, const char** sfunc)
 {
     const char* fname;
@@ -30,6 +30,7 @@ conv_function_t conv_get_4ci16_ci16_c(generic_opts_t cpu_cap, const char** sfunc
 
     SELECT_GENERIC_FN(fn, fname, tr_conv_4ci16_ci16_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_conv_4ci16_ci16_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_conv_4ci16_ci16_avx2, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
