@@ -37,11 +37,14 @@ typedef int (*libcapi79xx_init_fn_t)(libcapi79xx_t* o, const char* configuration
 typedef int (*libcapi79xx_upd_nco_fn_t)(libcapi79xx_t* o, unsigned type, unsigned ch, uint64_t freq, unsigned ncono, unsigned band);
 typedef int (*libcapi79xx_get_nco_fn_t)(libcapi79xx_t* o, unsigned type, unsigned ch, uint64_t* freq, unsigned ncono, unsigned band);
 
+typedef int (*libcapi79xx_check_health_fn_t)(libcapi79xx_t* o, int *ok, unsigned sz, char* buf);
 
 #define LIBCAPI79XX_CREATE_FN "libcapi79xx_create"
 #define LIBCAPI79XX_DESTROY_FN "libcapi79xx_destroy"
 #define LIBCAPI79XX_INIT_FN "libcapi79xx_init"
 #define LIBCAPI79XX_UPD_NCO_FN "libcapi79xx_upd_nco"
 #define LIBCAPI79XX_GET_NCO_FN "libcapi79xx_get_nco"
+
+#define LIBCAPI79XX_CHECK_HEALTH_FN  "libcapi79xx_check_health"
 
 #endif
