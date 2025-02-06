@@ -47,7 +47,7 @@ static int lms8001_spi_post(lms8001_state_t* obj, uint32_t* regs, unsigned count
         if (res)
             return res;
 
-        USDR_LOG("8001", USDR_LOG_INFO, "[%d/%d] reg wr %08x\n", i, count, regs[i]);
+        USDR_LOG("8001", USDR_LOG_NOTE, "[%d/%d] reg wr %08x\n", i, count, regs[i]);
     }
 
     return 0;
@@ -60,7 +60,7 @@ static int lms8001_spi_get(lms8001_state_t* obj, uint16_t addr, uint16_t* out)
     if (res)
         return res;
 
-    USDR_LOG("8001", USDR_LOG_INFO, " reg rd %04x => %08x\n", addr, v);
+    USDR_LOG("8001", USDR_LOG_NOTE, " reg rd %04x => %08x\n", addr, v);
     *out = v;
     return 0;
 }
