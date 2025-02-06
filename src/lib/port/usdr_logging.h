@@ -34,7 +34,7 @@ void usdrlog_vout(unsigned loglevel,
                   const char* file,
                   int line,
                   const char* fmt,
-                  va_list list)  __attribute__ ((format (printf, 6, 0)));;
+                  va_list list)  __attribute__ ((format (printf, 6, 0)));
 
 /**
  * @brief usdrlog_setlevel
