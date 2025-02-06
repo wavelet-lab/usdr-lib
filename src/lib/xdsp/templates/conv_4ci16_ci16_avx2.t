@@ -108,11 +108,6 @@ const __m256i permmask = _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0);
         c1 = _mm256_permutevar8x32_epi32(b1, permmask);
         c2 = _mm256_permutevar8x32_epi32(b2, permmask);
         c3 = _mm256_permutevar8x32_epi32(b3, permmask);
-
-        _mm256_storeu_si256((__m256i*)(outdata +  0), c0);
-        _mm256_storeu_si256((__m256i*)(outdata +  4), c1);
-        _mm256_storeu_si256((__m256i*)(outdata +  8), c2);
-        _mm256_storeu_si256((__m256i*)(outdata + 12), c3);
 #else
         a0 = _mm256_castpd_si256(_mm256_shuffle_pd(r0, r1, 0b0000));
         a1 = _mm256_castpd_si256(_mm256_shuffle_pd(r0, r1, 0b1111));

@@ -12,10 +12,10 @@
 
 #undef DEBUG_PRINT
 
-#define PACKET_SIZE (32768u)
+#define PACKET_SIZE (65536u)
 #define OUT_BZ (PACKET_SIZE * sizeof(int16_t))
 
-static const unsigned packet_lens[3] = { 1024u, 8192u, PACKET_SIZE };
+static const unsigned packet_lens[4] = { 8192u, 16384u, 32768u, PACKET_SIZE };
 
 #define SPEED_MEASURE_ITERS 1000000
 
@@ -198,7 +198,7 @@ Suite * conv_4ci16_ci16_suite(void)
     tcase_set_timeout(tc_core, 60);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
     tcase_add_test(tc_core, conv_4ci16_ci16_check_simd);
-    tcase_add_loop_test(tc_core, conv_4ci16_ci16_speed, 0, 3);
+    tcase_add_loop_test(tc_core, conv_4ci16_ci16_speed, 0, 4);
 
     suite_add_tcase(s, tc_core);
     return s;
