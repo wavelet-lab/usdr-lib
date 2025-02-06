@@ -30,7 +30,7 @@ conv_function_t conv_get_4ci16_ci16_c(generic_opts_t cpu_cap, const char** sfunc
 
     SELECT_GENERIC_FN(fn, fname, tr_conv_4ci16_ci16_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_conv_4ci16_ci16_avx2, cpu_cap);
-    SELECT_NEON_FN(fn, fname, tr_conv_4ci16_ci16_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_conv_4ci16_ci16_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
