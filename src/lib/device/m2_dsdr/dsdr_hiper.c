@@ -585,7 +585,7 @@ int dsdr_hiper_dsdr_hiper_ctrl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
 int dsdr_hiper_dsdr_hiper_exp_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     dsdr_hiper_fe_t* hiper = (dsdr_hiper_fe_t*)obj->object;
-    int res;
+    int res = 0;
     unsigned addr = (value >> 24) & 0x7f;
     unsigned data = value & 0xffffff;
 
@@ -596,8 +596,8 @@ int dsdr_hiper_dsdr_hiper_exp_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
 
         switch (addr) {
         case 0x20:
-            res = tca6424a_reg16_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, data);
-            res = tca6424a_reg8_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0 + 2, data >> 16);
+            res = res ? res : tca6424a_reg16_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, data);
+            res = res ? res : tca6424a_reg8_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0 + 2, data >> 16);
             break;
 
         case 0x21:
@@ -615,15 +615,15 @@ int dsdr_hiper_dsdr_hiper_exp_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
             return -EINVAL;
         }
     } else {
-        uint8_t di8;
+        uint8_t di8 = 0;
         uint16_t di16;
 
         switch (addr) {
         case 0x20:
-            res = tca6424a_reg16_get(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, &di16);
-            res = tca6424a_reg8_get(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0 + 2, &di8);
+            res = res ? res : tca6424a_reg16_get(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, &di16);
+            res = res ? res : tca6424a_reg8_get(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0 + 2, &di8);
 
-            hiper->debug_exp_reg_last = di16 | ((unsigned)di8 << 16);
+            hiper->debug_exp_reg_last = di16 | (((unsigned)di8) << 16);
 
             USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_EXP RD %08x => %08x\n", addr, hiper->debug_exp_reg_last);
             return res;
@@ -694,6 +694,9 @@ static int dsdr_hiper_initialize_lms8(dsdr_hiper_fe_t* dfe, unsigned addr, lms80
     res = res ? res : lms8001_create(dfe->dev, dfe->subdev, addr, obj);
 
     res = res ? res : lms8001_ch_enable(obj, 0xc);
+
+    res = res ? res : lms8001_temp_start(obj);
+
     return res;
 }
 #include <stdio.h>
@@ -704,7 +707,7 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     dfe->dev = dev;
     dfe->subdev = 0;
 
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "Initializing HIPER front end...\n");
+    USDR_LOG("HIPR", USDR_LOG_INFO, "Initializing HIPER front end...\n");
     dfe->ref_int_osc = DEF_OSC_INT_FREQ;
     dfe->ref_gps_osc = DEF_OSC_GPS_FREQ;
 
@@ -784,7 +787,7 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     res = res ? res : tmp114_temp_get(dev, dfe->subdev, I2C_TEMP_U70, &tmpid[4]);
     res = res ? res : tmp114_temp_get(dev, dfe->subdev, I2C_TEMP_U71, &tmpid[5]);
 
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER temp sensors %04x %04x %04x | %.2f %.2f %.2f\n",
+    USDR_LOG("HIPR", USDR_LOG_INFO, "HIPER temp sensors %04x %04x %04x | %.2f %.2f %.2f\n",
              tmpid[0], tmpid[1], tmpid[2], tmpid[3] / 256.0, tmpid[4] / 256.0, tmpid[5] / 256.0);
 
     if (res) {
@@ -799,17 +802,20 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     if (res)
         return res;
 
-    for (unsigned h = 0; h < 5; h++) {
-        sleep(1);
+    // SKIP counter check
+    //for (unsigned h = 0; h < 0; h++) {
+        //sleep(1);
+    {
         uint32_t a, b;
 
         dev_gpi_get32(dev, 24, &a);
         dev_gpi_get32(dev, 28, &b);
 
-        USDR_LOG("HIPR", USDR_LOG_WARNING, "Cntr %08x %08x / %7d %7d\n", a, b, a & 0xfffffff, b & 0xfffffff);
+        USDR_LOG("HIPR", USDR_LOG_WARNING, "ADF4002 Cntr %08x %08x / %7d %7d\n", a, b, a & 0xfffffff, b & 0xfffffff);
     }
 
-    {
+    // SKIP GPS
+    if (0) {
         // check uart
         char b[8192];
         uart_core_t uc;
@@ -827,7 +833,11 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     dfe->lms8st_enabled = 0;
 
     memset(dfe->fe_gpo_regs, 0, sizeof(dfe->fe_gpo_regs));
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER front end is ready!\n");
+
+    // Enable TX low band
+
+
+    USDR_LOG("HIPR", USDR_LOG_INFO, "HIPER front end is ready!\n");
     return 0;
 }
 

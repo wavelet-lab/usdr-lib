@@ -269,6 +269,7 @@ int _mstr_stream_recv(stream_handle_t* stream,
             return res;
     }
 
+    // TODO aggregate
     if (nfo)
         *nfo = lnfo[0];
     return 0;
@@ -279,22 +280,29 @@ int _mstr_stream_send(stream_handle_t* stream,
                       const char **stream_buffs,
                       unsigned samples,
                       dm_time_t timestamp,
-                      unsigned timeout_ms)
+                      unsigned timeout_ms,
+                      usdr_dms_send_stat_t* stat)
 {
     stream_mdev_t* str = container_of(stream, stream_mdev_t, base);
     dev_multi_t* obj =  container_of(stream->dev, dev_multi_t, virt_dev);
     stream_handle_t** real_str = str->type == USDR_DMS_RX ? obj->real_str_rx : obj->real_str_tx;
     size_t step = str->channels / str->dev_cnt;
 
+    struct usdr_dms_send_stat lstat[DEV_MAX];
+
     int res, i, idx;
     for (i = 0; i < str->dev_cnt; i++) {
         idx = str->dev_idx[i];
 
         res = real_str[idx]->ops->send(real_str[idx], stream_buffs + step * i,
-                                       samples, timestamp, timeout_ms);
+                                       samples, timestamp, timeout_ms, &lstat[i]);
         if (res)
             return res;
     }
+
+    // TODO aggregate
+    if (stat)
+        *stat = lstat[0];
 
     return 0;
 }

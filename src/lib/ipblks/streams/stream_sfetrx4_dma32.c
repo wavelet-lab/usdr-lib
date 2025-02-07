@@ -186,7 +186,8 @@ int _sfetrx4_stream_send(stream_handle_t* str,
                          const char **stream_buffs,
                          unsigned samples,
                          dm_time_t timestamp,
-                         unsigned timeout)
+                         unsigned timeout,
+                         usdr_dms_send_stat_t* ostat)
 {
     int res;
     struct lowlevel_ops* ops;
@@ -209,7 +210,7 @@ int _sfetrx4_stream_send(stream_handle_t* str,
         do {
             unsigned ns = (samples < stream->pkt_symbs) ? samples : stream->pkt_symbs;
 
-            res = _sfetrx4_stream_send(str, nstreams, ns, timestamp, timeout);
+            res = _sfetrx4_stream_send(str, nstreams, ns, timestamp, timeout, ostat);
             if (res)
                 return res;
 
@@ -267,10 +268,22 @@ int _sfetrx4_stream_send(stream_handle_t* str,
                  stat[2], (stat[3] >> 8) & 0xf);
 
 
+        // TODO fix overrun
         if (stream->stats.dropped != delayd)
             stream->stats.dropped = delayd;
         else
             stream->stats.pktok ++;
+
+        if (ostat) {
+            ostat->lhwtime = stat[2];
+            ostat->opkttime = 0; // TODO
+            ostat->ktime = stat[3];
+            ostat->underruns = stream->stats.dropped;
+            ostat->fifo_used = ((stat[3] >> 8) & 0xf) << 4; // CHECKME
+            ostat->reserved[0] = 0;
+            ostat->reserved[1] = 0;
+            ostat->reserved[2] = 0;
+        }
     } else {
         stream->stats.pktok ++;
     }

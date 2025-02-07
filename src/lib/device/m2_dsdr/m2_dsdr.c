@@ -244,6 +244,8 @@ static int dev_m2_dsdr_debug_clk_info_get(pdevice_t ud, pusdr_vfs_obj_t obj, uin
 static int dev_m2_dsdr_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_dsdr_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
+static int dev_m2_dsdr_afe_health_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
 static int dev_m2_dsdr_dummy(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     return 0;
@@ -265,6 +267,8 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/sdr/0/tx/freqency",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/tx/bandwidth", { dev_m2_dsdr_dummy, NULL }},
     { "/dm/sdr/0/tx/path",      { dev_m2_dsdr_dummy, NULL }},
+
+    { "/dm/sdr/0/afe_health",   { dev_m2_dsdr_dummy, dev_m2_dsdr_afe_health_get }},
 
     { "/dm/sensor/temp",  { NULL, dev_m2_dsdr_senstemp_get }},
     { "/dm/debug/all",    { NULL, dev_m2_dsdr_debug_all_get }},
@@ -372,7 +376,7 @@ int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
     int res = 0;
 
-    unsigned tx_inters[] = { 1, 2, 0, 4, 0, 0, 8, 16,  0,  0, 128 };
+    unsigned tx_inters[] = { 1, 2, 0, 4, 0, 0, 8, 16, 32, 64, 0 };
     unsigned rx_decims[] = { 1, 2, 3, 4, 5, 6, 8, 16, 32, 64, 128 };
     unsigned i = 0;
     unsigned ii;
@@ -384,15 +388,15 @@ int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
             break;
     }
 
-    // d->adc_rate = 245760000;
     d->rxbb_rate = d->adc_rate / rx_decims[i];
     d->rxbb_decim = rx_decims[i];
 
-    // d->dac_rate = 245760000;
-    d->txbb_rate = 0;
+    d->txbb_rate = tx_inters[i] == 0 ? 0 : d->dac_rate / tx_inters[i];
     d->txbb_inter = tx_inters[i];
 
-    USDR_LOG("DSDR", USDR_LOG_ERROR, "Set rate: %.3f Mhz => %.3f (Decim: %d)\n", value / 1.0e6, d->rxbb_rate / 1.0e6, d->rxbb_decim);
+    USDR_LOG("DSDR", USDR_LOG_ERROR, "Set rate: RX %.3f Mhz => %.3f (Decim: %d) -- TX %.3f Mhz => %.3f (Inter: %d)\n",
+             value / 1.0e6, d->rxbb_rate / 1.0e6, d->rxbb_decim,
+             value / 1.0e6, d->txbb_rate / 1.0e6, d->txbb_inter);
 
     res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim);
     if (res) {
@@ -403,14 +407,14 @@ int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     if (d->txbb_inter > 0) {
         d->txbb_rate = d->dac_rate / d->txbb_inter;
 
-        res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSPCHAIN_TX_PRG, (fgearbox_firs_t)d->txbb_inter);
+        res = (res) ? res : fgearbox_load_fir_i(d->base.dev, IGPO_DSPCHAIN_TX_PRG, (fgearbox_firs_t)d->txbb_inter);
         if (res) {
             USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize interpolation FIR gearbox, error = %d!\n", res);
             return res;
         }
     }
 
-
+#if 0
     for (int i = 0; i < 5; i++) {
         uint32_t clk;
         res = res ? res : dev_gpi_get32(d->base.dev, 20, &clk);
@@ -418,8 +422,31 @@ int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
         USDR_LOG("DSDR", USDR_LOG_ERROR, "Clk %d: %d\n", clk >> 28, clk & 0xfffffff);
         usleep(0.5 * 1e6);
     }
+#endif
 
+    return 0;
+}
 
+int dev_m2_dsdr_afe_health_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_dsdr *o = (struct dev_m2_dsdr *)ud;
+    if (o->st.libcapi79xx_check_health == 0) {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "AFE CAPI isn't available!\n");
+        return -ENOENT;
+    }
+
+    int rok = 0;
+    char staus_buffer[16384];
+    staus_buffer[0] = 0;
+
+    int res = o->st.libcapi79xx_check_health(&o->st.capi, &rok, SIZEOF_ARRAY(staus_buffer), staus_buffer);
+    if (res)
+        return res;
+
+    *ovalue = rok;
+    if (staus_buffer[0]) {
+        USDR_LOG("DSDR", USDR_LOG_WARNING, "AFE health report:\n%s\n", staus_buffer);
+    }
     return 0;
 }
 
@@ -479,7 +506,7 @@ int dev_m2_dsdr_debug_clk_info_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *
 
     res = res ? res : dev_gpi_get32(d->base.dev, 20, &clk);
     *value = clk & 0xfffffff;
-    return 0;
+    return res;
 }
 
 
@@ -579,7 +606,7 @@ static int usdr_jesd204b_bringup_post(struct dev_m2_dsdr *dd)
 {
     lldev_t dev = dd->base.dev;
     int res = 0;
-    uint32_t d;
+    uint32_t d = 0;
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_SYNC_RESET, 0);
 
@@ -723,7 +750,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     res = res ? res : lmk05318_check_lock(&d->lmk, &los);
 
     for (int i = 0; i < 5; i++) {
-        uint32_t clk;
+        uint32_t clk = 0;
         res = res ? res : dev_gpi_get32(d->base.dev, 20, &clk);
 
         USDR_LOG("DSDR", USDR_LOG_ERROR, "Clk %d: %d\n", clk >> 28, clk & 0xfffffff);
@@ -814,7 +841,9 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         res = res ? res : usdr_jesd204b_bringup_pre(d);
 
 
-        sleep(1);
+        // sleep(1);
+        usleep(10000);
+
         USDR_LOG("DSDR", USDR_LOG_ERROR, "Initializing AFE...\n");
 
         res = res ? res : afe79xx_init(&d->st, d->afecongiguration);
@@ -865,7 +894,7 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
             return -EINVAL;
         }
 
-        USDR_LOG("UDEV", USDR_LOG_ERROR, "DSDR channels %08x remmaped to %08x with %08x mux\n",
+        USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR channels %08x remmaped to %08x with %08x mux\n",
                  (unsigned)channels, (unsigned)remap_msk, remap_cfg);
         res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_RX_MAP, remap_cfg);
 
@@ -873,7 +902,7 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         for (unsigned ch = 0; ch < 4; ch++) {
             d->st.libcapi79xx_get_nco(&d->st.capi, NCO_RX, ch, &v, 0, 0);
 
-            USDR_LOG("UDEV", USDR_LOG_ERROR, "RX NCO[%d] = %lld\n", ch, (long long)v);
+            USDR_LOG("UDEV", USDR_LOG_INFO, "RX NCO[%d] = %lld\n", ch, (long long)v);
         }
 
 
@@ -920,9 +949,6 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
             USDR_LOG("UDEV", USDR_LOG_ERROR, "Unable to parse TX stream configuration!\n");
             return res;
         }
-
-        // Load interpolator u-code
-
 
         res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_TX_RST, 0x1);
         usleep(1000);
