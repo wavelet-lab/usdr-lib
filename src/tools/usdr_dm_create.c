@@ -185,7 +185,8 @@ void* freq_gen_thread_ci16(void* obj)
     int16_t phase_data[STEP];
     int16_t sin_data[STEP];
     int16_t cos_data[STEP];
-    int16_t sign[STEP];
+    int16_t sign_sin[STEP];
+    int16_t sign_cos[STEP];
 #endif
 
 #ifdef USE_WVLT_SINCOS
@@ -216,18 +217,14 @@ void* freq_gen_thread_ci16(void* obj)
             for(unsigned j = 0; j < len; ++j)
             {
                 phase_data[j] = (int16_t)phase; //intentional overflow
-                sign[j] = phase >= (MULTIPLIER / 4) && phase < (3 * MULTIPLIER / 4) ? -1 : 1; //mirroring sin&cos vals
+                const int16_t sign = phase >= (MULTIPLIER / 4) && phase < (3 * MULTIPLIER / 4) ? -1 : 1; //mirroring sin&cos vals
+                sign_sin[j] = -sign;
+                sign_cos[j] =  sign;
                 phase += istart_dphase[p];
                 phase %= MULTIPLIER;
             }
 
-            wvlt_sincos_i16(phase_data, len, sin_data, cos_data);
-
-            for(unsigned j = 0; j < len; ++j)
-            {
-                iqp[2 * (i + j) + 0] = - sin_data[j] * sign[j];
-                iqp[2 * (i + j) + 1] =   cos_data[j] * sign[j];
-            }
+            wvlt_sincos_i16_interleaved_ctrl(phase_data, sign_sin, sign_cos, len, iqp + i * 2);
         }
 #else
         for (unsigned i = 0; i < tx_get_samples; i++) {
@@ -1100,7 +1097,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                 int64_t lag = curtime - s_tx_time;
 
                 if ((statistics > 1) || (logprev_tx + 1000000000ULL < curtime)) {
-                    fprintf(stderr, "TX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns UND:%ld -- %08x FIFO: %d  len:%d\n", i, count, 0, 0, took, lag,
+                    fprintf(stderr, "TX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns UND:%d -- %08x FIFO: %d  len:%d\n", i, count, 0l, 0, took, lag,
                             txstat.underruns, txstat.ktime, txstat.fifo_used, tx_samples_cnt);
                     logprev_tx = logprev_tx + 1000000000ULL;
                 }
