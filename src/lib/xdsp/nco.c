@@ -1,52 +1,84 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
+#define _GNU_SOURCE
 #include "nco.h"
+#include <math.h>
 
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <smmintrin.h>
 #include "attribute_switch.h"
 
+#define WVLT_SINCOS_I16_SCALE 32767
+#define WVLT_SINCOS_I16_PHSCALE (M_PI / 2 / WVLT_SINCOS_I16_SCALE)
+
+#define TEMPLATE_FUNC_NAME wvlt_sincos_i16_generic
+VWLT_ATTRIBUTE(optimize("-O3", "inline"))
+#include "templates/wvlt_sincos_i16_generic.t"
+DECLARE_TR_FUNC_1_2(wvlt_sincos_i16_generic)
+
+#ifdef WVLT_SSSE3
+#define TEMPLATE_FUNC_NAME wvlt_sincos_i16_ssse3
+VWLT_ATTRIBUTE(optimize("-O3", "inline"), target("ssse3"))
+#include "templates/wvlt_sincos_i16_ssse3.t"
+DECLARE_TR_FUNC_1_2(wvlt_sincos_i16_ssse3)
+#endif
+
+conv_function_t get_wvlt_sincos_i16_c(generic_opts_t cpu_cap, const char** sfunc)
+{
+    const char* fname;
+    conv_function_t fn;
+
+    SELECT_GENERIC_FN(fn, fname, tr_wvlt_sincos_i16_generic, cpu_cap);
+    SELECT_SSSE3_FN(fn, fname, tr_wvlt_sincos_i16_ssse3, cpu_cap);
+    //SELECT_AVX2_FN(fn, fname, tr_wvlt_sincos_i16_avx2, cpu_cap);
+
+    if (sfunc) *sfunc = fname;
+    return fn;
+}
+
+conv_function_t get_wvlt_sincos_i16()
+{
+    return get_wvlt_sincos_i16_c(cpu_vcap_get(), NULL);
+}
+
+
+#define TEMPLATE_FUNC_NAME wvlt_sincos_i16_interleaved_ctrl_generic
+VWLT_ATTRIBUTE(optimize("-O3", "inline"))
+#include "templates/wvlt_sincos_i16_interleaved_ctrl_generic.t"
+DECLARE_TR_FUNC_3_1(wvlt_sincos_i16_interleaved_ctrl_generic)
+
+#ifdef WVLT_SSSE3
+#define TEMPLATE_FUNC_NAME wvlt_sincos_i16_interleaved_ctrl_ssse3
+VWLT_ATTRIBUTE(optimize("-O3", "inline"), target("ssse3"))
+#include "templates/wvlt_sincos_i16_interleaved_ctrl_ssse3.t"
+DECLARE_TR_FUNC_3_1(wvlt_sincos_i16_interleaved_ctrl_ssse3)
+#endif
+
+conv_function_t get_wvlt_sincos_i16_interleaved_ctrl_c(generic_opts_t cpu_cap, const char** sfunc)
+{
+    const char* fname;
+    conv_function_t fn;
+
+    SELECT_GENERIC_FN(fn, fname, tr_wvlt_sincos_i16_interleaved_ctrl_generic, cpu_cap);
+    SELECT_SSSE3_FN(fn, fname, tr_wvlt_sincos_i16_interleaved_ctrl_ssse3, cpu_cap);
+    //SELECT_AVX2_FN(fn, fname, tr_wvlt_sincos_i16_interleaved_ctrl_avx2, cpu_cap);
+
+    if (sfunc) *sfunc = fname;
+    return fn;
+}
+
+conv_function_t get_wvlt_sincos_i16_interleaved_ctrl()
+{
+    return get_wvlt_sincos_i16_interleaved_ctrl_c(cpu_vcap_get(), NULL);
+}
+
+
+
 #ifdef __SSSE3__
 
 VWLT_ATTRIBUTE(optimize("O3", "inline"), target("ssse3"))
-static void fsincos_ssse3(__m128i* pph, __m128i* psin, __m128i *pcos)
-{
-    __m128i ph = _mm_loadu_si128((__m128i*)pph);
-    __m128i ph2 = _mm_mulhrs_epi16(ph, ph);
-    __m128i phx1 = _mm_mulhrs_epi16(ph, _mm_set1_epi16(18705));
-    __m128i phx3_c = _mm_mulhrs_epi16(ph, _mm_set1_epi16(-21166));
-    __m128i phx5_c = _mm_mulhrs_epi16(ph, _mm_set1_epi16(2611));
-    __m128i phx7_c = _mm_mulhrs_epi16(ph, _mm_set1_epi16(-152));
-    __m128i ph4 = _mm_mulhrs_epi16(ph2, ph2);
-    __m128i phx3 = _mm_mulhrs_epi16(ph2, phx3_c);
-    __m128i phy2 = _mm_mulhrs_epi16(ph2, _mm_set1_epi16(-7656));
-    __m128i phs0 = _mm_add_epi16(ph, phx1);
-    __m128i phc0 = _mm_sub_epi16(_mm_set1_epi16(32767), ph2);
-    __m128i phs1 = _mm_add_epi16(phs0, phx3);
-    __m128i phc1 = _mm_add_epi16(phc0, phy2);
-    __m128i ph6 = _mm_mulhrs_epi16(ph4, ph2);
-    __m128i phx5 = _mm_mulhrs_epi16(ph4, phx5_c);
-    __m128i phy48 = _mm_mulhrs_epi16(ph4, _mm_set1_epi16(30));
-    __m128i phy4 = _mm_mulhrs_epi16(ph4, _mm_set1_epi16(8311));
-    // dummy
-    __m128i phy6 = _mm_mulhrs_epi16(ph6, _mm_set1_epi16(-683));
-    __m128i phx7 = _mm_mulhrs_epi16(ph6, phx7_c);
-    __m128i phy8 = _mm_mulhrs_epi16(ph4, phy48);
-    __m128i phs2 = _mm_add_epi16(phs1, phx5);
-    __m128i phc2 = _mm_add_epi16(phc1, phy4);
-    // dummy
-    // dummy
-    __m128i phs3 = _mm_add_epi16(phs2, phx7);
-    __m128i phc3 = _mm_add_epi16(phc2, phy6);
-    __m128i phc4 = _mm_add_epi16(phc3, phy8);
-
-    _mm_storeu_si128((__m128i*)psin, phs3);
-    _mm_storeu_si128((__m128i*)pcos, phc4);
-}
-
- VWLT_ATTRIBUTE(optimize("O3", "inline"), target("ssse3"))
 static void calc_vco_iq_ssse3(int32_t phase, int32_t delta, __m128i* psin, __m128i *pcos)
 {
     __m128i dp  = _mm_set1_epi32(delta);
@@ -89,7 +121,7 @@ static void calc_vco_iq_ssse3(int32_t phase, int32_t delta, __m128i* psin, __m12
     __m128i vphase = _mm_or_si128(vp, vn);
 
     __m128i pc;
-    fsincos_ssse3(&vphase, (__m128i*)psin, &pc);
+    wvlt_sincos_i16((const int16_t*)&vphase, 8, (int16_t*)psin, (int16_t*)&pc);
 
     __m128i pcn = _mm_sub_epi16(_mm_setzero_si128(), pc); // cos negative
     __m128i pcpm = _mm_and_si128(phx, pc);

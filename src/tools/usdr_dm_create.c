@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "../common/ring_buffer.h"
+#include "../xdsp/nco.h"
 
 #define LOG_TAG "DMCR"
 
@@ -152,6 +153,19 @@ void* disk_read_thread(void* obj)
     return NULL;
 }
 
+#define USE_WVLT_SINCOS
+
+//we have no NEON implementation for wvlt_sincos_i16() yet
+#if !defined (WVLT_ARCH_X86_64) && !defined (WVLT_ARCH_X86)
+#undef USE_WVLT_SINCOS
+#endif
+
+#ifdef USE_WVLT_SINCOS
+#define MULTIPLIER (32768u * 4) //full 0:2*pi range is 0:131071 -> effective diap -pi/2:+pi/2 = -32768:32767
+unsigned istart_phase[8] = { 0, MULTIPLIER / 2, MULTIPLIER / 4, MULTIPLIER / 8 };
+unsigned istart_dphase[8] = { MULTIPLIER / 3, MULTIPLIER / 50, 3 * MULTIPLIER / 100, MULTIPLIER / 25 };
+#endif
+
 double start_phase[8] = { 0, 0.5, 0.25, 0.125 };
 double start_dphase[8] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
 unsigned tx_get_samples;
@@ -162,7 +176,24 @@ unsigned tx_get_samples;
 void* freq_gen_thread_ci16(void* obj)
 {
     unsigned p = (intptr_t)obj;
+
+#ifdef USE_WVLT_SINCOS
+
+    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Using TX sinus generator with USE_WVLT_SINCOS opt @ ch#%d", p);
+
+    static const unsigned STEP = 16;
+    int16_t phase_data[STEP];
+    int16_t sin_data[STEP];
+    int16_t cos_data[STEP];
+    int16_t sign_sin[STEP];
+    int16_t sign_cos[STEP];
+#endif
+
+#ifdef USE_WVLT_SINCOS
+    unsigned phase = istart_phase[p];
+#else
     double phase = start_phase[p];
+#endif
 
     while (!s_stop && !thread_stop) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
@@ -177,6 +208,25 @@ void* freq_gen_thread_ci16(void* obj)
 
         int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
 
+#ifdef USE_WVLT_SINCOS
+        for (unsigned i = 0; i < tx_get_samples; i += STEP)
+        {
+            const unsigned rest_len = tx_get_samples - i * STEP;
+            const unsigned len = rest_len > STEP ? STEP : rest_len;
+
+            for(unsigned j = 0; j < len; ++j)
+            {
+                phase_data[j] = (int16_t)phase; //intentional overflow
+                const int16_t sign = phase >= (MULTIPLIER / 4) && phase < (3 * MULTIPLIER / 4) ? -1 : 1; //mirroring sin&cos vals
+                sign_sin[j] = -sign;
+                sign_cos[j] =  sign;
+                phase += istart_dphase[p];
+                phase %= MULTIPLIER;
+            }
+
+            wvlt_sincos_i16_interleaved_ctrl(phase_data, sign_sin, sign_cos, len, iqp + i * 2);
+        }
+#else
         for (unsigned i = 0; i < tx_get_samples; i++) {
             float ii, qq;
             sincosf(2 * M_PI * phase, &ii, &qq);
@@ -188,6 +238,7 @@ void* freq_gen_thread_ci16(void* obj)
                 phase -= 1.0;
 
         }
+#endif //USE_WVLT_SINCOS
 
         ring_buffer_ppost(tbuff[p]);
     }
@@ -1046,7 +1097,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                 int64_t lag = curtime - s_tx_time;
 
                 if ((statistics > 1) || (logprev_tx + 1000000000ULL < curtime)) {
-                    fprintf(stderr, "TX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns UND:%ld -- %08x FIFO: %d  len:%d\n", i, count, 0, 0, took, lag,
+                    fprintf(stderr, "TX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns UND:%d -- %08x FIFO: %d  len:%d\n", i, count, 0l, 0, took, lag,
                             txstat.underruns, txstat.ktime, txstat.fifo_used, tx_samples_cnt);
                     logprev_tx = logprev_tx + 1000000000ULL;
                 }
