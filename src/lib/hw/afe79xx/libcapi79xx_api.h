@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 // Callback functions
 enum afe79xx_chip_type {
@@ -26,6 +27,14 @@ struct libcapi79xx {
 
     int (*give_sysref_pulse)(libcapi79xx_t* dev);
 
+    void (*log_vout)(unsigned loglevel,
+                     const char* subsystem,
+                     const char* function,
+                     const char* file,
+                     int line,
+                     const char* fmt,
+                     va_list list);
+
     void *user;
     void *driver_handle; // Do not touch
 };
@@ -37,13 +46,19 @@ typedef int (*libcapi79xx_init_fn_t)(libcapi79xx_t* o, const char* configuration
 typedef int (*libcapi79xx_upd_nco_fn_t)(libcapi79xx_t* o, unsigned type, unsigned ch, uint64_t freq, unsigned ncono, unsigned band);
 typedef int (*libcapi79xx_get_nco_fn_t)(libcapi79xx_t* o, unsigned type, unsigned ch, uint64_t* freq, unsigned ncono, unsigned band);
 
+typedef int (*libcapi79xx_set_dsa_fn_t)(libcapi79xx_t* o, unsigned type, unsigned ch, unsigned dsa0_5db);
+
 typedef int (*libcapi79xx_check_health_fn_t)(libcapi79xx_t* o, int *ok, unsigned sz, char* buf);
+
 
 #define LIBCAPI79XX_CREATE_FN "libcapi79xx_create"
 #define LIBCAPI79XX_DESTROY_FN "libcapi79xx_destroy"
 #define LIBCAPI79XX_INIT_FN "libcapi79xx_init"
 #define LIBCAPI79XX_UPD_NCO_FN "libcapi79xx_upd_nco"
 #define LIBCAPI79XX_GET_NCO_FN "libcapi79xx_get_nco"
+
+#define LIBCAPI79XX_SET_DSA_FN "libcapi79xx_set_dsa"
+
 
 #define LIBCAPI79XX_CHECK_HEALTH_FN  "libcapi79xx_check_health"
 

@@ -23,7 +23,13 @@
 
 #include "../generic_usdr/generic_regs.h"
 
+#include "def_m2_dsdr_e.h"
+#include "def_m2_dsdr_p.h"
+#include "def_m2_dsdr_usr.h"
+
 #include "dsdr_hiper.h"
+
+static int dsdr_hiper_update_fe_user(dsdr_hiper_fe_t* fe);
 
 static int dev_gpo_set(lldev_t dev, unsigned bank, unsigned data)
 {
@@ -35,6 +41,13 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
     return lowlevel_reg_rd32(dev, 0, 16 + (bank / 4), data);
 }
 
+
+#define H_CHA 0
+#define H_CHB 1
+#define H_CHC 2
+#define H_CHD 3
+
+
 enum osc_defaults {
     DEF_OSC_GPS_FREQ = 25000000, // U82
     DEF_OSC_INT_FREQ = 40000000, // VCO1/VCO2
@@ -44,7 +57,9 @@ enum {
     IGPO_OFF_ADDR = 4,
     IGPO_OFF_YAML = 16,
 
-    IGPO_FE_REG_COUNT = 9,
+    IGPO_RX_IQS = 38,
+
+    //IGPO_FE_REG_COUNT = 9,
 };
 
 enum {
@@ -67,8 +82,8 @@ enum i2c_idx_extra {
 enum spi_idx {
     SPI_LMS8001B_U1_RX_AB_IDX = 0,
     SPI_LMS8001B_U2_RX_CD_IDX = 1,
-    SPI_LMS8001A_U3_RX_AB_IDX = 2,
-    SPI_LMS8001A_U4_RX_CD_IDX = 3,
+    SPI_LMS8001A_U3_RX_AB_IDX = 2, // LOW
+    SPI_LMS8001A_U4_RX_CD_IDX = 3, // LOW
     SPI_LMS8001B_U5_TX_AB_IDX = 4,
     SPI_LMS8001B_U6_TX_CD_IDX = 5,
     SPI_ADF4002 = 7,
@@ -117,7 +132,13 @@ enum bb_clean_zone {
     RX_N2_CLEAN_MAX = 2400,
 };
 
-
+static const uint64_t s_filerbank_ranges[] = {
+    400e6, 1000e6,
+    1000e6, 2000e6,
+    2000e6, 3500e6,
+    2500e6, 5000e6,
+    3500e6, 7100e6,
+};
 
 
 
@@ -149,6 +170,8 @@ static int dsdr_hiper_dsdr_hiper_ctrl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj,
 static int dsdr_hiper_dsdr_hiper_exp_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dsdr_hiper_dsdr_hiper_exp_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
+static int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dsdr_hiper_dsdr_hiper_usr_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 static int dsdr_hiper_sens0temp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 static int dsdr_hiper_sens1temp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
@@ -202,6 +225,8 @@ static int dsdr_hiper_senslms3temp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
 static int dsdr_hiper_senslms4temp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 static int dsdr_hiper_senslms5temp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
+
+
 static const usdr_dev_param_func_t s_fe_parameters[] = {
     { "/debug/hw/lms8001/0/reg" ,  { dsdr_hiper_debug_lms8001_u1_reg_set, dsdr_hiper_debug_lms8001_u1_reg_get }},
     { "/debug/hw/lms8001/1/reg" ,  { dsdr_hiper_debug_lms8001_u2_reg_set, dsdr_hiper_debug_lms8001_u2_reg_get }},
@@ -212,6 +237,7 @@ static const usdr_dev_param_func_t s_fe_parameters[] = {
 
     { "/debug/hw/dsdr_hiper_ctrl/0/reg", { dsdr_hiper_dsdr_hiper_ctrl_reg_set, dsdr_hiper_dsdr_hiper_ctrl_reg_get }  },
     { "/debug/hw/dsdr_hiper_exp/0/reg" , { dsdr_hiper_dsdr_hiper_exp_reg_set, dsdr_hiper_dsdr_hiper_exp_reg_get }  },
+    { "/debug/hw/dsdr_hiper_usr/0/reg" , { dsdr_hiper_dsdr_hiper_usr_reg_set, dsdr_hiper_dsdr_hiper_usr_reg_get }  },
 
     { "/dm/sensor/temp1",          { NULL, dsdr_hiper_sens0temp_get }},
     { "/dm/sensor/temp2",          { NULL, dsdr_hiper_sens1temp_get }},
@@ -245,6 +271,8 @@ static const usdr_dev_param_func_t s_fe_parameters[] = {
     { "/dm/sdr/0/dacvctcxo",       { dsdr_hiper_dacvctcxo_set, dsdr_hiper_dacvctcxo_get }},
 
     { "/debug/hw/adf4002b/0/reg",  { dsdr_hiper_adf4002b_reg_set, dsdr_hiper_adf4002b_reg_get }  },
+
+
 
 };
 
@@ -554,7 +582,7 @@ int dsdr_hiper_dsdr_hiper_ctrl_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
     if (value & 0x80000000) {
         USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_CTRL %08x => %08x\n", addr, data);
 
-        if (addr >= IGPO_OFF_YAML && addr < IGPO_OFF_YAML + IGPO_FE_REG_COUNT) {
+        if (addr >= IGPO_OFF_YAML && addr < IGPO_OFF_YAML + SIZEOF_ARRAY(hiper->fe_gpo_regs)) {
             hiper->fe_gpo_regs[addr - IGPO_OFF_YAML] = data;
 
             res = dev_gpo_set(hiper->dev, addr - IGPO_OFF_YAML + IGPO_OFF_ADDR, data);
@@ -564,7 +592,7 @@ int dsdr_hiper_dsdr_hiper_ctrl_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
             return -EINVAL;
         }
     } else {
-        if (addr >= IGPO_OFF_YAML && addr < IGPO_OFF_YAML + IGPO_FE_REG_COUNT) {
+        if (addr >= IGPO_OFF_YAML && addr < IGPO_OFF_YAML + SIZEOF_ARRAY(hiper->fe_gpo_regs)) {
             hiper->debug_fe_reg_last = hiper->fe_gpo_regs[addr - IGPO_OFF_YAML];
             res = 0;
         } else {
@@ -581,6 +609,31 @@ int dsdr_hiper_dsdr_hiper_ctrl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
     return 0;
 }
 
+static int _hiper_update_expander_vreg(dsdr_hiper_fe_t* hiper, unsigned addr, unsigned data)
+{
+    int res = 0;
+    switch (addr) {
+    case 0x0:
+        res = res ? res : tca6424a_reg16_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, data);
+        res = res ? res : tca6424a_reg8_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0 + 2, data >> 16);
+        break;
+
+    case 0x1:
+    case 0x2:
+    case 0x3:
+        res = tca6424a_reg8_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U113, TCA6424_OUT0 + (addr - 0x1), data);
+        break;
+
+    case 0x4:
+    case 0x5:
+    case 0x6:
+        res = tca6424a_reg8_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U115, TCA6424_OUT0 + (addr - 0x4), data);
+        break;
+    default:
+        return -EINVAL;
+    }
+    return res;
+}
 
 int dsdr_hiper_dsdr_hiper_exp_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -593,27 +646,12 @@ int dsdr_hiper_dsdr_hiper_exp_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
 
     if (value & 0x80000000) {
         USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_EXP WR %08x => %08x\n", addr, data);
+        res = _hiper_update_expander_vreg(hiper, addr - 0x20, data);
+        if (res)
+            return res;
 
-        switch (addr) {
-        case 0x20:
-            res = res ? res : tca6424a_reg16_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, data);
-            res = res ? res : tca6424a_reg8_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0 + 2, data >> 16);
-            break;
-
-        case 0x21:
-        case 0x22:
-        case 0x23:
-            res = tca6424a_reg8_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U113, TCA6424_OUT0 + (addr - 0x21), data);
-            break;
-
-        case 0x24:
-        case 0x25:
-        case 0x26:
-            res = tca6424a_reg8_set(hiper->dev, hiper->subdev, I2C_TCA6424AR_U115, TCA6424_OUT0 + (addr - 0x24), data);
-            break;
-        default:
-            return -EINVAL;
-        }
+        // Update cache
+        hiper->fe_ctrl_regs[addr - 0x20] = data;
     } else {
         uint8_t di8 = 0;
         uint16_t di16;
@@ -712,10 +750,12 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     dfe->ref_gps_osc = DEF_OSC_GPS_FREQ;
 
     // Reset FE registers
-    for (unsigned k = 0; k < IGPO_FE_REG_COUNT; k++) {
-        res = res ? res : dev_gpo_set(dev, IGPO_OFF_ADDR + k, 0);
+    memset(dfe->fe_gpo_regs, 0, sizeof(dfe->fe_gpo_regs));
+    for (unsigned k = 0; k < SIZEOF_ARRAY(dfe->fe_gpo_regs); k++) {
+        res = res ? res : dev_gpo_set(dev, IGPO_OFF_ADDR + k, dfe->fe_gpo_regs[k]);
     }
 
+    memset(dfe->fe_ctrl_regs, 0, sizeof(dfe->fe_ctrl_regs));
     res = res ? res : tca6424a_reg16_set(dev, dfe->subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, 0);
     res = res ? res : tca6424a_reg16_set(dev, dfe->subdev, I2C_TCA6424AR_U113, TCA6424_OUT0, 0);
     res = res ? res : tca6424a_reg16_set(dev, dfe->subdev, I2C_TCA6424AR_U115, TCA6424_OUT0, 0);
@@ -732,12 +772,21 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     // TODO: sanity check
 
     // Reset all LMS8001
-    res = res ? res : tca6424a_reg16_set(dev, dfe->subdev, I2C_TCA6424AR_U115, TCA6424_OUT0, 0xffff);
-    res = res ? res : tca6424a_reg8_set(dev, dfe->subdev, I2C_TCA6424AR_U115, TCA6424_OUT0 + 2, 0xff);
+    // res = res ? res : tca6424a_reg16_set(dev, dfe->subdev, I2C_TCA6424AR_U115, TCA6424_OUT0, 0xffff);
+    // res = res ? res : tca6424a_reg8_set(dev, dfe->subdev, I2C_TCA6424AR_U115, TCA6424_OUT0 + 2, 0xff);
+    // if (res)
+    //     return res;
 
-    if (res)
+    dfe->fe_ctrl_regs[ENABLE - SW_RX_FILTER] = MAKE_M2_DSDR_E_ENABLE(1, 1, 1, 1);
+    dfe->fe_ctrl_regs[LMS8001_RESET - SW_RX_FILTER] = MAKE_M2_DSDR_E_LMS8001_RESET(1, 1, 1, 1, 1, 1);
+    dfe->fe_ctrl_regs[GPIO6 - SW_RX_FILTER] = MAKE_M2_DSDR_E_GPIO6(0, 0, 0, 0, 1, 0, 1, 0);
+    for (unsigned k = 0; k < SIZEOF_ARRAY(dfe->fe_ctrl_regs); k++) {
+        res = res ? res : _hiper_update_expander_vreg(dfe, k, dfe->fe_ctrl_regs[k]);
+    }
+    if (res) {
+        USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER Expanders initialization failed: %d\n", res);
         return res;
-
+    }
 
     // LMS8
     for (unsigned k = 0; k < 6; k++) {
@@ -830,15 +879,30 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
     dfe->lms8st_flock_n = 100;
     dfe->lms8st_iq_gen = 0;
     dfe->lms8st_int_mod = 0;
-    dfe->lms8st_enabled = 0;
+    dfe->lms8st_enabled = 1;
 
-    memset(dfe->fe_gpo_regs, 0, sizeof(dfe->fe_gpo_regs));
 
-    // Enable TX low band
+    // TODO: set default configuration
+    for (unsigned i = 0; i < HIPER_MAX_HW_CHANS; i++) {
+        fe_chan_config_t* cfg = &dfe->ucfg[i];
+        cfg->rx_ifamp_bp = 0;
+        cfg->rx_band = IFBAND_AUTO;
+        cfg->rx_fb_sel = RX_FB_AUTO;
+        cfg->rx_dsa = 0;
+        cfg->tx_band = IFBAND_AUTO;
+        cfg->ant_sel = ANT_RX_TRX;
+        cfg->swap_rxiq = 0;
+        cfg->rx_freq = 0;
+        cfg->rx_nco = 0;
+        cfg->tx_freq = 0;
+        cfg->tx_nco = 0;
+    }
+
+    res = dsdr_hiper_update_fe_user(dfe);
 
 
     USDR_LOG("HIPR", USDR_LOG_INFO, "HIPER front end is ready!\n");
-    return 0;
+    return res;
 }
 
 int dsdr_hiper_meas_clk40_int_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
@@ -867,5 +931,432 @@ int dsdr_hiper_meas_adfmux_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* oval
 
 int dsdr_hiper_fe_destroy(dsdr_hiper_fe_t* dfe)
 {
+    int res = 0;
+
+    dfe->fe_ctrl_regs[ENABLE - SW_RX_FILTER] = MAKE_M2_DSDR_E_ENABLE(0, 0, 0, 0);
+    dfe->fe_ctrl_regs[LMS8001_RESET - SW_RX_FILTER] = MAKE_M2_DSDR_E_LMS8001_RESET(0, 0, 0, 0, 0, 0);
+
+    res = res ? res : _hiper_update_expander_vreg(dfe, LMS8001_RESET - SW_RX_FILTER, dfe->fe_ctrl_regs[LMS8001_RESET - SW_RX_FILTER]);
+    usleep(100);
+    res = res ? res : _hiper_update_expander_vreg(dfe, ENABLE - SW_RX_FILTER, dfe->fe_ctrl_regs[ENABLE - SW_RX_FILTER]);
+    return res;
+}
+
+
+int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dsdr_hiper_fe_t* hiper = (dsdr_hiper_fe_t*)obj->object;
+    int res = 0;
+    unsigned addr = (value >> 24) & 0x7f;
+    unsigned data = value & 0xffffff;
+
+    hiper->debug_usr_reg_last = ~0u;
+
+    if (value & 0x80000000) {
+        USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_USER %08x => %08x\n", addr, data);
+
+        switch (addr) {
+        case RX_IFAMP_BP:
+            hiper->ucfg[H_CHA].rx_ifamp_bp = GET_M2_DSDR_USR_RX_IFAMP_BP_A(data);
+            hiper->ucfg[H_CHB].rx_ifamp_bp = GET_M2_DSDR_USR_RX_IFAMP_BP_B(data);
+            hiper->ucfg[H_CHC].rx_ifamp_bp = GET_M2_DSDR_USR_RX_IFAMP_BP_C(data);
+            hiper->ucfg[H_CHD].rx_ifamp_bp = GET_M2_DSDR_USR_RX_IFAMP_BP_D(data);
+            break;
+        case RX_H_BAND:
+            hiper->ucfg[H_CHA].rx_band = GET_M2_DSDR_USR_RX_H_BAND_A(data);
+            hiper->ucfg[H_CHB].rx_band = GET_M2_DSDR_USR_RX_H_BAND_B(data);
+            hiper->ucfg[H_CHC].rx_band = GET_M2_DSDR_USR_RX_H_BAND_C(data);
+            hiper->ucfg[H_CHD].rx_band = GET_M2_DSDR_USR_RX_H_BAND_D(data);
+            break;
+        case RX_FILTER_BANK:
+            hiper->ucfg[H_CHA].rx_fb_sel = GET_M2_DSDR_USR_RX_FILTER_BANK_A(data);
+            hiper->ucfg[H_CHB].rx_fb_sel = GET_M2_DSDR_USR_RX_FILTER_BANK_B(data);
+            hiper->ucfg[H_CHC].rx_fb_sel = GET_M2_DSDR_USR_RX_FILTER_BANK_C(data);
+            hiper->ucfg[H_CHD].rx_fb_sel = GET_M2_DSDR_USR_RX_FILTER_BANK_D(data);
+            break;
+        case RX_ATTN:
+            hiper->ucfg[H_CHA].rx_dsa = GET_M2_DSDR_USR_RX_ATTN_A(data);
+            hiper->ucfg[H_CHB].rx_dsa = GET_M2_DSDR_USR_RX_ATTN_B(data);
+            hiper->ucfg[H_CHC].rx_dsa = GET_M2_DSDR_USR_RX_ATTN_C(data);
+            hiper->ucfg[H_CHD].rx_dsa = GET_M2_DSDR_USR_RX_ATTN_D(data);
+            break;
+        case TX_H_BAND:
+            hiper->ucfg[H_CHA].tx_band = GET_M2_DSDR_USR_TX_H_BAND_A(data);
+            hiper->ucfg[H_CHB].tx_band = GET_M2_DSDR_USR_TX_H_BAND_B(data);
+            hiper->ucfg[H_CHC].tx_band = GET_M2_DSDR_USR_TX_H_BAND_C(data);
+            hiper->ucfg[H_CHD].tx_band = GET_M2_DSDR_USR_TX_H_BAND_D(data);
+            break;
+        case ANT_SEL:
+            hiper->ucfg[H_CHA].ant_sel = GET_M2_DSDR_USR_ANT_SEL_A(data);
+            hiper->ucfg[H_CHB].ant_sel = GET_M2_DSDR_USR_ANT_SEL_B(data);
+            hiper->ucfg[H_CHC].ant_sel = GET_M2_DSDR_USR_ANT_SEL_C(data);
+            hiper->ucfg[H_CHD].ant_sel = GET_M2_DSDR_USR_ANT_SEL_D(data);
+            break;
+        default:
+            return -EINVAL;
+        }
+
+        // Update state
+        res = dsdr_hiper_update_fe_user(hiper);
+    } else {
+        switch (addr) {
+        case RX_IFAMP_BP:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_RX_IFAMP_BP(
+                hiper->ucfg[H_CHD].rx_ifamp_bp, hiper->ucfg[H_CHC].rx_ifamp_bp,
+                hiper->ucfg[H_CHB].rx_ifamp_bp, hiper->ucfg[H_CHA].rx_ifamp_bp);
+            break;
+        case RX_H_BAND:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_RX_H_BAND(
+                hiper->ucfg[H_CHD].rx_band, hiper->ucfg[H_CHC].rx_band,
+                hiper->ucfg[H_CHB].rx_band, hiper->ucfg[H_CHA].rx_band);
+            break;
+        case RX_FILTER_BANK:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_RX_FILTER_BANK(
+                hiper->ucfg[H_CHD].rx_fb_sel, hiper->ucfg[H_CHC].rx_fb_sel,
+                hiper->ucfg[H_CHB].rx_fb_sel, hiper->ucfg[H_CHA].rx_fb_sel);
+            break;
+        case RX_ATTN:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_RX_ATTN(
+                hiper->ucfg[H_CHD].rx_dsa, hiper->ucfg[H_CHC].rx_dsa,
+                hiper->ucfg[H_CHB].rx_dsa, hiper->ucfg[H_CHA].rx_dsa);
+            break;
+        case TX_H_BAND:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_TX_H_BAND(
+                hiper->ucfg[H_CHD].tx_band, hiper->ucfg[H_CHC].tx_band,
+                hiper->ucfg[H_CHB].tx_band, hiper->ucfg[H_CHA].tx_band);
+            break;
+        case ANT_SEL:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_ANT_SEL(
+                hiper->ucfg[H_CHD].ant_sel, hiper->ucfg[H_CHC].ant_sel,
+                hiper->ucfg[H_CHB].ant_sel, hiper->ucfg[H_CHA].ant_sel);
+            break;
+        default:
+            return -EINVAL;
+        }
+    }
+
+    return res;
+}
+
+int dsdr_hiper_dsdr_hiper_usr_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dsdr_hiper_fe_t* hiper = (dsdr_hiper_fe_t*)obj->object;
+    *ovalue = hiper->debug_usr_reg_last;
     return 0;
 }
+
+
+static void _hiper_fbank_map(unsigned filsel, unsigned *bout, unsigned *bin)
+{
+    // Sanity check YAML <-> internal ABI constants
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_400_1000M, RX_FB_400_1000M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_1000_2000M, RX_FB_1000_2000M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_2000_3500M, RX_FB_2000_3500M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_2500_5000M, RX_FB_2500_5000M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_3500_7100M, RX_FB_3500_7100M);
+
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_400_1000M, RX_FB_AUTO | RX_FB_400_1000M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_1000_2000M, RX_FB_AUTO | RX_FB_1000_2000M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_2000_3500M, RX_FB_AUTO | RX_FB_2000_3500M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_2500_5000M, RX_FB_AUTO | RX_FB_2500_5000M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_3500_7100M, RX_FB_AUTO | RX_FB_3500_7100M);
+
+    CHECK_CONSTANT_EQ(SW_RX_FILTER_IN_CHA_400_1000M, SW_RX_FILTER_OUT_CHA_400_1000M);
+
+    unsigned fb_f_sel = (~RX_FB_AUTO & filsel);
+    switch (fb_f_sel) {
+    case RX_FB_400_1000M: *bout = SW_RX_FILTER_OUT_CHA_400_1000M; *bin = SW_RX_FILTER_IN_CHA_400_1000M; break;
+    case RX_FB_1000_2000M: *bout = SW_RX_FILTER_OUT_CHA_1000_2000M; *bin = SW_RX_FILTER_IN_CHA_1000_2000M; break;
+    case RX_FB_2000_3500M: *bout = SW_RX_FILTER_OUT_CHA_2000_3500M; *bin = SW_RX_FILTER_IN_CHA_2000_3500M; break;
+    case RX_FB_2500_5000M: *bout = SW_RX_FILTER_OUT_CHA_2500_5000M; *bin = SW_RX_FILTER_IN_CHA_2500_5000M; break;
+    case RX_FB_3500_7100M: *bout = SW_RX_FILTER_OUT_CHA_3500_7100M; *bin = SW_RX_FILTER_IN_CHA_3500_7100M; break;
+    default: *bout = SW_RX_FILTER_OUT_CHA_MUTE1; *bin = SW_RX_FILTER_IN_CHA_MUTE1; break;
+    }
+}
+
+static void _hiper_antenna_sw_map(unsigned antenna, bool rxen, bool txen, uint8_t* gpo_ctrl, unsigned* inswlb, unsigned *arx, unsigned *atx)
+{
+    CHECK_CONSTANT_EQ(ANT_OPTS_RX_TO_RX_AND_TX_TO_TRX, ANT_RX_TRX);
+    CHECK_CONSTANT_EQ(ANT_OPTS_RX_TO_TRX_AND_TX_TERM, ANT_TRX_TERM);
+    CHECK_CONSTANT_EQ(ANT_OPTS_RX_TO_RX_AND_TX_TERM, ANT_RX_TERM);
+    CHECK_CONSTANT_EQ(ANT_OPTS_RX_TX_LOOPBACK, ANT_LOOPBACK);
+    CHECK_CONSTANT_EQ(ANT_OPTS_TDD_DRIVEN_AUTO, AND_HW_TDD);
+
+    switch (antenna) {
+    case ANT_RX_TRX:
+        SET_M2_DSDR_P_CHD_EN_TX(*gpo_ctrl, txen);
+        SET_M2_DSDR_P_CHD_EN_VADJ(*gpo_ctrl, txen);
+        SET_M2_DSDR_P_CHD_EN_RX(*gpo_ctrl, rxen);
+        SET_M2_DSDR_P_CHD_SW_HW_TDD_CTRL(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_SW_PA_ONOFF(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_SW_RX_TDDFDD(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_SW_RXTX(*gpo_ctrl, 0);
+        *inswlb = 0;
+        *arx = rxen;
+        *atx = txen;
+        break;
+
+    case ANT_TRX_TERM:
+        SET_M2_DSDR_P_CHD_EN_TX(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_EN_VADJ(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_EN_RX(*gpo_ctrl, rxen);
+        SET_M2_DSDR_P_CHD_SW_HW_TDD_CTRL(*gpo_ctrl, 1);
+        SET_M2_DSDR_P_CHD_SW_PA_ONOFF(*gpo_ctrl, 1);
+        SET_M2_DSDR_P_CHD_SW_RX_TDDFDD(*gpo_ctrl, 1);
+        SET_M2_DSDR_P_CHD_SW_RXTX(*gpo_ctrl, 0);
+        *inswlb = 0;
+        *arx = rxen;
+        *atx = 0;
+        break;
+
+    case ANT_RX_TERM:
+        SET_M2_DSDR_P_CHD_EN_TX(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_EN_VADJ(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_EN_RX(*gpo_ctrl, rxen);
+        SET_M2_DSDR_P_CHD_SW_HW_TDD_CTRL(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_SW_PA_ONOFF(*gpo_ctrl, 1);
+        SET_M2_DSDR_P_CHD_SW_RX_TDDFDD(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_SW_RXTX(*gpo_ctrl, 0);
+        *inswlb = 0;
+        *arx = rxen;
+        *atx = 0;
+        break;
+
+    case ANT_LOOPBACK:
+        SET_M2_DSDR_P_CHD_EN_TX(*gpo_ctrl, txen);
+        SET_M2_DSDR_P_CHD_EN_VADJ(*gpo_ctrl, txen);
+        SET_M2_DSDR_P_CHD_EN_RX(*gpo_ctrl, rxen);
+        SET_M2_DSDR_P_CHD_SW_HW_TDD_CTRL(*gpo_ctrl, 0);
+        SET_M2_DSDR_P_CHD_SW_PA_ONOFF(*gpo_ctrl, 1);
+        SET_M2_DSDR_P_CHD_SW_RX_TDDFDD(*gpo_ctrl, 1);
+        SET_M2_DSDR_P_CHD_SW_RXTX(*gpo_ctrl, 0);
+        *inswlb = 1;
+        *arx = rxen;
+        *atx = txen;
+        break;
+
+    case AND_HW_TDD:
+        SET_M2_DSDR_P_CHD_EN_TX(*gpo_ctrl, txen);
+        SET_M2_DSDR_P_CHD_EN_VADJ(*gpo_ctrl, txen);
+        SET_M2_DSDR_P_CHD_EN_RX(*gpo_ctrl, rxen);
+        SET_M2_DSDR_P_CHD_SW_HW_TDD_CTRL(*gpo_ctrl, 1);
+        *inswlb = 0;
+        *arx = rxen;
+        *atx = txen;
+        break;
+
+    default:
+        *inswlb = 0;
+        *arx = 0;
+        *atx = 0;
+        break;
+    }
+}
+
+// This function just update states of internal HW and I2C expander registers,
+// all calculation of band, filter, lofreq, etc. has been done before this call
+int dsdr_hiper_update_fe_user(dsdr_hiper_fe_t* fe)
+{
+    uint8_t old_fe_gpo_regs[FE_GPO_REGS];
+    uint32_t old_fe_ctrl_regs[FE_CTRL_REGS]; // I2C expanders cached registers
+    int res = 0;
+
+    memcpy(old_fe_gpo_regs, fe->fe_gpo_regs, sizeof(old_fe_gpo_regs));
+    memcpy(old_fe_ctrl_regs, fe->fe_ctrl_regs, sizeof(old_fe_ctrl_regs));
+
+    // TODO
+    unsigned enabled_rx = 0b1111;
+    unsigned enabled_tx = 0b0001;
+
+    unsigned fbanksel_out[HIPER_MAX_HW_CHANS];
+    unsigned fbanksel_in[HIPER_MAX_HW_CHANS];
+    unsigned lbrxtx[HIPER_MAX_HW_CHANS];
+    unsigned iflna[HIPER_MAX_HW_CHANS];
+    unsigned act_rx[HIPER_MAX_HW_CHANS];
+    unsigned act_tx[HIPER_MAX_HW_CHANS];
+
+    unsigned ifband_tx_h[HIPER_MAX_HW_CHANS];
+    unsigned ifband_rx_h[HIPER_MAX_HW_CHANS];
+
+    for (unsigned i = 0; i < HIPER_MAX_HW_CHANS; i++) {
+        unsigned rxen = ((1 << i) & enabled_rx) ? 1 : 0;
+        unsigned txen = ((1 << i) & enabled_tx) ? 1 : 0;
+
+        // RX filterbank
+        _hiper_fbank_map(fe->ucfg[i].rx_fb_sel, &fbanksel_out[i], &fbanksel_in[i]); // SW_RX_FILTER_OUT_CHA_MUTE1 if not enabled?
+
+        // Antanna switch, RF PA/LNA switch, loopback switch
+        _hiper_antenna_sw_map(fe->ucfg[i].ant_sel, rxen, txen, &fe->fe_gpo_regs[CHA - REFCTRL + i], &lbrxtx[i], &act_rx[i], &act_tx[i]);
+
+        // Update RX DSA
+        fe->fe_gpo_regs[ATT_RX_CHA - REFCTRL + i] = fe->ucfg[i].rx_dsa;
+
+        // TX IF band sel
+        ifband_tx_h[i] = fe->ucfg[i].tx_band & (~IFBAND_AUTO);
+
+        // RX IF band sel
+        ifband_rx_h[i] = fe->ucfg[i].rx_band & (~IFBAND_AUTO);
+
+        // RX IF amplifier config
+        iflna[i] = act_rx[i] ? ( fe->ucfg[i].rx_ifamp_bp ? IF_LNA_OPTS_BYPASS : IF_LNA_OPTS_LNA) : IF_LNA_OPTS_Disable;
+    };
+
+    SET_M2_DSDR_E_GPIO6_ABSLNA_PA_CHA(fe->fe_ctrl_regs[GPIO6 - SW_RX_FILTER], lbrxtx[H_CHA]);
+    SET_M2_DSDR_E_GPIO6_ABSLNA_PA_CHB(fe->fe_ctrl_regs[GPIO6 - SW_RX_FILTER], lbrxtx[H_CHB]);
+    SET_M2_DSDR_E_GPIO6_ABSLNA_PA_CHC(fe->fe_ctrl_regs[GPIO6 - SW_RX_FILTER], lbrxtx[H_CHC]);
+    SET_M2_DSDR_E_GPIO6_ABSLNA_PA_CHD(fe->fe_ctrl_regs[GPIO6 - SW_RX_FILTER], lbrxtx[H_CHD]);
+
+
+    fe->fe_ctrl_regs[SW_RX_FILTER - SW_RX_FILTER] = MAKE_M2_DSDR_E_SW_RX_FILTER(
+        fbanksel_in[H_CHD], fbanksel_in[H_CHC], fbanksel_in[H_CHB], fbanksel_in[H_CHA],
+        fbanksel_out[H_CHA], fbanksel_out[H_CHB], fbanksel_out[H_CHC], fbanksel_out[H_CHD]);
+
+    fe->fe_ctrl_regs[IF_LNA - SW_RX_FILTER] = MAKE_M2_DSDR_E_IF_LNA(iflna[H_CHD], iflna[H_CHC], iflna[H_CHB], iflna[H_CHA]);
+
+    fe->fe_ctrl_regs[SW_OUT - SW_RX_FILTER] = MAKE_M2_DSDR_E_SW_OUT(
+        ifband_rx_h[H_CHB] ? 1 : 0,
+        ifband_rx_h[H_CHA] ? 1 : 0,
+        ifband_rx_h[H_CHD] ? 1 : 0,
+        ifband_rx_h[H_CHC] ? 1 : 0,
+        ifband_tx_h[H_CHA] ? 0 : 1,
+        ifband_tx_h[H_CHB] ? 0 : 1,
+        ifband_tx_h[H_CHC] ? 0 : 1,
+        ifband_tx_h[H_CHD] ? 0 : 1);
+
+    fe->fe_ctrl_regs[SW_IN - SW_RX_FILTER] = MAKE_M2_DSDR_E_SW_IN(
+        ifband_tx_h[H_CHD] ? 1 : 0,
+        ifband_tx_h[H_CHC] ? 1 : 0,
+        ifband_tx_h[H_CHB] ? 1 : 0,
+        ifband_tx_h[H_CHA] ? 1 : 0,
+        ifband_rx_h[H_CHD] ? 0 : 1,
+        ifband_rx_h[H_CHC] ? 0 : 1,
+        ifband_rx_h[H_CHB] ? 0 : 1,
+        ifband_rx_h[H_CHA] ? 0 : 1);
+
+
+    // Update registers
+    for (unsigned i = 0; i < FE_GPO_REGS; i++) {
+        if (fe->fe_gpo_regs[i] != old_fe_gpo_regs[i]) {
+            USDR_LOG("HIPR", USDR_LOG_WARNING, "Updating HIPER_CTRL[%d] %08x => %08x\n", i, old_fe_gpo_regs[i], fe->fe_gpo_regs[i]);
+
+            res = res ? res : dev_gpo_set(fe->dev, i + IGPO_OFF_ADDR, fe->fe_gpo_regs[i]);
+        }
+    }
+
+    for (unsigned i = 0; i < FE_CTRL_REGS; i++) {
+       if (fe->fe_ctrl_regs[i] != old_fe_ctrl_regs[i]) {
+            USDR_LOG("HIPR", USDR_LOG_WARNING, "Updating EXPANDER_REG[%d] %08x => %08x\n", i, old_fe_ctrl_regs[i], fe->fe_ctrl_regs[i]);
+
+            res = res ? res : _hiper_update_expander_vreg(fe, i, fe->fe_ctrl_regs[i]);
+        }
+    }
+
+    // Swap IQ
+    unsigned sw_rxmap = 0;
+    for (unsigned i = 0; i < FE_GPO_REGS; i++) {
+        sw_rxmap |= (fe->ucfg[i].swap_rxiq) << i;
+    }
+    res = res ? res : dev_gpo_set(fe->dev, IGPO_RX_IQS, sw_rxmap);
+
+    return res;
+}
+
+
+
+void dsdr_hiper_fe_rx_filterbank_upd(dsdr_hiper_fe_t* def, unsigned chno)
+{
+    if (def->ucfg[chno].rx_fb_sel < RX_FILT_OPTS_AUTO_400_1000M)
+        return;
+
+    unsigned best_idx = 0;
+    unsigned best_off = 1000;
+
+    for (unsigned i = 0; i < SIZEOF_ARRAY(s_filerbank_ranges); i+= 2) {
+        if (s_filerbank_ranges[i] > def->ucfg[chno].rx_freq || def->ucfg[chno].rx_freq > s_filerbank_ranges[i + 1]) {
+            continue;
+        }
+
+        int64_t doff = (int64_t)(s_filerbank_ranges[i] + s_filerbank_ranges[i + 1]) / 2 - def->ucfg[chno].rx_freq ;
+        if (doff < 0)
+            doff = 0 - doff;
+
+        unsigned off = 1000 * doff / (s_filerbank_ranges[i + 1] - s_filerbank_ranges[i]);
+        if (off < best_off) {
+            best_off = off;
+            best_idx = i / 2;
+        }
+
+        USDR_LOG("HIPR", USDR_LOG_WARNING, "F%d %.3f -- %.3f  DOFF=%u OFF=%u\n",
+                 i, s_filerbank_ranges[i] / 1.0e6, s_filerbank_ranges[i + 1] / 1.0e6, (unsigned)doff, off);
+    }
+
+    def->ucfg[chno].rx_fb_sel = RX_FILT_OPTS_AUTO_400_1000M | best_idx;
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "RXFBabk[%d] = %d\n", chno, def->ucfg[chno].rx_fb_sel);
+}
+
+void dsdr_hiper_fe_rx_band_upd(dsdr_hiper_fe_t* def, unsigned chno)
+{
+    if (def->ucfg[chno].rx_band < BAND_OPTS_BAND_AUTO_L)
+        return;
+
+    //def->ucfg[chno].rx_band = (def->ucfg[chno].rx_freq > 3e9) ? BAND_OPTS_BAND_AUTO_H : BAND_OPTS_BAND_AUTO_L;
+
+    def->ucfg[chno].rx_band = (def->ucfg[chno].rx_freq > 2.0e9) ? BAND_OPTS_BAND_AUTO_H : BAND_OPTS_BAND_AUTO_L;
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "RXFand[%d] = %d\n", chno, def->ucfg[chno].rx_band);
+}
+
+
+int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno)
+{
+    int res = 0;
+    //bool fLOh = (def->ucfg[chno].rx_freq < 2300e6);
+    bool fLOh = (def->ucfg[chno].rx_freq < 3300e6);
+
+    uint64_t fIF = 2075e6;
+    uint64_t fLO = (fLOh) ? def->ucfg[chno].rx_freq + fIF : def->ucfg[chno].rx_freq - fIF;
+
+    unsigned idx = ((def->ucfg[chno].rx_band & 1) == BAND_OPTS_BAND_2200_7200) ?
+                       ((chno < 2) ? SPI_LMS8001B_U1_RX_AB_IDX : SPI_LMS8001B_U2_RX_CD_IDX) :
+                       ((chno < 2) ? SPI_LMS8001A_U3_RX_AB_IDX : SPI_LMS8001A_U4_RX_CD_IDX);
+
+    res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
+
+    def->ucfg[chno].rx_nco = fIF;
+    def->ucfg[chno].swap_rxiq = (fLOh) ? 1 : 0;
+
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] NCO=%.3f LO=%.3f SWAP_IQ=%d\n", chno,
+             def->ucfg[chno].rx_nco / 1.0e6, fLO / 1.0e6, def->ucfg[chno].swap_rxiq);
+
+
+    return res;
+}
+
+
+int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune)
+{
+    if (chno >= HIPER_MAX_HW_CHANS)
+        return -EINVAL;
+
+    def->ucfg[chno].rx_freq = freq;
+
+    dsdr_hiper_fe_rx_filterbank_upd(def, chno);
+    dsdr_hiper_fe_rx_band_upd(def, chno);
+    dsdr_hiper_fe_rxlo_upd(def, chno);
+
+    *ncotune = def->ucfg[chno].rx_nco;
+    return dsdr_hiper_update_fe_user(def);
+}
+
+int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune)
+{
+    if (chno >= HIPER_MAX_HW_CHANS)
+        return -EINVAL;
+
+    def->ucfg[chno].tx_freq = freq;
+    def->ucfg[chno].tx_band = IFBAND_400_3500;
+
+    // TODO trigger autoselection
+    return dsdr_hiper_update_fe_user(def);
+}
+
+

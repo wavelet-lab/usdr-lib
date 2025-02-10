@@ -22,6 +22,8 @@ struct afe79xx_state {
     libcapi79xx_upd_nco_fn_t libcapi79xx_upd_nco;
     libcapi79xx_get_nco_fn_t libcapi79xx_get_nco;
 
+    libcapi79xx_set_dsa_fn_t libcapi79xx_set_dsa;
+
     libcapi79xx_check_health_fn_t libcapi79xx_check_health;
 
 };
