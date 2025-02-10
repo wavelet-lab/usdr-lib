@@ -161,9 +161,8 @@ void* disk_read_thread(void* obj)
 #endif
 
 #ifdef USE_WVLT_SINCOS
-#define MULTIPLIER (32768u * 4) //full 0:2*pi range is 0:131071 -> effective diap -pi/2:+pi/2 = -32768:32767
-unsigned istart_phase[8] = { 0, MULTIPLIER / 2, MULTIPLIER / 4, MULTIPLIER / 8 };
-unsigned istart_dphase[8] = { MULTIPLIER / 3, MULTIPLIER / 50, 3 * MULTIPLIER / 100, MULTIPLIER / 25 };
+int32_t istart_phase[8] = { 0, WVLT_SINCOS_I16_TWO_PI / 2, WVLT_SINCOS_I16_TWO_PI / 4, WVLT_SINCOS_I16_TWO_PI / 8 };
+int32_t istart_dphase[8] = { WVLT_SINCOS_I16_TWO_PI / 3, WVLT_SINCOS_I16_TWO_PI / 50, 3 * WVLT_SINCOS_I16_TWO_PI / 100, WVLT_SINCOS_I16_TWO_PI / 25 };
 #endif
 
 double start_phase[8] = { 0, 0.5, 0.25, 0.125 };
@@ -178,19 +177,8 @@ void* freq_gen_thread_ci16(void* obj)
     unsigned p = (intptr_t)obj;
 
 #ifdef USE_WVLT_SINCOS
-
     USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Using TX sinus generator with USE_WVLT_SINCOS opt @ ch#%d", p);
-
-    static const unsigned STEP = 16;
-    int16_t phase_data[STEP];
-    int16_t sin_data[STEP];
-    int16_t cos_data[STEP];
-    int16_t sign_sin[STEP];
-    int16_t sign_cos[STEP];
-#endif
-
-#ifdef USE_WVLT_SINCOS
-    unsigned phase = istart_phase[p];
+    int32_t phase = istart_phase[p];
 #else
     double phase = start_phase[p];
 #endif
@@ -209,23 +197,7 @@ void* freq_gen_thread_ci16(void* obj)
         int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
 
 #ifdef USE_WVLT_SINCOS
-        for (unsigned i = 0; i < tx_get_samples; i += STEP)
-        {
-            const unsigned rest_len = tx_get_samples - i * STEP;
-            const unsigned len = rest_len > STEP ? STEP : rest_len;
-
-            for(unsigned j = 0; j < len; ++j)
-            {
-                phase_data[j] = (int16_t)phase; //intentional overflow
-                const int16_t sign = phase >= (MULTIPLIER / 4) && phase < (3 * MULTIPLIER / 4) ? -1 : 1; //mirroring sin&cos vals
-                sign_sin[j] = -sign;
-                sign_cos[j] =  sign;
-                phase += istart_dphase[p];
-                phase %= MULTIPLIER;
-            }
-
-            wvlt_sincos_i16_interleaved_ctrl(phase_data, sign_sin, sign_cos, len, iqp + i * 2);
-        }
+        wvlt_sincos_i16_interleaved_ctrl(&phase, istart_dphase[p], true/*invert sin*/, false/*invert cos*/, iqp, tx_get_samples);
 #else
         for (unsigned i = 0; i < tx_get_samples; i++) {
             float ii, qq;

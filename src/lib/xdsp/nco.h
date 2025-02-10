@@ -7,6 +7,10 @@
 #include <stdint.h>
 #include "conv.h"
 
+#define WVLT_SINCOS_I16_SCALE 32767
+#define WVLT_SINCOS_I16_HALF_PI 32768
+#define WVLT_SINCOS_I16_TWO_PI (32768 * 4)
+#define WVLT_SINCOS_I16_PHSCALE (M_PI * 2 / WVLT_SINCOS_I16_TWO_PI)
 
 conv_function_t get_wvlt_sincos_i16_c(generic_opts_t cpu_cap, const char** sfunc);
 conv_function_t get_wvlt_sincos_i16();
@@ -20,16 +24,31 @@ void wvlt_sincos_i16(const int16_t* phase, unsigned phase_len, int16_t* sindata,
 }
 
 
-conv_function_t get_wvlt_sincos_i16_interleaved_ctrl_c(generic_opts_t cpu_cap, const char** sfunc);
-conv_function_t get_wvlt_sincos_i16_interleaved_ctrl();
+sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl_c(generic_opts_t cpu_cap, const char** sfunc);
+sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl();
 
+/*
+ * wvlt_sincos_i16_interleaved_ctrl()
+ *
+ * int32_t* start_phase: Starting phase.
+ *                       Diapazon 0..2*PI mapped to int32 range [0..131072).
+ *                       Must be 0 or positive.
+ *                       The next starting phase for consequent calls is returned by ptr.
+ * int32_t delta_phase:  Delta, applying to starting phase. int32_t range is just the same as for start_phase.
+ *                       Must be 0 or positive.
+ * bool inv_sin:         Invert result sin values
+ * bool inv_cos:         Invert result cos values
+ * int16_t* outdata:     Array of output data. Format is interleaved sin/cos int16_t pairs.
+ *                       Sin & cos values are within (-32768..32767] range.
+ * unsigned iters:       Iterations count. One iteration == sin+cos pair calculation for some phase, and phase incrementation.
+ */
 static inline
-void wvlt_sincos_i16_interleaved_ctrl(const int16_t* phase, const int16_t* ctrl_sin, const int16_t* ctrl_cos,
-                                          unsigned phase_len, int16_t* sincosdata)
+void wvlt_sincos_i16_interleaved_ctrl(int32_t* start_phase, int32_t delta_phase,
+                                      bool inv_sin, bool inv_cos,
+                                      int16_t* outdata,
+                                      unsigned iters)
 {
-    const void* in[3] = {phase, ctrl_sin, ctrl_cos};
-    const unsigned bsize = phase_len * sizeof(int16_t);
-    return (*get_wvlt_sincos_i16_interleaved_ctrl())(in, bsize, (void**)&sincosdata, (bsize << 1));
+    return (*get_wvlt_sincos_i16_interleaved_ctrl())(start_phase, delta_phase, inv_sin, inv_cos, outdata, iters);
 }
 
 

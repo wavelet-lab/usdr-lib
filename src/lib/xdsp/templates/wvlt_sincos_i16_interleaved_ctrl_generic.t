@@ -1,30 +1,31 @@
 static
-void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
-                        const void *__restrict ctrl_sin_p,
-                        const void *__restrict ctrl_cos_p,
-                        unsigned indatabsz,
-                        void *__restrict outdata_p,
-                        unsigned outdatabsz)
+void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
+                        int32_t delta_phase,
+                        bool inv_sin,
+                        bool inv_cos,
+                        int16_t *__restrict outdata,
+                        unsigned iters)
 {
-    unsigned i = indatabsz;
-    if ((outdatabsz / 2) < i)
-        i = (outdatabsz / 2);
+    unsigned i = iters;
+    int32_t phase = *start_phase;
+    const int16_t sign_sin = inv_sin ? -1 : 1;
+    const int16_t sign_cos = inv_cos ? -1 : 1;
 
-    int16_t* phase    = (int16_t*)indata_p;
-    int16_t* ctrl_sin = (int16_t*)ctrl_sin_p;
-    int16_t* ctrl_cos = (int16_t*)ctrl_cos_p;
-    int16_t* outdata  = (int16_t*)outdata_p;
-
-    while(i >= 2)
+    while(i > 0)
     {
-        const float ph = WVLT_SINCOS_I16_PHSCALE * *phase++;
+        const float ph = WVLT_SINCOS_I16_PHSCALE * phase;
         float ssin, scos;
 
         sincosf(ph, &ssin, &scos);
-        *outdata++ = ssin * WVLT_SINCOS_I16_SCALE * *ctrl_sin++;
-        *outdata++ = scos * WVLT_SINCOS_I16_SCALE * *ctrl_cos++;
-        i -= 2;
+        *outdata++ = ssin * WVLT_SINCOS_I16_SCALE * sign_sin;
+        *outdata++ = scos * WVLT_SINCOS_I16_SCALE * sign_cos;
+
+        phase += delta_phase;
+        phase &= (WVLT_SINCOS_I16_TWO_PI - 1);
+        --i;
     }
+
+    *start_phase = phase;
 }
 
 #undef TEMPLATE_FUNC_NAME

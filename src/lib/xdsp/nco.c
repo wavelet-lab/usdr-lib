@@ -10,9 +10,6 @@
 #include <smmintrin.h>
 #include "attribute_switch.h"
 
-#define WVLT_SINCOS_I16_SCALE 32767
-#define WVLT_SINCOS_I16_PHSCALE (M_PI / 2 / WVLT_SINCOS_I16_SCALE)
-
 #define TEMPLATE_FUNC_NAME wvlt_sincos_i16_generic
 VWLT_ATTRIBUTE(optimize("-O3", "inline"))
 #include "templates/wvlt_sincos_i16_generic.t"
@@ -47,19 +44,19 @@ conv_function_t get_wvlt_sincos_i16()
 #define TEMPLATE_FUNC_NAME wvlt_sincos_i16_interleaved_ctrl_generic
 VWLT_ATTRIBUTE(optimize("-O3", "inline"))
 #include "templates/wvlt_sincos_i16_interleaved_ctrl_generic.t"
-DECLARE_TR_FUNC_3_1(wvlt_sincos_i16_interleaved_ctrl_generic)
+DECLARE_TR_FUNC_SINCOS_I16_INTERLEAVED_CTRL(wvlt_sincos_i16_interleaved_ctrl_generic)
 
 #ifdef WVLT_SSSE3
 #define TEMPLATE_FUNC_NAME wvlt_sincos_i16_interleaved_ctrl_ssse3
 VWLT_ATTRIBUTE(optimize("-O3", "inline"), target("ssse3"))
 #include "templates/wvlt_sincos_i16_interleaved_ctrl_ssse3.t"
-DECLARE_TR_FUNC_3_1(wvlt_sincos_i16_interleaved_ctrl_ssse3)
+DECLARE_TR_FUNC_SINCOS_I16_INTERLEAVED_CTRL(wvlt_sincos_i16_interleaved_ctrl_ssse3)
 #endif
 
-conv_function_t get_wvlt_sincos_i16_interleaved_ctrl_c(generic_opts_t cpu_cap, const char** sfunc)
+sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl_c(generic_opts_t cpu_cap, const char** sfunc)
 {
     const char* fname;
-    conv_function_t fn;
+    sincos_i16_interleaved_ctrl_function_t fn;
 
     SELECT_GENERIC_FN(fn, fname, tr_wvlt_sincos_i16_interleaved_ctrl_generic, cpu_cap);
     SELECT_SSSE3_FN(fn, fname, tr_wvlt_sincos_i16_interleaved_ctrl_ssse3, cpu_cap);
@@ -69,7 +66,7 @@ conv_function_t get_wvlt_sincos_i16_interleaved_ctrl_c(generic_opts_t cpu_cap, c
     return fn;
 }
 
-conv_function_t get_wvlt_sincos_i16_interleaved_ctrl()
+sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl()
 {
     return get_wvlt_sincos_i16_interleaved_ctrl_c(cpu_vcap_get(), NULL);
 }

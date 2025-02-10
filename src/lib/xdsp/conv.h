@@ -67,13 +67,6 @@ typedef void (*filter_function_t)(const int16_t *__restrict data,
                        unsigned outdatabsz) \
    { conv_fn(indata[0], indata[1], indatabsz, outdata[0], outdatabsz); }
 
-#define DECLARE_TR_FUNC_3_1(conv_fn) \
-void tr_##conv_fn (const void *__restrict *__restrict indata, \
-                  unsigned indatabsz, \
-                  void *__restrict *__restrict outdata, \
-                  unsigned outdatabsz) \
-   { conv_fn(indata[0], indata[1], indata[2], indatabsz, outdata[0], outdatabsz); }
-
 #define DECLARE_TR_FUNC_4_1(conv_fn) \
     void tr_##conv_fn (const void *__restrict *__restrict indata, \
                       unsigned indatabsz, \
@@ -81,6 +74,20 @@ void tr_##conv_fn (const void *__restrict *__restrict indata, \
                       unsigned outdatabsz) \
    { conv_fn(indata[0], indata[1], indata[2], indata[3], indatabsz, outdata[0], outdatabsz); }
 
+
+typedef void (*sincos_i16_interleaved_ctrl_function_t)(int32_t *__restrict start_phase,
+                                int32_t delta_phase, bool inv_sin, bool inv_cos,
+                                int16_t *__restrict outdata,
+                                unsigned iters);
+
+#define DECLARE_TR_FUNC_SINCOS_I16_INTERLEAVED_CTRL(conv_fn) \
+void tr_##conv_fn (int32_t *__restrict start_phase, \
+                  int32_t delta_phase, \
+                  bool inv_sin, \
+                  bool inv_cos, \
+                  int16_t *__restrict outdata, \
+                  unsigned iters) \
+    { conv_fn(start_phase, delta_phase, inv_sin, inv_cos, outdata, iters); }
 
 
 struct transform_info {

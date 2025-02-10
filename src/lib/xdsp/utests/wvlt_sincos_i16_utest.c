@@ -22,6 +22,8 @@
 #define CONV_SCALE (32767)
 #define EPSILON 5
 
+#define SPEED_CYCLES 256
+
 static const unsigned packet_lens[3] = { 100000, 500000, SPEED_WORD_COUNT };
 
 static int16_t* in_check = NULL;
@@ -32,8 +34,8 @@ static int16_t* cosdata = NULL;
 static int16_t* cosdata_etalon = NULL;
 
 static int16_t *sincosdata = NULL, *sincosdata_etalon = NULL;
-static int16_t *ctrl_sin = NULL, *ctrl_cos = NULL;
-static int16_t *ctrl_sin_check = NULL, *ctrl_cos_check = NULL;
+static int32_t start_phase[SPEED_CYCLES], delta_phase[SPEED_CYCLES];
+static bool invert_sin[SPEED_CYCLES], invert_cos[SPEED_CYCLES];
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
@@ -47,12 +49,8 @@ static void setup()
     posix_memalign((void**)&cosdata,        ALIGN_BYTES, SPEED_SIZE_BZ);
     posix_memalign((void**)&cosdata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
 
-    posix_memalign((void**)&sincosdata,        ALIGN_BYTES, SPEED_SIZE_BZ * 2);
-    posix_memalign((void**)&sincosdata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ * 2);
-    posix_memalign((void**)&ctrl_sin,          ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&ctrl_cos,          ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&ctrl_sin_check,    ALIGN_BYTES, STREAM_SIZE_BZ);
-    posix_memalign((void**)&ctrl_cos_check,    ALIGN_BYTES, STREAM_SIZE_BZ);
+    posix_memalign((void**)&sincosdata,        ALIGN_BYTES, SPEED_WORD_COUNT * 2 * sizeof(int16_t));
+    posix_memalign((void**)&sincosdata_etalon, ALIGN_BYTES, WORD_COUNT * 2 * sizeof(int16_t));
 
     srand( time(0) );
 
@@ -61,11 +59,6 @@ static void setup()
     for(unsigned i = 0; i < WORD_COUNT; ++i )
     {
         in_check[i] = phase++;
-
-        float fsign = (float)(rand()) / (float)RAND_MAX;
-        ctrl_sin_check[i] = fsign > 0.5 ? 1 : (fsign < 0.5 ? -1 : 0);
-        fsign = (float)(rand()) / (float)RAND_MAX;
-        ctrl_cos_check[i] = fsign > 0.5 ? 1 : (fsign < 0.5 ? -1 : 0);
     }
 
     //fill for speed
@@ -73,11 +66,14 @@ static void setup()
     {
         int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
         in[i] = sign * (sign == -1 ? CONV_SCALE + 1 : CONV_SCALE) * (float)(rand()) / (float)RAND_MAX;
+    }
 
-        float fsign = (float)(rand()) / (float)RAND_MAX;
-        ctrl_sin[i] = fsign > 0.5 ? 1 : (fsign < 0.5 ? -1 : 0);
-        fsign = (float)(rand()) / (float)RAND_MAX;
-        ctrl_cos[i] = fsign > 0.5 ? 1 : (fsign < 0.5 ? -1 : 0);
+    for(unsigned i = 0; i < SPEED_CYCLES; ++i)
+    {
+        start_phase[i] = 32768 * 4 * ((float)(rand()) / (float)RAND_MAX) - 1;
+        delta_phase[i] = 1024 * ((float)(rand()) / (float)RAND_MAX);
+        invert_sin[i] = (float)(rand()) / (float)RAND_MAX > 0.5;
+        invert_cos[i] = (float)(rand()) / (float)RAND_MAX > 0.5;
     }
 }
 
@@ -92,10 +88,6 @@ static void teardown()
 
     free(sincosdata);
     free(sincosdata_etalon);
-    free(ctrl_sin);
-    free(ctrl_cos);
-    free(ctrl_sin_check);
-    free(ctrl_cos_check);
 }
 
 static conv_function_t get_fn(generic_opts_t o, int log)
@@ -114,10 +106,10 @@ static conv_function_t get_fn(generic_opts_t o, int log)
     return fn;
 }
 
-static conv_function_t get_fn_interleaved(generic_opts_t o, int log)
+static sincos_i16_interleaved_ctrl_function_t get_fn_interleaved(generic_opts_t o, int log)
 {
     const char* fn_name = NULL;
-    conv_function_t fn = get_wvlt_sincos_i16_interleaved_ctrl_c(o, &fn_name);
+    sincos_i16_interleaved_ctrl_function_t fn = get_wvlt_sincos_i16_interleaved_ctrl_c(o, &fn_name);
 
     //ignore dups
     if(last_fn_name && !strcmp(last_fn_name, fn_name))
@@ -154,22 +146,28 @@ static int32_t is_equal_interleaved()
 START_TEST(wvlt_sincos_i16_interleaved_ctrl_check_simd)
 {
     generic_opts_t opt = max_opt;
-    conv_function_t fn = NULL;
-    const void* pin[3] = {in_check, ctrl_sin_check, ctrl_cos_check};
+    sincos_i16_interleaved_ctrl_function_t fn = NULL;
     last_fn_name = NULL;
 
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
 
+    int32_t ph_etalon = start_phase[0];
+    const int32_t delta_ph = delta_phase[0];
+    const bool inv_sin = invert_sin[0];
+    const bool inv_cos = invert_cos[0];
+
     //get etalon output data (generic foo)
-    (*get_fn_interleaved(OPT_GENERIC, 0))(pin, STREAM_SIZE_BZ, (void**)&sincosdata_etalon, STREAM_SIZE_BZ * 2);
+    (*get_fn_interleaved(OPT_GENERIC, 0))(&ph_etalon, delta_ph, inv_sin, inv_cos, sincosdata_etalon, WORD_COUNT);
 
     while(opt != OPT_GENERIC)
     {
-        conv_function_t fn = get_fn_interleaved(opt--, 1);
+        sincos_i16_interleaved_ctrl_function_t fn = get_fn_interleaved(opt--, 1);
         if(fn)
         {
-            memset(sincosdata, 0, STREAM_SIZE_BZ * 2);
-            (*fn)(pin, STREAM_SIZE_BZ, (void**)&sincosdata, STREAM_SIZE_BZ * 2);
+            memset(sincosdata, 0, WORD_COUNT * 2 * sizeof(int16_t));
+            int32_t ph = start_phase[0];
+
+            (*fn)(&ph, delta_ph, inv_sin, inv_cos, sincosdata, WORD_COUNT);
 
             int res = is_equal_interleaved();
             res >= 0 ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
@@ -184,6 +182,7 @@ START_TEST(wvlt_sincos_i16_interleaved_ctrl_check_simd)
             }
 #endif
             ck_assert_int_eq( res, -1 );
+            ck_assert_int_eq( ph, ph_etalon );
         }
     }
 }
@@ -193,30 +192,33 @@ END_TEST
 START_TEST(wvlt_sincos_i16_interleaved_ctrl_speed)
 {
     generic_opts_t opt = max_opt;
-    conv_function_t fn = NULL;
-    const void* pin[3] = {in, ctrl_sin, ctrl_cos};
+    sincos_i16_interleaved_ctrl_function_t fn = NULL;
     last_fn_name = NULL;
 
-    const size_t bzin  = packet_lens[_i] * sizeof(int16_t);
-    const size_t bzout = bzin * 2;
+    const unsigned iters  = packet_lens[_i];
+
 
     fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
-    fprintf(stderr,   "**** packet: %lu bytes, iters: %u ***\n", bzin, packet_lens[_i]);
+    fprintf(stderr,   "**** packet: %d IQs, cycles: %u ***\n", iters, SPEED_CYCLES);
 
     while(opt != OPT_GENERIC)
     {
-        conv_function_t fn = get_fn_interleaved(opt--, 1);
+        sincos_i16_interleaved_ctrl_function_t fn = get_fn_interleaved(opt--, 1);
         if(fn)
         {
+            int32_t ph = start_phase[0];
             //warming
-            for(int i = 0; i < 10; ++i) (*fn)(pin, 1000, (void**)&sincosdata, 2000);
+            for(int i = 0; i < 10; ++i) (*fn)(&ph, delta_phase[0], invert_sin[0], invert_cos[0], sincosdata, SPEED_WORD_COUNT);
 
             //measuring
             uint64_t tk = clock_get_time();
-            (*fn)(pin, bzin, (void**)&sincosdata, bzout);
+            for(unsigned i = 0; i < SPEED_CYCLES; ++i)
+            {
+                (*fn)(&start_phase[i], delta_phase[i], invert_sin[i], invert_cos[i], sincosdata, iters);
+            }
             uint64_t tk1 = clock_get_time() - tk;
-            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 call, ave speed = %" PRIu64 " calls/s \n",
-                    tk1, (uint64_t)(tk1*1000LL/packet_lens[_i]), (uint64_t)(1000000LL*packet_lens[_i]/tk1));
+            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 IQ, ave speed = %.2f mln IQs/s \n",
+                    tk1, (uint64_t)(tk1*1000LL/SPEED_CYCLES/iters), (uint64_t)(1000000LL*SPEED_CYCLES*iters/tk1)/(float)1000000);
         }
     }
 }
@@ -281,7 +283,7 @@ START_TEST(wvlt_sincos_i16_speed)
     const size_t bzout = bzin;
 
     fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
-    fprintf(stderr,   "**** packet: %lu bytes, iters: %u ***\n", bzin, packet_lens[_i]);
+    fprintf(stderr,   "**** packet: %d IQs, cycles: %u ***\n", packet_lens[_i], SPEED_CYCLES);
 
     while(opt != OPT_GENERIC)
     {
@@ -293,10 +295,13 @@ START_TEST(wvlt_sincos_i16_speed)
 
             //measuring
             uint64_t tk = clock_get_time();
-            (*fn)(&pin, bzin, (void**)out, bzout);
+            for(unsigned i = 0; i < SPEED_CYCLES; ++i)
+            {
+                (*fn)(&pin, bzin, (void**)out, bzout);
+            }
             uint64_t tk1 = clock_get_time() - tk;
-            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 call, ave speed = %" PRIu64 " calls/s \n",
-                    tk1, (uint64_t)(tk1*1000LL/packet_lens[_i]), (uint64_t)(1000000LL*packet_lens[_i]/tk1));
+            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 IQ, ave speed = %.2f mln IQs/s \n",
+                    tk1, (uint64_t)(tk1*1000LL/SPEED_CYCLES/packet_lens[_i]), (uint64_t)(1000000LL*SPEED_CYCLES*packet_lens[_i]/tk1)/(float)1000000);
         }
     }
 }
