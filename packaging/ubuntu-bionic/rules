@@ -17,14 +17,6 @@ override_dh_auto_configure:
 	sed 's/##DEB_HOST_MULTIARCH##/$(DEB_HOST_MULTIARCH)/g' debian/libusdr.install.template > debian/libusdr.install
 	sed 's/##DEB_HOST_MULTIARCH##/$(DEB_HOST_MULTIARCH)/g' debian/soapysdr-module-usdr.install.template > debian/soapysdr-module-usdr.install
 
-	# Generate the dev package install file
-	cat debian/libusdr-dev.install.template > debian/libusdr-dev.install
-
-	find src/lib -name "*.yaml" | while read file_path; do \
-		dest=`dirname "$$file_path" | sed 's/src\/lib//g'`; \
-		echo "$$file_path usr/share/usdr$$dest/" >> debian/libusdr-dev.install; \
-	done
-
 
 override_dh_auto_build:
 	cd "obj-$(DEB_TARGET_GNU_TYPE)" && make
