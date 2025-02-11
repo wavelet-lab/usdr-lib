@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../nco.h"
+#include "sincos_functions.h"
 #include <math.h>
 
 #define DEBUG_PRINT

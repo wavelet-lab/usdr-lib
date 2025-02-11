@@ -21,7 +21,7 @@
 #include <string.h>
 
 #include "../common/ring_buffer.h"
-#include "../xdsp/nco.h"
+#include "sincos_functions.h"
 
 #define LOG_TAG "DMCR"
 
