@@ -18,8 +18,10 @@
 
 #ifdef __GNUC__
 #  define UNUSED __attribute__((__unused__))
+#  define CHECK_CONSTANT_EQ(a, b) _Static_assert((unsigned)(a) == (unsigned)(b), "Broken ABI")
 #else
 #  define UNUSED
+#  define CHECK_CONSTANT_EQ(a, b)
 #endif
 
 #ifndef container_of

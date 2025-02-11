@@ -229,6 +229,8 @@ const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
 };
 
 static int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int dev_m2_dsdr_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_dsdr_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
@@ -243,6 +245,8 @@ static int dev_m2_dsdr_debug_clk_info_get(pdevice_t ud, pusdr_vfs_obj_t obj, uin
 
 static int dev_m2_dsdr_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_dsdr_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_sdr_rx_dsa_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_sdr_tx_dsa_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_dsdr_afe_health_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
@@ -255,11 +259,31 @@ static int _debug_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
 static int _debug_lmk05318_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 
+static int dev_m2_dsdr_sdr_rx_remap_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_sdr_rx_remap_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dev_m2_dsdr_sdr_tx_remap_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_sdr_tx_remap_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
+
 static
 const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/rate/master",        { dev_m2_dsdr_rate_set, NULL }},
+    { "/dm/rate/rxtxadcdac",    { dev_m2_dsdr_rate_m_set, NULL }},
+
     { "/dm/sdr/0/rx/gain",      { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/freqency",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/freqency",    { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+
+    { "/dm/sdr/0/rx/remap",    { dev_m2_dsdr_sdr_rx_remap_set, dev_m2_dsdr_sdr_rx_remap_get }},
+    { "/dm/sdr/0/tx/remap",    { dev_m2_dsdr_sdr_tx_remap_set, dev_m2_dsdr_sdr_tx_remap_get }},
+
+
+    { "/dm/sdr/0/rx/dsa",    { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
+
+//    { "/dm/sdr/0/rx/freqency/0",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+//    { "/dm/sdr/0/rx/freqency/1",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+//    { "/dm/sdr/0/rx/freqency/2",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+//    { "/dm/sdr/0/rx/freqency/3",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+
     { "/dm/sdr/0/rx/bandwidth", { dev_m2_dsdr_dummy, NULL }},
     { "/dm/sdr/0/rx/path",      { dev_m2_dsdr_dummy, NULL }},
 
@@ -267,6 +291,7 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/sdr/0/tx/freqency",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/tx/bandwidth", { dev_m2_dsdr_dummy, NULL }},
     { "/dm/sdr/0/tx/path",      { dev_m2_dsdr_dummy, NULL }},
+    { "/dm/sdr/0/tx/dsa",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
 
     { "/dm/sdr/0/afe_health",   { dev_m2_dsdr_dummy, dev_m2_dsdr_afe_health_get }},
 
@@ -313,6 +338,9 @@ struct dev_m2_dsdr {
     uint32_t dac_rate;
     unsigned txbb_rate;
     unsigned txbb_inter;
+
+    unsigned rx_remap;
+    unsigned tx_remap;
 };
 typedef struct dev_m2_dsdr dev_m2_dsdr_t;
 
@@ -339,6 +367,16 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
     return lowlevel_reg_rd32(dev, 0, 16 + (bank / 4), data);
 }
 
+uint64_t get_entity_mask(pusdr_vfs_obj_t obj, const char* basename)
+{
+    // TODO: fill mask
+    return UINT64_MAX;
+}
+
+bool dev_m2_dsdr_has_hiper(dev_m2_dsdr_t* d)
+{
+    return d->type == DSDR_PCIE_HIPER_R0;
+}
 
 int dev_m2_dsdr_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -346,12 +384,62 @@ int dev_m2_dsdr_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
     if (!d->st.libcapi79xx_upd_nco)
         return 0;
 
+    int res;
+    uint64_t mask = get_entity_mask(obj, "/dm/sdr/0/rx/freqency");
+
     for (unsigned i = 0; i < 4; i++) {
-        d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_RX, i, value / 1000, 0, 0);
+        if ((1ull << i) & mask) {
+            uint64_t ncoval = value;
+            if (dev_m2_dsdr_has_hiper(d)) {
+                res = dsdr_hiper_fe_rx_freq_set(&d->hiper, i, value, &ncoval);
+                if (res)
+                    return res;
+            }
+
+            USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] NCO=%.3f\n", i, ncoval / 1.0e6);
+            d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_RX, i, ncoval / 1000, 0, 0);
+        }
     }
 
     return 0;
 }
+
+int dev_m2_dsdr_sdr_rx_dsa_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    if (!d->st.libcapi79xx_set_dsa)
+        return 0;
+
+    int res = 0;
+    uint64_t mask = get_entity_mask(obj, "/dm/sdr/0/rx/dsa");
+
+    for (unsigned i = 0; i < 4; i++) {
+        if ((1ull << i) & mask) {
+            res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, value);
+        }
+    }
+
+    return res;
+}
+
+int dev_m2_dsdr_sdr_tx_dsa_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    if (!d->st.libcapi79xx_set_dsa)
+        return 0;
+
+    int res = 0;
+    uint64_t mask = get_entity_mask(obj, "/dm/sdr/0/tx/dsa");
+
+    for (unsigned i = 0; i < 4; i++) {
+        if ((1ull << i) & mask) {
+            res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_TX, i, value);
+        }
+    }
+
+    return res;
+}
+
 
 int dev_m2_dsdr_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -359,8 +447,20 @@ int dev_m2_dsdr_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
     if (!d->st.libcapi79xx_upd_nco)
         return 0;
 
+    int res;
+    uint64_t mask = get_entity_mask(obj, "/dm/sdr/0/tx/freqency");
+
     for (unsigned i = 0; i < 4; i++) {
-        d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_TX, i, value / 1000, 0, 0);
+        if ((1ull << i) & mask) {
+            uint64_t ncoval = value;
+            if (dev_m2_dsdr_has_hiper(d)) {
+                res = dsdr_hiper_fe_tx_freq_set(&d->hiper, i, value, &ncoval);
+                if (res)
+                    return res;
+            }
+
+            d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_TX, i, value / 1000, 0, 0);
+        }
     }
 
     return 0;
@@ -371,19 +471,25 @@ int dev_m2_dsdr_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t valu
     return 0;
 }
 
-int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+static int dsdr_set_rates(dev_m2_dsdr_t* d, uint32_t rx_rate, uint32_t tx_rate)
 {
-    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
     int res = 0;
-
-    unsigned tx_inters[] = { 1, 2, 0, 4, 0, 0, 8, 16, 32, 64, 0 };
-    unsigned rx_decims[] = { 1, 2, 3, 4, 5, 6, 8, 16, 32, 64, 128 };
+    unsigned tx_inters[] = { 1, 2, 0, 4, 0, 8, 16, 32, 64, 128, 256 };
+    unsigned rx_decims[] = { 1, 2, 3, 4, 6, 8, 16, 32, 64, 128, 256 };
     unsigned i = 0;
     unsigned ii;
+    unsigned j = 0;
+    unsigned jj;
 
     for (ii = 0; ii < SIZEOF_ARRAY(rx_decims); ii++) {
-        if (value * rx_decims[ii] < d->max_rate)
+        if (rx_rate * rx_decims[ii] < d->max_rate)
             i = ii;
+        else
+            break;
+    }
+    for (jj = 0; jj < SIZEOF_ARRAY(rx_decims); jj++) {
+        if (tx_rate * rx_decims[jj] < d->max_rate)
+            j = jj;
         else
             break;
     }
@@ -394,9 +500,15 @@ int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     d->txbb_rate = tx_inters[i] == 0 ? 0 : d->dac_rate / tx_inters[i];
     d->txbb_inter = tx_inters[i];
 
+    // Reset FIFO after rate change
+    if (rx_rate) {
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x2);
+    }
+
+
     USDR_LOG("DSDR", USDR_LOG_ERROR, "Set rate: RX %.3f Mhz => %.3f (Decim: %d) -- TX %.3f Mhz => %.3f (Inter: %d)\n",
-             value / 1.0e6, d->rxbb_rate / 1.0e6, d->rxbb_decim,
-             value / 1.0e6, d->txbb_rate / 1.0e6, d->txbb_inter);
+             rx_rate / 1.0e6, d->rxbb_rate / 1.0e6, d->rxbb_decim,
+             tx_rate / 1.0e6, d->txbb_rate / 1.0e6, d->txbb_inter);
 
     res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim);
     if (res) {
@@ -414,6 +526,10 @@ int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
         }
     }
 
+    if (rx_rate) {
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x0);
+    }
+
 #if 0
     for (int i = 0; i < 5; i++) {
         uint32_t clk;
@@ -424,7 +540,32 @@ int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     }
 #endif
 
-    return 0;
+    return res;
+}
+
+
+int dev_m2_dsdr_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    uint32_t *rates = (uint32_t *)(uintptr_t)value;
+
+    uint32_t rx_rate = rates[0];
+    uint32_t tx_rate = rates[1];
+
+    //uint32_t adc_rate = rates[2];
+    //uint32_t dac_rate = rates[3];
+
+    if (rx_rate == 0 && tx_rate == 0)
+        return -EINVAL;
+
+    return dsdr_set_rates(d, rx_rate, tx_rate);
+}
+
+
+int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    return dsdr_set_rates(d, value, value);
 }
 
 int dev_m2_dsdr_afe_health_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
@@ -443,11 +584,20 @@ int dev_m2_dsdr_afe_health_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* oval
     if (res)
         return res;
 
-    *ovalue = rok;
-    if (staus_buffer[0]) {
-        USDR_LOG("DSDR", USDR_LOG_WARNING, "AFE health report:\n%s\n", staus_buffer);
+    uint32_t fpga_jesd;
+    unsigned delay;
+    res = dev_gpi_get32(o->base.dev, 36, &fpga_jesd);
+    delay = (fpga_jesd >> 16) & 0x3ff;
+    USDR_LOG("DSDR", USDR_LOG_INFO, "FPGA JESD: SYSREF realign TX/RX = %08x Delay = %d PLL Locked %d BUFFER_OVERFLOW: %04x\n",
+                                        fpga_jesd & 0xff, delay, (fpga_jesd >> 26) & 3, fpga_jesd >> 28);
+
+    if (ovalue) {
+        *ovalue = rok;
+        if (staus_buffer[0]) {
+            USDR_LOG("DSDR", USDR_LOG_WARNING, "AFE health report:\n%s\n", staus_buffer);
+        }
     }
-    return 0;
+    return res;
 }
 
 
@@ -552,6 +702,33 @@ static int dev_m2_dsdr_debug_rxtime_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 static
 void usdr_device_m2_dsdr_destroy(pdevice_t udev)
 {
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)udev;
+    lldev_t dev = d->base.dev;
+
+    // FE Power OFF
+    if (dev_m2_dsdr_has_hiper(d)) {
+        dsdr_hiper_fe_destroy(&d->hiper);
+    }
+
+    dev_gpo_set(dev, IGPO_AFE_RST, 0x1);
+    usleep(100);
+
+    // Safe Power OFF sequence
+    dev_gpo_set(dev, IGPO_PWR_AFE, 0xf);
+    usleep(100);
+    dev_gpo_set(dev, IGPO_PWR_AFE, 0x7);
+    usleep(100);
+    dev_gpo_set(dev, IGPO_PWR_AFE, 0x3);
+    usleep(100);
+    dev_gpo_set(dev, IGPO_PWR_AFE, 0x1);
+    usleep(100);
+    dev_gpo_set(dev, IGPO_PWR_AFE, 0x0);
+    usleep(100);
+    dev_gpo_set(dev, IGPO_PWR_LMK, 0x0);
+
+    // Activity LED off
+    dev_gpo_set(dev, IGPO_BANK_LEDS, 0);
+
     usdr_device_base_destroy(udev);
 }
 
@@ -684,20 +861,20 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         res = res ? res : afe79xx_create_dummy(&d->st);
 
         for (int i = 0; i < 10; i++) {
-            uint32_t clk;
+            uint32_t clk = 0;
             res = res ? res : dev_gpi_get32(d->base.dev, 20, &clk);
 
             USDR_LOG("DSDR", USDR_LOG_ERROR, "Clk %d: %d\n", clk >> 28, clk & 0xfffffff);
             usleep(0.5 * 1e6);
         }
 
-        res = usdr_jesd204b_bringup_pre(d);
+        res = res ? res : usdr_jesd204b_bringup_pre(d);
 
-        USDR_LOG("XDEV", USDR_LOG_ERROR, "Waiting for AFE... (press eneter when external confuguration is done)\n");
+        USDR_LOG("XDEV", USDR_LOG_ERROR, "Waiting for AFE... (press enter when external confuguration is done)\n");
         getchar();
         USDR_LOG("XDEV", USDR_LOG_ERROR, "Resetting JESD\n");
 
-        res = usdr_jesd204b_bringup_post(d);
+        res = res ? res : usdr_jesd204b_bringup_post(d);
         return res;
     }
 
@@ -852,11 +1029,43 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     }
 
     if (d->type == DSDR_PCIE_HIPER_R0) {
-        //res = res ? res :
-                  dsdr_hiper_fe_create(dev, SPI_BUS_HIPER_FE, &d->hiper);
+        res = res ? res : dsdr_hiper_fe_create(dev, SPI_BUS_HIPER_FE, &d->hiper);
+
+        // check state
+        // int o;
+        // res = res ? res : d->st.libcapi79xx_check_health(&d->st.capi, &o, 0, NULL);
+        res = res ? res : dev_m2_dsdr_afe_health_get(udev, NULL, NULL);
     }
+
+    return res;
+}
+
+
+int dev_m2_dsdr_sdr_rx_remap_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    d->rx_remap = value;
+    return dev_gpo_set(d->base.dev, IGPO_RX_MAP, d->rx_remap);
+}
+int dev_m2_dsdr_sdr_rx_remap_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    *ovalue = d->rx_remap;
     return 0;
 }
+int dev_m2_dsdr_sdr_tx_remap_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    d->tx_remap = value;
+    return dev_gpo_set(d->base.dev, IGPO_TX_MAP, d->rx_remap);
+}
+int dev_m2_dsdr_sdr_tx_remap_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    *ovalue = d->tx_remap;
+    return 0;
+}
+
 
 static
 int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char* dformat,
@@ -877,10 +1086,15 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         uint8_t  remap_cfg;
 
         switch (channels) {
-        case 1: remap_msk = 1; remap_cfg = 0; break; // 0001 A
-        case 2: remap_msk = 1; remap_cfg = 1; break; // 0010 B
-        case 4: remap_msk = 1; remap_cfg = 2; break; // 0100 C
-        case 8: remap_msk = 1; remap_cfg = 3; break; // 1000 D
+        // case 1: remap_msk = 1; remap_cfg = 0; break; // 0001 A
+        // case 2: remap_msk = 1; remap_cfg = 1; break; // 0010 B
+        // case 4: remap_msk = 1; remap_cfg = 2; break; // 0100 C
+        // case 8: remap_msk = 1; remap_cfg = 3; break; // 1000 D
+
+        case 1: remap_msk = 1; remap_cfg = 3; break; // D_FE
+        case 2: remap_msk = 1; remap_cfg = 2; break; // C_FE
+        case 4: remap_msk = 1; remap_cfg = 0; break; // A_FE
+        case 8: remap_msk = 1; remap_cfg = 1; break; // B_FE
 
         case 3: remap_msk = 3; remap_cfg = 4 * 1 + 0; break; // 0011 B+A
         case 5: remap_msk = 3; remap_cfg = 4 * 2 + 0; break; // 0101 C+A
@@ -894,9 +1108,11 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
             return -EINVAL;
         }
 
+        d->rx_remap = remap_cfg;
+
         USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR channels %08x remmaped to %08x with %08x mux\n",
                  (unsigned)channels, (unsigned)remap_msk, remap_cfg);
-        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_RX_MAP, remap_cfg);
+        res = res ? res : dev_gpo_set(d->base.dev, IGPO_RX_MAP, remap_cfg);
 
         uint64_t v;
         for (unsigned ch = 0; ch < 4; ch++) {
@@ -905,9 +1121,8 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
             USDR_LOG("UDEV", USDR_LOG_INFO, "RX NCO[%d] = %lld\n", ch, (long long)v);
         }
 
-
         struct sfetrx4_config rxcfg;
-        res = parse_sfetrx4(dformat, remap_msk, pktsyms, &rxcfg);
+        res = res ? res : parse_sfetrx4(dformat, remap_msk, pktsyms, &rxcfg);
         if (res) {
             USDR_LOG("UDEV", USDR_LOG_ERROR, "Unable to parse RX stream configuration!\n");
             return res;
@@ -941,6 +1156,8 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
             break;
         }
 
+        d->tx_remap = remap_cfg;
+
         res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_TX_MAP, remap_cfg);
 
         struct sfetrx4_config txcfg;
@@ -963,6 +1180,10 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         }
         *out_handle = d->tx;
     }
+
+    // dev_m2_dsdr_sdr_rx_dsa_set(&d->base, NULL, 50);
+
+    // dev_m2_dsdr_sdr_tx_dsa_set(&d->base, NULL, 20);
 
     return res;
 }
@@ -1008,6 +1229,9 @@ int usdr_device_m2_dsdr_create(lldev_t dev, device_id_t devid)
 
     d->rx = NULL;
     d->tx = NULL;
+
+    d->rx_remap = 0;
+    d->tx_remap = 0;
 
     d->type = DSDR_PCIE_HIPER_R0;
     dev->pdev = &d->base;
