@@ -174,6 +174,66 @@ void* disk_read_thread(void* obj)
     return NULL;
 }
 
+static const int16_t lut_sincos60_25000[] = {
+    0, 25000,
+    -21651, 12500,
+    -21651, -12500,
+    0, -25000,
+    21651, -12500,
+    21651, 12500,
+
+    0, 25000,
+    -21651, 12500,
+    -21651, -12500,
+    0, -25000,
+    21651, -12500,
+    21651, 12500,
+};
+
+void* freq_gen_thread_ci16_lut(void* obj)
+{
+    tx_thread_input_t* inp = (tx_thread_input_t*)obj;
+    const unsigned p = inp->chan;
+    const unsigned tx_get_samples = inp->samples_count;
+
+    int phase = 0;
+    int lut_sz = 6;
+    int k = 0;
+
+    while (!s_stop && !thread_stop) {
+        unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
+        if (idx == IDX_TIMEDOUT)
+            continue;
+
+        char* data = ring_buffer_at(tbuff[p], idx);
+        tx_header_t* hdr = (tx_header_t*)data;
+        hdr->len = tx_get_samples * sizeof(uint16_t) * 2;
+        hdr->flags = TXF_NONE;
+        int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
+#ifdef RAMP_PATTERN
+        memset(iqp, k, hdr->len);
+#else
+        const int16_t *lut = lut_sincos60_25000 + phase * 2;
+
+        unsigned i = 0;
+        for (; i < tx_get_samples - lut_sz; i += lut_sz) {
+            memcpy(iqp + 2 * i, lut, lut_sz * sizeof(uint16_t) * 2);
+        }
+
+        for (; i < tx_get_samples; i++) {
+            memcpy(iqp + 2 * i, lut + 2 * (i % lut_sz), sizeof(uint16_t) * 2);
+        }
+
+        phase = (phase + i) % lut_sz;
+#endif
+        ring_buffer_ppost(tbuff[p]);
+        k++;
+    }
+
+    return NULL;
+}
+
+
 #define USE_WVLT_SINCOS
 
 //we have no NEON implementation for wvlt_sincos_i16() yet
@@ -219,8 +279,8 @@ void* freq_gen_thread_ci16(void* obj)
         for (unsigned i = 0; i < tx_get_samples; i++) {
             float ii, qq;
             sincosf(2 * M_PI * phase, &ii, &qq);
-            iqp[2 * i + 0] = -30000 * (ii) + 0.5;
-            iqp[2 * i + 1] = 30000 * (qq) + 0.5;
+            iqp[2 * i + 0] = -20000 * (ii) + 0.5;
+            iqp[2 * i + 1] = 20000 * (qq) + 0.5;
 
             phase += phase_delta;
             if (phase > 1.0)
@@ -348,6 +408,7 @@ static void usage(int severity, const char* me)
                                 "\t[-X <flag: Skip initialization>] \n"
                                 "\t[-z <flag: Continue on error>] \n"
                                 "\t[-l loglevel [3(INFO)]] \n"
+                                "\t[-G calibration [algo#]] \n"
                                 "\t[-h <flag: This help>]",
              me);
 }
@@ -497,6 +558,8 @@ int main(UNUSED int argc, UNUSED char** argv)
     bool tx_from_file = false;
     uint64_t fref = 0;
     unsigned statistics = 1;
+    bool use_lut = false;
+    unsigned calibrate = 0;
 
     memset(rx_thread_inputs, 0, sizeof(rx_thread_inputs));
     memset(tx_thread_inputs, 0, sizeof(tx_thread_inputs));
@@ -533,7 +596,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:JG:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -557,6 +620,12 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
         //RX VGA gain
         case 'U': dev_data[DD_RX_GAIN_VGA].value = atoi(optarg); dev_data[DD_RX_GAIN_VGA].ignore = false; break;
+        case 'G':
+            calibrate = atoi(optarg);
+            break;
+        case 'J':
+            use_lut = true;
+            break;
         //Statistics option
         case 'j':
             statistics = atoi(optarg);
@@ -959,7 +1028,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             if(tx_from_file)
                 thread_func = disk_read_thread;
             else if(strcmp(fmt, SFMT_CI16) == 0)
-                thread_func = freq_gen_thread_ci16;
+                thread_func = (use_lut) ? freq_gen_thread_ci16_lut : freq_gen_thread_ci16;
             else if(strcmp(fmt, SFMT_CF32) == 0)
                 thread_func = freq_gen_thread_cf32;
             else
@@ -1070,6 +1139,13 @@ int main(UNUSED int argc, UNUSED char** argv)
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set device parameters: errno %d", res);
             if (stop_on_error) goto dev_close;
         }
+    }
+
+    if (calibrate) {
+        res = usdr_dme_set_uint(dev, "/dm/sdr/0/calibrate", calibrate);
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "SDR Calibration done: %d\n", res);
+
+        res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
     }
 
     uint64_t stm = start_tx_delay;
