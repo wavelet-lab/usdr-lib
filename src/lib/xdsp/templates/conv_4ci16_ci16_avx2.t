@@ -94,10 +94,10 @@ const __m256i permmask = _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0);
         r3 = _mm256_loadu_si256(vp3++);
 
 #ifdef ALGO1
-        a0 = _mm256_castpd_si256(_mm256_shuffle_pd(r0, r1, 0b0000));
-        a1 = _mm256_castpd_si256(_mm256_shuffle_pd(r0, r1, 0b1111));
-        a2 = _mm256_castpd_si256(_mm256_shuffle_pd(r2, r3, 0b0000));
-        a3 = _mm256_castpd_si256(_mm256_shuffle_pd(r2, r3, 0b1111));
+        a0 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(r0), _mm256_castsi256_pd(r1), 0b0000));
+        a1 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(r0), _mm256_castsi256_pd(r1), 0b1111));
+        a2 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(r2), _mm256_castsi256_pd(r3), 0b0000));
+        a3 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(r2), _mm256_castsi256_pd(r3), 0b1111));
 
         b0 = _mm256_permute2x128_si256(a0, a2, 0b00100000);
         b1 = _mm256_permute2x128_si256(a1, a3, 0b00100000);
@@ -109,20 +109,20 @@ const __m256i permmask = _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0);
         c2 = _mm256_permutevar8x32_epi32(b2, permmask);
         c3 = _mm256_permutevar8x32_epi32(b3, permmask);
 #else
-        a0 = _mm256_castpd_si256(_mm256_shuffle_pd(r0, r1, 0b0000));
-        a1 = _mm256_castpd_si256(_mm256_shuffle_pd(r0, r1, 0b1111));
-        a2 = _mm256_castpd_si256(_mm256_shuffle_pd(r2, r3, 0b0000));
-        a3 = _mm256_castpd_si256(_mm256_shuffle_pd(r2, r3, 0b1111));
+        a0 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(r0), _mm256_castsi256_pd(r1), 0b0000));
+        a1 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(r0), _mm256_castsi256_pd(r1), 0b1111));
+        a2 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(r2), _mm256_castsi256_pd(r3), 0b0000));
+        a3 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(r2), _mm256_castsi256_pd(r3), 0b1111));
 
         a0 = _mm256_shuffle_epi32(a0, _MM_SHUFFLE(3,1,2,0));
         a1 = _mm256_shuffle_epi32(a1, _MM_SHUFFLE(3,1,2,0));
         a2 = _mm256_shuffle_epi32(a2, _MM_SHUFFLE(3,1,2,0));
         a3 = _mm256_shuffle_epi32(a3, _MM_SHUFFLE(3,1,2,0));
 
-        b0 = _mm256_castpd_si256(_mm256_shuffle_pd(a0, a2, 0b0000));
-        b1 = _mm256_castpd_si256(_mm256_shuffle_pd(a0, a2, 0b1111));
-        b2 = _mm256_castpd_si256(_mm256_shuffle_pd(a1, a3, 0b0000));
-        b3 = _mm256_castpd_si256(_mm256_shuffle_pd(a1, a3, 0b1111));
+        b0 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(a0), _mm256_castsi256_pd(a2), 0b0000));
+        b1 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(a0), _mm256_castsi256_pd(a2), 0b1111));
+        b2 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(a1), _mm256_castsi256_pd(a3), 0b0000));
+        b3 = _mm256_castpd_si256(_mm256_shuffle_pd(_mm256_castsi256_pd(a1), _mm256_castsi256_pd(a3), 0b1111));
 
         c0 = _mm256_permute2x128_si256(b0, b1, 0b00100000);
         c1 = _mm256_permute2x128_si256(b2, b3, 0b00100000);
