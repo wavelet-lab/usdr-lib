@@ -46,12 +46,31 @@ static bool thread_stop = false;
 static unsigned rx_bufcnt = 0;
 static unsigned tx_bufcnt = 0;
 
-#define MAX_CHS 32
+#define MAX_CHS 64
 
 static FILE* s_out_file[MAX_CHS];
 static FILE* s_in_file[MAX_CHS];
 static ring_buffer_t* rbuff[MAX_CHS];
 static ring_buffer_t* tbuff[MAX_CHS];
+
+struct rx_thread_input_s
+{
+    unsigned chan;
+};
+typedef struct rx_thread_input_s rx_thread_input_t;
+
+struct tx_thread_input_s
+{
+    unsigned chan;
+    unsigned samplerate;
+    unsigned samples_count;
+    double start_phase;
+    double delta_phase;
+};
+typedef struct tx_thread_input_s tx_thread_input_t;
+
+static rx_thread_input_t rx_thread_inputs[MAX_CHS];
+static tx_thread_input_t tx_thread_inputs[MAX_CHS];
 
 static bool tx_file_cycle = false;
 
@@ -76,7 +95,8 @@ enum tx_header_flags
  */
 void* disk_write_thread(void* obj)
 {
-    unsigned i = (intptr_t)obj;
+    rx_thread_input_t* inp = (rx_thread_input_t*)obj;
+    const unsigned i = inp->chan;
 
     while (!s_stop && !thread_stop) {
         unsigned idx = ring_buffer_cwait(rbuff[i], 100000);
@@ -101,7 +121,8 @@ void* disk_write_thread(void* obj)
  */
 void* disk_read_thread(void* obj)
 {
-    unsigned i = (intptr_t)obj;
+    tx_thread_input_t* inp = (tx_thread_input_t*)obj;
+    const unsigned i = inp->chan;
     bool interrupt = false;
 
     while (!s_stop && !thread_stop && !interrupt) {
@@ -160,27 +181,23 @@ void* disk_read_thread(void* obj)
 #undef USE_WVLT_SINCOS
 #endif
 
-#ifdef USE_WVLT_SINCOS
-int32_t istart_phase[8] = { 0, WVLT_SINCOS_I16_TWO_PI / 2, WVLT_SINCOS_I16_TWO_PI / 4, WVLT_SINCOS_I16_TWO_PI / 8 };
-int32_t istart_dphase[8] = { WVLT_SINCOS_I16_TWO_PI / 3, WVLT_SINCOS_I16_TWO_PI / 50, 3 * WVLT_SINCOS_I16_TWO_PI / 100, WVLT_SINCOS_I16_TWO_PI / 25 };
-#endif
-
-double start_phase[8] = { 0, 0.5, 0.25, 0.125 };
-double start_dphase[8] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
-unsigned tx_get_samples;
-
 /*
  *   Thread function - Sine generator to TX stream (ci16)
  */
 void* freq_gen_thread_ci16(void* obj)
 {
-    unsigned p = (intptr_t)obj;
+    tx_thread_input_t* inp = (tx_thread_input_t*)obj;
+    const unsigned p = inp->chan;
+    const unsigned tx_get_samples = inp->samples_count;
 
 #ifdef USE_WVLT_SINCOS
-    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Using TX sinus generator with USE_WVLT_SINCOS opt @ ch#%d", p);
-    int32_t phase = istart_phase[p];
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 sinus generator with USE_WVLT_SINCOS opt @ ch#%d F:%.6f MHz",
+             p, (double)inp->samplerate * inp->delta_phase / 1000000.f);
+    int32_t phase             = WVLT_SINCOS_I16_TWO_PI * inp->start_phase;
+    const int32_t phase_delta = WVLT_SINCOS_I16_TWO_PI * inp->delta_phase;
 #else
-    double phase = start_phase[p];
+    double phase             = inp->start_phase;
+    const double phase_delta = inp->delta_phase;
 #endif
 
     while (!s_stop && !thread_stop) {
@@ -197,7 +214,7 @@ void* freq_gen_thread_ci16(void* obj)
         int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
 
 #ifdef USE_WVLT_SINCOS
-        wvlt_sincos_i16_interleaved_ctrl(&phase, istart_dphase[p], true/*invert sin*/, false/*invert cos*/, iqp, tx_get_samples);
+        wvlt_sincos_i16_interleaved_ctrl(&phase, phase_delta, true/*invert sin*/, false/*invert cos*/, iqp, tx_get_samples);
 #else
         for (unsigned i = 0; i < tx_get_samples; i++) {
             float ii, qq;
@@ -205,7 +222,7 @@ void* freq_gen_thread_ci16(void* obj)
             iqp[2 * i + 0] = -30000 * (ii) + 0.5;
             iqp[2 * i + 1] = 30000 * (qq) + 0.5;
 
-            phase += start_dphase[p];
+            phase += phase_delta;
             if (phase > 1.0)
                 phase -= 1.0;
 
@@ -223,8 +240,10 @@ void* freq_gen_thread_ci16(void* obj)
  */
 void* freq_gen_thread_cf32(void* obj)
 {
-    unsigned p = (intptr_t)obj;
-    double phase = start_phase[p];
+    tx_thread_input_t* inp = (tx_thread_input_t*)obj;
+    const unsigned p = inp->chan;
+    double phase = inp->start_phase;
+    const unsigned tx_get_samples = inp->samples_count;
 
     while (!s_stop && !thread_stop) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
@@ -242,7 +261,7 @@ void* freq_gen_thread_cf32(void* obj)
         for (unsigned i = 0; i < tx_get_samples; i++) {
             //float ii, qq; (but we use trick to not do inversion, however, it leads to incorrect phase)
             sincosf(2 * M_PI * phase, &iqp[2 * i + 1], &iqp[2 * i + 0]);
-            phase += start_dphase[p];
+            phase += inp->delta_phase;
             if (phase > 1.0)
                 phase -= 1.0;
 
@@ -301,8 +320,8 @@ static void usage(int severity, const char* me)
                                 "\t[-r samplerate [50e6]] \n"
                                 "\t[-F format [ci16] | cf32] \n"
                                 "\t[-C chmsk [autodetect]] \n"
-                                "\t[-S TX samples_per_blk [4096]] \n"
-                                "\t[-O RX samples_per_blk [4096]] \n"
+                                "\t[-S RX buffer size (in samples) [4096]] \n"
+                                "\t[-O TX buffer size (in samples) [4096]] \n"
                                 "\t[-t <flag: TX only mode>] \n"
                                 "\t[-T <flag: TX+RX mode>] \n"
                                 "\t[-N <flag: No TX timestamps>] \n"
@@ -324,6 +343,8 @@ static void usage(int severity, const char* me)
                                 "\t[-Q <flag: Discover and exit>] \n"
                                 "\t[-R RX_LML_MODE [0]] \n"
                                 "\t[-A Antenna configuration [0]] \n"
+                                "\t[-H comma-separated list of sin generator start phases (FP values)] \n"
+                                "\t[-d comma-separated list of sin generator phase deltas (FP values)] \n"
                                 "\t[-X <flag: Skip initialization>] \n"
                                 "\t[-z <flag: Continue on error>] \n"
                                 "\t[-l loglevel [3(INFO)]] \n"
@@ -477,6 +498,15 @@ int main(UNUSED int argc, UNUSED char** argv)
     uint64_t fref = 0;
     unsigned statistics = 1;
 
+    memset(rx_thread_inputs, 0, sizeof(rx_thread_inputs));
+    memset(tx_thread_inputs, 0, sizeof(tx_thread_inputs));
+    for(unsigned i = 0; i < MAX_CHS; ++i)
+    {
+        tx_thread_input_t* inp = &tx_thread_inputs[i];
+        inp->start_phase = -1;
+        inp->delta_phase = -1;
+    }
+
     //Device parameters
     //                 { endpoint, default_value, ignore flag, stop_on_fail flag }
     struct dme_findsetv_data dev_data[] = {
@@ -503,7 +533,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -655,6 +685,32 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'A':
             antennacfg = atoi(optarg);
             break;
+        //Comma-separated list of sin generator start phases (FP values)
+        //Ordered by channel#
+        //If start phase is not specified or ==-1, default sequence is applied (see start_phase[] below)
+        case 'H':
+        {
+            char *pt = strtok(optarg, ",");
+            unsigned i = 0;
+            while (pt != NULL && i < MAX_CHS) {
+                tx_thread_inputs[i++].start_phase = atof(pt);
+                pt = strtok(NULL, ",");
+            }
+            break;
+        }
+        //Comma-separated list of sin generator phase deltas (FP values). The resulting frequency == sample_rate * phase_delta
+        //Ordered by channel#
+        //If not specified or ==-1, default sequence is applied (see start_dphase[] below)
+        case 'd':
+        {
+            char *pt = strtok(optarg, ",");
+            unsigned i = 0;
+            while (pt != NULL && i < MAX_CHS) {
+                tx_thread_inputs[i++].delta_phase = atof(pt);
+                pt = strtok(NULL, ",");
+            }
+            break;
+        }
         //Don't stop on error
         case 'z':
             stop_on_error = false;
@@ -850,7 +906,32 @@ int main(UNUSED int argc, UNUSED char** argv)
         if (stop_on_error) goto dev_close;
     }
 
-    tx_get_samples = samples_tx;
+    // initialize thread input params
+    for(unsigned i = 0; i < rx_bufcnt; ++i)
+    {
+        rx_thread_input_t* inp = &rx_thread_inputs[i];
+        inp->chan = i;
+    }
+
+    static double start_phase[]  = { 0, 0.5, 0.25, 0.125 };
+    static double start_dphase[] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
+
+    for(unsigned i = 0; i < tx_bufcnt; ++i)
+    {
+        tx_thread_input_t* inp = &tx_thread_inputs[i];
+        inp->chan = i;
+        inp->samplerate = rate;
+        inp->samples_count = samples_tx;
+        inp->start_phase = inp->start_phase >= 0 ? inp->start_phase : start_phase[i % (sizeof(start_phase) / sizeof(*start_phase))];
+        inp->delta_phase = inp->delta_phase >= 0 ? inp->delta_phase : start_dphase[i % (sizeof(start_dphase) / sizeof(*start_dphase))];
+    }
+
+    for(unsigned i = 0; i < MAX_CHS; ++i)
+    {
+        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX SINGEN CH#%2d PHASE_START:%.4f PHASE_DELTA:%.4f",
+                 i, tx_thread_inputs[i].start_phase, tx_thread_inputs[i].delta_phase);
+    }
+    //
 
     //Create TX buffers and threads
     if (dotx) {
@@ -889,7 +970,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                 goto dev_close;
             }
 
-            res = pthread_create(&rthread[i], NULL, thread_func, (void*)(intptr_t)i);
+            res = pthread_create(&rthread[i], NULL, thread_func, &tx_thread_inputs[i]);
 
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: errno %d", i, res);
@@ -919,7 +1000,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         for (unsigned i = 0; i < rx_bufcnt; i++) {
             rbuff[i] = ring_buffer_create(256, snfo_rx.pktbszie);
-            res = pthread_create(&wthread[i], NULL, disk_write_thread, (void*)(intptr_t)i);
+            res = pthread_create(&wthread[i], NULL, disk_write_thread, &rx_thread_inputs[i]);
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start RX thread %d: errno %d", i, res);
                 goto dev_close;
