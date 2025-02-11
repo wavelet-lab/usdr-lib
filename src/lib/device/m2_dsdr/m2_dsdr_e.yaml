@@ -12,8 +12,8 @@ bus:
     wr_mask: 0x80000000
 addr_width:   8
 data_width:   24
-page_prefix:  True
-field_prefix: [ Page, RegName ]
+# page_prefix:  True
+field_prefix: [ RegName ]
 field_macros: True
 
 x-rx-filt-in-opts: &rx-filt-in-opts
@@ -40,9 +40,9 @@ x-rx-filt-out-opts: &rx-filt-out-opts
 
 x-if-lna-opts: &if-lna-opts
     0b00: LNA
-    0b01: "OFF"
+    0b01: Disable
     0b10: BYPASS
-    0b11: BYPASS
+    0b11: BYPASS2
 
 pages:
   - name: V0
@@ -205,10 +205,10 @@ pages:
             name: REF_GPS
             desc: Enable GPS module
           - bits: "1"
-            name: 8V_TX
+            name: P8V_TX
             desc: Enable +8v power supply for TX amps
           - bits: "0"
-            name: 5V_RX
+            name: P5V_RX
             desc: Enable +5v power supply for RX amps
 #
       - addr: 0x25
