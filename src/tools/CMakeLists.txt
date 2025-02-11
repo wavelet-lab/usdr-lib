@@ -6,6 +6,7 @@ project(usdr_tools C)
 
 include_directories(../lib/port)
 include_directories(../lib/lowlevel)
+include_directories(../lib/xdsp)
 
 add_executable(usdr_flash usdr_flash.c)
 target_link_libraries(usdr_flash usdr)

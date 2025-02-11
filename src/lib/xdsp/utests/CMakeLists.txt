@@ -32,10 +32,12 @@ set(TEST_SUIT_SRCS
     ../conv_ci12_2cf32_2.c
     ../conv_f32_i12_2.c
     ../conv_2cf32_ci12_2.c
-    ../nco.c
+    ../sincos_functions.c
     ../conv_4ci16_ci16_2.c
     ../vbase.c
 )
+
+include_directories(../)
 
 if(WVLT_ARCH_X86 OR WVLT_ARCH_X86_64)
     add_definitions("-msse4.1")
