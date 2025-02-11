@@ -29,5 +29,10 @@ override_dh_auto_configure:
 override_dh_auto_build:
 	cd "obj-$(DEB_TARGET_GNU_TYPE)" && make
 
+
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/tmp
+
+
 override_dh_missing:
 
