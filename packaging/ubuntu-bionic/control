@@ -66,6 +66,7 @@ Section: misc
 Priority: optional
 Depends:
     usdr-tools (= ${binary:Version}),
+    libusdr (= ${binary:Version}),
     python3-yaml,
     python3-pyqt5,
     python3-pyqtgraph
