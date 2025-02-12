@@ -62,3 +62,14 @@ Depends:
     dkms,
     ${shlibs:Depends}
 Description: DKMS source for the uSDR PCIe driver
+
+Package: usdr-dmonitor
+Architecture: all
+Section: misc
+Priority: optional
+Depends:
+    usdr-tools (= ${binary:Version}),
+    python3-yaml,
+    python3-pyqt5,
+    python3-pyqtgraph
+Description: Debug tools for usdr
