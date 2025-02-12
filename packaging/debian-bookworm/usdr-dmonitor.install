@@ -1,0 +1,4 @@
+usr/libexec/usdr_dmonitor/*.py usr/libexec/usdr_dmonitor/
+usr/libexec/usdr_dmonitor/img usr/libexec/usdr_dmonitor/
+usr/libexec/usdr_dmonitor/yamls usr/libexec/usdr_dmonitor/
+usr/libexec/usdr_dmonitor/usdr_registers usr/bin/
