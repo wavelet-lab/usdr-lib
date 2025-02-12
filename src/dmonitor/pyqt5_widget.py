@@ -11,6 +11,10 @@ import math
 import configparser
 import re
 import time
+import os
+
+
+ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
 class LongSpinBox(QAbstractSpinBox):
@@ -252,11 +256,11 @@ class QtBuilderTop(QWidget):
 
             self.tab.addTab(q, page.name)
 
-        saveAction = QAction(QIcon("img/save.png"), 'Save', self)
+        saveAction = QAction(QIcon(f"{ABS_PATH}/img/save.png"), 'Save', self)
         saveAction.setShortcut('Ctrl+S')
         saveAction.triggered.connect(self.save_button_clicked)
 
-        loadAction = QAction(QIcon("img/load.png"), 'Load', self)
+        loadAction = QAction(QIcon(f"{ABS_PATH}/img/load.png"), 'Load', self)
         loadAction.setShortcut('Ctrl+L')
         loadAction.triggered.connect(self.load_button_clicked)
 
