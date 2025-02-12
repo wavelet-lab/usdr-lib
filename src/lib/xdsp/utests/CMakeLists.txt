@@ -17,7 +17,7 @@ set(TEST_SUIT_SRCS
     xfft_rtsa_utest.c
     fft_window_cf32_utest.c
     wvlt_sincos_i16_utest.c
-    conv_4ci16_ci16_utest
+    conv_4ci16_ci16_utest.c
 
     ../fft_window_functions.c
     ../fftad_functions.c
