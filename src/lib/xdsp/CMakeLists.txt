@@ -76,3 +76,5 @@ else()
     set_target_properties(usdr-dsp PROPERTIES VERSION ${USDR_LIBVER})
 
 endif()
+
+install(FILE ${CMAKE_CURRENT_SOURCE_DIR}/vbase.h DESTINATION include/usdr)
