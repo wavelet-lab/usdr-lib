@@ -174,3 +174,38 @@ pages:
             opts:
                 <<: *x-ant-opts
 #
+      - addr: 0x46
+        name: RX_CHEN
+        fields:
+          - bits: "0"
+            name: A
+            desc: FE Chan enabled
+          - bits: "1"
+            name: B
+            desc: FE Chan enabled
+          - bits: "2"
+            name: C
+            desc: FE Chan enabled
+          - bits: "3"
+            name: D
+            desc: FE Chan enabled
+#
+      - addr: 0x47
+        name: TX_CHEN
+        fields:
+          - bits: "0"
+            name: A
+            desc: FE Chan enabled
+          - bits: "1"
+            name: B
+            desc: FE Chan enabled
+          - bits: "2"
+            name: C
+            desc: FE Chan enabled
+          - bits: "3"
+            name: D
+            desc: FE Chan enabled
+#
+
+
+
