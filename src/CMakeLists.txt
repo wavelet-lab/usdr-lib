@@ -30,6 +30,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 find_package(LIBUSB_1 REQUIRED)
 
 option(BUILD_SHARED_LIBS "Build shared libraries(otherwise static libraries will be produced)" ON)
+option(ENABLE_DMONITOR  "Enable debug tools" ON)
 option(ENABLE_VERILATOR "Enable verilator lowlevel bridge" OFF)
 option(ENABLE_SOAPY "Enable SopaySDR support" ON)
 option(ENABLE_GUI  "Enable USDR QT5 simple GUI" ON)
@@ -70,6 +71,10 @@ endif(ENABLE_SOAPY)
 if(ENABLE_VERILATOR)
     add_subdirectory(verilator)
 endif(ENABLE_VERILATOR)
+
+if(ENABLE_DMONITOR)
+    add_subdirectory(dmonitor)
+endif(ENABLE_DMONITOR)
 
 
 

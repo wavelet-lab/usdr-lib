@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import subprocess
 import time
@@ -7,7 +7,7 @@ import signal
 class wvltSDR:
 
     #please set your custom USDR_DM_CREATE_PATH
-    USDR_DM_CREATE_PATH = './usdr_dm_create'
+    USDR_DM_CREATE_PATH = 'usdr_dm_create'
 
     OPTS = {
         '-D' : [None, None],            #  device_parameters] \n"
@@ -79,7 +79,7 @@ class wvltSDR:
             optval = self.getOptionValue(opt)
             if optval is None: continue
             self.args.append(opt)
-            if optval <> '': self.args.append(str(optval))
+            if optval != '': self.args.append(str(optval))
 
     def resetOpts(self):
         for opt in self.OPTS.keys(): self.setOptionValue(opt, None)
@@ -123,7 +123,7 @@ class wvltSDR:
 
     def start(self):
         self.constructArgs();
-        print self.args
+        print(self.args)
         self.proc = subprocess.Popen(args=self.args, stdout=self.fd, stderr=self.fd)
         return self.proc
 
@@ -169,12 +169,12 @@ def main():
     usdr.setMaxBlocksCount()
 
     #start usdr_dm_create utility for RX
-    print "starting (RX)..."
+    print("starting (RX)...")
     p = usdr.start()
     if p:
-        print "started ok"
+        print("started ok")
     else:
-        print "error!"
+        print("error!")
         exit(1)
 
     #wait for 10s, then stop it
@@ -184,13 +184,13 @@ def main():
         i += 1
 
     if usdr.stop():
-        print "stopped ok"
+        print("stopped ok")
     else:
-        print "not stopped, trying to kill..."
+        print("not stopped, trying to kill...")
         if usdr.stop(force=True):
-            print "killed"
+            print("killed")
         else:
-            print "cannot kill"
+            print("cannot kill")
             exit(11)
 
     #reset opts and set for TX
@@ -203,12 +203,12 @@ def main():
     usdr.setBlocksCount(10)
 
     #start usdr_dm_create utility for TX
-    print "starting (TX)..."
+    print("starting (TX)...")
     p = usdr.start()
     if p:
-        print "started ok"
+        print("started ok")
     else:
-        print "error!"
+        print("error!")
         exit(2)
 
     #wait for 10s and stop
@@ -219,16 +219,16 @@ def main():
         i += 1
 
     if usdr.stop():
-        print "stopped ok"
+        print("stopped ok")
     else:
-        print "not stopped, trying to kill..."
+        print("not stopped, trying to kill...")
         if usdr.stop(force=True):
-            print "killed"
+            print("killed")
         else:
-            print "cannot kill"
+            print("cannot kill")
             exit(22)
 
-    print "Bye bye"
+    print("Bye bye")
 
 
 if __name__ == '__main__': main()

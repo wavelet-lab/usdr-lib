@@ -257,7 +257,8 @@ int _limestr_stream_send(stream_handle_t* str,
                          const char **stream_buffs,
                          unsigned samples,
                          dm_time_t timestamp,
-                         unsigned timeout)
+                         unsigned timeout,
+                         usdr_dms_send_stat_t* stat)
 {
     int res;
     stream_limesdr_t* stream = (stream_limesdr_t*)str;
@@ -272,6 +273,10 @@ int _limestr_stream_send(stream_handle_t* str,
     unsigned wire_buf_off = 0;
 
     unsigned ignoreTimestamp = (((int64_t)timestamp) < 0);
+
+    if (stat) {
+        memset(stat, 0, sizeof(*stat));
+    }
 
     if (stream->burst_count * stream->burst_symbs < samples) {
         USDR_LOG("DSTR", USDR_LOG_ERROR, "Frame is too big, max = %dx%d, requested = %d\n",

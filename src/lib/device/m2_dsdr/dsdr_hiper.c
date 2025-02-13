@@ -57,8 +57,6 @@ enum {
     IGPO_OFF_ADDR = 4,
     IGPO_OFF_YAML = 16,
 
-    IGPO_RX_IQS = 38,
-
     //IGPO_FE_REG_COUNT = 9,
 };
 
@@ -891,7 +889,6 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
         cfg->rx_dsa = 0;
         cfg->tx_band = IFBAND_AUTO;
         cfg->ant_sel = ANT_RX_TRX;
-        cfg->swap_rxiq = 0;
         cfg->rx_freq = 0;
         cfg->rx_nco = 0;
         cfg->tx_freq = 0;
@@ -992,6 +989,18 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
             hiper->ucfg[H_CHC].ant_sel = GET_M2_DSDR_USR_ANT_SEL_C(data);
             hiper->ucfg[H_CHD].ant_sel = GET_M2_DSDR_USR_ANT_SEL_D(data);
             break;
+        case RX_CHEN:
+            hiper->ucfg[H_CHA].rx_en = GET_M2_DSDR_USR_RX_CHEN_A(data);
+            hiper->ucfg[H_CHB].rx_en = GET_M2_DSDR_USR_RX_CHEN_B(data);
+            hiper->ucfg[H_CHC].rx_en = GET_M2_DSDR_USR_RX_CHEN_C(data);
+            hiper->ucfg[H_CHD].rx_en = GET_M2_DSDR_USR_RX_CHEN_D(data);
+            break;
+        case TX_CHEN:
+            hiper->ucfg[H_CHA].tx_en = GET_M2_DSDR_USR_TX_CHEN_A(data);
+            hiper->ucfg[H_CHB].tx_en = GET_M2_DSDR_USR_TX_CHEN_B(data);
+            hiper->ucfg[H_CHC].tx_en = GET_M2_DSDR_USR_TX_CHEN_C(data);
+            hiper->ucfg[H_CHD].tx_en = GET_M2_DSDR_USR_TX_CHEN_D(data);
+            break;
         default:
             return -EINVAL;
         }
@@ -1029,6 +1038,16 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
             hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_ANT_SEL(
                 hiper->ucfg[H_CHD].ant_sel, hiper->ucfg[H_CHC].ant_sel,
                 hiper->ucfg[H_CHB].ant_sel, hiper->ucfg[H_CHA].ant_sel);
+            break;
+        case RX_CHEN:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_RX_CHEN(
+                hiper->ucfg[H_CHD].rx_en, hiper->ucfg[H_CHC].rx_en,
+                hiper->ucfg[H_CHB].rx_en, hiper->ucfg[H_CHA].rx_en);
+            break;
+        case TX_CHEN:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_TX_CHEN(
+                hiper->ucfg[H_CHD].tx_en, hiper->ucfg[H_CHC].tx_en,
+                hiper->ucfg[H_CHB].tx_en, hiper->ucfg[H_CHA].tx_en);
             break;
         default:
             return -EINVAL;
@@ -1164,10 +1183,6 @@ int dsdr_hiper_update_fe_user(dsdr_hiper_fe_t* fe)
     memcpy(old_fe_gpo_regs, fe->fe_gpo_regs, sizeof(old_fe_gpo_regs));
     memcpy(old_fe_ctrl_regs, fe->fe_ctrl_regs, sizeof(old_fe_ctrl_regs));
 
-    // TODO
-    unsigned enabled_rx = 0b1111;
-    unsigned enabled_tx = 0b0001;
-
     unsigned fbanksel_out[HIPER_MAX_HW_CHANS];
     unsigned fbanksel_in[HIPER_MAX_HW_CHANS];
     unsigned lbrxtx[HIPER_MAX_HW_CHANS];
@@ -1179,8 +1194,8 @@ int dsdr_hiper_update_fe_user(dsdr_hiper_fe_t* fe)
     unsigned ifband_rx_h[HIPER_MAX_HW_CHANS];
 
     for (unsigned i = 0; i < HIPER_MAX_HW_CHANS; i++) {
-        unsigned rxen = ((1 << i) & enabled_rx) ? 1 : 0;
-        unsigned txen = ((1 << i) & enabled_tx) ? 1 : 0;
+        unsigned rxen = fe->ucfg[i].rx_en;
+        unsigned txen = fe->ucfg[i].tx_en;
 
         // RX filterbank
         _hiper_fbank_map(fe->ucfg[i].rx_fb_sel, &fbanksel_out[i], &fbanksel_in[i]); // SW_RX_FILTER_OUT_CHA_MUTE1 if not enabled?
@@ -1251,13 +1266,6 @@ int dsdr_hiper_update_fe_user(dsdr_hiper_fe_t* fe)
         }
     }
 
-    // Swap IQ
-    unsigned sw_rxmap = 0;
-    for (unsigned i = 0; i < FE_GPO_REGS; i++) {
-        sw_rxmap |= (fe->ucfg[i].swap_rxiq) << i;
-    }
-    res = res ? res : dev_gpo_set(fe->dev, IGPO_RX_IQS, sw_rxmap);
-
     return res;
 }
 
@@ -1306,7 +1314,7 @@ void dsdr_hiper_fe_rx_band_upd(dsdr_hiper_fe_t* def, unsigned chno)
 }
 
 
-int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno)
+int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxiq)
 {
     int res = 0;
     //bool fLOh = (def->ucfg[chno].rx_freq < 2300e6);
@@ -1322,17 +1330,16 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno)
     res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
 
     def->ucfg[chno].rx_nco = fIF;
-    def->ucfg[chno].swap_rxiq = (fLOh) ? 1 : 0;
+    *p_swap_rxiq = (fLOh) ? 1 : 0;
 
     USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] NCO=%.3f LO=%.3f SWAP_IQ=%d\n", chno,
-             def->ucfg[chno].rx_nco / 1.0e6, fLO / 1.0e6, def->ucfg[chno].swap_rxiq);
-
+             def->ucfg[chno].rx_nco / 1.0e6, fLO / 1.0e6, *p_swap_rxiq);
 
     return res;
 }
 
 
-int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune)
+int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool* p_swap_rxiq)
 {
     if (chno >= HIPER_MAX_HW_CHANS)
         return -EINVAL;
@@ -1341,17 +1348,18 @@ int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq
 
     dsdr_hiper_fe_rx_filterbank_upd(def, chno);
     dsdr_hiper_fe_rx_band_upd(def, chno);
-    dsdr_hiper_fe_rxlo_upd(def, chno);
+    dsdr_hiper_fe_rxlo_upd(def, chno, p_swap_rxiq);
 
     *ncotune = def->ucfg[chno].rx_nco;
     return dsdr_hiper_update_fe_user(def);
 }
 
-int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune)
+int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool *p_swap_txiq)
 {
     if (chno >= HIPER_MAX_HW_CHANS)
         return -EINVAL;
 
+    *p_swap_txiq = false;
     def->ucfg[chno].tx_freq = freq;
     def->ucfg[chno].tx_band = IFBAND_400_3500;
 
@@ -1359,4 +1367,20 @@ int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq
     return dsdr_hiper_update_fe_user(def);
 }
 
+
+int dsdr_hiper_fe_rx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_rx)
+{
+    for (unsigned i = 0; i < HIPER_MAX_HW_CHANS; i++) {
+        def->ucfg[i].rx_en = (ch_fe_mask_rx & (1u << i)) ? 1 : 0;
+    }
+    return dsdr_hiper_update_fe_user(def);
+}
+
+int dsdr_hiper_fe_tx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_tx)
+{
+    for (unsigned i = 0; i < HIPER_MAX_HW_CHANS; i++) {
+        def->ucfg[i].tx_en = (ch_fe_mask_tx & (1u << i)) ? 1 : 0;
+    }
+    return dsdr_hiper_update_fe_user(def);
+}
 

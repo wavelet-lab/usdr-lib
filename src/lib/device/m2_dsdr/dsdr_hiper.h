@@ -42,7 +42,8 @@ struct fe_chan_config {
     uint8_t tx_band;
     uint8_t ant_sel;
 
-    uint8_t swap_rxiq;
+    uint8_t tx_en; // Channel enabled on device side
+    uint8_t rx_en; // Channel enabled on device side
 
     // For auto band & filter selection
     uint64_t rx_freq;
@@ -98,9 +99,10 @@ typedef struct dsdr_hiper_fe dsdr_hiper_fe_t;
 int dsdr_hiper_fe_create(lldev_t dev, unsigned spix_num, dsdr_hiper_fe_t* dfe);
 int dsdr_hiper_fe_destroy(dsdr_hiper_fe_t* dfe);
 
-int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune);
-int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune);
+int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool *p_swap_rxiq);
+int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool* p_swap_txiq);
 
-
+int dsdr_hiper_fe_rx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_rx);
+int dsdr_hiper_fe_tx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_tx);
 
 #endif
