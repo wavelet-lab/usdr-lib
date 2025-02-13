@@ -31,6 +31,7 @@ set(xdsplib_conv_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/trig.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_4ci16_ci16_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_4cf32_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_4cf32_ci16_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sincos_functions.c
 )
 

@@ -53,12 +53,14 @@ static void setup()
     out[2] = out3;
     out[3] = out4;
 
+    srand( time(0) );
+
     //fill
     int16_t n = 0;
     for(unsigned i = 0; i < SPEED_WORD_COUNT; ++i)
     {
-        //int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
-        in[i] = n++;//sign * 32767 * (float)(rand()) / (float)RAND_MAX;
+        int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
+        in[i] = sign * 32767 * (float)(rand()) / (float)RAND_MAX;
     }
 #if 0
     for(unsigned i = 0; i < WORD_COUNT; ++i)

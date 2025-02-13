@@ -19,6 +19,7 @@ set(TEST_SUIT_SRCS
     wvlt_sincos_i16_utest.c
     conv_4ci16_ci16_utest
     conv_ci16_4cf32_utest.c
+    conv_4cf32_ci16_utest.c
 
     ../fft_window_functions.c
     ../fftad_functions.c
@@ -36,6 +37,7 @@ set(TEST_SUIT_SRCS
     ../sincos_functions.c
     ../conv_4ci16_ci16_2.c
     ../conv_ci16_4cf32_2.c
+    ../conv_4cf32_ci16_2.c
     ../vbase.c
 )
 
