@@ -7,9 +7,12 @@ Homepage: https://github.com/wavelet-lab/usdr-lib
 Vcs-Browser: https://github.com/wavelet-lab/usdr-lib
 Vcs-Git: https://github.com/wavelet-lab/usdr-lib.git
 Build-Depends:
-     debhelper,
+     debhelper (>= 12.10),
      dkms,
      build-essential,
+     cmake,
+     python3,
+     python3-yaml,
      dwarves,
      libusb-1.0-0-dev,
      libsoapysdr-dev,

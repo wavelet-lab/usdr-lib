@@ -1,4 +1,5 @@
-FROM ubuntu:22.04
+# Ubuntu Focal Fossa (20.04)
+FROM ubuntu:20.04
 
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -15,8 +16,11 @@ RUN apt-get install dkms dh-make devscripts debhelper -y
 
 RUN sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
 
-RUN mkdir -p /work/work
 RUN mkdir -p /work/build
+RUN mkdir -p /work/source
+RUN mkdir -p /work/output
+ENV PACKAGE_DIR_NAME=ubuntu-focal
+ENV PACKAGE_ARCH_NAME=unknown
 WORKDIR /work/
 
 CMD ["tail", "-f", "/dev/null"]
