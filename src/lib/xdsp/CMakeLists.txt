@@ -36,6 +36,8 @@ set(xdsplib_conv_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/sincos_functions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci12_4cf32_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_4cf32_ci12_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_i12_i16_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_i16_i12_2.c
 )
 
 if(WVLT_ARCH_X86 OR WVLT_ARCH_X86_64)
