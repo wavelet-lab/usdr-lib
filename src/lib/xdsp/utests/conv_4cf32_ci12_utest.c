@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2024 Wavelet Lab
+// Copyright (c) 2025 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
 #include <check.h>
@@ -8,12 +8,12 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_2cf32_ci16_2.h"
+#include "conv_4cf32_ci12_2.h"
 
 #undef DEBUG_PRINT
 
 #define PACKET_SIZE (8192u)
-#define OUT_BZ (PACKET_SIZE * sizeof(int16_t))
+#define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
 
 #define CONV_SCALE (1.0f/32767)
 #define EPS (5E-4)
@@ -24,10 +24,12 @@ static const unsigned packet_lens[3] = { 1111u, 4123u, PACKET_SIZE };
 
 static float* in_0 = NULL;
 static float* in_1 = NULL;
-static float* in[2] = {NULL, NULL};
+static float* in_2 = NULL;
+static float* in_3 = NULL;
+static float* in[4] = {NULL, NULL, NULL, NULL};
 
-static int16_t* out = NULL;
-static int16_t* out_etalon = NULL;
+static uint8_t* out = NULL;
+static uint8_t* out_etalon = NULL;
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
@@ -35,23 +37,29 @@ static generic_opts_t max_opt = OPT_GENERIC;
 static void setup()
 {
     posix_memalign((void**)&in_0,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 2);
-    posix_memalign((void**)&in_1,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 2);
+    posix_memalign((void**)&in_1,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
+    posix_memalign((void**)&in_2,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
+    posix_memalign((void**)&in_3,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
     posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
     posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
 
     in[0] = in_0;
     in[1] = in_1;
+    in[2] = in_2;
+    in[3] = in_3;
 
     //fill
     float *p0 = in_0;
     float *p1 = in_1;
+    float *p2 = in_2;
+    float *p3 = in_3;
 
     for(int i = 0; i < PACKET_SIZE; i += 4)
     {
-        *p0++ = ((float)(i + 0) / PACKET_SIZE) - 0.5;
-        *p0++ = ((float)(i + 1) / PACKET_SIZE) - 0.5;
-        *p1++ = ((float)(i + 2) / PACKET_SIZE) - 0.5;
-        *p1++ = ((float)(i + 3) / PACKET_SIZE) - 0.5;
+        *p0++ =   ((float)(i + 0) / PACKET_SIZE);
+        *p1++ = - ((float)(i + 1) / PACKET_SIZE);
+        *p2++ = - ((float)(i + 2) / PACKET_SIZE);
+        *p3++ =   ((float)(i + 3) / PACKET_SIZE);
     }
 }
 
@@ -59,6 +67,8 @@ static void teardown()
 {
     free(in_0);
     free(in_1);
+    free(in_2);
+    free(in_3);
     free(out);
     free(out_etalon);
 }
@@ -66,7 +76,7 @@ static void teardown()
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
     const char* fn_name = NULL;
-    conv_function_t fn = conv_get_2cf32_ci16_c(o, &fn_name);
+    conv_function_t fn = conv_get_4cf32_ci12_c(o, &fn_name);
 
     //ignore dups
     if(last_fn_name && !strcmp(last_fn_name, fn_name))
@@ -81,25 +91,52 @@ static conv_function_t get_fn(generic_opts_t o, int log)
 
 static int is_equal()
 {
-    for(unsigned i = 0; i < PACKET_SIZE; ++i)
+    int res = 0;
+    int i = OUT_BZ;
+    const uint8_t* buf_got = out;
+    const uint8_t* buf_eta = out_etalon;
+
+    unsigned cnt = 0;
+
+    while(i >= 3)
     {
-        float a = out[i];
-        float b = out_etalon[i];
+        uint8_t v0 = *(buf_got++);
+        uint8_t v1 = *(buf_got++);
+        uint8_t v2 = *(buf_got++);
+
+        float a = (int16_t) (((uint16_t)v0 << 4) | ((uint16_t)v1 << 12));
+        float b = (int16_t) (((uint16_t)v2 << 8) | (v1 & 0xf0));
+
+        uint8_t e0 = *(buf_eta++);
+        uint8_t e1 = *(buf_eta++);
+        uint8_t e2 = *(buf_eta++);
+
+        float c = (int16_t) (((uint16_t)e0 << 4) | ((uint16_t)e1 << 12));
+        float d = (int16_t) (((uint16_t)e2 << 8) | (e1 & 0xf0));
 
         a *= CONV_SCALE;
         b *= CONV_SCALE;
+        c *= CONV_SCALE;
+        d *= CONV_SCALE;
 
-        float delta = fabs(a-b);
-        if(delta > EPS)
+        float d1 = fabs(a - c);
+        float d2 = fabs(b - d);
+
+        if(d1 > EPS || d2 > EPS)
         {
-            fprintf(stderr, "i = %d : out = %d, etalon = %d, delta = %.6f\n", i, out[i], out_etalon[i], delta);
+            printf("[%u] (%.6f) -> etalon: (%.6f) delta: %.6f\n", cnt,     a, c, d1);
+            printf("[%u] (%.6f) -> etalon: (%.6f) delta: %.6f\n", cnt + 1, b, d, d2);
             return 1;
         }
+
+        cnt += 2;
+        i -= 3;
     }
-    return 0;
+
+    return res;
 }
 
-START_TEST(conv_2cf32_ci16_check_simd)
+START_TEST(conv_4cf32_ci12_check_simd)
 {
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
@@ -130,8 +167,8 @@ START_TEST(conv_2cf32_ci16_check_simd)
                 fprintf(stderr, "%.6f ", out[i]);
             }
             fprintf(stderr, "\n");
-#endif
-            //int res = memcmp(out, out_etalon, bzout);
+#endif \
+    //int res = memcmp(out, out_etalon, bzout);
             int res = is_equal();
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
@@ -147,7 +184,7 @@ START_TEST(conv_2cf32_ci16_check_simd)
 END_TEST
 
 
-START_TEST(conv_2cf32_ci16_speed)
+START_TEST(conv_4cf32_ci12_speed)
 {
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
@@ -180,19 +217,19 @@ START_TEST(conv_2cf32_ci16_speed)
 }
 END_TEST
 
-Suite * conv_2cf32_ci16_suite(void)
+Suite * conv_4cf32_ci12_suite(void)
 {
     Suite *s;
     TCase *tc_core;
 
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_2cf32_ci16");
+    s = suite_create("conv_4cf32_ci12");
     tc_core = tcase_create("XDSP");
     tcase_set_timeout(tc_core, 60);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_2cf32_ci16_check_simd);
-    tcase_add_loop_test(tc_core, conv_2cf32_ci16_speed, 0, 3);
+    tcase_add_test(tc_core, conv_4cf32_ci12_check_simd);
+    tcase_add_loop_test(tc_core, conv_4cf32_ci12_speed, 0, 3);
 
     suite_add_tcase(s, tc_core);
     return s;

@@ -8,23 +8,25 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_2cf32_ci16_2.h"
+#include "../conv_4cf32_ci16_2.h"
 
-#undef DEBUG_PRINT
+#define DEBUG_PRINT
 
-#define PACKET_SIZE (8192u)
-#define OUT_BZ (PACKET_SIZE * sizeof(int16_t))
+#define WORD_COUNT (8192u)
+#define OUT_BZ (WORD_COUNT * sizeof(int16_t))
 
 #define CONV_SCALE (1.0f/32767)
 #define EPS (5E-4)
 
-static const unsigned packet_lens[3] = { 1111u, 4123u, PACKET_SIZE };
+static const unsigned packet_lens[3] = { 1111u, 4123u, WORD_COUNT };
 
 #define SPEED_MEASURE_ITERS 1000000
 
 static float* in_0 = NULL;
 static float* in_1 = NULL;
-static float* in[2] = {NULL, NULL};
+static float* in_2 = NULL;
+static float* in_3 = NULL;
+static float* in[4] = {NULL, NULL, NULL, NULL};
 
 static int16_t* out = NULL;
 static int16_t* out_etalon = NULL;
@@ -34,24 +36,36 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in_0,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 2);
-    posix_memalign((void**)&in_1,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 2);
+    posix_memalign((void**)&in_0,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
+    posix_memalign((void**)&in_1,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
+    posix_memalign((void**)&in_2,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
+    posix_memalign((void**)&in_3,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
     posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
     posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
 
     in[0] = in_0;
     in[1] = in_1;
+    in[2] = in_2;
+    in[3] = in_3;
 
     //fill
     float *p0 = in_0;
     float *p1 = in_1;
+    float *p2 = in_2;
+    float *p3 = in_3;
 
-    for(int i = 0; i < PACKET_SIZE; i += 4)
+    srand( time(0) );
+
+    for(int i = 0; i < WORD_COUNT;)
     {
-        *p0++ = ((float)(i + 0) / PACKET_SIZE) - 0.5;
-        *p0++ = ((float)(i + 1) / PACKET_SIZE) - 0.5;
-        *p1++ = ((float)(i + 2) / PACKET_SIZE) - 0.5;
-        *p1++ = ((float)(i + 3) / PACKET_SIZE) - 0.5;
+        *p0++ = ((float)(i++) * CONV_SCALE) * ((float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1);
+        *p0++ = ((float)(i++) * CONV_SCALE) * ((float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1);
+        *p1++ = ((float)(i++) * CONV_SCALE) * ((float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1);
+        *p1++ = ((float)(i++) * CONV_SCALE) * ((float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1);
+        *p2++ = ((float)(i++) * CONV_SCALE) * ((float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1);
+        *p2++ = ((float)(i++) * CONV_SCALE) * ((float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1);
+        *p3++ = ((float)(i++) * CONV_SCALE) * ((float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1);
+        *p3++ = ((float)(i++) * CONV_SCALE) * ((float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1);
     }
 }
 
@@ -59,6 +73,8 @@ static void teardown()
 {
     free(in_0);
     free(in_1);
+    free(in_2);
+    free(in_3);
     free(out);
     free(out_etalon);
 }
@@ -66,7 +82,7 @@ static void teardown()
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
     const char* fn_name = NULL;
-    conv_function_t fn = conv_get_2cf32_ci16_c(o, &fn_name);
+    conv_function_t fn = conv_get_4cf32_ci16_c(o, &fn_name);
 
     //ignore dups
     if(last_fn_name && !strcmp(last_fn_name, fn_name))
@@ -81,7 +97,7 @@ static conv_function_t get_fn(generic_opts_t o, int log)
 
 static int is_equal()
 {
-    for(unsigned i = 0; i < PACKET_SIZE; ++i)
+    for(unsigned i = 0; i < WORD_COUNT; ++i)
     {
         float a = out[i];
         float b = out_etalon[i];
@@ -99,7 +115,7 @@ static int is_equal()
     return 0;
 }
 
-START_TEST(conv_2cf32_ci16_check_simd)
+START_TEST(conv_4cf32_ci16_check_simd)
 {
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
@@ -107,7 +123,7 @@ START_TEST(conv_2cf32_ci16_check_simd)
     void* pout = (void*)out;
     last_fn_name = NULL;
 
-    const size_t bzin  = PACKET_SIZE * sizeof(float);
+    const size_t bzin  = WORD_COUNT * sizeof(float);
     const size_t bzout = OUT_BZ;
 
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
@@ -116,6 +132,22 @@ START_TEST(conv_2cf32_ci16_check_simd)
     (*get_fn(OPT_GENERIC, 0))(pin, bzin, &pout, bzout);
     memcpy(out_etalon, out, bzout);
 
+#if 0
+    for(unsigned i = 0; i < WORD_COUNT; i += 8)
+    {
+        if(i > 32) break;
+
+        for(unsigned k = 0; k < 4; ++k)
+        {
+            fprintf(stderr,"#%d in[%d]: {%.2f, %.2f}\n", i, k, in[k][i / 4] / CONV_SCALE, in[k][i / 4 + 1] / CONV_SCALE);
+        }
+
+        fprintf(stderr,"\tETALON out: {");
+        for(unsigned j = 0; j < 8; ++j) fprintf(stderr,"%d, ", out_etalon[i+j]);
+        fprintf(stderr,"}\n");
+    }
+#endif
+
     while(opt != OPT_GENERIC)
     {
         conv_function_t fn = get_fn(opt--, 1);
@@ -123,21 +155,21 @@ START_TEST(conv_2cf32_ci16_check_simd)
         {
             memset(out, 0, bzout);
             (*fn)(pin, bzin, &pout, bzout);
-#if 0
-            fprintf(stderr, "\n");
-            for(uint16_t i = 0; i < 16; ++i)
-            {
-                fprintf(stderr, "%.6f ", out[i]);
-            }
-            fprintf(stderr, "\n");
-#endif
-            //int res = memcmp(out, out_etalon, bzout);
             int res = is_equal();
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
-            for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)
+            for(unsigned i = 0; res && i < WORD_COUNT; i += 8)
             {
-                fprintf(stderr, "i = %d : in = %d, out = %.6f, etalon = %.6f\n", i, in[i], out[i], out_etalon[i]);
+                if(i > 32) break;
+
+                for(unsigned k = 0; k < 4; ++k)
+                {
+                    fprintf(stderr,"#%d in[%d]: {%.2f, %.2f}\n", i, k, in[k][i / 4] / CONV_SCALE, in[k][i / 4 + 1] / CONV_SCALE);
+                }
+
+                fprintf(stderr,"\tout: {");
+                for(unsigned j = 0; j < 8; ++j) fprintf(stderr,"%d, ", out[i+j]);
+                fprintf(stderr,"}\n");
             }
 #endif
             ck_assert_int_eq( res, 0 );
@@ -147,7 +179,7 @@ START_TEST(conv_2cf32_ci16_check_simd)
 END_TEST
 
 
-START_TEST(conv_2cf32_ci16_speed)
+START_TEST(conv_4cf32_ci16_speed)
 {
     generic_opts_t opt = max_opt;
     conv_function_t fn = NULL;
@@ -156,7 +188,7 @@ START_TEST(conv_2cf32_ci16_speed)
     last_fn_name = NULL;
 
     const size_t bzin  = packet_lens[_i] * sizeof(float);
-    const size_t bzout = OUT_BZ;
+    const size_t bzout = packet_lens[_i] * sizeof(int16_t);
 
     fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
     fprintf(stderr,   "**** packet: %lu bytes, iters: %u ***\n", bzin, SPEED_MEASURE_ITERS);
@@ -180,19 +212,19 @@ START_TEST(conv_2cf32_ci16_speed)
 }
 END_TEST
 
-Suite * conv_2cf32_ci16_suite(void)
+Suite * conv_4cf32_ci16_suite(void)
 {
     Suite *s;
     TCase *tc_core;
 
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_2cf32_ci16");
+    s = suite_create("conv_4cf32_ci16");
     tc_core = tcase_create("XDSP");
     tcase_set_timeout(tc_core, 60);
     tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_2cf32_ci16_check_simd);
-    tcase_add_loop_test(tc_core, conv_2cf32_ci16_speed, 0, 3);
+    tcase_add_test(tc_core, conv_4cf32_ci16_check_simd);
+    tcase_add_loop_test(tc_core, conv_4cf32_ci16_speed, 0, 3);
 
     suite_add_tcase(s, tc_core);
     return s;
