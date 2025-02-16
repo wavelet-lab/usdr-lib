@@ -51,6 +51,8 @@ static void setup()
     int16_t *p2 = in_2;
     int16_t *p3 = in_3;
 
+    srand( time(0) );
+
     for(int i = 0; i < PACKET_SIZE; i += 8)
     {
         int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
