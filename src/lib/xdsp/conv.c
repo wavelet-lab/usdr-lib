@@ -14,6 +14,13 @@
 #include "conv_ci12_2cf32_2.h"
 #include "conv_2cf32_ci12_2.h"
 
+#include "conv_ci16_4ci16_2.h"
+#include "conv_4ci16_ci16_2.h"
+#include "conv_ci16_4cf32_2.h"
+#include "conv_4cf32_ci16_2.h"
+#include "conv_ci12_4cf32_2.h"
+#include "conv_4cf32_ci12_2.h"
+
 #include <strings.h>
 #include <string.h>
 
@@ -102,6 +109,55 @@ transform_info_t get_transform_fn(const char* from,
         return s_tr_none; //TODO!!!! implement transforms for ci16@ci12!
     }
 
+    if(inveccnt == 4 && outveccnt == 1)
+    {
+        if(isCI16(from) && isCI16(to))
+        {
+            transform_info_t l_conv_4ci16_ci16 = { conv_get_4ci16_ci16(), tr_dummy_sz };
+            return l_conv_4ci16_ci16;
+        }
+
+        if(isCF32(from) && isCI16(to))
+        {
+            transform_info_t l_conv_4cf32_ci16 = { conv_get_4cf32_ci16(), tr_conv_f32_i16_sz };
+            return l_conv_4cf32_ci16;
+        }
+
+        if(isCF32(from) && isCI12(to))
+        {
+            transform_info_t l_conv_4cf32_ci12 = { conv_get_4cf32_ci12(), tr_conv_f32_i12_sz };
+            return l_conv_4cf32_ci12;
+        }
+    }
+
+    if(inveccnt == 1 && outveccnt == 4)
+    {
+        if(isI16(from) && isF32(to))
+        {
+            transform_info_t l_conv_i16_4f32 = { conv_get_i16_4f32(), tr_conv_i16_f32_sz };
+            return l_conv_i16_4f32;
+        }
+        //
+        if(isCI16(from) && isCI16(to))
+        {
+            transform_info_t l_conv_ci16_4ci16 = { conv_get_ci16_4ci16(), tr_dummy_sz };
+            return l_conv_ci16_4ci16;
+        }
+
+        if(isCI16(from) && isCF32(to))
+        {
+            transform_info_t l_conv_ci16_4cf32 = { conv_get_ci16_4cf32(), tr_conv_i16_f32_sz };
+            return l_conv_ci16_4cf32;
+        }
+
+        if(isCI12(from) && isCF32(to))
+        {
+            transform_info_t l_conv_ci12_cf32 = { conv_get_ci12_4cf32(), tr_conv_i12_f32_sz };
+            return l_conv_ci12_cf32;
+        }
+    }
+
+
     if (inveccnt == 1 && outveccnt == 2 && isCI16(from) && isCF32(to)) {
         transform_info_t l_conv_ci16_2f32 = { conv_get_ci16_2cf32(), tr_conv_i16_f32_sz };
         return l_conv_ci16_2f32;
@@ -117,11 +173,6 @@ transform_info_t get_transform_fn(const char* from,
         return l_conv_ci16_2ci16;
     }
     
-    if (inveccnt == 1 && outveccnt == 4 && isI16(from) && isF32(to)) {
-        transform_info_t l_conv_i16_4f32 = { conv_get_i16_4f32(), tr_conv_i16_f32_sz };
-        return l_conv_i16_4f32;
-    }
-
     if (inveccnt == 2 && outveccnt == 1 && isCF32(from) && isCI16(to)) {
         transform_info_t l_conv_2cf32_ci16 = { conv_get_2cf32_ci16(), tr_conv_f32_i16_sz };
         return l_conv_2cf32_ci16;
