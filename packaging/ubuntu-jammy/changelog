@@ -1,0 +1,5 @@
+usdr (0.9.9~jammy0) jammy; urgency=low
+
+  * Fixes and improvements
+
+ -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Sun, 30 Jan 2025 00:00:00 +0000

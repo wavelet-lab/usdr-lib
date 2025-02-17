@@ -59,7 +59,7 @@ pages:
         fields:
           - bits: 7
             name: FCAL_OVR
-            desc: FCAL Override: If set to 1, FCAL is bypassed. Clear to 0 to allow FCAL.
+            desc: "FCAL Override: If set to 1, FCAL is bypassed. Clear to 0 to allow FCAL."
           - bits: 1
             name: RESERVED
             desc: Must be 1

@@ -35,8 +35,7 @@ static int afe79xx_rd(afe79xx_state_t* d, uint16_t regno, uint8_t* odata)
 
 int capi79xx_spi_reg_write(libcapi79xx_t* dev, uint16_t addr, uint8_t data)
 {
-    USDR_LOG("79xx", USDR_LOG_WARNING, "AFE_WR[%04x] <= %02x\n", addr, data);
-
+    //USDR_LOG("79xx", USDR_LOG_DEBUG, "AFE_WR[%04x] <= %02x\n", addr, data);
     afe79xx_state_t* d = container_of(dev, afe79xx_state_t, capi);
     return afe79xx_wr(d, addr, data);
 }
@@ -116,26 +115,32 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_
     out->capi.spi_reg_write = &capi79xx_spi_reg_write;
     out->capi.spi_reg_read = &capi79xx_spi_reg_read;
     out->capi.give_sysref_pulse = &capi79xx_give_sysref_pulse;
+    out->capi.log_vout = &usdrlog_vout;
     out->capi.user = NULL;
     out->capi.driver_handle = NULL;
 
     out->dl_handle = dlopen(afe79xxlib, RTLD_NOW);
     if (out->dl_handle == NULL) {
-        USDR_LOG("79xx", USDR_LOG_ERROR, "Couldn't load CAPI AFE79XX NDA LIB `%s`!\n",
-                 afe79xxlib);
+        USDR_LOG("79xx", USDR_LOG_ERROR, "Couldn't load CAPI AFE79XX NDA LIB wrapper `%s`: %s!\n",
+                 afe79xxlib, dlerror());
         return -EFAULT;
     }
 
     out->libcapi79xx_create = (libcapi79xx_create_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_CREATE_FN);
     out->libcapi79xx_destroy = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_DESTROY_FN);
-    out->libcapi79xx_init = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_INIT_FN);
+    out->libcapi79xx_init = (libcapi79xx_init_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_INIT_FN);
 
     out->libcapi79xx_upd_nco = (libcapi79xx_upd_nco_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_UPD_NCO_FN);
     out->libcapi79xx_get_nco = (libcapi79xx_get_nco_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_GET_NCO_FN);
 
+    out->libcapi79xx_set_dsa = (libcapi79xx_set_dsa_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_SET_DSA_FN);
+
+    out->libcapi79xx_check_health = (libcapi79xx_check_health_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_CHECK_HEALTH_FN);
+
     if (!out->libcapi79xx_create || !out->libcapi79xx_destroy || !out->libcapi79xx_init ||
-        !out->libcapi79xx_upd_nco || !out->libcapi79xx_get_nco) {
-        USDR_LOG("79xx", USDR_LOG_ERROR, "Broken CAPI AFE79XX NDA LIB `%s`!\n",
+        !out->libcapi79xx_set_dsa ||
+        !out->libcapi79xx_upd_nco || !out->libcapi79xx_get_nco || !out->libcapi79xx_check_health) {
+        USDR_LOG("79xx", USDR_LOG_ERROR, "Broken CAPI AFE79XX NDA LIB wrapper `%s`!\n",
                  afe79xxlib);
 
         dlclose(out->dl_handle);

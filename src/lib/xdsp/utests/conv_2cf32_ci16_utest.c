@@ -26,8 +26,8 @@ static float* in_0 = NULL;
 static float* in_1 = NULL;
 static float* in[2] = {NULL, NULL};
 
-static uint8_t* out = NULL;
-static uint8_t* out_etalon = NULL;
+static int16_t* out = NULL;
+static int16_t* out_etalon = NULL;
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;

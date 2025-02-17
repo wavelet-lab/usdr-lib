@@ -14,6 +14,15 @@
 #include "conv_ci12_2cf32_2.h"
 #include "conv_2cf32_ci12_2.h"
 
+#include "conv_ci16_4ci16_2.h"
+#include "conv_4ci16_ci16_2.h"
+#include "conv_ci16_4cf32_2.h"
+#include "conv_4cf32_ci16_2.h"
+#include "conv_ci12_4cf32_2.h"
+#include "conv_4cf32_ci12_2.h"
+#include "conv_i12_i16_2.h"
+#include "conv_i16_i12_2.h"
+
 #include <strings.h>
 #include <string.h>
 
@@ -89,6 +98,20 @@ static unsigned tr_conv_f32_i16_sz(unsigned inbytes, bool reverse)
     return tr_conv_i16_f32_sz(inbytes, !reverse);
 }
 
+static unsigned tr_conv_i12_i16_sz(unsigned inbytes, bool reverse)
+{
+    if (reverse)
+        return inbytes * 3 / 4;
+    else
+        return inbytes * 4 / 3;
+}
+
+static unsigned tr_conv_i16_i12_sz(unsigned inbytes, bool reverse)
+{
+    return tr_conv_i12_i16_sz(inbytes, !reverse);
+}
+
+
 static transform_info_t s_tr_none = { NULL, NULL };
 static transform_info_t s_tr_dummy = { tr_dummy, tr_dummy_sz };
 
@@ -97,10 +120,54 @@ transform_info_t get_transform_fn(const char* from,
                                   unsigned inveccnt,
                                   unsigned outveccnt)
 {
-    if((isCI16(to) && isCI12(from)) || (isCI16(from) && isCI12(to)))
+    if(inveccnt == 4 && outveccnt == 1)
     {
-        return s_tr_none; //TODO!!!! implement transforms for ci16@ci12!
+        if(isCI16(from) && isCI16(to))
+        {
+            transform_info_t l_conv_4ci16_ci16 = { conv_get_4ci16_ci16(), tr_dummy_sz };
+            return l_conv_4ci16_ci16;
+        }
+
+        if(isCF32(from) && isCI16(to))
+        {
+            transform_info_t l_conv_4cf32_ci16 = { conv_get_4cf32_ci16(), tr_conv_f32_i16_sz };
+            return l_conv_4cf32_ci16;
+        }
+
+        if(isCF32(from) && isCI12(to))
+        {
+            transform_info_t l_conv_4cf32_ci12 = { conv_get_4cf32_ci12(), tr_conv_f32_i12_sz };
+            return l_conv_4cf32_ci12;
+        }
     }
+
+    if(inveccnt == 1 && outveccnt == 4)
+    {
+        if(isI16(from) && isF32(to))
+        {
+            transform_info_t l_conv_i16_4f32 = { conv_get_i16_4f32(), tr_conv_i16_f32_sz };
+            return l_conv_i16_4f32;
+        }
+        //
+        if(isCI16(from) && isCI16(to))
+        {
+            transform_info_t l_conv_ci16_4ci16 = { conv_get_ci16_4ci16(), tr_dummy_sz };
+            return l_conv_ci16_4ci16;
+        }
+
+        if(isCI16(from) && isCF32(to))
+        {
+            transform_info_t l_conv_ci16_4cf32 = { conv_get_ci16_4cf32(), tr_conv_i16_f32_sz };
+            return l_conv_ci16_4cf32;
+        }
+
+        if(isCI12(from) && isCF32(to))
+        {
+            transform_info_t l_conv_ci12_cf32 = { conv_get_ci12_4cf32(), tr_conv_i12_f32_sz };
+            return l_conv_ci12_cf32;
+        }
+    }
+
 
     if (inveccnt == 1 && outveccnt == 2 && isCI16(from) && isCF32(to)) {
         transform_info_t l_conv_ci16_2f32 = { conv_get_ci16_2cf32(), tr_conv_i16_f32_sz };
@@ -117,11 +184,6 @@ transform_info_t get_transform_fn(const char* from,
         return l_conv_ci16_2ci16;
     }
     
-    if (inveccnt == 1 && outveccnt == 4 && isI16(from) && isF32(to)) {
-        transform_info_t l_conv_i16_4f32 = { conv_get_i16_4f32(), tr_conv_i16_f32_sz };
-        return l_conv_i16_4f32;
-    }
-
     if (inveccnt == 2 && outveccnt == 1 && isCF32(from) && isCI16(to)) {
         transform_info_t l_conv_2cf32_ci16 = { conv_get_2cf32_ci16(), tr_conv_f32_i16_sz };
         return l_conv_2cf32_ci16;
@@ -162,6 +224,18 @@ transform_info_t get_transform_fn(const char* from,
         (isCF32(from) && isCI12(to))) {
         transform_info_t l_conv_f32_i12 = { conv_get_f32_i12(), tr_conv_f32_i12_sz };
         return l_conv_f32_i12;
+    }
+
+    if ((isI16(from) && isI12(to)) ||
+        (isCI16(from) && isCI12(to))) {
+        transform_info_t l_conv_i16_i12 = { conv_get_i16_i12(), tr_conv_i16_i12_sz };
+        return l_conv_i16_i12;
+    }
+
+    if ((isI12(from) && isI16(to)) ||
+        (isCI12(from) && isCI16(to))) {
+        transform_info_t l_conv_i12_i16 = { conv_get_i12_i16(), tr_conv_i12_i16_sz };
+        return l_conv_i12_i16;
     }
 
     return s_tr_dummy;

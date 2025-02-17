@@ -1,113 +1,93 @@
 version: '3'
 
+env:
+  DOCKER_CLI_HINTS: "false"
+  DEBIAN_FRONTEND: "noninteractive"
+vars:
+  NOW:
+    sh: "date +%Y%m%d%H%m%S"
+  LABEL:
+    sh: "echo box-$(basename {{.ROOT_DIR}})"
+  DOCKER_FILE_PREFIX: "docker/Dockerfile.box"
+
 tasks:
 
-  run:
+  _box:
     internal: true
     interactive: true
-    env:
-      DOCKER_CLI_HINTS: "false"
-      DEBIAN_FRONTEND: "noninteractive"
+    requires:
+      vars:
+        - name: OS
+          enum: [ 'ubuntu', 'debian' ]
+        - name: DISTRO_NAME
+          enum: [ 'bookworm', 'bionic', 'focal', 'jammy', 'noble' ]
+        - name: ARCH
+          enum: [ 'amd64', 'aarch64' ]
+        - COMMAND
+    vars:
+      PLATFORM: 'linux/{{.ARCH}}'
+      DOCKER_IMAGE: '{{.LABEL}}-{{.OS}}-{{.DISTRO_NAME}}-{{.ARCH}}'
+      DOCKER_FILE: '{{.DOCKER_FILE_PREFIX}}.{{.OS}}-{{.DISTRO_NAME}}'
+      COMMAND: '{{.COMMAND}}'
+      CONTAINER_NAME: '{{.DOCKER_IMAGE}}-{{.NOW}}'
     cmds:
-      - docker build --platform {{.PLATFORM}} -t {{.DOCKER_IMAGE}} -f {{.DOCKER_FILE}} .
-      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work/source:ro -v $(pwd)/output:/work/output -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml:ro -v ~/.gnupg:/mnt/gnupg:ro {{.DOCKER_IMAGE}}
+      - docker build --platform {{.PLATFORM}} -t {{.DOCKER_IMAGE}} -f {{.DOCKER_FILE}} --label {{.LABEL}}=true .
+      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work/source:ro -v $(pwd)/output:/work/output -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml:ro -v ~/.gnupg:/mnt/gnupg:ro -e PACKAGE_ARCH_NAME={{.ARCH}} --name {{.CONTAINER_NAME}} {{.DOCKER_IMAGE}}
       - silent: true
         cmd: |
-          if ! [ -n "{{.INTERACTIVE}}" ]; then
-            CMD="{{.COMMAND}}"
-          else
-            echo "==> Starting interactive mode!"
-            CMD="/bin/bash"
+          docker exec -ti {{.CONTAINER_NAME}} {{.COMMAND}}
+
+  '*-*-*-deb':
+    desc: Build the debian packages
+    summary: |
+      Use this task to build deb packages for the specified OS and distro.
+      Results will be saved in the ./output directory.
+    cmds:
+      - task: _box
+        vars:
+          OS: '{{index .MATCH 0}}'
+          DISTRO_NAME: '{{index .MATCH 1}}'
+          ARCH: '{{index .MATCH 2}}'
+          COMMAND: 'task deb'
+
+  '*-*-*-int':
+    desc: The build environment in interactive mode
+    summary: |
+      Use this task to start the build environment in interactive mode.
+    cmds:
+      - task: _box
+        vars:
+          OS: '{{index .MATCH 0}}'
+          DISTRO_NAME: '{{index .MATCH 1}}'
+          ARCH: '{{index .MATCH 2}}'
+          COMMAND: '/bin/bash'
+
+  clean:
+    desc: Stops and removes build containers
+    cmds:
+      - silent: true
+        cmd: |
+          containers=$(docker ps -aq -f label={{.LABEL}})
+          
+          if [ -z "$containers" ]; then
+             echo "No containers found!"
+             exit 0
           fi
           
-          docker exec -ti $(docker ps -lq) ${CMD}
+          docker rm -f -v $containers
 
-  ubuntu1804-amd64:
+  clean-all:
+    desc: Removes all all build images
+    deps:
+      - clean
     cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-ubuntu1804-amd64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu1804
-          COMMAND: task deb-ubuntu-bionic
-
-  ubuntu2004-amd64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-ubuntu2004-amd64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2004
-          COMMAND: task deb-ubuntu
-
-  ubuntu2204-amd64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-ubuntu2204-amd64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2204
-          COMMAND: task deb-ubuntu
-
-  ubuntu2404-amd64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-ubuntu2404-amd64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2404
-          COMMAND: task deb-ubuntu
-
-  debian12-amd64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/amd64
-          DOCKER_IMAGE: buildbox-debian12-amd64
-          DOCKER_FILE: docker/Dockerfile.buildbox.debian12
-          COMMAND: task deb-debian-bookworm
-
-  ubuntu1804-aarch64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/arm64
-          DOCKER_IMAGE: buildbox-ubuntu1804-aarch64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu1804
-          COMMAND: task deb-ubuntu-bionic
-
-  ubuntu2004-aarch64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/arm64
-          DOCKER_IMAGE: buildbox-ubuntu2004-aarch64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2004
-          COMMAND: task deb-ubuntu
-
-  ubuntu2204-aarch64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/arm64
-          DOCKER_IMAGE: buildbox-ubuntu2204-aarch64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2204
-          COMMAND: task deb-ubuntu
-
-  ubuntu2404-aarch64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/arm64
-          DOCKER_IMAGE: buildbox-ubuntu2404-aarch64
-          DOCKER_FILE: docker/Dockerfile.buildbox.ubuntu2404
-          COMMAND: task deb-ubuntu
-
-  debian12-aarch64:
-    cmds:
-      - task: run
-        vars:
-          PLATFORM: linux/arm64
-          DOCKER_IMAGE: buildbox-debian12-aarch64
-          DOCKER_FILE: docker/Dockerfile.buildbox.debian12
-          COMMAND: task deb-debian-bookworm
+      - silent: true
+        cmd: |
+          images=$(docker image ls -aq -f label={{.LABEL}})
+          
+          if [ -z "$images" ]; then
+             echo "No images found!"
+             exit 0
+          fi
+          
+          docker image rm -f $images

@@ -3,7 +3,6 @@
 
 #ifndef USDR_PORT_H
 #define USDR_PORT_H
-
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -11,6 +10,9 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <endian.h>
+#include <string.h>
+#include <inttypes.h>
+
 
 #define PORT_THREAD __thread
 
@@ -18,8 +20,10 @@
 
 #ifdef __GNUC__
 #  define UNUSED __attribute__((__unused__))
+#  define CHECK_CONSTANT_EQ(a, b) _Static_assert((unsigned)(a) == (unsigned)(b), "Broken ABI")
 #else
 #  define UNUSED
+#  define CHECK_CONSTANT_EQ(a, b)
 #endif
 
 #ifndef container_of
@@ -28,5 +32,6 @@
         (type *)( (char *)__mptr - offsetof(type,member) );})
 #endif
 
+#define SAFE_STRCPY(dst, src) ({strncpy((dst), (src), sizeof(dst) - 1); dst[SIZEOF_ARRAY(dst) - 1] = 0; })
 
 #endif

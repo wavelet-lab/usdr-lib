@@ -10,43 +10,9 @@
 
 #ifdef __SSSE3__
 
+#include "templates/wvlt_sincos_i16_ssse3.inc"
+
 VWLT_ATTRIBUTE(optimize("O3", "inline"), target("ssse3"))
-static void fsincos_ssse3(__m128i* pph, __m128i* psin, __m128i *pcos)
-{
-    __m128i ph = _mm_loadu_si128((__m128i*)pph);
-    __m128i ph2 = _mm_mulhrs_epi16(ph, ph);
-    __m128i phx1 = _mm_mulhrs_epi16(ph, _mm_set1_epi16(18705));
-    __m128i phx3_c = _mm_mulhrs_epi16(ph, _mm_set1_epi16(-21166));
-    __m128i phx5_c = _mm_mulhrs_epi16(ph, _mm_set1_epi16(2611));
-    __m128i phx7_c = _mm_mulhrs_epi16(ph, _mm_set1_epi16(-152));
-    __m128i ph4 = _mm_mulhrs_epi16(ph2, ph2);
-    __m128i phx3 = _mm_mulhrs_epi16(ph2, phx3_c);
-    __m128i phy2 = _mm_mulhrs_epi16(ph2, _mm_set1_epi16(-7656));
-    __m128i phs0 = _mm_add_epi16(ph, phx1);
-    __m128i phc0 = _mm_sub_epi16(_mm_set1_epi16(32767), ph2);
-    __m128i phs1 = _mm_add_epi16(phs0, phx3);
-    __m128i phc1 = _mm_add_epi16(phc0, phy2);
-    __m128i ph6 = _mm_mulhrs_epi16(ph4, ph2);
-    __m128i phx5 = _mm_mulhrs_epi16(ph4, phx5_c);
-    __m128i phy48 = _mm_mulhrs_epi16(ph4, _mm_set1_epi16(30));
-    __m128i phy4 = _mm_mulhrs_epi16(ph4, _mm_set1_epi16(8311));
-    // dummy
-    __m128i phy6 = _mm_mulhrs_epi16(ph6, _mm_set1_epi16(-683));
-    __m128i phx7 = _mm_mulhrs_epi16(ph6, phx7_c);
-    __m128i phy8 = _mm_mulhrs_epi16(ph4, phy48);
-    __m128i phs2 = _mm_add_epi16(phs1, phx5);
-    __m128i phc2 = _mm_add_epi16(phc1, phy4);
-    // dummy
-    // dummy
-    __m128i phs3 = _mm_add_epi16(phs2, phx7);
-    __m128i phc3 = _mm_add_epi16(phc2, phy6);
-    __m128i phc4 = _mm_add_epi16(phc3, phy8);
-
-    _mm_storeu_si128((__m128i*)psin, phs3);
-    _mm_storeu_si128((__m128i*)pcos, phc4);
-}
-
- VWLT_ATTRIBUTE(optimize("O3", "inline"), target("ssse3"))
 static void calc_vco_iq_ssse3(int32_t phase, int32_t delta, __m128i* psin, __m128i *pcos)
 {
     __m128i dp  = _mm_set1_epi32(delta);
@@ -89,7 +55,7 @@ static void calc_vco_iq_ssse3(int32_t phase, int32_t delta, __m128i* psin, __m12
     __m128i vphase = _mm_or_si128(vp, vn);
 
     __m128i pc;
-    fsincos_ssse3(&vphase, (__m128i*)psin, &pc);
+    WVLT_SINCOS(vphase, *psin, pc);
 
     __m128i pcn = _mm_sub_epi16(_mm_setzero_si128(), pc); // cos negative
     __m128i pcpm = _mm_and_si128(phx, pc);

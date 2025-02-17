@@ -735,6 +735,7 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
                           double *actualfreq)
 {
     if (actualfreq) *actualfreq = freq;
+    bool first_rx = d->tx_lo == 0;
     if (dir_tx) {
         d->tx_lo = freq;
     } else {
@@ -750,10 +751,29 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
     }
     d->rfic_rx_lo = freq;
 
-    USDR_LOG("XDEV", USDR_LOG_INFO, "%s: FE_FREQ orig=%u RFIC=%u\n",
+    USDR_LOG("UDEV", USDR_LOG_INFO, "%s: FE_FREQ orig=%u RFIC=%u\n",
              lowlevel_get_devname(d->base.dev), d->rx_lo, d->rfic_rx_lo);
 
-    return lms6002d_tune_pll(&d->lms, dir_tx, freq);
+    // Fixup for error when TX PLL doesn't work when RX isn't running
+    int res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
+    if (res == -ENOLCK && !dir_tx && first_rx) {
+        // LDO may not be ready, check again
+        usleep(100);
+        res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
+    }
+    if (res == -ENOLCK && dir_tx && d->rx_lo == 0) {
+        res = lms6002d_tune_pll(&d->lms, 0, freq);
+        if (res)
+            return res;
+
+        res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
+    }
+    if (res == -ENOLCK) {
+        USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: %s_LO=%u unable to lock!\n",
+                 lowlevel_get_devname(d->base.dev), dir_tx ? "TX" : "RX",
+                 dir_tx ? d->tx_lo : d->rx_lo);
+    }
+    return res;
 }
 
 

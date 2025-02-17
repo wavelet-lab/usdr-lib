@@ -1,7 +1,7 @@
 # Copyright (c) 2023-2024 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
-set(WVLT_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
+set(WVLT_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR} CACHE STRING "Arch being built for")
 
 if(${WVLT_ARCH} STREQUAL "x86")
     add_definitions(-DWVLT_ARCH_X86)

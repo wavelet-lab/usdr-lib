@@ -11,5 +11,4 @@ tasks:
   clean:
     desc: Clean the build environment
     cmds:
-      - rm -rf /work/build
-      - rm -rf /work/output/*
+      - rm -rf ./build

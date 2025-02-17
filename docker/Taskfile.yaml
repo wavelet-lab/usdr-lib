@@ -1,54 +1,56 @@
 version: '3'
 
+vars:
+  PACKAGE_DIR_NAME:
+    sh: "echo $PACKAGE_DIR_NAME"
+  PACKAGE_ARCH_NAME:
+    sh: "echo $PACKAGE_ARCH_NAME"
+  OUTPUT_DIR_NAME:
+    sh: "echo $PACKAGE_DIR_NAME-$PACKAGE_ARCH_NAME"
+
 tasks:
 
   clean:
     desc: Clean the build environment
+    preconditions:
+      - sh: test -n "{{.PACKAGE_DIR_NAME}}"
+        msg: "PACKAGE_DIR_NAME env var is not set"
+      - sh: test -n "{{.PACKAGE_ARCH_NAME}}"
+        msg: "PACKAGE_ARCH_NAME env var is not set"
+      - sh: test -d "/work/source/packaging/{{.PACKAGE_DIR_NAME}}"
+        msg: "Package `{{.PACKAGE_DIR_NAME}}` directory not found"
     cmds:
       - rm -rf /work/build
-      - rm -rf /work/output/*
+      - rm -rf /work/output/{{.OUTPUT_DIR_NAME}}
       - mkdir -p /work/build
+      - mkdir -p /work/output/{{.OUTPUT_DIR_NAME}}
 
-  deb:
-    desc: Build the debian packages
-    internal: true
-    deps:
-      - clean
-    dir: /work/build/source
-    cmds:
-      - cp -ra /work/source /work/build/
-      - ln -s packaging/{{.FOLDER}} debian
-      - debuild -us -uc -eDH_VERBOSE=1
-      - cp -ra /work/build/*.deb /work/output/
-
-  deb-ubuntu:
-    desc: Build the debian packages for Ubuntu
-    cmds:
-      - task: deb
-        vars:
-          FOLDER: ubuntu
-
-  deb-ubuntu-bionic:
-    desc: Build the debian packages for Ubuntu Bionic(18.04)
-    cmds:
-      - task: deb
-        vars:
-          FOLDER: ubuntu-bionic
-
-  deb-debian-bookworm:
-    desc: Build the debian packages for Debian Bookworm(12)
-    cmds:
-      - task: deb
-        vars:
-          FOLDER: debian-bookworm
-
-  ppa:
-    desc: Upload the debian package to the ppa
+  prepare:
+    desc: Prepare the build environment
     deps:
       - clean
     preconditions:
+      - test -d /work/source
+    dir: /work/build/source
+    cmds:
+      - cp -ra /work/source /work/build/
+      - ln -s packaging/{{.PACKAGE_DIR_NAME}} debian
+
+  deb:
+    desc: Build the debian packages
+    deps:
+      - prepare
+    dir: /work/build/source
+    cmds:
+      - debuild -us -uc -eDH_VERBOSE=1
+      - cp -ra /work/build/*.deb /work/output/{{.OUTPUT_DIR_NAME}}/
+
+  ppa:
+    desc: Upload the package to the launchpad/ppa
+    deps:
+      - prepare
+    preconditions:
       - test -d /mnt/gnupg
-      - test -d debian/
     dir: /work/build/source
     cmds:
       - rm -rf /root/.gnupg
