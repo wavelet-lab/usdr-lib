@@ -26,10 +26,10 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         uint64x2_t f2 = vreinterpretq_u64_f32(vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_low_s16(res1))), CONV_SCALE)); \
         uint64x2_t f3 = vreinterpretq_u64_f32(vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_high_s16(res1))), CONV_SCALE)); \
         \
-        vst1q_u64((uint64_t*)(outdata_0 + 0), vcombine_u64(vget_low_u64(f0), vget_low_u64(f1)); \
-        vst1q_u64((uint64_t*)(outdata_0 + 4), vcombine_u64(vget_low_u64(f2), vget_low_u64(f3)); \
-        vst1q_u64((uint64_t*)(outdata_1 + 0), vcombine_u64(vget_high_u64(f0), vget_high_u64(f1)); \
-        vst1q_u64((uint64_t*)(outdata_1 + 4), vcombine_u64(vget_high_u64(f2), vget_high_u64(f3)); \
+        vst1q_u64((uint64_t*)(outdata_0 + 0), vcombine_u64(vget_low_u64(f0), vget_low_u64(f1))); \
+        vst1q_u64((uint64_t*)(outdata_0 + 4), vcombine_u64(vget_low_u64(f2), vget_low_u64(f3))); \
+        vst1q_u64((uint64_t*)(outdata_1 + 0), vcombine_u64(vget_high_u64(f0), vget_high_u64(f1))); \
+        vst1q_u64((uint64_t*)(outdata_1 + 4), vcombine_u64(vget_high_u64(f2), vget_high_u64(f3))); \
         \
         outdata_0 += 8; \
         outdata_1 += 8; \
