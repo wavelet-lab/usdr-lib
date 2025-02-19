@@ -25,10 +25,10 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
         indata_0 += 8; \
         indata_1 += 8; \
     \
-        int32x4_t n0 = vreinterpretq_s32_u64(vcombine_u64(vget_low_u64(u0), vget_low_u64(u2)); \
-        int32x4_t n1 = vreinterpretq_s32_u64(vcombine_u64(vget_high_u64(u0), vget_high_u64(u2)); \
-        int32x4_t n2 = vreinterpretq_s32_u64(vcombine_u64(vget_low_u64(u1), vget_low_u64(u1)); \
-        int32x4_t n3 = vreinterpretq_s32_u64(vcombine_u64(vget_high_u64(u3), vget_high_u64(u3)); \
+        int32x4_t n0 = vreinterpretq_s32_u64(vcombine_u64(vget_low_u64(u0), vget_low_u64(u2))); \
+        int32x4_t n1 = vreinterpretq_s32_u64(vcombine_u64(vget_high_u64(u0), vget_high_u64(u2))); \
+        int32x4_t n2 = vreinterpretq_s32_u64(vcombine_u64(vget_low_u64(u1), vget_low_u64(u1))); \
+        int32x4_t n3 = vreinterpretq_s32_u64(vcombine_u64(vget_high_u64(u3), vget_high_u64(u3))); \
     \
         int16x8_t i0 = vcombine_s16(vqmovn_s32(n0), vqmovn_s32(n1)); \
         int16x8_t i1 = vcombine_s16(vqmovn_s32(n2), vqmovn_s32(n3)); \
