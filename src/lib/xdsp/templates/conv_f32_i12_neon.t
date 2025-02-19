@@ -48,7 +48,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 *
 */
 
-#define CONVERT_F32_I12_BLOCK(res0, res1) \
+#define CONVERT_F32_I12_BLOCK(rlow, rmid, rhigh) \
     { \
         int32x4_t n0 = vcvtq_s32_f32(vmulq_n_f32(vld1q_f32(indata +  0), scale)); \
         int32x4_t n1 = vcvtq_s32_f32(vmulq_n_f32(vld1q_f32(indata +  4), scale)); \
@@ -61,31 +61,40 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     \
         uint64x2_t s0_1 = vshlq_n_u64(vandq_u64(s0, maske), 4); \
         uint64x2_t s0_2 = vandq_u64(s0, masko); \
-                   res0 = vreinterpretq_u8_u64(vorrq_u64(s0_1, s0_2)); \
+        uint8x16_t res0 = vreinterpretq_u8_u64(vorrq_u64(s0_1, s0_2)); \
     \
         uint64x2_t s1_1 = vshlq_n_u64(vandq_u64(s1, maske), 4); \
         uint64x2_t s1_2 = vandq_u64(s1, masko); \
-                   res1 = vreinterpretq_u8_u64(vorrq_u64(s1_1, s1_2)); \
+        uint8x16_t res1 = vreinterpretq_u8_u64(vorrq_u64(s1_1, s1_2)); \
     \
         res0 = vqtbl1q_u8(res0, lk0); \
         res1 = vqtbl1q_u8(res1, lk1); \
+    \
+        rlow  = vget_low_u8(res0); \
+        rmid  = vorr_u8(vget_high_u8(res0), vget_low_u8(res1)); \
+        rhigh = vget_high_u8(res1); \
     }
 // CONVERT_F32_I12_BLOCK end
 
-    uint8x16_t i0, i1, i2, i3;
+    uint8x8_t lo0, hi0, lo1, hi1, lo2, hi2;
 
-    for (; i >= 128; i -= 128)
+    if(i >= 128)
     {
-        CONVERT_F32_I12_BLOCK(i0, i1);
-        CONVERT_F32_I12_BLOCK(i2, i3);
+        CONVERT_F32_I12_BLOCK(lo0, hi0, lo1);
+        CONVERT_F32_I12_BLOCK(hi1, lo2, hi2);
 
-        uint8x8_t lo0 = vget_low_u8(i0);
-        uint8x8_t hi0 = vorr_u8(vget_high_u8(i0), vget_low_u8(i1));
-        uint8x8_t lo1 = vget_high_u8(i1);
+        for(; i >= 2*128; i -= 128)
+        {
+            vst1q_u8(outdata +  0, vcombine_u8(lo0, hi0));
+            vst1q_u8(outdata + 16, vcombine_u8(lo1, hi1));
+            vst1q_u8(outdata + 32, vcombine_u8(lo2, hi2));
+            outdata += 48;
 
-        uint8x8_t hi1 = vget_low_u8(i2);
-        uint8x8_t lo2 = vorr_u8(vget_high_u8(i2), vget_low_u8(i3));
-        uint8x8_t hi2 = vget_high_u8(i3);
+            CONVERT_F32_I12_BLOCK(lo0, hi0, lo1);
+            CONVERT_F32_I12_BLOCK(hi1, lo2, hi2);
+        }
+
+        i -= 128;
 
         vst1q_u8(outdata +  0, vcombine_u8(lo0, hi0));
         vst1q_u8(outdata + 16, vcombine_u8(lo1, hi1));
