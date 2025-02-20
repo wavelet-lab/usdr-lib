@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_4cf32_ci12_2.h"
 
-#define DEBUG_PRINT
+//#define DEBUG_PRINT
 
 #define PACKET_SIZE (8192u)
 #define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
