@@ -47,7 +47,7 @@ static void setup()
     for(unsigned i = 0; i < SPEED_WORD_COUNT; ++i)
     {
         int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
-        in[i] = sign * 100u * (float)(rand()) / (float)RAND_MAX;
+        in[i] = sign * 32767 * (float)(rand()) / (float)RAND_MAX;
     }
 #if 0
     for(unsigned i = 0; i < WORD_COUNT; ++i)

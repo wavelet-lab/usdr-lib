@@ -58,8 +58,8 @@ int main(int argc, char** argv)
     srunner_add_suite(sr, conv_i12_i16_suite());
 
 #else
-    sr = srunner_create(conv_4cf32_ci16_suite());
-    //srunner_add_suite(sr, conv_ci12_2cf32_suite());
+    sr = srunner_create(conv_ci16_2ci16_suite());
+    srunner_add_suite(sr, conv_2ci16_ci16_suite());
     //srunner_add_suite(sr, conv_f32_i12_suite());
     //srunner_add_suite(sr, conv_2cf32_ci12_suite());
 #endif
