@@ -8,9 +8,9 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_f32_i16_2.h"
+#include "conv_f32_i16_2.h"
 
-#undef DEBUG_PRINT
+//#define DEBUG_PRINT
 
 #define STREAM_SIZE (8192 + 16 + 8 + 7)
 #define STREAM_SIZE_CHECK STREAM_SIZE
@@ -36,9 +36,12 @@ static void setup()
     posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
     posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
 
+    srand( time(0) );
+
     for(unsigned i = 0; i < STREAM_SIZE_SPEED; ++i)
     {
-        in[i] = ((float)i / STREAM_SIZE_SPEED) - 0.5;
+        float sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? 1.0 : -1.0;
+        in[i] = sign * (float)(rand()) / (float)RAND_MAX;
     }
 }
 
@@ -85,6 +88,16 @@ static conv_function_t get_fn(generic_opts_t o, int log)
     return fn;
 }
 
+static void printer(const char* header)
+{
+    fprintf(stderr, "%s\n", header ? header : "");
+    fprintf(stderr, "in:  ");
+    for(unsigned i = 0; i < 16; ++i) fprintf(stderr, "%.4f ", in[i]);
+    fprintf(stderr, "\nout: ");
+    for(unsigned i = 0; i < 16; ++i) fprintf(stderr, "%.4f ", (float)out[i] / 32767);
+    fprintf(stderr, "\n");
+}
+
 START_TEST(conv_f32_i16_check)
 {
     generic_opts_t opt = max_opt;
@@ -100,6 +113,7 @@ START_TEST(conv_f32_i16_check)
 
     //get etalon output data (generic foo)
     (*get_fn(OPT_GENERIC, 0))(&pin, bzin, &pout, bzout);
+    printer("ETALON:");
     memcpy(out_etalon, out, bzout);
 
     while(opt != OPT_GENERIC)
@@ -109,6 +123,9 @@ START_TEST(conv_f32_i16_check)
         {
             memset(out, 0, bzout);
             (*fn)(&pin, bzin, &pout, bzout);
+#ifdef DEBUG_PRINT
+            printer(NULL);
+#endif
             int res = is_equal();
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
 #ifdef DEBUG_PRINT
