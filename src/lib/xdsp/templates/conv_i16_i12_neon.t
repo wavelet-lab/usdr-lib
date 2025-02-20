@@ -17,7 +17,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     { \
         int16x8_t i0 = vld1q_s16(indata + 0); \
         int16x8_t i1 = vld1q_s16(indata + 8); \
-        indata += 16;
+        indata += 16; \
         CONVERT_I16_I12_BLOCK(i0, i1, rlow, rmid, rhigh); \
     }
 // CONVERT_I16_I12_BLOCK2 end
