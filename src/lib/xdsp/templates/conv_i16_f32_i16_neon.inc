@@ -4,5 +4,5 @@
 { \
     int32x4_t n0 = vcvtq_s32_f32(vmulq_n_f32((f0), scale)); \
     int32x4_t n1 = vcvtq_s32_f32(vmulq_n_f32((f1), scale)); \
-    vst1q_s16((ptr_out), vcombine_s16(vqmovn_s32(n0), vqmovn_s32(n1)); \
+    vst1q_s16((ptr_out), vcombine_s16(vqmovn_s32(n0), vqmovn_s32(n1))); \
 }

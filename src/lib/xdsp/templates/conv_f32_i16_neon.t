@@ -10,6 +10,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 
     const float* indata = (const float*)indata_p;
     int16_t* outdata = (int16_t*)outdata_p;
+    const float scale = 1.0f / CONV_SCALE;
 
 #include "conv_i16_f32_i16_neon.inc"
 
