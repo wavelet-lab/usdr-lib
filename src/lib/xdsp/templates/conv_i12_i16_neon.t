@@ -18,29 +18,31 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     {   \
         int16x8_t res0, res1; \
         CONVERT_I12_I16_BLOCK(reg0, reg1, res0, res1); \
-        vst1q_s16(out + 0, res0); \
-        vst1q_s16(out + 8, res1); \
+        vst1q_s16(outdata + 0, res0); \
+        vst1q_s16(outdata + 8, res1); \
         \
-        out += 16; \
+        outdata += 16; \
     }
 // CONVERT_I12_i16_BLOCK2 end
 
+    uint8x16_t y0, y1, y2;
+
     if(i >= 48)
     {
-        y0 = vld1q_u8(in +  0);
-        y1 = vld1q_u8(in + 16);
-        y2 = vld1q_u8(in + 32);
-        in += 48;
+        y0 = vld1q_u8(indata +  0);
+        y1 = vld1q_u8(indata + 16);
+        y2 = vld1q_u8(indata + 32);
+        indata += 48;
 
         for(; i >= 2*48; i -= 48)
         {
             CONVERT_I12_i16_BLOCK2(y0, vcombine_u8(vget_high_u8(y0), vget_low_u8(y1)));
             CONVERT_I12_i16_BLOCK2(vcombine_u8(vget_high_u8(y1), vget_low_u8(y2)), y2);
 
-            y0 = vld1q_u8(in +  0);
-            y1 = vld1q_u8(in + 16);
-            y2 = vld1q_u8(in + 32);
-            in += 48;
+            y0 = vld1q_u8(indata +  0);
+            y1 = vld1q_u8(indata + 16);
+            y2 = vld1q_u8(indata + 32);
+            indata += 48;
         }
 
         i -= 48;
