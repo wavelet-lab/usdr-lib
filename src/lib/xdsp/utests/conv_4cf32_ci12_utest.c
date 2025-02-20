@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_4cf32_ci12_2.h"
 
-#undef DEBUG_PRINT
+#define DEBUG_PRINT
 
 #define PACKET_SIZE (8192u)
 #define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
@@ -54,12 +54,14 @@ static void setup()
     float *p2 = in_2;
     float *p3 = in_3;
 
+    srand( time(0) );
+
     for(int i = 0; i < PACKET_SIZE; i += 4)
     {
-        *p0++ =   ((float)(i + 0) / PACKET_SIZE);
-        *p1++ = - ((float)(i + 1) / PACKET_SIZE);
-        *p2++ = - ((float)(i + 2) / PACKET_SIZE);
-        *p3++ =   ((float)(i + 3) / PACKET_SIZE);
+        *p0++ =   (float)(rand()) / (float)RAND_MAX;
+        *p1++ = - (float)(rand()) / (float)RAND_MAX;
+        *p2++ = - (float)(rand()) / (float)RAND_MAX;
+        *p3++ =   (float)(rand()) / (float)RAND_MAX;
     }
 }
 
@@ -136,6 +138,38 @@ static int is_equal()
     return res;
 }
 
+static void printer(const char* header)
+{
+    fprintf(stderr, "%s\n", header ? header : "");
+
+    for(unsigned k = 0; k < 4; ++k)
+    {
+        fprintf(stderr, "in[%d]: ", k);
+        for(unsigned i = 0; i < 4; ++i)
+        {
+            fprintf(stderr, "%.4f ", in[k][i]);
+        }
+        fprintf(stderr, "\n");
+    }
+
+    fprintf(stderr, "out  : ");
+    for(unsigned i = 0; i < 24; i += 3)
+    {
+        uint8_t v0 = out[i + 0];
+        uint8_t v1 = out[i + 1];
+        uint8_t v2 = out[i + 2];
+
+        float a = (int16_t) (((uint16_t)v0 << 4) | ((uint16_t)v1 << 12));
+        float b = (int16_t) (((uint16_t)v2 << 8) | (v1 & 0xf0));
+
+        a *= CONV_SCALE;
+        b *= CONV_SCALE;
+
+        fprintf(stderr, "%.4f %.4f ", a, b);
+    }
+    fprintf(stderr, "\n");
+}
+
 START_TEST(conv_4cf32_ci12_check_simd)
 {
     generic_opts_t opt = max_opt;
@@ -151,6 +185,7 @@ START_TEST(conv_4cf32_ci12_check_simd)
 
     //get etalon output data (generic foo)
     (*get_fn(OPT_GENERIC, 0))(pin, bzin, &pout, bzout);
+    printer("ETALON:");
     memcpy(out_etalon, out, bzout);
 
     while(opt != OPT_GENERIC)
@@ -160,23 +195,12 @@ START_TEST(conv_4cf32_ci12_check_simd)
         {
             memset(out, 0, bzout);
             (*fn)(pin, bzin, &pout, bzout);
-#if 0
-            fprintf(stderr, "\n");
-            for(uint16_t i = 0; i < 16; ++i)
-            {
-                fprintf(stderr, "%.6f ", out[i]);
-            }
-            fprintf(stderr, "\n");
+#ifdef DEBUG_PRINT
+            printer(NULL);
 #endif \
     //int res = memcmp(out, out_etalon, bzout);
             int res = is_equal();
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
-#ifdef DEBUG_PRINT
-            for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)
-            {
-                fprintf(stderr, "i = %d : in = %d, out = %.6f, etalon = %.6f\n", i, in[i], out[i], out_etalon[i]);
-            }
-#endif
             ck_assert_int_eq( res, 0 );
         }
     }
