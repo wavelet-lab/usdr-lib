@@ -1,5 +1,5 @@
 static
-void TEMPLATE_FUNC_NAME(const void *__restrict indata,
+void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
                         unsigned indatabsz,
                         void *__restrict outdata_0_p,
                         void *__restrict outdata_1_p,
@@ -9,21 +9,23 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
     if ((outdatabsz) < i)
         i = (outdatabsz);
 
-    const uint64_t *ld = (const uint64_t *)indata;
+    const int16_t *indata = (const int16_t *)indata_p;
     int16_t* outdata_0 = (int16_t*)outdata_0_p;
     int16_t* outdata_1 = (int16_t*)outdata_1_p;
 
     while(i >= 32)
     {
-        uint32x4x2_t reg = vld2q_u32(indata);
-        vst1q_u32(outdata_0, reg.val[0]);
-        vst1q_u32(outdata_1, reg.val[1]);
+        uint32x4x2_t reg = vld2q_u32((uint32_t*)indata);
+        vst1q_u32((uint32_t*)outdata_0, reg.val[0]);
+        vst1q_u32((uint32_t*)outdata_1, reg.val[1]);
 
         i -= 32;
-        outdata_0 += 4;
-        outdata_1 += 4;
-        indata += 8;
+        outdata_0 += 8;
+        outdata_1 += 8;
+        indata += 16;
     }
+
+    const uint64_t *ld = (const uint64_t *)indata;
 
     for (; i >= 8; i -= 8) {
         uint64_t v = *(ld++);
