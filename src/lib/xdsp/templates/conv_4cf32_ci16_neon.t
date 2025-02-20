@@ -15,7 +15,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
     const float* indata_1 = (const float*)indata_1_p;
     const float* indata_2 = (const float*)indata_2_p;
     const float* indata_3 = (const float*)indata_3_p;
-    uint64_t* outdata = (uint64_t*)outdata_p;
+    int16_t* out = (int16_t*)outdata_p;
     const float scale = 1.0f / CONV_SCALE;
 
 #include "conv_i16_f32_i16_neon.inc"
@@ -32,14 +32,16 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
         float32x4_t icf2 = vreinterpretq_f32_u64(vcombine_u64(vget_high_u64(cf0), vget_high_u64(cf1)));
         float32x4_t icf3 = vreinterpretq_f32_u64(vcombine_u64(vget_high_u64(cf2), vget_high_u64(cf3)));
 
-        CONV_F32_I16(icf0, icf1, outdata + 0);
-        CONV_F32_I16(icf2, icf3, outdata + 8);
+        CONV_F32_I16(icf0, icf1, out + 0);
+        CONV_F32_I16(icf2, icf3, out + 8);
         indata_0 += 4;
         indata_1 += 4;
         indata_2 += 4;
         indata_3 += 4;
-        outdata += 16;
+        out += 16;
     }
+
+    uint64_t* outdata = (uint64_t*)out;
 
     for (; i >= 32; i -= 32)
     {
