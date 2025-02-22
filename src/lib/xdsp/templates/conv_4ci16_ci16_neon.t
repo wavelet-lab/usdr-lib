@@ -18,12 +18,10 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
 
     uint64_t* outdata = (uint64_t*)outdata_p;
 
-    uint32x4x4_t reg;
-
     while(i >= 64)
     {
         vst4q_u32((uint32_t*)outdata,
-            (uint32x4x4_t){ vld1q_u32(indata_0), vld1q_u32(indata_1), vld1q_u32(indata_2), vld1q_u32(indata_3) });
+            (uint32x4x4_t){ {vld1q_u32(indata_0), vld1q_u32(indata_1), vld1q_u32(indata_2), vld1q_u32(indata_3)} });
 
         i -= 64;
         indata_0 += 4;

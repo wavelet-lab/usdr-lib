@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_ci12_4cf32_2.h"
 
-#undef DEBUG_PRINT
+//#define DEBUG_PRINT
 
 #define WORD_COUNT (32u)
 #define IN_STREAM_SIZE_BZ (WORD_COUNT * 12u / 8u)

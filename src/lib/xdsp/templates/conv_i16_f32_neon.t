@@ -11,24 +11,15 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
     const int16_t *in = (const int16_t *)indata;
     float* out = (float*)p_outdata;
 
-    float32x4_t vf[4];
+
+#include "conv_i16_f32_i16_neon.inc"
 
     while(i >= 32)
     {
-        vf[0] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in)) );
-        vf[1] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in + 4)) );
-        vf[2] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in + 8)) );
-        vf[3] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in + 12)) );
-
-        vf[0] = vmulq_n_f32(vf[0], CONV_SCALE);
-        vf[1] = vmulq_n_f32(vf[1], CONV_SCALE);
-        vf[2] = vmulq_n_f32(vf[2], CONV_SCALE);
-        vf[3] = vmulq_n_f32(vf[3], CONV_SCALE);
-
-        vst1q_f32(out, vf[0]);
-        vst1q_f32(out + 4,  vf[1]);
-        vst1q_f32(out + 8,  vf[2]);
-        vst1q_f32(out + 12, vf[3]);
+        vst1q_f32(out +  0, CONV_I16_F32(in +  0));
+        vst1q_f32(out +  4, CONV_I16_F32(in +  4));
+        vst1q_f32(out +  8, CONV_I16_F32(in +  8));
+        vst1q_f32(out + 12, CONV_I16_F32(in + 12));
 
         out += 16;
         in += 16;
@@ -37,14 +28,8 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
 
     while(i >= 16)
     {
-        vf[0] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in)) );
-        vf[1] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in + 4)) );
-
-        vf[0] = vmulq_n_f32(vf[0], CONV_SCALE);
-        vf[1] = vmulq_n_f32(vf[1], CONV_SCALE);
-
-        vst1q_f32(out, vf[0]);
-        vst1q_f32(out + 4, vf[1]);
+        vst1q_f32(out +  0, CONV_I16_F32(in +  0));
+        vst1q_f32(out +  4, CONV_I16_F32(in +  4));
 
         out += 8;
         in += 8;
@@ -53,9 +38,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
 
     while(i >= 8)
     {
-        vf[0] = vcvtq_f32_s32( vmovl_s16(vld1_s16(in)) );
-        vf[0] = vmulq_n_f32(vf[0], CONV_SCALE);
-        vst1q_f32(out, vf[0]);
+        vst1q_f32(out +  0, CONV_I16_F32(in +  0));
 
         out += 4;
         in += 4;

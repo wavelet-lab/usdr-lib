@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_i16_f32_2.h"
+#include "conv_i16_f32_2.h"
 
 #undef DEBUG_PRINT
 
@@ -33,10 +33,12 @@ static void setup()
     posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
     posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
 
+    srand( time(0) );
+
     for(unsigned i = 0; i < STREAM_SIZE_SPEED; ++i)
     {
         int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
-        in[i] = sign * 100u * (float)(rand()) / (float)RAND_MAX;
+        in[i] = sign * 32767 * (float)(rand()) / (float)RAND_MAX;
     }
 }
 
