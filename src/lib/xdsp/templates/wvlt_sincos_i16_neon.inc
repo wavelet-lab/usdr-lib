@@ -1,5 +1,5 @@
 const int16x8_t max_s16 = vdupq_n_s16(32767);
-const int16x8_t min_s16 = vdupq_n_s16(-32768);
+//const int16x8_t min_s16 = vdupq_n_s16(-32768);
 
 #define WVLT_SINCOS(rph, rs, rc) \
     { \
