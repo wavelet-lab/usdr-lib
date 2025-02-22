@@ -47,10 +47,10 @@ static void setup()
 
     for(int i = 0; i < PACKET_SIZE; i += 4)
     {
-        *p0++ = ((uint16_t)( 32767.f * (rand()) / (float)RAND_MAX) & 0xfff0);
-        *p0++ = ((uint16_t)(-32767.f * (rand()) / (float)RAND_MAX) & 0xfff0);
-        *p1++ = ((uint16_t)(-32767.f * (rand()) / (float)RAND_MAX) & 0xfff0);
-        *p1++ = ((uint16_t)( 32767.f * (rand()) / (float)RAND_MAX) & 0xfff0);
+        *p0++ = ((int16_t)( 32767.f * (rand()) / (float)RAND_MAX) & 0xfff0);
+        *p0++ = ((int16_t)(-32767.f * (rand()) / (float)RAND_MAX) & 0xfff0);
+        *p1++ = ((int16_t)(-32767.f * (rand()) / (float)RAND_MAX) & 0xfff0);
+        *p1++ = ((int16_t)( 32767.f * (rand()) / (float)RAND_MAX) & 0xfff0);
     }
 }
 
