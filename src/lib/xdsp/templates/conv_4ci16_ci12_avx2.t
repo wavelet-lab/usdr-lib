@@ -18,28 +18,9 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
 
     uint64_t *out64 = (uint64_t*)outdata_p;
 
-    const __m256i maske = _mm256_set1_epi64x(0x0000fff00000fff0);
-    const __m256i masko = _mm256_set1_epi64x(0xfff00000fff00000);
-
-    const __m256i shfl = _mm256_set_epi8(
-        0x80, 0x80, 0x80, 0x80, 0x0f, 0x0e, 0x0d, 0x0b,
-        0x0a, 0x09, 0x07, 0x06, 0x05, 0x03, 0x02, 0x01,
-        0x80, 0x80, 0x80, 0x80, 0x0f, 0x0e, 0x0d, 0x0b,
-        0x0a, 0x09, 0x07, 0x06, 0x05, 0x03, 0x02, 0x01);
-
-    const __m256i permmask0 = _mm256_set_epi32(7,3,6,5,4,2,1,0);
     const __m256i permmask1 = _mm256_set_epi32(7,3,5,1,6,2,4,0);
-    const __m256i storemask = _mm256_set_epi64x(0, -1, -1, -1);
 
-#define CONVERT_I16_I12_BLOCK(reg, res) \
-    { \
-        __m256i ro0 = _mm256_and_si256(reg, masko); \
-        __m256i re0 = _mm256_slli_epi64(_mm256_and_si256(reg, maske), 4); \
-        __m256i r0  = _mm256_or_si256(ro0, re0); \
-    \
-        res  = _mm256_shuffle_epi8(r0, shfl); \
-        res  = _mm256_permutevar8x32_epi32(res, permmask0); \
-    }
+#include "conv_i16_i12_avx2.inc"
 
     while (i >= 32*4)
     {
@@ -65,17 +46,10 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
 
         /* Convert linear data to CI12 */
 
-        __m256i res0, res1, res2, res3;
-        CONVERT_I16_I12_BLOCK(i0, res0);
-        CONVERT_I16_I12_BLOCK(i1, res1);
-        CONVERT_I16_I12_BLOCK(i2, res2);
-        CONVERT_I16_I12_BLOCK(i3, res3);
-
-        _mm256_maskstore_epi64((long long*)(out64 + 0), storemask, res0); \
-        _mm256_maskstore_epi64((long long*)(out64 + 3), storemask, res1); \
-        _mm256_maskstore_epi64((long long*)(out64 + 6), storemask, res2); \
-        _mm256_maskstore_epi64((long long*)(out64 + 9), storemask, res3); \
-        out64 += 12; \
+        CONVERT_I16_I12_BLOCK(i0, out64);
+        CONVERT_I16_I12_BLOCK(i1, out64);
+        CONVERT_I16_I12_BLOCK(i2, out64);
+        CONVERT_I16_I12_BLOCK(i3, out64);
 
         indata_0 += 16;
         indata_1 += 16;

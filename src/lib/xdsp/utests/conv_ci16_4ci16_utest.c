@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_ci16_4ci16_2.h"
 
-//#define DEBUG_PRINT
+#define DEBUG_PRINT
 
 #define CHECK_WORD_COUNT (4096u + 77u)
 #define CHECK_SIZE_BZ (CHECK_WORD_COUNT * sizeof(int16_t))
@@ -94,8 +94,6 @@ static conv_function_t get_fn(generic_opts_t o, int log)
     last_fn_name = fn_name;
     return fn;
 }
-
-#define CONV_SCALE (1.0f/32767)
 
 
 static void print_data(const char* header)
