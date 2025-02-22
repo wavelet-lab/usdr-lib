@@ -19,6 +19,13 @@ VWLT_ATTRIBUTE(optimize("-O3", "inline"), target("ssse3"))
 DECLARE_TR_FUNC_1_2(wvlt_sincos_i16_ssse3)
 #endif
 
+#ifdef WVLT_NEON
+#define TEMPLATE_FUNC_NAME wvlt_sincos_i16_neon
+VWLT_ATTRIBUTE(optimize("-O3", "inline"))
+#include "templates/wvlt_sincos_i16_neon.t"
+DECLARE_TR_FUNC_1_2(wvlt_sincos_i16_neon)
+#endif
+
 conv_function_t get_wvlt_sincos_i16_c(generic_opts_t cpu_cap, const char** sfunc)
 {
     const char* fname;
@@ -27,6 +34,7 @@ conv_function_t get_wvlt_sincos_i16_c(generic_opts_t cpu_cap, const char** sfunc
     SELECT_GENERIC_FN(fn, fname, tr_wvlt_sincos_i16_generic, cpu_cap);
     SELECT_SSSE3_FN(fn, fname, tr_wvlt_sincos_i16_ssse3, cpu_cap);
     //SELECT_AVX2_FN(fn, fname, tr_wvlt_sincos_i16_avx2, cpu_cap);
+    SELECT_NEON_FN(fn, fname, tr_wvlt_sincos_i16_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
     return fn;
