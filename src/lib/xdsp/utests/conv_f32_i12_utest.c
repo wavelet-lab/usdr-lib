@@ -191,7 +191,7 @@ START_TEST(conv_f32_i12_speed)
     last_fn_name = NULL;
 
     const size_t bzin  = packet_lens[_i] * sizeof(float);
-    const size_t bzout = OUT_BZ;
+    const size_t bzout = bzin * 3 / 8;
 
     fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
     fprintf(stderr,   "**** packet: %lu bytes, iters: %u ***\n", bzin, SPEED_MEASURE_ITERS);
