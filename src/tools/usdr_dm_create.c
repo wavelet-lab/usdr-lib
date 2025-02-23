@@ -236,11 +236,6 @@ void* freq_gen_thread_ci16_lut(void* obj)
 
 #define USE_WVLT_SINCOS
 
-//we have no NEON implementation for wvlt_sincos_i16() yet
-#if !defined (WVLT_ARCH_X86_64) && !defined (WVLT_ARCH_X86)
-#undef USE_WVLT_SINCOS
-#endif
-
 /*
  *   Thread function - Sine generator to TX stream (ci16)
  */
