@@ -30,6 +30,8 @@ struct vfs_filter_obj {
 };
 typedef struct vfs_filter_obj vfs_filter_obj_t;
 
+struct usdr_channel_info;
+typedef struct usdr_channel_info usdr_channel_info_t;
 
 struct device {
     lldev_t dev;              ///< Underlying lowlevel device
@@ -41,8 +43,8 @@ struct device {
 
     // Highlevel stream operations
     int (*create_stream)(device_t* dev, const char* sid, const char* dformat,
-                         uint64_t channels, unsigned pktsyms,
-                         unsigned flags, stream_handle_t** out_handle);
+                         const usdr_channel_info_t* channels, unsigned pktsyms,
+                         unsigned flags, const char* parameters, stream_handle_t** out_handle);
     int (*unregister_stream)(device_t* dev, stream_handle_t* stream);
 
 

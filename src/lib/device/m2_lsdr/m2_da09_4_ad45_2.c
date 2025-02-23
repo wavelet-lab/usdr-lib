@@ -1099,14 +1099,38 @@ int usdr_device_m2_d09_4_ad45_2_initialize(pdevice_t udev, unsigned pcount, cons
     return 0;
 }
 
+// 2 & 3 are disable now, so ignore them
+static const channel_map_info_t s_lsdr_chmap[] = {
+    { "0a", 0 },
+    { "0b", 1 },
+    // { "1a", 2 },
+    // { "1b", 3 },
+    { "a", 0 },
+    { "b", 1 },
+    // { "c", 2 },
+    // { "d", 3 },
+    { NULL, CH_NULL },
+};
+
+int lsdr_map_channels(const usdr_channel_info_t* channels, channel_info_t* core_chans)
+{
+    return usdr_channel_info_map_default(channels, s_lsdr_chmap, 2, core_chans);
+}
+
 static
 int usdr_device_m2_d09_4_ad45_2_create_stream(device_t* dev, const char* sid, const char* dformat,
-                                              uint64_t channels, unsigned pktsyms,
-                                              unsigned flags, stream_handle_t** out_handle)
+                                                     const usdr_channel_info_t* channels, unsigned pktsyms,
+                                                     unsigned flags, const char* parameters, stream_handle_t** out_handle)
 {
     struct dev_m2_d09_4_ad45_2 *d = (struct dev_m2_d09_4_ad45_2 *)dev;
     int res = -EINVAL;
     unsigned hwchs;
+    channel_info_t lchans;
+
+    res = lsdr_map_channels(channels, &lchans);
+    if (res) {
+        return res;
+    }
 
     if (strstr(sid, "rx") != NULL) {
         if (d->rx) {
@@ -1114,7 +1138,7 @@ int usdr_device_m2_d09_4_ad45_2_create_stream(device_t* dev, const char* sid, co
         }
 
         struct sfetrx4_config rxcfg;
-        res = parse_sfetrx4(dformat, channels, pktsyms, &rxcfg);
+        res = parse_sfetrx4(dformat, &lchans, pktsyms, channels->count, &rxcfg);
         if (res) {
             USDR_LOG("UDEV", USDR_LOG_ERROR, "Unable to parse RX stream configuration!\n");
             return res;
@@ -1128,7 +1152,7 @@ int usdr_device_m2_d09_4_ad45_2_create_stream(device_t* dev, const char* sid, co
         res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_RST, 0x0);
 
 
-        res = (res) ? res : create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels, pktsyms,
+        res = (res) ? res : create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
                                     flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
         if (res) {

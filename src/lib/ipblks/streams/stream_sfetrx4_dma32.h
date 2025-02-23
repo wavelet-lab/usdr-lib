@@ -10,6 +10,9 @@
 enum {
     CORE_SFERX_DMA32_R0 = 0,
     CORE_SFETX_DMA32_R0 = 1,
+
+
+    CORE_EXFERX_DMA32_R0 = 256,
 };
 
 enum {
@@ -31,13 +34,14 @@ struct sfetrx4_config
     char dfmt[256];
 };
 
-int parse_sfetrx4(const char* dformat, logical_ch_msk_t channels, unsigned pktsyms,
+int parse_sfetrx4(const char* dformat, const channel_info_t* channels, unsigned pktsyms, unsigned int chcnt,
                   struct sfetrx4_config *out);
 
 int create_sfetrx4_stream(device_t* device,
                           unsigned core_id,
                           const char* dformat,
-                          logical_ch_msk_t channels,
+                          unsigned int chcount,
+                          channel_info_t *channels,
                           unsigned pktsyms,
                           unsigned flags,
                           unsigned sx_base,
@@ -51,5 +55,7 @@ int create_sfetrx4_stream(device_t* device,
 int sfetrx4_stream_sync(device_t* device,
                         stream_handle_t** pstream, unsigned scount,
                         const char* synctype);
+
+
 
 #endif

@@ -19,7 +19,8 @@ int sfe_tx4_check_format(const struct stream_config* psc)
     if (!bfmt.complex)
         return -EINVAL;
 
-    return (psc->chmsk == 0x3 || psc->chmsk == 0x1) ? 0 : -EINVAL;
+    return ((psc->chcnt == 1 && psc->channels.ch_map[0] == 0) ||
+            (psc->chcnt == 2 && psc->channels.ch_map[0] == 0 && psc->channels.ch_map[1] == 1)) ? 0 : -EINVAL;
 }
 
 int sfe_tx4_mtu_get(const struct stream_config* sc)

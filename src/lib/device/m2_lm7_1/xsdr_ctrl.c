@@ -1263,9 +1263,10 @@ int xsdr_rfe_pwrdc_get(xsdr_dev_t *d, int *meas1000db)
 
 int xsdrcal_set_nco_offset(void* param, int channel, int32_t freqoffset)
 {
-    xsdr_dev_t *d = (xsdr_dev_t *)param;
+    //xsdr_dev_t *d = (xsdr_dev_t *)param;
     //d->rxdsp_freq_offset = freqoffset;
-    return sfe_rf4_nco_freq(d->base.lmsstate.dev, 0, CSR_RFE4_BASE, freqoffset);
+    //return sfe_rf4_nco_freq(d->base.lmsstate.dev, 0, CSR_RFE4_BASE, freqoffset);
+    return -EINVAL;
 }
 
 int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int* func)
@@ -1288,7 +1289,8 @@ int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int*
     }
 
     for (unsigned k = 0; k < aidx; k++) {
-        res = sfe_rf4_nco_enable(d->base.lmsstate.dev, 0, CSR_RFE4_BASE, func ? true : false, idx);
+        //res = sfe_rf4_nco_enable(d->base.lmsstate.dev, 0, CSR_RFE4_BASE, func ? true : false, idx);
+        res = -EINVAL;
         if (res)
             return res;
 

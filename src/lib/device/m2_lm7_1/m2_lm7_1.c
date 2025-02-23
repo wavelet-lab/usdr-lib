@@ -542,24 +542,24 @@ int dev_m2_lm7_1_debug_lms8001_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
 int dev_m2_lm7_1_rfe_throttle_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    bool enable = (value & (1 << 16)) ? true : false;
-    uint8_t en = value >> 8;
-    uint8_t skip = value;
-
-    return sfe_rx4_throttle(d->base.dev, 0, CSR_RFE4_BASE, enable, en, skip);
+    if (d->rx) {
+        return d->rx->ops->option_set(d->rx, "throttle", value);
+    }
+    return -EINVAL;
 }
 
 
 int dev_m2_lm7_1_rfe_nco_enable_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    return sfe_rf4_nco_enable(d->base.dev, 0, CSR_RFE4_BASE, (value & 0xff) ? true : false,
-                              value >> 32);
+    //struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    //return sfe_rf4_nco_enable(d->base.dev, 0, CSR_RFE4_BASE, (value & 0xff) ? true : false, value >> 32);
+    return -EINVAL;
 }
 int dev_m2_lm7_1_rfe_nco_enable_frequency(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    return sfe_rf4_nco_freq(d->base.dev, 0, CSR_RFE4_BASE, (int)value);
+    //struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    //return sfe_rf4_nco_freq(d->base.dev, 0, CSR_RFE4_BASE, (int)value);
+    return -EINVAL;
 }
 int dev_m2_lm7_1_rfe_nco_pwrdc_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value)
 {
@@ -1060,14 +1060,36 @@ int dev_m2_lm7_1_revision_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalu
     return res;
 }
 
+static const channel_map_info_t s_xsdr_chmap[] = {
+    { "ai", 0 },
+    { "aq", 1 },
+    { "bi", 2 },
+    { "bq", 3 },
+    { "a", 0 },
+    { "b", 1 },
+    { NULL, CH_NULL },
+};
+
+int xsdr_map_channels(const usdr_channel_info_t* channels, channel_info_t* core_chans)
+{
+    return usdr_channel_info_map_default(channels, s_xsdr_chmap, 4, core_chans);
+}
+
 static
 int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const char* dformat,
-                                           uint64_t channels, unsigned pktsyms,
-                                           unsigned flags, stream_handle_t** out_handle)
+                                              const usdr_channel_info_t* channels, unsigned pktsyms,
+                                              unsigned flags, const char* parameters, stream_handle_t** out_handle)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)dev;
     int res = -EINVAL;
     unsigned hwchs;
+    channel_info_t lchans;
+
+    res = xsdr_map_channels(channels, &lchans);
+    if (res) {
+        return res;
+    }
+
 
     if (strstr(sid, "rx") != NULL) {
         if (d->rx) {
@@ -1075,7 +1097,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         }
 
         struct sfetrx4_config rxcfg;
-        res = parse_sfetrx4(dformat, channels, pktsyms, &rxcfg);
+        res = parse_sfetrx4(dformat, &lchans, pktsyms, channels->count, &rxcfg);
         if (res) {
             USDR_LOG("UDEV", USDR_LOG_ERROR, "Unable to parse RX stream configuration!\n");
             return res;
@@ -1101,7 +1123,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
             }
         }
 
-        res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels, pktsyms,
+        res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
                                     flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
         if (res) {
@@ -1114,7 +1136,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         }
 
         struct sfetrx4_config txcfg;
-        res = parse_sfetrx4(dformat, channels, pktsyms, &txcfg);
+        res = parse_sfetrx4(dformat, &lchans, pktsyms, channels->count, &txcfg);
         if (res) {
             USDR_LOG("UDEV", USDR_LOG_ERROR, "Unable to parse TX stream configuration!\n");
             return res;
@@ -1131,7 +1153,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
             flags |= DMS_FLAG_BIFURCATION;
         }
 
-        res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels, pktsyms,
+        res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
                                     flags, M2PCI_REG_WR_TXDMA_CNF_L, VIRT_CFG_SFX_BASE + 512,
                                     0, 0, &d->tx, &hwchs);
         if (res) {

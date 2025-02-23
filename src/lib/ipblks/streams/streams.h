@@ -39,12 +39,37 @@ struct sample_format {
 /// in the structure
 #define SFMT_UNS "uns"
 
+#define MAX_CHANNELS 64
+
+#define CHANNEL_NULL 255
+
+enum channel_map {
+    CH_NULL = 255,
+    CH_ANY = 254,
+
+    CH_SWAP_IQ_FLAG = 128,
+};
+
+struct channel_info {
+    uint8_t ch_map[MAX_CHANNELS]; // map to physical channels
+};
+typedef struct channel_info channel_info_t;
+
+struct channel_map_info {
+    const char* name;
+    unsigned hwidx;
+};
+typedef struct channel_map_info channel_map_info_t;
+
+int channel_info_remap(unsigned count, const char** names, const channel_map_info_t* table, channel_info_t* out);
 
 struct stream_config {
-    const char* sfmt;    //Samples format
-    unsigned spburst;    //Samples per burst
-    unsigned burstspblk; //Bursts per block; 0 -- auto
-    unsigned chmsk;      //Channel mask
+    const char* sfmt;         // Samples format
+    unsigned spburst;         // Samples per burst
+    unsigned burstspblk;      // Bursts per block; 0 -- auto
+    unsigned chcnt;           // Number of logical channel
+
+    channel_info_t channels;  // Channel routing
 };
 
 struct fifo_config {

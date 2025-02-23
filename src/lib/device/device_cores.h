@@ -65,6 +65,8 @@ enum usdr_stream_cores {
 enum usdr_fe_cores {
     USDR_FC_BRSTN = 0,
     USDR_TFE_BRSTN = 1,
+
+    USDR_EXFC_BRSTN = 16,
 };
 
 #define USDR_MAKE_COREID(family, coreid) \

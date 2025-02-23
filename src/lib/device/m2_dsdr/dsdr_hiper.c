@@ -1302,22 +1302,21 @@ void dsdr_hiper_fe_rx_filterbank_upd(dsdr_hiper_fe_t* def, unsigned chno)
     USDR_LOG("HIPR", USDR_LOG_WARNING, "RXFBabk[%d] = %d\n", chno, def->ucfg[chno].rx_fb_sel);
 }
 
-void dsdr_hiper_fe_rx_band_upd(dsdr_hiper_fe_t* def, unsigned chno)
+void dsdr_hiper_fe_rx_band_upd(dsdr_hiper_fe_t* def, unsigned chno, bool flo_h)
 {
     if (def->ucfg[chno].rx_band < BAND_OPTS_BAND_AUTO_L)
         return;
 
-    //def->ucfg[chno].rx_band = (def->ucfg[chno].rx_freq > 3e9) ? BAND_OPTS_BAND_AUTO_H : BAND_OPTS_BAND_AUTO_L;
-
-    def->ucfg[chno].rx_band = (def->ucfg[chno].rx_freq > 2.0e9) ? BAND_OPTS_BAND_AUTO_H : BAND_OPTS_BAND_AUTO_L;
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "RXFand[%d] = %d\n", chno, def->ucfg[chno].rx_band);
+    def->ucfg[chno].rx_band = (flo_h) ? BAND_OPTS_BAND_AUTO_H : BAND_OPTS_BAND_AUTO_L;
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "RXBand[%d] switched to %c (%d)\n", chno,
+             def->ucfg[chno].rx_band == BAND_OPTS_BAND_AUTO_H ? 'H' : 'L',
+             def->ucfg[chno].rx_band);
 }
 
-
-int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxiq)
+int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxiq, bool* flo_h)
 {
     int res = 0;
-    //bool fLOh = (def->ucfg[chno].rx_freq < 2300e6);
+
     bool fLOh = (def->ucfg[chno].rx_freq < 3300e6);
 
     uint64_t fIF = 2075e6;
@@ -1331,9 +1330,10 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxi
 
     def->ucfg[chno].rx_nco = fIF;
     *p_swap_rxiq = (fLOh) ? 1 : 0;
+    *flo_h = fLOh;
 
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] NCO=%.3f LO=%.3f SWAP_IQ=%d\n", chno,
-             def->ucfg[chno].rx_nco / 1.0e6, fLO / 1.0e6, *p_swap_rxiq);
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] NCO=%.3f LO_%c=%.3f SWAP_IQ=%d\n", chno,
+             def->ucfg[chno].rx_nco / 1.0e6, fLOh ? 'H' : 'L', fLO / 1.0e6, *p_swap_rxiq);
 
     return res;
 }
@@ -1341,14 +1341,20 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxi
 
 int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool* p_swap_rxiq)
 {
+    bool floh = false;
+    int res;
+
     if (chno >= HIPER_MAX_HW_CHANS)
         return -EINVAL;
 
     def->ucfg[chno].rx_freq = freq;
 
     dsdr_hiper_fe_rx_filterbank_upd(def, chno);
-    dsdr_hiper_fe_rx_band_upd(def, chno);
-    dsdr_hiper_fe_rxlo_upd(def, chno, p_swap_rxiq);
+    res = dsdr_hiper_fe_rxlo_upd(def, chno, p_swap_rxiq, &floh);
+    if (res)
+        return res;
+
+    dsdr_hiper_fe_rx_band_upd(def, chno, floh);
 
     *ncotune = def->ucfg[chno].rx_nco;
     return dsdr_hiper_update_fe_user(def);

@@ -44,4 +44,9 @@ struct stream_handle {
 typedef struct stream_handle stream_handle_t;
 
 
+int usdr_channel_info_map_default(const usdr_channel_info_t* channels, const channel_map_info_t* map, unsigned int max_chnum, channel_info_t* core_chans);
+
+int usdr_channel_info_string_parse(char* chanlist, unsigned max_chans, usdr_channel_info_t* cinfo);
+
+
 #endif
