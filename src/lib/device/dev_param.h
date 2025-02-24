@@ -12,6 +12,12 @@ struct opt_param_u32 {
 };
 typedef struct opt_param_u32 opt_u32_t;
 
+struct opt_param_u64 {
+    uint64_t value;
+    bool set;
+};
+typedef struct opt_param_u64 opt_u64_t;
+
 #define BIT(x) (1u << (x))
 
 static inline void opt_u32_set_null(opt_u32_t* p)
@@ -21,6 +27,18 @@ static inline void opt_u32_set_null(opt_u32_t* p)
 }
 
 static inline void opt_u32_set_val(opt_u32_t* p, unsigned val)
+{
+    p->set = true;
+    p->value = val;
+}
+
+static inline void opt_u64_set_null(opt_u64_t* p)
+{
+    p->set = false;
+    p->value = 0;
+}
+
+static inline void opt_u64_set_val(opt_u64_t* p, unsigned val)
 {
     p->set = true;
     p->value = val;

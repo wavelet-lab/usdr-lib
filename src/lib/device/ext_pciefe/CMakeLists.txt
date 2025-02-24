@@ -9,6 +9,7 @@ set(HW_FILES pciefe pciefe_cmd)
 foreach(I ${HW_FILES})
     message(STATUS "Generating header for ${I}")
     GENERATE_YAML_H(${CMAKE_CURRENT_SOURCE_DIR}/${I}.yaml ${CMAKE_CURRENT_BINARY_DIR}/def_${I}.h)
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${I}.yaml DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/usdr/schema/)
 
     list(APPEND USDR_DEPEND_TARGETS generate_${I})
 endforeach()

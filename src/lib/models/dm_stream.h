@@ -39,6 +39,15 @@ struct usdr_dms_stat {
     uint64_t spurios_op;
 };
 
+struct usdr_channel_info {
+    unsigned count;
+    unsigned flags;
+
+    const char** phys_names;
+    unsigned* phys_nums;
+};
+typedef struct usdr_channel_info usdr_channel_info_t;
+
 // Bit mask of logical channels in use in the stream
 typedef uint64_t logical_ch_msk_t;
 
@@ -64,6 +73,16 @@ int usdr_dms_create_ex(pdm_dev_t device,
                        unsigned flags,
                        pusdr_dms_t* outu);
 
+
+int usdr_dms_create_ex2(pdm_dev_t device,
+                        const char* sobj,
+                        const char* dformat,
+                        const usdr_channel_info_t* channels,
+                        unsigned pktsyms,
+                        unsigned flags,
+                        const char* parameters,
+                        pusdr_dms_t* outu);
+
 struct usdr_dms_frame_nfo {
     dm_time_t time;
     unsigned samples;
@@ -79,6 +98,18 @@ struct usdr_dms_recv_nfo {
 };
 typedef struct usdr_dms_recv_nfo usdr_dms_recv_nfo_t;
 
+struct usdr_dms_send_stat {
+    dm_time_t lhwtime;
+    dm_time_t opkttime;
+    unsigned ktime;
+    unsigned underruns;
+
+    uint8_t fifo_used; // 0 -- EMPTY; 255 -- FULL
+    uint8_t reserved[3];
+
+};
+typedef struct usdr_dms_send_stat usdr_dms_send_stat_t;
+
 //
 int usdr_dms_recv(pusdr_dms_t stream,
                   void **stream_buffs,
@@ -90,6 +121,13 @@ int usdr_dms_send(pusdr_dms_t stream,
                   unsigned samples,
                   dm_time_t timestamp,
                   unsigned timeout);
+
+int usdr_dms_send_stat(pusdr_dms_t stream,
+                       const void **stream_buffs,
+                       unsigned samples,
+                       dm_time_t timestamp,
+                       unsigned timeout,
+                       usdr_dms_send_stat_t* stat);
 
 int usdr_dms_destroy(pusdr_dms_t stream);
 

@@ -1,6 +1,0 @@
-src/lib/lowlevel/pcie_uram/driver/*.c usr/src/usdr-dkms-#MODULE_VERSION#/
-src/lib/lowlevel/pcie_uram/pcie_uram_driver_if.h usr/src/usdr-dkms-#MODULE_VERSION#/
-src/lib/ipblks/si2c.h usr/src/usdr-dkms-#MODULE_VERSION#/
-src/lib/device/device_cores.h usr/src/usdr-dkms-#MODULE_VERSION#/
-src/lib/lowlevel/pcie_uram/driver/Makefile usr/src/usdr-dkms-#MODULE_VERSION#/
-src/lib/lowlevel/pcie_uram/driver/helpers/50-usdr-pcie-driver.rules /etc/udev/rules.d/

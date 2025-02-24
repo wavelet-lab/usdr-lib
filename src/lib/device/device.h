@@ -30,6 +30,8 @@ struct vfs_filter_obj {
 };
 typedef struct vfs_filter_obj vfs_filter_obj_t;
 
+struct usdr_channel_info;
+typedef struct usdr_channel_info usdr_channel_info_t;
 
 struct device {
     lldev_t dev;              ///< Underlying lowlevel device
@@ -41,8 +43,8 @@ struct device {
 
     // Highlevel stream operations
     int (*create_stream)(device_t* dev, const char* sid, const char* dformat,
-                         uint64_t channels, unsigned pktsyms,
-                         unsigned flags, stream_handle_t** out_handle);
+                         const usdr_channel_info_t* channels, unsigned pktsyms,
+                         unsigned flags, const char* parameters, stream_handle_t** out_handle);
     int (*unregister_stream)(device_t* dev, stream_handle_t* stream);
 
 
@@ -87,6 +89,17 @@ int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objec
 
 int usdr_device_vfs_obj_val_get_u64(pdevice_t dev, const char* fullpath, uint64_t *ovalue);
 int usdr_device_vfs_obj_val_set_by_path(pdevice_t dev, const char* fullpath, uint64_t ovalue);
+
+struct usdr_core_info {
+    const char* path;
+    unsigned busno;
+    unsigned core;
+    unsigned base;
+    int irq;
+};
+typedef struct usdr_core_info usdr_core_info_t;
+
+int usdr_device_vfs_link_get_corenfo(pdevice_t dev, const char* fullpath, const char *linkpath, usdr_core_info_t *nfo);
 
 static inline int usdr_device_vfs_obj_val_get_u32(pdevice_t dev, const char* fullpath, uint32_t *ovalue)
 {

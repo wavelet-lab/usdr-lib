@@ -44,10 +44,10 @@ sudo apt install libusdr-dev
 
 Go to [releases page](https://github.com/wavelet-lab/usdr-lib/releases) and download the corresponding archive.
 
-* Ubuntu 18.04(amd64): `usdr_0.9.8~bionic0.amd64.tar`
-* Ubuntu 18.04(arm64): `usdr_0.9.8~bionic0.arm64.tar`
-* Debian 12(amd64): `usdr_0.9.8~bookworm0.amd64.tar`
-* Debian 12(arm64): `usdr_0.9.8~bookworm0.arm64.tar`
+* Ubuntu 18.04(amd64): `usdr_0.9.9~bionic0.amd64.tar`
+* Ubuntu 18.04(arm64): `usdr_0.9.9~bionic0.arm64.tar`
+* Debian 12(amd64): `usdr_0.9.9~bookworm0.amd64.tar`
+* Debian 12(arm64): `usdr_0.9.9~bookworm0.arm64.tar`
 
 Unpack the archive.
 

@@ -15,8 +15,8 @@
 
 static int _mdev_get_obj(pdevice_t dev, const char* fullpath, pusdr_vfs_obj_t *obj);
 static int _mdev_create_stream(device_t* dev, const char* sid, const char* dformat,
-                     uint64_t channels, unsigned pktsyms,
-                     unsigned flags, stream_handle_t** out_handle);
+                               const usdr_channel_info_t* channels, unsigned pktsyms,
+                               unsigned flags, const char* parameters, stream_handle_t** out_handle);
 static int _mdev_unregister_stream(device_t* dev, stream_handle_t* stream);
 static void _mdev_destroy(device_t *udev);
 
@@ -269,6 +269,7 @@ int _mstr_stream_recv(stream_handle_t* stream,
             return res;
     }
 
+    // TODO aggregate
     if (nfo)
         *nfo = lnfo[0];
     return 0;
@@ -279,22 +280,29 @@ int _mstr_stream_send(stream_handle_t* stream,
                       const char **stream_buffs,
                       unsigned samples,
                       dm_time_t timestamp,
-                      unsigned timeout_ms)
+                      unsigned timeout_ms,
+                      usdr_dms_send_stat_t* stat)
 {
     stream_mdev_t* str = container_of(stream, stream_mdev_t, base);
     dev_multi_t* obj =  container_of(stream->dev, dev_multi_t, virt_dev);
     stream_handle_t** real_str = str->type == USDR_DMS_RX ? obj->real_str_rx : obj->real_str_tx;
     size_t step = str->channels / str->dev_cnt;
 
+    struct usdr_dms_send_stat lstat[DEV_MAX];
+
     int res, i, idx;
     for (i = 0; i < str->dev_cnt; i++) {
         idx = str->dev_idx[i];
 
         res = real_str[idx]->ops->send(real_str[idx], stream_buffs + step * i,
-                                       samples, timestamp, timeout_ms);
+                                       samples, timestamp, timeout_ms, &lstat[i]);
         if (res)
             return res;
     }
+
+    // TODO aggregate
+    if (stat)
+        *stat = lstat[0];
 
     return 0;
 }
@@ -339,8 +347,8 @@ stream_ops_t _mstr_ops = {
 
 static
 int _mdev_create_stream(device_t* dev, const char* sid, const char* dformat,
-                        uint64_t channels, unsigned pktsyms,
-                        unsigned flags, stream_handle_t** out_handle)
+                        const usdr_channel_info_t* channels, unsigned pktsyms,
+                        unsigned flags, const char* parameters, stream_handle_t** out_handle)
 {
     dev_multi_t* obj =  container_of(dev, dev_multi_t, virt_dev);
     bool rx = (strstr(sid, "rx/0") == 0) ? true : false;
@@ -354,29 +362,47 @@ int _mdev_create_stream(device_t* dev, const char* sid, const char* dformat,
     int64_t tmp;
     usdr_dms_nfo_t nfo;
     stream_handle_t** real_str = rx ? obj->real_str_rx : obj->real_str_tx;
-    unsigned choff = (rx) ? obj->rx_chans : obj->tx_chans;
-    unsigned chmsk = (1u << choff) - 1;
+    unsigned chans_per_dev = (rx) ? obj->rx_chans : obj->tx_chans;
     int res;
 
     // Bifurcate to children
     unsigned pcnt = 0;
     for (unsigned i = 0; i < obj->cnt; i++) {
-        uint64_t child_msk = ((channels >> (choff * i)) & chmsk);
+        usdr_channel_info_t subdev_info;
+        unsigned phys_nums[64];
+        const char* phys_names[64];
+
+        subdev_info.count = channels->count / obj->cnt;
+        subdev_info.flags = channels->flags;
+        subdev_info.phys_names = channels->phys_names ? phys_names : NULL;
+        subdev_info.phys_nums = channels->phys_nums ? phys_nums : NULL;
+
+        // TODO proper parse with specific chnnel mixing
+        for (unsigned k = 0; k < chans_per_dev; k++) {
+            if (channels->phys_names) {
+                phys_names[k] = channels->phys_names[chans_per_dev * i + k];
+            }
+            if (channels->phys_nums) {
+                phys_nums[k] = channels->phys_nums[chans_per_dev * i + k];
+            }
+        }
+
         mstr->dev_mask[i] = false;
+        /*
         if (child_msk == 0) {
             USDR_LOG("MDEV", USDR_LOG_TRACE, "Device %d ignored\n", i);
             continue;
         }
+        */
 
         if (real_str[i]) {
             USDR_LOG("MDEV", USDR_LOG_WARNING, "Device %d stream is already in use!\n", i);
             return -EBUSY;
         }
 
-        USDR_LOG("MDEV", USDR_LOG_ERROR, "Creating stream for dev %d with %x mask (child chans %d)\n",
-                 i, (unsigned)child_msk, choff);
+        USDR_LOG("MDEV", USDR_LOG_ERROR, "Creating stream for dev %d with %d channels\n", i, chans_per_dev);
         pdevice_t child_dev = obj->real[i]->pdev;
-        res = child_dev->create_stream(child_dev, sid, dformat, child_msk, pktsyms, flags,
+        res = child_dev->create_stream(child_dev, sid, dformat, &subdev_info, pktsyms, flags, parameters,
                                        &real_str[i]);
         if (res)
             return res;

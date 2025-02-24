@@ -341,16 +341,16 @@ int limesdr_device_initialize(pdevice_t udev, unsigned pcount, const char** devp
 
 static
 int limesdr_device_create_stream(device_t* dev, const char* sid, const char* dformat,
-                                 uint64_t channels, unsigned pktsyms,
-                                 unsigned flags, stream_handle_t** out_handle)
+                                        const usdr_channel_info_t* channels, unsigned pktsyms,
+                                        unsigned flags, const char* parameters, stream_handle_t** out_handle)
 {
     struct dev_limesdr *d = (struct dev_limesdr *)dev;
     int res = -EINVAL;
     bool rx = (strstr(sid, "rx") != 0);
 
-
+    // TODO: pass channels
     res = create_limesdr_stream(dev,
-                                rx ? 0 : 1, dformat, channels, pktsyms, flags,
+                                rx ? 0 : 1, dformat, 0, pktsyms, flags,
                                 out_handle);
     if (res) {
         return res;

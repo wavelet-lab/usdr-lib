@@ -353,6 +353,10 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
     if (!tx)
         obj->rxpll_vco_div_bufsel = vregs[1];
 
+    // TODO add more options for failed locks
+    if (lo > hi && hi == 0) {
+        return -ENOLCK;
+    }
     return 0;
 }
 

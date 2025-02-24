@@ -25,6 +25,10 @@ from PyQt5.QtCore import Qt, QTimer
 import pyqtgraph as pg
 
 
+ABS_PATH = os.path.dirname(os.path.abspath(__file__))
+SCHEMA_PATH = "/usr/share/usdr/schema/"
+
+
 class Sensors(QWidget):
     def __init__(self, params, pipe):
         super(Sensors, self).__init__()
@@ -190,10 +194,12 @@ class RegActor:
 
     def __setitem__(self, addr, value):
         pipe.seti64(self.path, self.make_reg(addr, value) | self.wr_mask, )
+        print("WR%s[%04x]<=%04x" % (self.path, addr, value))
+
 
     def __getitem__(self, addr):
         r = pipe.setgeti64(self.path, (self.make_reg(addr, -1) & ~self.wr_mask) | self.rd_mask) & self.data_mask
-        print("RD%s[%02x]=>%04x" % (self.path, addr, r))
+        print("RD%s[%04x]=>%04x" % (self.path, addr, r))
         return r
 
 
@@ -244,12 +250,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.qs)
 
         self.icons = {
-            "i2c": QIcon("img/i2c_logo.svg"),
-            "spi": QIcon("img/spi_logo.svg"),
-            "virtual": QIcon("img/virt_logo.svg"),
-            "ctrl": QIcon("img/ctrl_logo.svg"),
-            "info": QIcon("img/info_logo.svg"),
-            "stat": QIcon("img/stat_logo.svg"),
+            "i2c": QIcon(f"{ABS_PATH}/img/i2c_logo.svg"),
+            "spi": QIcon(f"{ABS_PATH}/img/spi_logo.svg"),
+            "virtual": QIcon(f"{ABS_PATH}/img/virt_logo.svg"),
+            "ctrl": QIcon(f"{ABS_PATH}/img/ctrl_logo.svg"),
+            "info": QIcon(f"{ABS_PATH}/img/info_logo.svg"),
+            "stat": QIcon(f"{ABS_PATH}/img/stat_logo.svg"),
         }
 
         if type(pipe) is FakePipe:
@@ -304,7 +310,7 @@ class FakePipe:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Debug UI options')
-    parser.add_argument('--ypath', dest='ypath', type=str, default="./yamls/")
+    parser.add_argument('--ypath', dest='ypath', type=str, default=SCHEMA_PATH)
     parser.add_argument('--pipe', dest='pipe', type=str, default="usdr_debug_pipe",
                         help='sum the integers (default: find the max)')
     parser.add_argument('--fake', dest='fake', action='store_true', help='use fake pipe')

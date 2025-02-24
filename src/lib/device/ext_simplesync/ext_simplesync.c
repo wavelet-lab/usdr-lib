@@ -77,7 +77,7 @@ int board_ext_simplesync_init(lldev_t dev,
     // Wait for power up
     usleep(50000);
 
-    res = lmk05318_create(dev, subdev, i2ca, &ob->lmk);
+    res = lmk05318_create(dev, subdev, i2ca, 0, &ob->lmk);
     if (res)
         return res;
 

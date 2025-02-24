@@ -33,3 +33,26 @@ int stream_parse_dformat(char* dmft, struct parsed_data_format* ofmt)
 
     return 0;
 }
+
+int channel_info_remap(unsigned count, const char** names, const channel_map_info_t* table, channel_info_t* out)
+{
+    int res = 0;
+    const channel_map_info_t* t;
+
+    for (unsigned i = 0; i < count; i++) {
+        for (t = table; t->name != NULL; t++) {
+            if (strcasecmp(names[i], t->name) == 0) {
+                out->ch_map[i] = t->hwidx;
+                break;
+            }
+        }
+
+        if (t->name == NULL) {
+            out->ch_map[i] = t->hwidx;
+            res = -EINVAL;
+        }
+    }
+
+    return res;
+}
+

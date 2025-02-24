@@ -48,9 +48,43 @@ int usdr_dms_create_ex(pdm_dev_t device,
                        unsigned flags,
                        pusdr_dms_t* outu)
 {
+    // Only up to 64 channels supported in old API
+    usdr_channel_info_t chans;
+    unsigned chan_map[64];
+
+    unsigned cnt;
+    unsigned i;
+    for (cnt = 0, i = 0; i < 64; i++) {
+        if (channels & (((uint64_t)1) << i)) {
+            chan_map[cnt++] = i;
+        }
+    }
+
+    if (cnt == 0) {
+        return -EINVAL;
+    }
+
+    chans.count = cnt;
+    chans.flags = 0;
+    chans.phys_names = NULL;
+    chans.phys_nums = chan_map;
+
+    return usdr_dms_create_ex2(device, sobj, dformat,
+                               &chans, pktsyms, flags, NULL, outu);
+}
+
+int usdr_dms_create_ex2(pdm_dev_t device,
+                        const char* sobj,
+                        const char* dformat,
+                        const usdr_channel_info_t *channels,
+                        unsigned pktsyms,
+                        unsigned flags,
+                        const char* parameters,
+                        pusdr_dms_t* outu)
+{
     device_t* dev = device->lldev->pdev;
     int res = dev->create_stream(dev, sobj, dformat,
-                                 channels, pktsyms, flags,
+                                 channels, pktsyms, flags, parameters,
                                  (stream_handle_t**)outu);
     return res;
 }
@@ -105,5 +139,16 @@ int usdr_dms_send(pusdr_dms_t stream,
                   unsigned timeout_ms)
 {
     struct stream_handle* h = (struct stream_handle*)stream;
-    return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms);
+    return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms, NULL);
+}
+
+int usdr_dms_send_stat(pusdr_dms_t stream,
+                       const void **stream_buffs,
+                       unsigned samples,
+                       dm_time_t timestamp,
+                       unsigned timeout_ms,
+                       usdr_dms_send_stat_t* stat)
+{
+    struct stream_handle* h = (struct stream_handle*)stream;
+    return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms, stat);
 }

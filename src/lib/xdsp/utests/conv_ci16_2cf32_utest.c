@@ -8,9 +8,9 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_ci16_2cf32_2.h"
+#include "conv_ci16_2cf32_2.h"
 
-#undef DEBUG_PRINT
+//#define DEBUG_PRINT
 
 #define WORD_COUNT (4096u + 77u)
 #define IN_STREAM_SIZE_BZ (WORD_COUNT * sizeof(int16_t))
@@ -47,7 +47,7 @@ static void setup()
     for(unsigned i = 0; i < SPEED_WORD_COUNT; ++i)
     {
         int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
-        in[i] = sign * 100u * (float)(rand()) / (float)RAND_MAX;
+        in[i] = sign * 32767 * (float)(rand()) / (float)RAND_MAX;
     }
 #if 0
     for(unsigned i = 0; i < WORD_COUNT; ++i)
@@ -84,6 +84,20 @@ static conv_function_t get_fn(generic_opts_t o, int log)
 
 #define CONV_SCALE (1.0f/32767)
 
+static void printer(const char* header)
+{
+    fprintf(stderr, "%s\n", header ? header : "");
+    fprintf(stderr, "in:     ");
+    for(unsigned i = 0; i < 16; ++i) fprintf(stderr, "%d ", in[i]);
+
+    for(unsigned k = 0; k < 2; ++k)
+    {
+        fprintf(stderr, "\nout[%d]: ", k);
+        for(unsigned i = 0; i < 8; ++i) fprintf(stderr, "%d ", (int16_t)(32767 * out[k][i]));
+    }
+    fprintf(stderr, "\n");
+}
+
 START_TEST(conv_ci16_2cf32_check_simd)
 {
     generic_opts_t opt = max_opt;
@@ -99,6 +113,7 @@ START_TEST(conv_ci16_2cf32_check_simd)
 
     //get etalon output data (generic foo)
     (*get_fn(OPT_GENERIC, 0))(&pin, bzin, pout, bzout);
+    printer("ETALON:");
     memcpy(out1_etalon, out[0], bzout / 2);
     memcpy(out2_etalon, out[1], bzout / 2);
 
@@ -110,27 +125,11 @@ START_TEST(conv_ci16_2cf32_check_simd)
             memset(out[0], 0, bzout / 2);
             memset(out[1], 0, bzout / 2);
             (*fn)(&pin, bzin, pout, bzout);
-#if 0
-            fprintf(stderr, "\n\n");
-            for(uint16_t i = 0; i < 16; ++i)
-            {
-                fprintf(stderr, "%.6f ", out[0][i]);
-            }
-            fprintf(stderr, "\n");
-            for(uint16_t i = 0; i < 16; ++i)
-            {
-                fprintf(stderr, "%.6f ", out[1][i]);
-            }
-            fprintf(stderr, "\n\n");
+#ifdef DEBUG_PRINT
+            printer(NULL);
 #endif
             int res = memcmp(out[0], out1_etalon, bzout / 2) || memcmp(out[1], out2_etalon, bzout / 2);
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
-#ifdef DEBUG_PRINT
-            for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)
-            {
-                fprintf(stderr, "i = %d : in = %d, out = %.6f, etalon = %.6f\n", i, in[i], out[i], out_etalon[i]);
-            }
-#endif
             ck_assert_int_eq( res, 0 );
         }
     }

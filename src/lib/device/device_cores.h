@@ -43,8 +43,11 @@ enum usdr_bus_cores {
     USDR_BS_DI2C_SIMPLE = 1,
 
     USDR_LIME_C64_PROTO = 2,
-
     USDR_DRP_PHY_V0 = 3,
+    USDR_BS_UART_SIMPLE = 4,
+    USDR_BS_GPIO15_SIMPLE = 5,
+
+    USDR_BS_QSPIA24_R0 = 6,
 };
 
 enum usd_aux_cores {
@@ -62,6 +65,8 @@ enum usdr_stream_cores {
 enum usdr_fe_cores {
     USDR_FC_BRSTN = 0,
     USDR_TFE_BRSTN = 1,
+
+    USDR_EXFC_BRSTN = 16,
 };
 
 #define USDR_MAKE_COREID(family, coreid) \

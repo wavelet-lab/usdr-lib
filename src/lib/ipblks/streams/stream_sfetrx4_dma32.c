@@ -40,7 +40,6 @@ struct stream_sfetrx_dma32 {
 
     // Cached values
     unsigned cnf_base;
-    unsigned aux_base;
     unsigned cfg_base;
 
     unsigned pkt_symbs;
@@ -62,6 +61,12 @@ struct stream_sfetrx_dma32 {
     stream_stats_t stats;
     int fd;
     unsigned burst_count;
+
+    unsigned fe_chans;  // Number of active channels in frontend
+    unsigned fe_complex;// Compex data streaming
+    union {
+        sfe_cfg_t srx4;
+    } storage;
 };
 typedef struct stream_sfetrx_dma32 stream_sfetrx_dma32_t;
 
@@ -86,8 +91,7 @@ int _sfetrx4_destroy(stream_handle_t* str)
         if (res)
             return res;
 
-        res = sfe_rx4_startstop(dev, 0,
-                                stream->aux_base, 0, 0);
+        res = sfe_rx4_startstop(&stream->storage.srx4, false);
         if (res)
             return res;
     } else {
@@ -186,7 +190,8 @@ int _sfetrx4_stream_send(stream_handle_t* str,
                          const char **stream_buffs,
                          unsigned samples,
                          dm_time_t timestamp,
-                         unsigned timeout)
+                         unsigned timeout,
+                         usdr_dms_send_stat_t* ostat)
 {
     int res;
     struct lowlevel_ops* ops;
@@ -209,7 +214,7 @@ int _sfetrx4_stream_send(stream_handle_t* str,
         do {
             unsigned ns = (samples < stream->pkt_symbs) ? samples : stream->pkt_symbs;
 
-            res = _sfetrx4_stream_send(str, nstreams, ns, timestamp, timeout);
+            res = _sfetrx4_stream_send(str, nstreams, ns, timestamp, timeout, ostat);
             if (res)
                 return res;
 
@@ -267,10 +272,22 @@ int _sfetrx4_stream_send(stream_handle_t* str,
                  stat[2], (stat[3] >> 8) & 0xf);
 
 
+        // TODO fix overrun
         if (stream->stats.dropped != delayd)
             stream->stats.dropped = delayd;
         else
             stream->stats.pktok ++;
+
+        if (ostat) {
+            ostat->lhwtime = stat[2];
+            ostat->opkttime = 0; // TODO
+            ostat->ktime = stat[3];
+            ostat->underruns = stream->stats.dropped;
+            ostat->fifo_used = ((stat[3] >> 8) & 0xf) << 4; // CHECKME
+            ostat->reserved[0] = 0;
+            ostat->reserved[1] = 0;
+            ostat->reserved[2] = 0;
+        }
     } else {
         stream->stats.pktok ++;
     }
@@ -315,8 +332,7 @@ static int _sfetrx4_op(stream_handle_t* str,
         if (res)
             return res;
 
-        res = sfe_rx4_startstop(dev, 0,
-                                stream->aux_base, tm, start);
+        res = sfe_rx4_startstop(&stream->storage.srx4, start);
         if (res)
             return res;
     } else {
@@ -324,25 +340,6 @@ static int _sfetrx4_op(stream_handle_t* str,
                           stream->channels != 1, false, start);
         if (res)
             return res;
-
-#if 0
-        res = lowlevel_reg_wr32(stream->base.dev, 0,
-                                stream->cnf_base + 2, 0);
-        if (res)
-            return res;
-
-        if (start) {
-            res = lowlevel_reg_wr32(stream->base.dev, 0,
-                                    stream->cnf_base + 2, 1<<7);
-
-            // Enable DMA first (16bit, MIMO)
-            uint32_t cmd = stream->channels == 1 ? ((1 << 3) | (1 << 8)) : 0;
-            res = lowlevel_reg_wr32(stream->base.dev, 0,
-                                    stream->cnf_base + 2, cmd | (start ? 3 : 0));
-            if (res)
-                return res;
-        }
-#endif
     }
 
     return 0;
@@ -361,7 +358,7 @@ int _sfetrx4_option_get(stream_handle_t* str, const char* name, int64_t* out_val
 }
 
 static
-int _sfetrx4_option_set(stream_handle_t* str, const char* name, int64_t UNUSED in_val)
+int _sfetrx4_option_set(stream_handle_t* str, const char* name, int64_t in_val)
 {
     stream_sfetrx_dma32_t* stream = (stream_sfetrx_dma32_t*)str;
     if (strcmp(name, "ready") == 0) {
@@ -371,6 +368,20 @@ int _sfetrx4_option_set(stream_handle_t* str, const char* name, int64_t UNUSED i
         // Issue rx ready, should be put inside
         return lowlevel_reg_wr32(stream->base.dev->dev, 0,
                                  stream->cnf_base + 1, 4);
+    } else if (stream->type == USDR_ZCPY_RX && strcmp(name, "throttle") == 0) {
+        bool enable = (in_val & (1 << 16)) ? true : false;
+        uint8_t en = in_val >> 8;
+        uint8_t skip = in_val;
+
+        return sfe_rx4_throttle(&stream->storage.srx4, enable, en, skip);
+    } else if (stream->type == USDR_ZCPY_RX && strcmp(name, "chmap") == 0) {
+        if (stream->storage.srx4.cfg_fecore_id != CORE_EXFERX_DMA32_R0)
+            return -ENOTSUP;
+
+        return exfe_rx4_update_chmap(&stream->storage.srx4,
+                                     stream->fe_complex,
+                                     (stream->fe_complex ? 2 : 1) * stream->fe_chans,
+                                     (const channel_info_t *)in_val);
     }
     return -EINVAL;
 }
@@ -410,11 +421,11 @@ static const struct stream_ops s_sfetr4_dma32_ops = {
 };
 
 
-int parse_sfetrx4(const char* dformat, logical_ch_msk_t channels, unsigned pktsyms,
+int parse_sfetrx4(const char* dformat, const channel_info_t *channels, unsigned pktsyms, unsigned chcnt,
                   struct sfetrx4_config *out)
 {
     struct stream_config sc, sc_b;
-    unsigned logicchs = 0;
+    unsigned logicchs = chcnt;
     unsigned cfgchs = 0;
     bool bifurcation = true;
     struct parsed_data_format pfmt;
@@ -424,13 +435,9 @@ int parse_sfetrx4(const char* dformat, logical_ch_msk_t channels, unsigned pktsy
         return -EINVAL;
     }
 
-    for (logical_ch_msk_t b = 1; b != 0; b <<= 1) {
-        if (channels & b)
-            cfgchs++;
-    }
-
     sc.burstspblk = 0;
-    sc.chmsk = channels;
+    sc.chcnt = chcnt;
+    sc.channels = *channels;
     sc.sfmt = (pfmt.wire_fmt == NULL) ? pfmt.host_fmt : pfmt.wire_fmt;
     sc.spburst = pktsyms;
 
@@ -441,13 +448,13 @@ int parse_sfetrx4(const char* dformat, logical_ch_msk_t channels, unsigned pktsy
         logicchs = cfgchs;
     }
 
-    // Bifurcation check
+    // TODO: Bifurcation proper set
     sc_b = sc;
     struct bitsfmt bfmt = get_bits_fmt(sc.sfmt);
-    if ((bfmt.complex) && (sc.chmsk == 1 || sc.chmsk == 2)) {
-        sc_b.chmsk = 3;
-    } else if ((!bfmt.complex) && (sc.chmsk == 0x3 || sc.chmsk == 0xc)) {
-        sc_b.chmsk = 15;
+    if ((bfmt.complex) && (sc.chcnt == 1)) {
+        sc_b.chcnt = 2;
+    } else if ((!bfmt.complex) && (sc.chcnt == 2)) {
+        sc_b.chcnt = 4;
     } else {
         bifurcation = false;
     }
@@ -467,10 +474,10 @@ int parse_sfetrx4(const char* dformat, logical_ch_msk_t channels, unsigned pktsy
 }
 
 static int initialize_stream_rx_32(device_t* device,
-                                   logical_ch_msk_t channels,
+                                   unsigned chcount,
+                                   channel_info_t *channels,
                                    unsigned pktsyms,
-                                   unsigned fe_fifobsz,
-                                   unsigned fe_base,
+                                   sfe_cfg_t* fecfg,
                                    unsigned sx_base,
                                    unsigned sx_cfg_base,
                                    struct parsed_data_format pfmt,
@@ -488,14 +495,11 @@ static int initialize_stream_rx_32(device_t* device,
 
     struct stream_config sc;
     struct fifo_config fc;
-    unsigned logicchs = 0;
-    for (logical_ch_msk_t b = 1; b != 0; b <<= 1) {
-        if (channels & b)
-            logicchs++;
-    }
+    unsigned logicchs = chcount;
 
     sc.burstspblk = 0;
-    sc.chmsk = channels;
+    sc.chcnt = chcount;
+    sc.channels = *channels;
     sc.sfmt = (pfmt.wire_fmt == NULL) ? pfmt.host_fmt : pfmt.wire_fmt;
     sc.spburst = pktsyms;
 
@@ -531,12 +535,19 @@ static int initialize_stream_rx_32(device_t* device,
         USDR_LOG("DSTR", USDR_LOG_INFO, "No transformation!\n");
     }
 
+    struct bitsfmt bfmt = get_bits_fmt(sc.sfmt);
     if (data_lane_bifurcation) {
-        struct bitsfmt bfmt = get_bits_fmt(sc.sfmt);
-        if ((bfmt.complex) && (sc.chmsk == 1 || sc.chmsk == 2)) {
-            sc.chmsk = 3;
-        } else if ((!bfmt.complex) && (sc.chmsk == 0x3 || sc.chmsk == 0xc)) {
-            sc.chmsk = 15;
+        // TODO: proper channel remap, now assuming bifurcation lanes are siblings
+
+        if ((bfmt.complex) && (sc.chcnt == 1)) {
+            sc.chcnt = 2;
+            sc.channels.ch_map[1] = sc.channels.ch_map[0] + 1;
+
+        } else if ((!bfmt.complex) && (sc.chcnt == 2)) {
+            sc.chcnt = 4;
+
+            sc.channels.ch_map[2] = sc.channels.ch_map[0] + 2;
+            sc.channels.ch_map[3] = sc.channels.ch_map[1] + 2;
         } else {
             USDR_LOG("DSTR", USDR_LOG_ERROR, "Bifurcation is only valid for single channel complex\n");
             return -EINVAL;
@@ -549,7 +560,10 @@ static int initialize_stream_rx_32(device_t* device,
         sc.spburst /= 2;
     }
 
-    res = sfe_rx4_configure(device->dev, 0, fe_base, fe_fifobsz, &sc, &fc);
+    // TODO obtain exfe configuration constants
+    res = (fecfg->cfg_fecore_id == CORE_EXFERX_DMA32_R0) ?
+        exfe_rx4_configure(fecfg, &sc, &fc) :
+        sfe_rx4_configure(fecfg, &sc, &fc);
     if (res)
         return res;
 
@@ -591,7 +605,6 @@ static int initialize_stream_rx_32(device_t* device,
     strdev->ll_streamo = sid;
 
     strdev->cnf_base = sx_base;
-    strdev->aux_base = fe_base;
     strdev->cfg_base = sx_cfg_base;
 
     strdev->pkt_symbs = pktsyms;
@@ -616,6 +629,10 @@ static int initialize_stream_rx_32(device_t* device,
 
     strdev->burst_mask = ((((uint64_t)1U) << fc.burstspblk) - 1) << (32 - fc.burstspblk);
     strdev->burst_count = fc.burstspblk;
+
+    strdev->fe_chans = sc.chcnt;
+    strdev->fe_complex = bfmt.complex;
+    strdev->storage.srx4 = *fecfg;
     *outu = strdev;
     return 0;
 }
@@ -627,7 +644,8 @@ enum {
 
 
 static int initialize_stream_tx_32(device_t* device,
-                                   logical_ch_msk_t channels,
+                                   unsigned chcount,
+                                   channel_info_t *channels,
                                    unsigned pktsyms,
                                    //unsigned fe_fifobsz,
                                    //unsigned fe_base,
@@ -636,36 +654,36 @@ static int initialize_stream_tx_32(device_t* device,
                                    struct parsed_data_format pfmt,
                                    stream_sfetrx_dma32_t** outu,
                                    bool need_fd,
-                                   bool data_lane_bifurcation)
+                                   bool data_lane_bifurcation,
+                                   bool dont_check_fw)
 {
     int res;
     stream_sfetrx_dma32_t* strdev;
 
     struct stream_config sc;
-    unsigned logicchs = 0;
-    for (logical_ch_msk_t b = 1; b != 0; b <<= 1) {
-        if (channels & b)
-            logicchs++;
-    }
+    unsigned logicchs = chcount;
 
     sc.burstspblk = 0;
-    sc.chmsk = channels;
+    sc.chcnt = chcount;
+    sc.channels = *channels;
     sc.sfmt = (pfmt.wire_fmt == NULL) ? pfmt.host_fmt : pfmt.wire_fmt;
     sc.spburst = pktsyms;
 
     if (logicchs > 2)
         return -EINVAL;
 
-    uint64_t fwid;
-    res = usdr_device_vfs_obj_val_get_u64(device, "/dm/revision", &fwid);
-    if (res) {
-        USDR_LOG("DSTR", USDR_LOG_ERROR, "Unable to check comatability firmware!\n");
-    }
-    if (get_xilinx_rev_h(fwid & 0xffffffff) < get_xilinx_rev_h(MINIM_FWID_COMPAT)) {
-        USDR_LOG("DSTR", USDR_LOG_ERROR, "You're running outdated firmware, please update! CurrentID=%08x MinimalID=%08x\n",
-                 (uint32_t)(fwid & 0xffffffff),
-                 MINIM_FWID_COMPAT);
-        return -ECONNRESET;
+    if (!dont_check_fw) {
+        uint64_t fwid;
+        res = usdr_device_vfs_obj_val_get_u64(device, "/dm/revision", &fwid);
+        if (res) {
+            USDR_LOG("DSTR", USDR_LOG_ERROR, "Unable to check comatability firmware!\n");
+        }
+        if (get_xilinx_rev_h(fwid & 0xffffffff) < get_xilinx_rev_h(MINIM_FWID_COMPAT)) {
+            USDR_LOG("DSTR", USDR_LOG_ERROR, "You're running outdated firmware, please update! CurrentID=%08x MinimalID=%08x\n",
+                     (uint32_t)(fwid & 0xffffffff),
+                     MINIM_FWID_COMPAT);
+            return -ECONNRESET;
+        }
     }
 
     unsigned bits_per_single_sym = 32; // We support I/Q 16 bit for now only
@@ -677,8 +695,8 @@ static int initialize_stream_tx_32(device_t* device,
 
     if (data_lane_bifurcation) {
         struct bitsfmt bfmt = get_bits_fmt(sc.sfmt);
-        if ((bfmt.complex) && (sc.chmsk == 1 || sc.chmsk == 2)) {
-            sc.chmsk = 3;
+        if ((bfmt.complex) && (sc.chcnt == 1)) {
+            sc.chcnt = 2;
         } else {
             USDR_LOG("DSTR", USDR_LOG_ERROR, "Bifurcation is only valid for single channel complex");
             return -EINVAL;
@@ -761,7 +779,6 @@ static int initialize_stream_tx_32(device_t* device,
     strdev->ll_streamo = sid;
 
     strdev->cnf_base = sx_base;
-    strdev->aux_base = 0;
     strdev->cfg_base = sx_cfg_base;
 
     strdev->pkt_symbs = pktsyms;
@@ -794,7 +811,8 @@ static int initialize_stream_tx_32(device_t* device,
 int create_sfetrx4_stream(device_t* device,
                           unsigned core_id,
                           const char* dformat,
-                          logical_ch_msk_t channels,
+                          unsigned chcount,
+                          channel_info_t *channels,
                           unsigned pktsyms,
                           unsigned flags,
                           unsigned sx_base,
@@ -807,6 +825,7 @@ int create_sfetrx4_stream(device_t* device,
     bool need_fd = (flags & DMS_FLAG_NEED_FD) == DMS_FLAG_NEED_FD;
     bool need_tx_stat = (flags & DMS_FLAG_NEED_TX_STAT) == DMS_FLAG_NEED_TX_STAT;
     bool bifurcation = (flags & DMS_FLAG_BIFURCATION) == DMS_FLAG_BIFURCATION;
+    bool dontcheck = (flags & DMS_DONT_CHECK_FWID) == DMS_DONT_CHECK_FWID;
     char dfmt[256];
     int res;
 
@@ -818,17 +837,30 @@ int create_sfetrx4_stream(device_t* device,
 
     switch (core_id) {
     case CORE_SFERX_DMA32_R0:
-        res = initialize_stream_rx_32(device, channels, pktsyms,
-                                      fe_fifobsz, fe_base,
-                                      sx_base, sx_cfg_base, pfmt,
+    case CORE_EXFERX_DMA32_R0:
+    {
+        sfe_cfg_t fecfg;
+        fecfg.dev = device->dev;
+        fecfg.subdev = 0;
+        fecfg.cfg_fecore_id = core_id;
+        fecfg.cfg_base = fe_base;
+        fecfg.cfg_fifomaxbytes = fe_fifobsz;
+
+        // TODO obtain dynamic config
+        fecfg.cfg_word_bytes = (core_id == CORE_SFERX_DMA32_R0) ? 8 : 16;
+        fecfg.cfg_raw_chans = (core_id == CORE_SFERX_DMA32_R0) ? 4 : 8;
+
+        res = initialize_stream_rx_32(device, chcount, channels, pktsyms,
+                                      &fecfg, sx_base, sx_cfg_base, pfmt,
                                       (stream_sfetrx_dma32_t** )outu,
                                       need_fd, need_tx_stat, bifurcation);
         break;
+    }
     case CORE_SFETX_DMA32_R0:
-        res = initialize_stream_tx_32(device, channels, pktsyms,
+        res = initialize_stream_tx_32(device, chcount, channels, pktsyms,
                                        sx_base, sx_cfg_base, pfmt,
                                        (stream_sfetrx_dma32_t** )outu,
-                                       need_fd, bifurcation);
+                                       need_fd, bifurcation, dontcheck);
         break;
     default:
         return -EINVAL;

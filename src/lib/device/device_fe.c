@@ -150,7 +150,18 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, unsi
     const unsigned gpiobase = 3;
     const unsigned uartbase = 54;
     const unsigned spiext_cfg = 58;
+
     memset(&dfe, 0, sizeof(dfe));
+
+    usdr_core_info_t fe_gpio;
+    usdr_core_info_t fe_uart;
+    uint64_t spi_busno  = ~0ul;
+    uint64_t i2c_busno  = ~0ul;
+
+    usdr_device_vfs_link_get_corenfo(base, "/ll/fe/0/gpio_busno/0", "/ll/gpio", &fe_gpio);
+    usdr_device_vfs_link_get_corenfo(base, "/ll/fe/0/uart_busno/0", "/ll/uart", &fe_uart);
+    usdr_device_vfs_obj_val_get_u64(base, "/ll/fe/0/spi_busno/0", &spi_busno);
+    usdr_device_vfs_obj_val_get_u64(base, "/ll/fe/0/i2c_busno/0", &i2c_busno);
 
     for (i = 0; i < FET_COUNT; i++) {
         const char* hint_strip = NULL;

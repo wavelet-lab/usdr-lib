@@ -2,7 +2,7 @@ Source: usdr
 Section: misc
 Priority: optional
 Maintainer: Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>
-Standards-Version: 0.9.8
+Standards-Version: 0.9.9
 Homepage: https://github.com/wavelet-lab/usdr-lib
 Vcs-Browser: https://github.com/wavelet-lab/usdr-lib
 Vcs-Git: https://github.com/wavelet-lab/usdr-lib.git
@@ -62,3 +62,15 @@ Depends:
     dkms,
     ${shlibs:Depends}
 Description: DKMS source for the uSDR PCIe driver
+
+Package: usdr-dmonitor
+Architecture: all
+Section: misc
+Priority: optional
+Depends:
+    usdr-tools (= ${binary:Version}),
+    libusdr (= ${binary:Version}),
+    python3-yaml,
+    python3-pyqt5,
+    python3-pyqtgraph
+Description: Debug tools for usdr

@@ -12,8 +12,8 @@ bus:
     wr_mask: 0x80000000
 addr_width:   8
 data_width:   24
-page_prefix:  True
-field_prefix: [ Page, RegName ]
+# page_prefix:  True
+field_prefix: [ RegName ]
 field_macros: True
 
 pages:
@@ -39,6 +39,9 @@ pages:
           - bits: "5"
             name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "3"
+            name: SW_HW_TDD_CTRL
+            desc: Hardware control of TRX antenna to TX/RX port based on burst boundaries. SW_PA_ONOFF, SW_RX_TDDFDD, SW_RXTX wont take effect in this mode
           - bits: "2"
             name: SW_PA_ONOFF
             desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
@@ -61,6 +64,9 @@ pages:
           - bits: "5"
             name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "3"
+            name: SW_HW_TDD_CTRL
+            desc: Hardware control of TRX antenna to TX/RX port based on burst boundaries. SW_PA_ONOFF, SW_RX_TDDFDD, SW_RXTX wont take effect in this mode
           - bits: "2"
             name: SW_PA_ONOFF
             desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
@@ -83,6 +89,9 @@ pages:
           - bits: "5"
             name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "3"
+            name: SW_HW_TDD_CTRL
+            desc: Hardware control of TRX antenna to TX/RX port based on burst boundaries. SW_PA_ONOFF, SW_RX_TDDFDD, SW_RXTX wont take effect in this mode
           - bits: "2"
             name: SW_PA_ONOFF
             desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
@@ -105,6 +114,9 @@ pages:
           - bits: "5"
             name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
+          - bits: "3"
+            name: SW_HW_TDD_CTRL
+            desc: Hardware control of TRX antenna to TX/RX port based on burst boundaries. SW_PA_ONOFF, SW_RX_TDDFDD, SW_RXTX wont take effect in this mode
           - bits: "2"
             name: SW_PA_ONOFF
             desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB

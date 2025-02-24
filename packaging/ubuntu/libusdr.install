@@ -1,2 +1,0 @@
-usr/lib/${DEB_HOST_MULTIARCH}/lib* usr/lib/${DEB_HOST_MULTIARCH}/
-src/lib/device/50-usdr-usb.rules /etc/udev/rules.d/

@@ -1,0 +1,42 @@
+# Ubuntu Bionic Beaver (18.04)
+FROM ubuntu:18.04
+
+ENV TZ=UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update
+RUN apt-get upgrade -y
+
+RUN apt-get install build-essential curl -y
+
+# Install fresh version of Cmake
+RUN apt-get install libssl-dev -y
+RUN cd /tmp \
+    && curl https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -o cmake-3.28.3.tar.gz \
+    && tar xvf cmake-3.28.3.tar.gz \
+    && cd cmake-3.28.3 \
+    && ./bootstrap \
+    && make \
+    && make install \
+    && cd .. \
+    && rm -rf cmake-3.28.3 cmake-3.28.3.tar.gz \
+    && update-alternatives --install /usr/bin/cmake cmake /usr/local/bin/cmake 10
+
+RUN apt-get install python3.8 python3.8-distutils -y
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 10
+RUN curl https://bootstrap.pypa.io/get-pip.py | python3.8
+RUN python3.8 -m pip install pyyaml
+
+RUN apt-get install dwarves libusb-1.0-0-dev libsoapysdr-dev check -y
+RUN apt-get install dh-make devscripts debhelper dkms -y
+
+RUN sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
+RUN mkdir -p /work/build
+RUN mkdir -p /work/source
+RUN mkdir -p /work/output
+ENV PACKAGE_DIR_NAME=ubuntu-bionic
+ENV PACKAGE_ARCH_NAME=unknown
+WORKDIR /work/
+
+CMD ["tail", "-f", "/dev/null"]

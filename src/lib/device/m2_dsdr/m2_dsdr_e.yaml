@@ -12,8 +12,8 @@ bus:
     wr_mask: 0x80000000
 addr_width:   8
 data_width:   24
-page_prefix:  True
-field_prefix: [ Page, RegName ]
+# page_prefix:  True
+field_prefix: [ RegName ]
 field_macros: True
 
 x-rx-filt-in-opts: &rx-filt-in-opts
@@ -40,9 +40,9 @@ x-rx-filt-out-opts: &rx-filt-out-opts
 
 x-if-lna-opts: &if-lna-opts
     0b00: LNA
-    0b01: "OFF"
+    0b01: Disable
     0b10: BYPASS
-    0b11: BYPASS
+    0b11: BYPASS2
 
 pages:
   - name: V0
@@ -142,57 +142,57 @@ pages:
         fields:
 #
           - bits: "6"
-            name: RX_CHA
+            name: RX_H_CHA
             desc: Channel A RX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "7"
-            name: RX_CHB
+            name: RX_H_CHB
             desc: Channel B RX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "4"
-            name: RX_CHC
+            name: RX_H_CHC
             desc: Channel C RX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "5"
-            name: RX_CHD
+            name: RX_H_CHD
             desc: Channel D RX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "3"
-            name: TX_CHA
-            desc: Channel A TX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
+            name: TX_L_CHA
+            desc: Channel A TX OUT selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "2"
-            name: TX_CHB
-            desc: Channel B TX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
+            name: TX_L_CHB
+            desc: Channel B TX OUT selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "1"
-            name: TX_CHC
-            desc: Channel C TX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
+            name: TX_L_CHC
+            desc: Channel C TX OUT selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "0"
-            name: TX_CHD
-            desc: Channel D TX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
+            name: TX_L_CHD
+            desc: Channel D TX OUT selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
 
       - addr: 0x23
         name: SW_IN
         fields:
 #
           - bits: "0"
-            name: RX_CHA
-            desc: Channel A RX IN selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
+            name: RX_L_CHA
+            desc: Channel A RX IN selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "1"
-            name: RX_CHB
-            desc: Channel B RX IN selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
+            name: RX_L_CHB
+            desc: Channel B RX IN selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "2"
-            name: RX_CHC
-            desc: Channel C RX IN selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
+            name: RX_L_CHC
+            desc: Channel C RX IN selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "3"
-            name: RX_CHD
-            desc: Channel D RX IN selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
+            name: RX_L_CHD
+            desc: Channel D RX IN selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "4"
-            name: TX_CHA
+            name: TX_H_CHA
             desc: Channel A TX IN selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "5"
-            name: TX_CHB
+            name: TX_H_CHB
             desc: Channel B TX IN selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "6"
-            name: TX_CHC
+            name: TX_H_CHC
             desc: Channel C TX IN selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "7"
-            name: TX_CHD
+            name: TX_H_CHD
             desc: Channel D TX IN selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
 #
       - addr: 0x24
@@ -205,10 +205,10 @@ pages:
             name: REF_GPS
             desc: Enable GPS module
           - bits: "1"
-            name: 8V_TX
+            name: P8V_TX
             desc: Enable +8v power supply for TX amps
           - bits: "0"
-            name: 5V_RX
+            name: P5V_RX
             desc: Enable +5v power supply for RX amps
 #
       - addr: 0x25

@@ -25,7 +25,8 @@ struct stream_ops {
                 const char **stream_buffs,
                 unsigned samples,
                 dm_time_t timestamp,
-                unsigned timeout_ms);
+                unsigned timeout_ms,
+                usdr_dms_send_stat_t* stat);
 
     int (*stat)(stream_handle_t*, usdr_dms_nfo_t* nfo);
 
@@ -41,6 +42,11 @@ struct stream_handle {
     const stream_ops_t* ops;
 };
 typedef struct stream_handle stream_handle_t;
+
+
+int usdr_channel_info_map_default(const usdr_channel_info_t* channels, const channel_map_info_t* map, unsigned int max_chnum, channel_info_t* core_chans);
+
+int usdr_channel_info_string_parse(char* chanlist, unsigned max_chans, usdr_channel_info_t* cinfo);
 
 
 #endif

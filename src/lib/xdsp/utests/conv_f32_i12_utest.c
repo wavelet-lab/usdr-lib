@@ -8,9 +8,9 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_f32_i12_2.h"
+#include "conv_f32_i12_2.h"
 
-#undef DEBUG_PRINT
+//#define DEBUG_PRINT
 
 #define PACKET_SIZE (8192u)
 #define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
@@ -36,9 +36,12 @@ static void setup()
     posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
 
     //fill
+    srand( time(0) );
+
     for(int i = 0; i < PACKET_SIZE; ++i)
     {
-        in[i] = ((float)i / PACKET_SIZE) - 0.5;
+        float sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? 1.0 : -1.0;
+        in[i] = sign * (float)(rand()) / (float)RAND_MAX;
     }
 }
 
@@ -112,6 +115,35 @@ static int is_equal()
     return res;
 }
 
+static void printer(const char* header)
+{
+    fprintf(stderr, "%s\n", header ? header : "");
+
+    fprintf(stderr, "in : ");
+    for(unsigned i = 0; i < 16; ++i)
+    {
+        fprintf(stderr, "%.4f ", in[i]);
+    }
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "out: ");
+    for(unsigned i = 0; i < 24; i += 3)
+    {
+        uint8_t v0 = out[i + 0];
+        uint8_t v1 = out[i + 1];
+        uint8_t v2 = out[i + 2];
+
+        float a = (int16_t) (((uint16_t)v0 << 4) | ((uint16_t)v1 << 12));
+        float b = (int16_t) (((uint16_t)v2 << 8) | (v1 & 0xf0));
+
+        a *= CONV_SCALE;
+        b *= CONV_SCALE;
+
+        fprintf(stderr, "%.4f %.4f ", a, b);
+    }
+    fprintf(stderr, "\n");
+}
+
 START_TEST(conv_f32_i12_check_simd)
 {
     generic_opts_t opt = max_opt;
@@ -127,6 +159,7 @@ START_TEST(conv_f32_i12_check_simd)
 
     //get etalon output data (generic foo)
     (*get_fn(OPT_GENERIC, 0))(&pin, bzin, &pout, bzout);
+    printer("HEADER:");
     memcpy(out_etalon, out, bzout);
 
     while(opt != OPT_GENERIC)
@@ -136,23 +169,12 @@ START_TEST(conv_f32_i12_check_simd)
         {
             memset(out, 0, bzout);
             (*fn)(&pin, bzin, &pout, bzout);
-#if 0
-            fprintf(stderr, "\n");
-            for(uint16_t i = 0; i < 16; ++i)
-            {
-                fprintf(stderr, "%.6f ", out[i]);
-            }
-            fprintf(stderr, "\n");
+#ifdef DEBUG_PRINT
+            printer(NULL);
 #endif
             int res = is_equal();
             //int res = memcmp(out, out_etalon, bzout);
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
-#ifdef DEBUG_PRINT
-            for(int i = 0; res && i < STREAM_SIZE_CHECK; ++i)
-            {
-                fprintf(stderr, "i = %d : in = %d, out = %.6f, etalon = %.6f\n", i, in[i], out[i], out_etalon[i]);
-            }
-#endif
             ck_assert_int_eq( res, 0 );
         }
     }
@@ -169,7 +191,7 @@ START_TEST(conv_f32_i12_speed)
     last_fn_name = NULL;
 
     const size_t bzin  = packet_lens[_i] * sizeof(float);
-    const size_t bzout = OUT_BZ;
+    const size_t bzout = bzin * 3 / 8;
 
     fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
     fprintf(stderr,   "**** packet: %lu bytes, iters: %u ***\n", bzin, SPEED_MEASURE_ITERS);

@@ -37,9 +37,13 @@ int tca6424a_reg16_get(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
                        uint8_t reg, uint16_t* oval)
 {
     uint8_t data[1] = { 0x80 | reg };
-    return lowlevel_ls_op(dev, subdev,
-                          USDR_LSOP_I2C_DEV, ls_op_addr,
-                          2, oval, 1, data);
+    uint8_t odata[2] = { 0x00, 0x00 };
+    int res = lowlevel_ls_op(dev, subdev,
+                             USDR_LSOP_I2C_DEV, ls_op_addr,
+                             2, odata, 1, data);
+
+    *oval = (((unsigned)odata[0]) << 8) | odata[1];
+    return res;
 }
 
 

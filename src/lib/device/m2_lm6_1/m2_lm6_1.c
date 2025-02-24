@@ -65,7 +65,12 @@ const usdr_dev_param_constant_t s_params_m2_lm6_1_rev000[] = {
     { "/ll/idx_regsp/0/base", M2PCI_REG_WR_BADDR },
     { "/ll/idx_regsp/0/virt_base", VIRT_CFG_SFX_BASE },
 
-    { "/ll/gpio/0/base",   M2PCI_WR_GPIO_CB },
+    { "/ll/gpio/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_GPIO15_SIMPLE) },
+    { "/ll/gpio/0/base", M2PCI_REG_GPIO_S },
+    { "/ll/gpio/0/irq",  -1 },
+    { "/ll/uart/0/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_UART_SIMPLE) },
+    { "/ll/uart/0/base", REG_UART_TRX },
+    { "/ll/uart/0/irq",  -1 },
 
     // data stream cores
     { "/ll/srx/0/core",    USDR_MAKE_COREID(USDR_CS_STREAM, USDR_SC_RXDMA_BRSTN) },
@@ -98,8 +103,12 @@ const usdr_dev_param_constant_t s_params_m2_lm6_1_rev000[] = {
     { "/ll/poll_event/in",  M2PCI_INT_RX },
     { "/ll/poll_event/out", M2PCI_INT_TX },
 
-    { "/ll/fe/i2c_addr", },
+    // Frontend interface
+    { "/ll/fe/0/gpio_busno/0",  0},
+    { "/ll/fe/0/uart_busno/0",  0},
 
+    { "/ll/fe/0/spi_busno/0", -1},
+    { "/ll/fe/0/i2c_busno/0", -1},
 };
 
 static int dev_m2_lm6_1_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -826,11 +835,10 @@ int dev_m2_lm6_1_sdr_revision_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* o
 int dev_m2_lm6_1_sdr_rfe_throttle_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
-    bool enable = (value & (1 << 16)) ? true : false;
-    uint8_t en = value >> 8;
-    uint8_t skip = value;
-
-    return sfe_rx4_throttle(d->base.dev, 0, CSR_RFE4_BASE, enable, en, skip);
+    if (d->rx) {
+        return d->rx->ops->option_set(d->rx, "throttle", value);
+    }
+    return -EINVAL;
 }
 
 static
@@ -902,20 +910,41 @@ int usdr_device_m2_lm6_1_initialize(pdevice_t udev, unsigned pcount, const char*
     return res;
 }
 
+static const channel_map_info_t s_usdr_chmap[] = {
+    { "ai", 0 },
+    { "aq", 1 },
+    { "i", 0 },
+    { "q", 1 },
+    { "a", 0 },
+    { NULL, CH_NULL },
+};
+
+
+int usdr_map_channels(const usdr_channel_info_t* channels, channel_info_t* core_chans)
+{
+    return usdr_channel_info_map_default(channels, s_usdr_chmap, 2, core_chans);
+}
+
 static
 int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const char* dformat,
-                                           uint64_t channels, unsigned pktsyms,
-                                           unsigned flags, stream_handle_t** out_handle)
+                                              const usdr_channel_info_t* channels, unsigned pktsyms,
+                                              unsigned flags, const char* parameters, stream_handle_t** out_handle)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)dev;
     int res = -EINVAL;
     unsigned chans;
+    channel_info_t lchans;
+
+    res = usdr_map_channels(channels, &lchans);
+    if (res) {
+        return res;
+    }
 
     if (strstr(sid, "rx") != NULL) {
         if (d->rx) {
             return -EBUSY;
         }
-        res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels, pktsyms,
+        res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
                                     flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &chans);
         if (res) {
@@ -926,7 +955,7 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         if (d->tx) {
             return -EBUSY;
         }
-        res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels, pktsyms,
+        res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
                                     flags, M2PCI_REG_WR_TXDMA_CNF_L, VIRT_CFG_SFX_BASE + 512,
                                     0, 0, &d->tx, &chans);
         if (res) {
