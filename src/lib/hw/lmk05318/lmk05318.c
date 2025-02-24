@@ -923,7 +923,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
         }
         else
         {
-            USDR_LOG("5318", USDR_LOG_WARNING, "port:%d cannot solve it via APLL1, will try APLL2", out->port);
+            USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d cannot solve it via APLL1, will try APLL2", out->port);
         }
 
         //we cannot revert phase for ports NOT linked to APLL1

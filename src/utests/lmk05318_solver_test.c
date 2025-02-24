@@ -1,19 +1,15 @@
-#include "stdio.h"
+#include <check.h>
 #include "lmk05318/lmk05318.h"
-#include "usdr_logging.h"
 
 #define OUTS_LEN 8
 #define DELTA_PLUS 2
 #define DELTA_MINUS 2
 
-int main()
+static lmk05318_out_config_t cfg[OUTS_LEN];
+
+static void setup()
 {
-    fprintf(stderr, "LMK05318 solver test\n");
-
-    usdrlog_setlevel(NULL, USDR_LOG_DEBUG);
-    usdrlog_enablecolorize(NULL);
-
-    lmk05318_out_config_t cfg[OUTS_LEN];
+    memset(cfg, 0, sizeof(cfg));
 
     cfg[0].port = 0;
     cfg[0].wanted.freq = 100000000;
@@ -70,23 +66,40 @@ int main()
     cfg[7].wanted.freq_delta_plus = DELTA_PLUS;
     cfg[7].wanted.revert_phase = true;
     cfg[7].wanted.type = OUT_OFF;
+}
 
-//    VCO_APLL2_MIN = 5500000000ull,
-//    VCO_APLL2_MAX = 6250000000ull,
-/*
-    uint64_t f = 5659995555ull;
+static void teardown()
+{
+}
+
+START_TEST(lmk05318_solver_test1)
+{
+    int res = lmk05318_solver(NULL, cfg, 8);
+    ck_assert_int_eq( res, 0 );
+}
+
+START_TEST(lmk05318_solver_test2)
+{
+    const uint64_t f = 5659995555ull;
     cfg[2].wanted.freq = cfg[3].wanted.freq =   f/7/256;
     cfg[5].wanted.freq =                        f/2/4;
     cfg[6].wanted.freq =                        f/7/17;
-*/
 
     int res = lmk05318_solver(NULL, cfg, 8);
-    if(res)
-    {
-        fprintf(stderr, "lmk05318_solver() error:%d\n", res);
-        return res;
-    }
+    ck_assert_int_eq( res, 0 );
+}
 
-    fprintf(stderr, "lmk05318_solver() OK\n");
-    return 0;
+Suite * lmk05318_solver_suite(void)
+{
+    Suite *s;
+    TCase *tc_core;
+
+    s = suite_create("lmk05318_solver");
+    tc_core = tcase_create("HW");
+    tcase_set_timeout(tc_core, 1);
+    tcase_add_checked_fixture(tc_core, setup, teardown);
+    tcase_add_test(tc_core, lmk05318_solver_test1);
+    tcase_add_test(tc_core, lmk05318_solver_test2);
+    suite_add_tcase(s, tc_core);
+    return s;
 }

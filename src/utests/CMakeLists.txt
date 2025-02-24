@@ -13,6 +13,7 @@ set(TEST_SUIT_SRCS
     ring_buffer_test.c
     trig_test.c
     clockgen_test.c
+    lmk05318_solver_test.c
 )
 
 include_directories(../lib/xdsp)
@@ -20,6 +21,3 @@ include_directories(../lib/common)
 
 add_executable(usdr_testsuit ${TEST_SUIT_SRCS})
 target_link_libraries(usdr_testsuit usdr mock_lowlevel usdr-dsp check subunit m rt pthread)
-
-add_executable(lmk05318_test lmk05318_test.c)
-target_link_libraries(lmk05318_test usdr check subunit m rt pthread)
