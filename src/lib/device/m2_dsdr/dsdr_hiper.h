@@ -51,6 +51,9 @@ struct fe_chan_config {
 
     uint64_t tx_freq;
     uint64_t tx_nco;
+
+    uint8_t lms8_pa_gain;
+    uint8_t lms8_lna_gain;
 };
 typedef struct fe_chan_config fe_chan_config_t;
 

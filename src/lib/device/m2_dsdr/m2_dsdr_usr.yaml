@@ -206,6 +206,37 @@ pages:
             name: D
             desc: FE Chan enabled
 #
+      - addr: 0x48
+        name: RX_8KA_LNA
+        fields:
+          - bits: "4:0"
+            name: A
+            desc: FE LMS8001A RX low band 0-15 LNA Gain, 16 bypass
+          - bits: "10:6"
+            name: B
+            desc: FE LMS8001A RX low band 0-15 LNA Gain, 16 bypass
+          - bits: "16:12"
+            name: C
+            desc: FE LMS8001A RX low band 0-15 LNA Gain, 16 bypass
+          - bits: "22:18"
+            name: D
+            desc: FE LMS8001A RX low band 0-15 LNA Gain, 16 bypass
+#
+      - addr: 0x49
+        name: RX_8KA_PA
+        fields:
+          - bits: "4:0"
+            name: A
+            desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
+          - bits: "10:6"
+            name: B
+            desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
+          - bits: "16:12"
+            name: C
+            desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
+          - bits: "22:18"
+            name: D
+            desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
 
 
 

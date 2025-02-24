@@ -1237,7 +1237,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     for (unsigned j = 0; j < 10; j++) {
         usleep(10000);
-        res = res ? res : dev_gpi_get32(dev, 16, &pg);
+        res = res ? res : dev_gpi_get32(dev, IGPI_PGOOD, &pg);
         if (res || (pg & 1))
             break;
     }
@@ -1283,6 +1283,9 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     res = res ? res : lmk05318_check_lock(&d->lmk, &los);
     // res = res ? res : lmk05318_set_out_mux(&d->lmk, LMK_FPGA_SYSREF, false, LVDS);
+
+    usleep(1000);
+    res = res ? res : dev_gpi_get32(dev, IGPI_PGOOD, &pg);
 
     USDR_LOG("DSDR", USDR_LOG_ERROR, "Configuration: OK [%08x, %08x] res=%d   PG=%08x\n", usr2, hwid, res, pg);
 

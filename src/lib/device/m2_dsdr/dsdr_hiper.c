@@ -728,14 +728,6 @@ static int dsdr_hiper_initialize_lms8(dsdr_hiper_fe_t* dfe, unsigned addr, lms80
     USDR_LOG("HIPR", USDR_LOG_WARNING, "LMS8001.%08x: version %08x\n", addr, chipver);
 
     res = res ? res : lms8001_create(dfe->dev, dfe->subdev, addr, obj);
-
-    /*
-    if (addr == SPI_LMS8001A_U3_RX_AB_IDX || addr == SPI_LMS8001A_U4_RX_CD_IDX) {
-        res = res ? res : lms8001a_ch_enable(obj, 0xc, 0, 0);
-    } else {
-        res = res ? res : lms8001_ch_enable(obj, 0xc);
-    }
-    */
     res = res ? res : lms8001_temp_start(obj);
 
     return res;
@@ -898,10 +890,11 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, dsdr_hiper_fe_t* df
         cfg->rx_nco = 0;
         cfg->tx_freq = 0;
         cfg->tx_nco = 0;
+        cfg->lms8_lna_gain = 0;
+        cfg->lms8_pa_gain = 0;
     }
 
     res = dsdr_hiper_update_fe_user(dfe);
-
 
     USDR_LOG("HIPR", USDR_LOG_INFO, "HIPER front end is ready!\n");
     return res;
@@ -944,6 +937,24 @@ int dsdr_hiper_fe_destroy(dsdr_hiper_fe_t* dfe)
     return res;
 }
 
+static void convert_lms8_gains_to_loss(dsdr_hiper_fe_t* def, unsigned chno, unsigned *pa, unsigned *lna)
+{
+    unsigned pa_gain = def->ucfg[chno].lms8_pa_gain;
+    unsigned lna_gain = def->ucfg[chno].lms8_lna_gain;
+
+    if (pa_gain >= 16)
+        pa_gain = ~0u;
+    else
+        pa_gain = 15 - pa_gain;
+
+    if (lna_gain >= 16)
+        lna_gain = ~0u;
+    else
+        lna_gain = 15 - lna_gain;
+
+    *lna = lna_gain;
+    *pa = pa_gain;
+}
 
 int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -1007,6 +1018,18 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
             hiper->ucfg[H_CHC].tx_en = GET_M2_DSDR_USR_TX_CHEN_C(data);
             hiper->ucfg[H_CHD].tx_en = GET_M2_DSDR_USR_TX_CHEN_D(data);
             break;
+        case RX_8KA_LNA:
+            hiper->ucfg[H_CHA].lms8_lna_gain = GET_M2_DSDR_USR_RX_8KA_LNA_A(data);
+            hiper->ucfg[H_CHB].lms8_lna_gain = GET_M2_DSDR_USR_RX_8KA_LNA_B(data);
+            hiper->ucfg[H_CHC].lms8_lna_gain = GET_M2_DSDR_USR_RX_8KA_LNA_C(data);
+            hiper->ucfg[H_CHD].lms8_lna_gain = GET_M2_DSDR_USR_RX_8KA_LNA_D(data);
+            break;
+        case RX_8KA_PA:
+            hiper->ucfg[H_CHA].lms8_pa_gain = GET_M2_DSDR_USR_RX_8KA_PA_A(data);
+            hiper->ucfg[H_CHB].lms8_pa_gain = GET_M2_DSDR_USR_RX_8KA_PA_B(data);
+            hiper->ucfg[H_CHC].lms8_pa_gain = GET_M2_DSDR_USR_RX_8KA_PA_C(data);
+            hiper->ucfg[H_CHD].lms8_pa_gain = GET_M2_DSDR_USR_RX_8KA_PA_D(data);
+            break;
         default:
             return -EINVAL;
         }
@@ -1021,6 +1044,18 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
                 pusdr_vfs_obj_t obj;
                 res = res ? res : hiper->dev->pdev->vfs_get_single_object(hiper->dev->pdev, entity, &obj);
                 res = res ? res : obj->ops.si64(obj, hiper->ucfg[i].rx_freq);
+            }
+
+            if ((addr == RX_8KA_LNA || addr == RX_8KA_PA) && hiper->ucfg[i].rx_en && ((hiper->ucfg[i].rx_band & 1) == IFBAND_400_3500)) {
+                unsigned idx = (i < 2) ? SPI_LMS8001A_U3_RX_AB_IDX : SPI_LMS8001A_U4_RX_CD_IDX;
+                unsigned chan = 2 + (i % 2);
+                unsigned lna_loss;
+                unsigned pa_loss;
+
+                convert_lms8_gains_to_loss(hiper, i, &pa_loss, &lna_loss);
+                USDR_LOG("HIPR", USDR_LOG_WARNING, "Updating chan %d LNA_LOSS: %d PA_LOSS: %d\n", i, lna_loss, pa_loss);
+
+                res = res ? res : lms8001a_ch_lna_pa_set(&hiper->lms8[idx], chan, lna_loss, pa_loss);
             }
         }
 
@@ -1067,6 +1102,16 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
             hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_TX_CHEN(
                 hiper->ucfg[H_CHD].tx_en, hiper->ucfg[H_CHC].tx_en,
                 hiper->ucfg[H_CHB].tx_en, hiper->ucfg[H_CHA].tx_en);
+            break;
+        case RX_8KA_LNA:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_RX_8KA_LNA(
+                hiper->ucfg[H_CHD].lms8_lna_gain, hiper->ucfg[H_CHC].lms8_lna_gain,
+                hiper->ucfg[H_CHB].lms8_lna_gain, hiper->ucfg[H_CHA].lms8_lna_gain);
+            break;
+        case RX_8KA_PA:
+            hiper->debug_usr_reg_last = MAKE_M2_DSDR_USR_RX_8KA_PA(
+                hiper->ucfg[H_CHD].lms8_pa_gain, hiper->ucfg[H_CHC].lms8_pa_gain,
+                hiper->ucfg[H_CHB].lms8_pa_gain, hiper->ucfg[H_CHA].lms8_pa_gain);
             break;
         default:
             return -EINVAL;
@@ -1368,11 +1413,18 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxi
                          (def->ucfg[chno + 1].rx_en << 3) | (def->ucfg[chno].rx_en << 2);
 
     if (high_path) {
-        res = res ? res : lms8001a_ch_enable(&def->lms8[idx_off], 0x0, 0, 0);
+        unsigned zeroes[4] = {0, 0, 0, 0};
+        res = res ? res : lms8001a_ch_enable(&def->lms8[idx_off], 0x0, zeroes, zeroes);
         res = res ? res : lms8001_ch_enable(&def->lms8[idx], chmsk);
     } else {
+        unsigned pas[4] = {0, 0, 0, 0};
+        unsigned lnas[4] = {0, 0, 0, 0};
+
+        convert_lms8_gains_to_loss(def, (chno & 1) ? chno - 0 : chno + 1, pas + 3, lnas + 3);
+        convert_lms8_gains_to_loss(def, (chno & 1) ? chno - 1 : chno + 0, pas + 2, lnas + 2);
+
         res = res ? res : lms8001_ch_enable(&def->lms8[idx_off], 0x0);
-        res = res ? res : lms8001a_ch_enable(&def->lms8[idx], chmsk, 0, 0);
+        res = res ? res : lms8001a_ch_enable(&def->lms8[idx], chmsk, lnas, pas);
     }
 
     res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
