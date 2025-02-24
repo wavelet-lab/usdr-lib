@@ -253,6 +253,47 @@ int lms8001_ch_enable(lms8001_state_t* state, unsigned mask)
     return res;
 }
 
+
+int lms8001a_ch_enable(lms8001_state_t* state, unsigned mask, unsigned lna_loss, unsigned pa_loss)
+{
+    int res;
+    unsigned e[] = { (mask >> 0) & 1, (mask >> 1) & 1, (mask >> 2) & 1, (mask >> 3) & 1 };
+    unsigned lna_bp = (lna_loss == ~0u) ? 1 : 0;
+    unsigned pa_bp = (pa_loss == ~0u) ? 1 : 0;
+
+    state->chan_mask = mask;
+
+    uint32_t en_regs[] = {
+        MAKE_LMS8001_BIASLDOCONFIG_LOBUFA_LDO_Config(0, 0, e[0], LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_LOBUFB_LDO_Config(0, 0, e[1], LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_LOBUFC_LDO_Config(0, 0, e[2], LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_LOBUFD_LDO_Config(0, 0, e[3], LMS_LDO_1P25),
+
+        MAKE_LMS8001_BIASLDOCONFIG_HFLNAA_LDO_Config(0, 0, e[0], LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_HFLNAB_LDO_Config(0, 0, e[1], LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_HFLNAC_LDO_Config(0, 0, e[2], LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_HFLNAD_LDO_Config(0, 0, e[3], LMS_LDO_1P25),
+
+        MAKE_LMS8001_CHANNEL_A_CHx_PD0(0, pa_bp, pa_bp || !e[0], !lna_bp || !e[0], 1, lna_bp || !e[0], 1, lna_bp || !e[0]),
+        MAKE_LMS8001_CHANNEL_B_CHx_PD0(0, pa_bp, pa_bp || !e[1], !lna_bp || !e[1], 1, lna_bp || !e[1], 1, lna_bp || !e[1]),
+        MAKE_LMS8001_CHANNEL_C_CHx_PD0(0, pa_bp, pa_bp || !e[2], !lna_bp || !e[2], 1, lna_bp || !e[2], 1, lna_bp || !e[2]),
+        MAKE_LMS8001_CHANNEL_D_CHx_PD0(0, pa_bp, pa_bp || !e[3], !lna_bp || !e[3], 1, lna_bp || !e[3], 1, lna_bp || !e[3]),
+
+        MAKE_LMS8001_CHANNEL_A_CHx_LNA_CTRL0(16, 16, 10, lna_loss),
+        MAKE_LMS8001_CHANNEL_B_CHx_LNA_CTRL0(16, 16, 10, lna_loss),
+        MAKE_LMS8001_CHANNEL_C_CHx_LNA_CTRL0(16, 16, 10, lna_loss),
+        MAKE_LMS8001_CHANNEL_D_CHx_LNA_CTRL0(16, 16, 10, lna_loss),
+
+        MAKE_LMS8001_CHANNEL_A_CHx_PA_CTRL0(pa_loss, pa_loss),
+        MAKE_LMS8001_CHANNEL_B_CHx_PA_CTRL0(pa_loss, pa_loss),
+        MAKE_LMS8001_CHANNEL_C_CHx_PA_CTRL0(pa_loss, pa_loss),
+        MAKE_LMS8001_CHANNEL_D_CHx_PA_CTRL0(pa_loss, pa_loss),
+    };
+
+    res = lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
+    return res;
+}
+
 int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms8001_state_t *out)
 {
     int res;

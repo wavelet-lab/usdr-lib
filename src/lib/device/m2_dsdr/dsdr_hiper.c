@@ -729,8 +729,13 @@ static int dsdr_hiper_initialize_lms8(dsdr_hiper_fe_t* dfe, unsigned addr, lms80
 
     res = res ? res : lms8001_create(dfe->dev, dfe->subdev, addr, obj);
 
-    res = res ? res : lms8001_ch_enable(obj, 0xc);
-
+    /*
+    if (addr == SPI_LMS8001A_U3_RX_AB_IDX || addr == SPI_LMS8001A_U4_RX_CD_IDX) {
+        res = res ? res : lms8001a_ch_enable(obj, 0xc, 0, 0);
+    } else {
+        res = res ? res : lms8001_ch_enable(obj, 0xc);
+    }
+    */
     res = res ? res : lms8001_temp_start(obj);
 
     return res;
@@ -1313,27 +1318,57 @@ void dsdr_hiper_fe_rx_band_upd(dsdr_hiper_fe_t* def, unsigned chno, bool flo_h)
              def->ucfg[chno].rx_band);
 }
 
+static unsigned get_lms8_idx(bool high_path, unsigned chno)
+{
+    return (high_path) ?
+               ((chno < 2) ? SPI_LMS8001B_U1_RX_AB_IDX : SPI_LMS8001B_U2_RX_CD_IDX) :
+               ((chno < 2) ? SPI_LMS8001A_U3_RX_AB_IDX : SPI_LMS8001A_U4_RX_CD_IDX);
+}
+
 int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxiq, bool* flo_h)
 {
     int res = 0;
 
-    bool fLOh = (def->ucfg[chno].rx_freq < 3300e6);
+    bool fLOh = (def->ucfg[chno].rx_freq < 3700e6);
+    bool high_path;
+
+    if (def->ucfg[chno].rx_band < BAND_OPTS_BAND_AUTO_L) {
+        high_path = (def->ucfg[chno].rx_band == BAND_OPTS_BAND_400_3500) ? false : true;
+    } else {
+        high_path = (def->ucfg[chno].rx_freq < 2600e6) ? false : true;
+    }
 
     uint64_t fIF = 2075e6;
     uint64_t fLO = (fLOh) ? def->ucfg[chno].rx_freq + fIF : def->ucfg[chno].rx_freq - fIF;
 
-    unsigned idx = ((def->ucfg[chno].rx_band & 1) == BAND_OPTS_BAND_2200_7200) ?
-                       ((chno < 2) ? SPI_LMS8001B_U1_RX_AB_IDX : SPI_LMS8001B_U2_RX_CD_IDX) :
-                       ((chno < 2) ? SPI_LMS8001A_U3_RX_AB_IDX : SPI_LMS8001A_U4_RX_CD_IDX);
+    if (high_path == false) {
+        fIF = 1975e6;
+        fLO = def->ucfg[chno].rx_freq + fIF;
+    }
+
+    unsigned idx = get_lms8_idx(high_path, chno);
+    unsigned idx_off = get_lms8_idx(!high_path, chno);
+
+    unsigned chmsk = (chno & 1) ?
+                         (def->ucfg[chno].rx_en << 3) | (def->ucfg[chno - 1].rx_en << 2) :
+                         (def->ucfg[chno + 1].rx_en << 3) | (def->ucfg[chno].rx_en << 2);
+
+    if (high_path) {
+        res = res ? res : lms8001a_ch_enable(&def->lms8[idx_off], 0x0, 0, 0);
+        res = res ? res : lms8001_ch_enable(&def->lms8[idx], chmsk);
+    } else {
+        res = res ? res : lms8001_ch_enable(&def->lms8[idx_off], 0x0);
+        res = res ? res : lms8001a_ch_enable(&def->lms8[idx], chmsk, 0, 0);
+    }
 
     res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
 
     def->ucfg[chno].rx_nco = fIF;
     *p_swap_rxiq = (fLOh) ? 1 : 0;
-    *flo_h = fLOh;
+    *flo_h = high_path;
 
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] NCO=%.3f LO_%c=%.3f SWAP_IQ=%d\n", chno,
-             def->ucfg[chno].rx_nco / 1.0e6, fLOh ? 'H' : 'L', fLO / 1.0e6, *p_swap_rxiq);
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] NCO=%.3f LO_%c=%.3f SWAP_IQ=%d PATH=%s LMS8[%d]_MSK=%x\n", chno,
+             def->ucfg[chno].rx_nco / 1.0e6, fLOh ? 'H' : 'L', fLO / 1.0e6, *p_swap_rxiq, high_path ? "HIGH" : "LOW", idx, chmsk);
 
     return res;
 }
