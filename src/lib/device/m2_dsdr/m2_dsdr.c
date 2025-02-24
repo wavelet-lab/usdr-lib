@@ -1635,6 +1635,7 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
             return -EBUSY;
         }
 
+        d->hw_enabled_tx = 0;
         memset(d->tx_hw_to_logic, 0xff, sizeof(d->tx_hw_to_logic));
 
         if (channels->count > 2) {
