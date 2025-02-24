@@ -956,6 +956,7 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
 
     if (value & 0x80000000) {
         USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_USER %08x => %08x\n", addr, data);
+        uint8_t rx_band_old[] = { hiper->ucfg[H_CHA].rx_band, hiper->ucfg[H_CHB].rx_band, hiper->ucfg[H_CHC].rx_band, hiper->ucfg[H_CHD].rx_band };
 
         switch (addr) {
         case RX_IFAMP_BP:
@@ -1008,6 +1009,19 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
             break;
         default:
             return -EINVAL;
+        }
+
+        for (unsigned i = 0; i < HIPER_MAX_HW_CHANS; i++) {
+            if (hiper->ucfg[i].rx_band != rx_band_old[i]) {
+                char entity[] = "/dm/sdr/0/rx/freqency/a";
+                static const uint8_t s_chanmap_fe_to_hw[4] = { 3, 2, 0, 1 };
+                entity[SIZEOF_ARRAY(entity) - 2] = 'a' + s_chanmap_fe_to_hw[i];
+
+                USDR_LOG("HIPR", USDR_LOG_WARNING, "Update `%s`\n", entity);
+                pusdr_vfs_obj_t obj;
+                res = res ? res : hiper->dev->pdev->vfs_get_single_object(hiper->dev->pdev, entity, &obj);
+                res = res ? res : obj->ops.si64(obj, hiper->ucfg[i].rx_freq);
+            }
         }
 
         // Update state
