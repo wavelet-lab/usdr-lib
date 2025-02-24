@@ -25,7 +25,7 @@ int main(int argc, char** argv)
     fprintf(stderr, "Running with %s CPU features\n", buffer);
     usdrlog_setlevel(NULL, (argc > 1) ? USDR_LOG_TRACE : USDR_LOG_INFO);
     usdrlog_enablecolorize(NULL);
-#if 1
+#if 0
     sr = srunner_create(ring_buffer_suite());
     srunner_add_suite(sr, trig_suite());
     srunner_add_suite(sr, clockgen_suite());

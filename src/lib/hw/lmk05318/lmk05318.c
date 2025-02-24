@@ -185,6 +185,52 @@ int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div)
     return 0;
 }
 
+static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned pd1, unsigned pd2)
+{
+    unsigned fref = VCO_APLL1 / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
+    if (fref < APLL2_PD_MIN || fref > APLL2_PD_MAX) {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 PFD should be in range [%" PRIu64 ";%" PRIu64 "] but got %d!\n",
+                 (uint64_t)APLL2_PD_MIN, (uint64_t)APLL2_PD_MAX, fref);
+        return -EINVAL;
+    }
+
+    if(fvco2 < VCO_APLL2_MIN || fvco2 > VCO_APLL2_MAX ||
+        pd1 < APLL2_PDIV_MIN || pd1 > APLL2_PDIV_MAX ||
+        pd2 < APLL2_PDIV_MIN || pd2 > APLL2_PDIV_MAX)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2: either FVCO2[%" PRIu64"] or PD1[%d] or PD2[%d] is out of range",
+                                          fvco2, pd1, pd2);
+        // Disable
+        uint32_t regs[] = {
+            MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
+        };
+        return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));;
+    }
+
+    unsigned n = fvco2 / fref;
+    unsigned num = (fvco2 - n * (uint64_t)fref) * (1ull << 24) / fref;
+    int res;
+
+    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 FVCO=%" PRIu64 " N=%d NUM=%d PD1=%d PD2=%d\n", fvco2, n, num, pd1, pd2);
+
+    uint32_t regs[] = {
+        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
+        MAKE_LMK05318_PLL2_CTRL2(pd2 - 1, pd1 - 1),
+        MAKE_LMK05318_PLL2_NDIV_BY0(n),
+        MAKE_LMK05318_PLL2_NDIV_BY1(n),
+        MAKE_LMK05318_PLL2_NUM_BY0(num),
+        MAKE_LMK05318_PLL2_NUM_BY1(num),
+        MAKE_LMK05318_PLL2_NUM_BY2(num),
+        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 0),
+    };
+
+    res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    if (res)
+        return res;
+
+    return 0;
+}
+
 int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, int xo_type,
                          bool xo_doubler_enabled, bool xo_fdet_bypass)
 {
@@ -281,7 +327,7 @@ int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
-int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype)
+static int lmk05318_set_out_mux_ex(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
 {
     unsigned ot;
     switch (otype) {
@@ -291,7 +337,6 @@ int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned
     case LVCMOS: ot = OUT_OPTS_LVCMOS_P_N; break;
     default: ot = OUT_OPTS_Disabled; break;
     }
-    unsigned mux = (pll1) ? OUT_PLL_SEL_APLL1_P1 : OUT_PLL_SEL_APLL2_P1;
 
     if (port > 7)
         return -EINVAL;
@@ -308,9 +353,14 @@ int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
+int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype)
+{
+    return lmk05318_set_out_mux_ex(d, port, (pll1 ? OUT_PLL_SEL_APLL1_P1 : OUT_PLL_SEL_APLL2_P1), otype);
+}
+
 static uint64_t lmk05318_max_odiv(unsigned port)
 {
-    assert(port < MAX_OUT_PORTS);
+    assert(port < LMK05318_MAX_OUT_PORTS);
 
     switch(port)
     {
@@ -392,11 +442,11 @@ static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned c
     };
     typedef struct fvco2_range fvco2_range_t;
 
-    fvco2_range_t fvco2_ranges[(APLL2_PDIV_MAX - APLL2_PDIV_MIN + 1) * 2 * MAX_REAL_PORTS];
+    fvco2_range_t fvco2_ranges[(APLL2_PDIV_MAX - APLL2_PDIV_MIN + 1) * 2 * LMK05318_MAX_REAL_PORTS];
     int fvco2_ranges_count = 0;
 
     // find FVCO2 ranges for all PDs and all ports
-    for(unsigned i = 0; i < MAX_REAL_PORTS; ++i)
+    for(unsigned i = 0; i < LMK05318_MAX_REAL_PORTS; ++i)
     {
         lmk05318_out_config_t* out = outs + i;
         if(out->solved)
@@ -458,7 +508,7 @@ static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned c
         int prim_idx;
         range_t intersection;
         int sect_counter;
-        int sects[(APLL2_PDIV_MAX - APLL2_PDIV_MIN + 1) * 2 * MAX_REAL_PORTS];
+        int sects[(APLL2_PDIV_MAX - APLL2_PDIV_MIN + 1) * 2 * LMK05318_MAX_REAL_PORTS];
     };
     typedef struct intersects intersects_t;
 
@@ -550,7 +600,7 @@ static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned c
     struct solution
     {
         range_t fvco2;
-        solution_var_t vars[MAX_REAL_PORTS];
+        solution_var_t vars[LMK05318_MAX_REAL_PORTS];
         int vars_count;
         bool is_valid;
     };
@@ -666,8 +716,8 @@ static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned c
     struct pd_bind
     {
         int pd;
-        int ports[MAX_REAL_PORTS];
-        uint64_t odivs[MAX_REAL_PORTS];
+        int ports[LMK05318_MAX_REAL_PORTS];
+        uint64_t odivs[LMK05318_MAX_REAL_PORTS];
         int ports_count;
     };
     typedef struct pd_bind pd_bind_t;
@@ -692,7 +742,7 @@ static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned c
         pd_binds[0].odivs[0] = sol->vars[0].divs[0].od;
         pd_binds_count = 1;
 
-        int unmapped_ports[MAX_REAL_PORTS];
+        int unmapped_ports[LMK05318_MAX_REAL_PORTS];
         int unmapped_ports_count = 0;
 
         //scan all other vars, try to find variants with PD==PD1 and add them to PD1 binding
@@ -837,25 +887,31 @@ static int lmk05318_comp_port(const void * elem1, const void * elem2)
 
 
 VWLT_ATTRIBUTE(optimize("-Ofast"))
-int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs)
+int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs, bool dry_run)
 {
-    if(!_outs || !n_outs || n_outs > MAX_OUT_PORTS)
+    if(!_outs || !n_outs || n_outs > LMK05318_MAX_OUT_PORTS)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "input data is incorrect");
         return -EINVAL;
     }
 
     // internally we have only _6_ out divs and freqs (0==1 and 2==3), except output type, but it does not matter here
-    lmk05318_out_config_t outs[MAX_REAL_PORTS];
+    lmk05318_out_config_t outs[LMK05318_MAX_REAL_PORTS];
     memset(outs, 0, sizeof(outs));
 
     for(unsigned i = 0; i < n_outs; ++i)
     {
         lmk05318_out_config_t* out = _outs + i;
 
-        if(out->port > MAX_OUT_PORTS - 1)
+        if(out->port > LMK05318_MAX_OUT_PORTS - 1)
         {
-            USDR_LOG("5318", USDR_LOG_ERROR, "port value should be in [0; %d] diap", (MAX_OUT_PORTS - 1));
+            USDR_LOG("5318", USDR_LOG_ERROR, "port value should be in [0; %d] diap", (LMK05318_MAX_OUT_PORTS - 1));
+            return -EINVAL;
+        }
+
+        if(out->wanted.type == LVCMOS && out->port < 4)
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "LVCMOS output type supported for ports# 4..7 only");
             return -EINVAL;
         }
 
@@ -892,7 +948,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
 
     //now outs[] contains effective ports ordered (0..5) config.
     //some elems may be not initialized (wanted.freq == 0) and should not be processed.
-    for(unsigned i = 0; i < MAX_REAL_PORTS; ++i)
+    for(unsigned i = 0; i < LMK05318_MAX_REAL_PORTS; ++i)
     {
         outs[i].solved = outs[i].wanted.freq == 0;
         USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d freq:%d (-%d, +%d) *%s*",
@@ -903,7 +959,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
 
     //first we try routing ports to APLL1
     //it's easy
-    for(unsigned i = 0; i < MAX_REAL_PORTS; ++i)
+    for(unsigned i = 0; i < LMK05318_MAX_REAL_PORTS; ++i)
     {
         lmk05318_out_config_t* out = outs + i;
         if(out->solved)
@@ -938,7 +994,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     //second - try routing to APLL2
     unsigned cnt_to_solve = 0;
     USDR_LOG("5318", USDR_LOG_DEBUG,"Need to solve via APLL2:");
-    for(unsigned i = 0; i < MAX_REAL_PORTS; ++i)
+    for(unsigned i = 0; i < LMK05318_MAX_REAL_PORTS; ++i)
     {
         if(outs[i].solved)
             continue;
@@ -956,7 +1012,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     static const uint64_t fvco2_pd_max = VCO_APLL2_MAX / APLL2_PDIV_MIN;
 
     //determine valid PD ranges for our frequencies
-    for(unsigned i = 0; i < MAX_REAL_PORTS; ++i)
+    for(unsigned i = 0; i < LMK05318_MAX_REAL_PORTS; ++i)
     {
         lmk05318_out_config_t* out = outs + i;
         if(out->solved)
@@ -1028,7 +1084,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
 
     //if ok - update the results
 
-    qsort(outs, MAX_REAL_PORTS, sizeof(lmk05318_out_config_t), lmk05318_comp_port);
+    qsort(outs, LMK05318_MAX_REAL_PORTS, sizeof(lmk05318_out_config_t), lmk05318_comp_port);
     qsort(_outs, n_outs, sizeof(lmk05318_out_config_t), lmk05318_comp_port);
 
     bool complete_solution_check = true;
@@ -1061,7 +1117,33 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
                  is_freq_ok ? "**OK**" : "**BAD**");
     }
 
-    return complete_solution_check ? 0 : -EINVAL;
+    if(complete_solution_check == false)
+        return -EINVAL;
+
+    //update hw registers
+    if(!dry_run)
+    {
+        //tune APLL2
+        int res = lmk05318_tune_apll2_ex(d, fvco2, pd1, pd2);
+        if(res)
+            return res;
+
+        //set output ports
+        for(unsigned i = 0; i < n_outs; ++i)
+        {
+            const lmk05318_out_config_t* out = _outs + i;
+
+            res =             lmk05318_set_out_mux_ex(d, out->port, out->result.mux, out->wanted.type);
+            res = res ? res : lmk05318_set_out_div(d, out->port, out->result.out_div);
+            if(res)
+            {
+                USDR_LOG("5318", USDR_LOG_ERROR, "error %d setting hw parameters for port#%d", res, out->port);
+                return res;
+            }
+        }
+    }
+
+    return 0;
 }
 
 int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk)

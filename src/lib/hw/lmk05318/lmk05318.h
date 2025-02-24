@@ -6,8 +6,8 @@
 
 #include <usdr_lowlevel.h>
 
-#define MAX_OUT_PORTS 8
-#define MAX_REAL_PORTS (MAX_OUT_PORTS - 2)
+#define LMK05318_MAX_OUT_PORTS 8
+#define LMK05318_MAX_REAL_PORTS (LMK05318_MAX_OUT_PORTS - 2)
 
 struct lmk05318_state {
     lldev_t dev;
@@ -62,7 +62,7 @@ struct lmk05318_out_config
     } result;
 
     //*
-    // these fields are for internal use, do not fill them
+    // these fields are for internal use, do not touch them. Use lmk05318_port_request().
     bool solved;
     uint64_t max_odiv;
     uint32_t freq_min, freq_max;
@@ -70,6 +70,28 @@ struct lmk05318_out_config
     //*
 };
 typedef struct lmk05318_out_config lmk05318_out_config_t;
+
+static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
+                                        unsigned port,
+                                        uint32_t freq,
+                                        unsigned freq_delta_plus, unsigned freq_delta_minus,
+                                        bool revert_phase,
+                                        lmk05318_type_t type)
+{
+    if(port > LMK05318_MAX_OUT_PORTS - 1)
+        return -EINVAL;
+
+    lmk05318_out_config_t* p = cfg + port;
+    memset(p, 0, sizeof(*p));
+    p->port = port;
+    p->wanted.freq = freq;
+    p->wanted.freq_delta_plus = freq_delta_plus;
+    p->wanted.freq_delta_minus = freq_delta_minus;
+    p->wanted.revert_phase = revert_phase;
+    p->wanted.type = type;
+    p->solved = false;
+    return 0;
+}
 
 int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned flags, lmk05318_state_t* out);
 
@@ -100,6 +122,6 @@ int lmk05318_tune_apll1(lmk05318_state_t* d,
                         uint32_t xo_fref, int xo_type,
                         bool xo_doubler_enabled, bool xo_fdet_bypass, bool dpll_mode);
 
-int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs);
+int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs, bool dry_run);
 
 #endif
