@@ -5,7 +5,6 @@
 #define LMK05318_H
 
 #include <usdr_lowlevel.h>
-#include "lmk05318_solver.h"
 
 #define MAX_OUT_PORTS 8
 #define MAX_REAL_PORTS (MAX_OUT_PORTS - 2)
