@@ -105,7 +105,13 @@ int dsdr_hiper_fe_destroy(dsdr_hiper_fe_t* dfe);
 int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool *p_swap_rxiq);
 int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool* p_swap_txiq);
 
+
+int dsdr_hiper_fe_rx_gain_set(dsdr_hiper_fe_t* def, unsigned chno, unsigned gain, unsigned* actual_gain);
+
+
 int dsdr_hiper_fe_rx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_rx);
 int dsdr_hiper_fe_tx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_tx);
+
+
 
 #endif

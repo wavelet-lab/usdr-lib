@@ -246,6 +246,9 @@ static int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
 static int dev_m2_dsdr_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_dsdr_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_gain_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_gain_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_dsdr_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 static int dev_m2_dsdr_debug_all_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
@@ -381,6 +384,45 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/sdr/0/tx/remap",       { dev_m2_dsdr_sdr_tx_remap_set, dev_m2_dsdr_sdr_tx_remap_get }},
 
     { "/dm/sdr/0/rx/gain",        { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/0",      { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/1",      { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/2",      { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/3",      { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/a",      { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/b",      { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/c",      { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/d",      { dev_m2_dsdr_gain_set, NULL }},
+
+    { "/dm/sdr/0/rx/gain/auto",   { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/0", { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/1", { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/2", { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/3", { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/a", { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/b", { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/c", { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/d", { dev_m2_dsdr_gain_auto_set, NULL }},
+
+    { "/dm/sdr/0/rx/gain/lna",    { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/0",  { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/1",  { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/2",  { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/3",  { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/a",  { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/b",  { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/c",  { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/d",  { dev_m2_dsdr_gain_lna_set, NULL }},
+
+    { "/dm/sdr/0/rx/gain/pga",    { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/0",  { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/1",  { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/2",  { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/3",  { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/a",  { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/b",  { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/c",  { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/d",  { dev_m2_dsdr_gain_pga_set, NULL }},
+
 
     { "/dm/sdr/0/rx/freqency",    { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/freqency/0",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
@@ -757,8 +799,77 @@ int dev_m2_dsdr_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
 
 int dev_m2_dsdr_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
 {
-    return 0;
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    if (!d->st.libcapi79xx_set_dsa)
+        return 0;
+
+    if (obj->full_path[0])
+        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/gain", false);
+
+    int res = 0;
+    unsigned i = obj->full_path[1];
+    unsigned dsa_attn = (value > 25) ? 0 : 50 - 2 * value;
+    unsigned rem_gain = (value > 25) ? value - 25 : 0;
+
+    if (dev_m2_dsdr_has_hiper(d)) {
+        res = res ? res : dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[i], rem_gain, NULL);
+    }
+    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, dsa_attn);
+    return res;
 }
+
+int dev_m2_dsdr_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    if (!d->st.libcapi79xx_set_dsa)
+        return 0;
+
+    if (obj->full_path[0])
+        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/gain/auto", false);
+
+    int res = 0;
+    unsigned i = obj->full_path[1];
+    unsigned dsa_attn = (value > 25) ? 0 : 50 - 2 * value;
+    unsigned rem_gain = (value > 25) ? value - 25 : 0;
+
+    if (dev_m2_dsdr_has_hiper(d)) {
+        res = res ? res : dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[i], rem_gain, NULL);
+    }
+    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, dsa_attn);
+    return res;
+}
+
+int dev_m2_dsdr_gain_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    if (!dev_m2_dsdr_has_hiper(d))
+        return -ENOTSUP;
+
+    if (obj->full_path[0])
+        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/gain/lna", false);
+
+    unsigned i = obj->full_path[1];
+    int res = dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[i], value, NULL);
+    return res;
+}
+
+int dev_m2_dsdr_gain_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    if (!d->st.libcapi79xx_set_dsa)
+        return 0;
+
+    if (obj->full_path[0])
+        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/gain/pga", false);
+
+    unsigned i = obj->full_path[1];
+    if (value > 25)
+        value = 25;
+
+    int res = d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, 50 - 2 * value);
+    return res;
+}
+
 
 static int dsdr_set_rates(dev_m2_dsdr_t* d, uint32_t rx_rate, uint32_t tx_rate)
 {
