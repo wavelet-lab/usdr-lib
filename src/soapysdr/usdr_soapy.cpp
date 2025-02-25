@@ -108,7 +108,7 @@ const char* SoapyUSDR::get_sdr_param(int sdridx, const char* dir, const char* pa
 
 
 
-SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
+SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
  : _actual_tx_rate(0)
  , _actual_rx_rate(0)
  , _desired_rx_pkt(0)
@@ -125,6 +125,17 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
         loglevel = atoi(lenv);
     }
 #endif
+
+    std::string env_str;
+    if (getenv("SOAPY_USDR_ARGS")) {
+        env_str = std::string(getenv("SOAPY_USDR_ARGS"));
+
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() overriding default parameters to `%s`", env_str.c_str());
+    }
+    SoapySDR::Kwargs env_args = SoapySDR::KwargsFromString(env_str);
+    const SoapySDR::Kwargs &args = (env_str.length() > 0) ? env_args : args_orig;
+
+
     std::string dev = (args.count("dev")) ? args.at("dev") : "";
 
     if (args.count("loglevel")) {
