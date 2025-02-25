@@ -130,10 +130,10 @@ int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
     lmk05318_port_request(cfg, 1, meas_lo, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
     lmk05318_port_request(cfg, 2, meas_lo, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
     lmk05318_port_request(cfg, 3, meas_lo, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    lmk05318_set_port_affinity(cfg, 4, AFF_APLL1);
-    lmk05318_set_port_affinity(cfg, 5, AFF_APLL1);
-    lmk05318_set_port_affinity(cfg, 6, AFF_APLL1);
-    lmk05318_set_port_affinity(cfg, 7, AFF_APLL1);
+    lmk05318_set_port_affinity(cfg, 0, AFF_APLL2);
+    lmk05318_set_port_affinity(cfg, 1, AFF_APLL2);
+    lmk05318_set_port_affinity(cfg, 2, AFF_APLL2);
+    lmk05318_set_port_affinity(cfg, 3, AFF_APLL2);
 
     int res = lmk05318_solver(&ob->lmk, cfg, 4, false);
 #endif
