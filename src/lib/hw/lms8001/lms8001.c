@@ -316,6 +316,16 @@ int lms8001a_ch_lna_pa_set(lms8001_state_t* state, unsigned chan, unsigned lna_l
     return lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
 }
 
+int lms8001_core_enable(lms8001_state_t* out, bool en)
+{
+    uint32_t lms_init[] = {
+        MAKE_LMS8001_BIASLDOCONFIG_CLK_BUF_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_DIV_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_CP_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
+    };
+    return lms8001_spi_post(out, lms_init, SIZEOF_ARRAY(lms_init));
+}
+
 int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms8001_state_t *out)
 {
     int res;

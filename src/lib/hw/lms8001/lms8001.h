@@ -81,6 +81,8 @@ typedef struct lms8001_state lms8001_state_t;
 int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms8001_state_t *out);
 int lms8001_destroy(lms8001_state_t* m);
 
+int lms8001_core_enable(lms8001_state_t* state, bool enable);
+
 int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out);
 int lms8001_ch_enable(lms8001_state_t* state, unsigned mask);
 
