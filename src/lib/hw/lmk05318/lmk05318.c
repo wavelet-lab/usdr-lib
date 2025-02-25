@@ -931,6 +931,12 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     {
         lmk05318_out_config_t* out = _outs + i;
 
+        if(out->wanted.freq == 0)
+        {
+            USDR_LOG("5318", USDR_LOG_DEBUG, "skipping port#%d freq=0", out->port);
+            continue;
+        }
+
         if(out->port > LMK05318_MAX_OUT_PORTS - 1)
         {
             USDR_LOG("5318", USDR_LOG_ERROR, "port value should be in [0; %d] diap", (LMK05318_MAX_OUT_PORTS - 1));
@@ -984,7 +990,6 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
                  outs[i].port, outs[i].wanted.freq, outs[i].wanted.freq_delta_minus, outs[i].wanted.freq_delta_plus,
                  outs[i].solved ? "not used" : "active");
     }
-
 
     //first we try routing ports to APLL1
     //it's easy
@@ -1118,9 +1123,7 @@ have_complete_solution:
 
     //if ok - update the results
 
-    qsort(outs, LMK05318_MAX_REAL_PORTS, sizeof(lmk05318_out_config_t), lmk05318_comp_port);
     qsort(_outs, n_outs, sizeof(lmk05318_out_config_t), lmk05318_comp_port);
-
     bool complete_solution_check = true;
 
     USDR_LOG("5318", USDR_LOG_DEBUG, "=== COMPLETE SOLUTION @ VCO1:%" PRIu64 " VCO2:%" PRIu64 " PD1:%d PD2:%d ===", VCO_APLL1, fvco2, pd1, pd2);
@@ -1128,6 +1131,9 @@ have_complete_solution:
     {
         lmk05318_out_config_t* out_dst = _outs + i;
         lmk05318_out_config_t* out_src = NULL;
+
+        if(out_dst->wanted.freq == 0)
+            continue;
 
         if(out_dst->port < 2)
             out_src = outs + 0;
@@ -1186,6 +1192,9 @@ have_complete_solution:
         for(unsigned i = 0; i < n_outs; ++i)
         {
             const lmk05318_out_config_t* out = _outs + i;
+
+            if(out->wanted.freq == 0)
+                continue;
 
             res =             lmk05318_set_out_mux_ex(d, out->port, out->result.mux, out->wanted.type);
             res = res ? res : lmk05318_set_out_div(d, out->port, out->result.out_div);
