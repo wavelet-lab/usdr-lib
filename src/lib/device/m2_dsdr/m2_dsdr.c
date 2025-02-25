@@ -484,7 +484,6 @@ struct dev_m2_dsdr {
     uint32_t adc_rate;
     unsigned rxbb_rate;
     unsigned rxbb_decim;
-    uint32_t rxbb_swap_iq;
 
     uint32_t dac_rate;
     unsigned txbb_rate;
@@ -661,8 +660,6 @@ static int dsdr_set_rx_frequency_chan(dev_m2_dsdr_t* d, uint64_t freq, unsigned 
         int res = dsdr_hiper_fe_rx_freq_set(&d->hiper, fe_chan, freq, &ncoval, &ch_rxiq);
         if (res)
             return res;
-
-        d->rxbb_swap_iq = (ch_rxiq) ? d->rxbb_swap_iq | (1u << chno) : d->rxbb_swap_iq & (~(1u << chno));
 
         for (unsigned k = 0; k < DSDR_CHANS_HW; k++) {
             if ((d->rx_chans.ch_map[k] & ~CH_SWAP_IQ_FLAG) == chno) {
@@ -1776,7 +1773,6 @@ int usdr_device_m2_dsdr_create(lldev_t dev, device_id_t devid)
     memset(d->rx_logic_to_hw, 0xff, sizeof(d->rx_logic_to_hw));
     memset(d->tx_hw_to_logic, 0xff, sizeof(d->tx_hw_to_logic));
 
-    d->rxbb_swap_iq = 0;
     d->txbb_swap_iq = 0;
 
     d->tx_activated = false;

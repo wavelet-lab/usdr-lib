@@ -956,6 +956,17 @@ static void convert_lms8_gains_to_loss(dsdr_hiper_fe_t* def, unsigned chno, unsi
     *pa = pa_gain;
 }
 
+static int dsdr_update_entity(dsdr_hiper_fe_t* hiper, const char *entity, uint64_t value)
+{
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "Update `%s` to %" PRIu64 "\n", entity, value);
+    pusdr_vfs_obj_t obj;
+    int res = 0;
+
+    res = res ? res : hiper->dev->pdev->vfs_get_single_object(hiper->dev->pdev, entity, &obj);
+    res = res ? res : obj->ops.si64(obj, value);
+    return res;
+}
+
 int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     dsdr_hiper_fe_t* hiper = (dsdr_hiper_fe_t*)obj->object;
@@ -968,6 +979,7 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
     if (value & 0x80000000) {
         USDR_LOG("HIPR", USDR_LOG_WARNING, "HIPER_USER %08x => %08x\n", addr, data);
         uint8_t rx_band_old[] = { hiper->ucfg[H_CHA].rx_band, hiper->ucfg[H_CHB].rx_band, hiper->ucfg[H_CHC].rx_band, hiper->ucfg[H_CHD].rx_band };
+        uint8_t tx_band_old[] = { hiper->ucfg[H_CHA].tx_band, hiper->ucfg[H_CHB].tx_band, hiper->ucfg[H_CHC].tx_band, hiper->ucfg[H_CHD].tx_band };
 
         switch (addr) {
         case RX_IFAMP_BP:
@@ -1035,15 +1047,18 @@ int dsdr_hiper_dsdr_hiper_usr_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
         }
 
         for (unsigned i = 0; i < HIPER_MAX_HW_CHANS; i++) {
+            static const uint8_t s_chanmap_fe_to_hw[4] = { 3, 2, 0, 1 };
+
             if (hiper->ucfg[i].rx_band != rx_band_old[i]) {
                 char entity[] = "/dm/sdr/0/rx/freqency/a";
-                static const uint8_t s_chanmap_fe_to_hw[4] = { 3, 2, 0, 1 };
                 entity[SIZEOF_ARRAY(entity) - 2] = 'a' + s_chanmap_fe_to_hw[i];
+                res = res ? res : dsdr_update_entity(hiper, entity, hiper->ucfg[i].rx_freq);
+            }
 
-                USDR_LOG("HIPR", USDR_LOG_WARNING, "Update `%s`\n", entity);
-                pusdr_vfs_obj_t obj;
-                res = res ? res : hiper->dev->pdev->vfs_get_single_object(hiper->dev->pdev, entity, &obj);
-                res = res ? res : obj->ops.si64(obj, hiper->ucfg[i].rx_freq);
+            if (hiper->ucfg[i].tx_band != tx_band_old[i]) {
+                char entity[] = "/dm/sdr/0/tx/freqency/a";
+                entity[SIZEOF_ARRAY(entity) - 2] = 'a' + s_chanmap_fe_to_hw[i];
+                res = res ? res : dsdr_update_entity(hiper, entity, hiper->ucfg[i].tx_freq);
             }
 
             if ((addr == RX_8KA_LNA || addr == RX_8KA_PA) && hiper->ucfg[i].rx_en && ((hiper->ucfg[i].rx_band & 1) == IFBAND_400_3500)) {
@@ -1366,16 +1381,28 @@ void dsdr_hiper_fe_rx_filterbank_upd(dsdr_hiper_fe_t* def, unsigned chno)
     USDR_LOG("HIPR", USDR_LOG_WARNING, "RXFBabk[%d] = %d\n", chno, def->ucfg[chno].rx_fb_sel);
 }
 
-void dsdr_hiper_fe_rx_band_upd(dsdr_hiper_fe_t* def, unsigned chno, bool flo_h)
+static void dsdr_hiper_fe_rx_band_upd(dsdr_hiper_fe_t* def, unsigned chno, bool band_high)
 {
     if (def->ucfg[chno].rx_band < BAND_OPTS_BAND_AUTO_L)
         return;
 
-    def->ucfg[chno].rx_band = (flo_h) ? BAND_OPTS_BAND_AUTO_H : BAND_OPTS_BAND_AUTO_L;
+    def->ucfg[chno].rx_band = (band_high) ? BAND_OPTS_BAND_AUTO_H : BAND_OPTS_BAND_AUTO_L;
     USDR_LOG("HIPR", USDR_LOG_WARNING, "RXBand[%d] switched to %c (%d)\n", chno,
              def->ucfg[chno].rx_band == BAND_OPTS_BAND_AUTO_H ? 'H' : 'L',
              def->ucfg[chno].rx_band);
 }
+
+static void dsdr_hiper_fe_tx_band_upd(dsdr_hiper_fe_t* def, unsigned chno, bool band_high)
+{
+    if (def->ucfg[chno].tx_band < BAND_OPTS_BAND_AUTO_L)
+        return;
+
+    def->ucfg[chno].tx_band = (band_high) ? BAND_OPTS_BAND_AUTO_H : BAND_OPTS_BAND_AUTO_L;
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "TXBand[%d] switched to %c (%d)\n", chno,
+             def->ucfg[chno].tx_band == BAND_OPTS_BAND_AUTO_H ? 'H' : 'L',
+             def->ucfg[chno].tx_band);
+}
+
 
 static unsigned get_lms8_idx(bool high_path, unsigned chno)
 {
@@ -1384,11 +1411,11 @@ static unsigned get_lms8_idx(bool high_path, unsigned chno)
                ((chno < 2) ? SPI_LMS8001A_U3_RX_AB_IDX : SPI_LMS8001A_U4_RX_CD_IDX);
 }
 
-int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxiq, bool* flo_h)
+int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxiq, bool* p_high_path)
 {
     int res = 0;
 
-    bool fLOh = (def->ucfg[chno].rx_freq < 3700e6);
+    bool fLOh = (def->ucfg[chno].rx_freq < 4700e6);
     bool high_path;
 
     if (def->ucfg[chno].rx_band < BAND_OPTS_BAND_AUTO_L) {
@@ -1431,10 +1458,47 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxi
 
     def->ucfg[chno].rx_nco = fIF;
     *p_swap_rxiq = (fLOh) ? 1 : 0;
-    *flo_h = high_path;
+    *p_high_path = high_path;
 
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] NCO=%.3f LO_%c=%.3f SWAP_IQ=%d PATH=%s LMS8[%d]_MSK=%x\n", chno,
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] RX_NCO=%.3f LO_%c=%.3f SWAP_IQ=%d PATH=%s LMS8[%d]_MSK=%x\n", chno,
              def->ucfg[chno].rx_nco / 1.0e6, fLOh ? 'H' : 'L', fLO / 1.0e6, *p_swap_rxiq, high_path ? "HIGH" : "LOW", idx, chmsk);
+
+    return res;
+}
+
+
+int dsdr_hiper_fe_txlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_txiq, bool* p_high_path)
+{
+    int res = 0;
+    bool high_path;
+
+    if (def->ucfg[chno].tx_band < BAND_OPTS_BAND_AUTO_L) {
+        high_path = (def->ucfg[chno].tx_band == BAND_OPTS_BAND_400_3500) ? false : true;
+    } else {
+        high_path = (def->ucfg[chno].tx_freq < 3500e6) ? false : true;
+    }
+
+    uint64_t fIF = (high_path) ? 1875e6 : def->ucfg[chno].tx_freq;
+    uint64_t fLO = (high_path) ? def->ucfg[chno].tx_freq + fIF : 0;
+
+    unsigned idx = get_lms8_idx(high_path, chno);
+    unsigned chmsk = (chno & 1) ?
+                         (def->ucfg[chno].tx_en << 3) | (def->ucfg[chno - 1].tx_en << 2) :
+                         (def->ucfg[chno + 1].tx_en << 3) | (def->ucfg[chno].tx_en << 2);
+
+
+    res = res ? res : lms8001_core_enable(&def->lms8[idx], high_path);
+    res = res ? res : lms8001_ch_enable(&def->lms8[idx], high_path ? chmsk : 0);
+    if (fLO > 0) {
+        res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
+    }
+
+    def->ucfg[chno].tx_nco = fIF;
+    *p_swap_txiq = 1;
+    *p_high_path = high_path;
+
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] TX_NCO=%.3f LO=%.3f SWAP_IQ=%d PATH=%s LMS8[%d]_MSK=%x\n", chno,
+             def->ucfg[chno].rx_nco / 1.0e6, fLO / 1.0e6, *p_swap_txiq, high_path ? "HIGH" : "LOW", idx, chmsk);
 
     return res;
 }
@@ -1442,7 +1506,7 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxi
 
 int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool* p_swap_rxiq)
 {
-    bool floh = false;
+    bool high_band = false;
     int res;
 
     if (chno >= HIPER_MAX_HW_CHANS)
@@ -1451,11 +1515,11 @@ int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq
     def->ucfg[chno].rx_freq = freq;
 
     dsdr_hiper_fe_rx_filterbank_upd(def, chno);
-    res = dsdr_hiper_fe_rxlo_upd(def, chno, p_swap_rxiq, &floh);
+    res = dsdr_hiper_fe_rxlo_upd(def, chno, p_swap_rxiq, &high_band);
     if (res)
         return res;
 
-    dsdr_hiper_fe_rx_band_upd(def, chno, floh);
+    dsdr_hiper_fe_rx_band_upd(def, chno, high_band);
 
     *ncotune = def->ucfg[chno].rx_nco;
     return dsdr_hiper_update_fe_user(def);
@@ -1463,14 +1527,22 @@ int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq
 
 int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool *p_swap_txiq)
 {
+    bool high_band = false;
+    int res;
+
     if (chno >= HIPER_MAX_HW_CHANS)
         return -EINVAL;
 
     *p_swap_txiq = false;
     def->ucfg[chno].tx_freq = freq;
-    def->ucfg[chno].tx_band = IFBAND_400_3500;
 
-    // TODO trigger autoselection
+    res = dsdr_hiper_fe_txlo_upd(def, chno, p_swap_txiq, &high_band);
+    if (res)
+        return res;
+
+    dsdr_hiper_fe_tx_band_upd(def, chno, high_band);
+
+    *ncotune = def->ucfg[chno].tx_nco;
     return dsdr_hiper_update_fe_user(def);
 }
 
