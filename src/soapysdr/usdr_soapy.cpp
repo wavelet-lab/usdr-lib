@@ -207,6 +207,8 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
             type = RFIC_LMS7002M;
         else if (strcmp(rfic, "ad45lb49") == 0)
             type = RFIC_AD45LB49;
+        else if (strcmp(rfic, "afe79xx") == 0)
+            type = RFIC_AFE79XX;
     }
 
     if (args.count("rx_bw")) {
@@ -525,7 +527,11 @@ SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const 
     SoapySDR::RangeList ranges;
     if (name == "RF")
     {
-        ranges.push_back(SoapySDR::Range(1e5, 3.8e9));
+        if (type == RFIC_AFE79XX) {
+            ranges.push_back(SoapySDR::Range(5e6, 12.5e9));
+        } else {
+            ranges.push_back(SoapySDR::Range(1e5, 3.8e9));
+        }
     }
     else if (name == "BB")
     {
@@ -541,7 +547,11 @@ SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const 
 SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const size_t /*channel*/) const
 {
     SoapySDR::RangeList ranges;
-    ranges.push_back(SoapySDR::Range(0e6, 3.8e9));
+    if (type == RFIC_AFE79XX) {
+        ranges.push_back(SoapySDR::Range(5e6, 12.5e9));
+    } else {
+        ranges.push_back(SoapySDR::Range(0e6, 3.8e9));
+    }
     return ranges;
 }
 
@@ -602,7 +612,8 @@ double SoapyUSDR::getSampleRate(const int direction, const size_t /*channel*/) c
 SoapySDR::RangeList SoapyUSDR::getSampleRateRange(const int /*direction*/, const size_t /*channel*/) const
 {
     SoapySDR::RangeList ranges;
-    ranges.push_back(SoapySDR::Range(0.1e6, (type == RFIC_AD45LB49) ? 130e6 : 80e6));
+    ranges.push_back(SoapySDR::Range((type == RFIC_AFE79XX) ? 1.92e6 : 0.1e6,
+                                     (type == RFIC_AFE79XX) ? 500e6 : (type == RFIC_AD45LB49) ? 130e6 : 80e6));
     return ranges;
 }
 
