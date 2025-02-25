@@ -9,6 +9,27 @@
 #define LMK05318_MAX_OUT_PORTS 8
 #define LMK05318_MAX_REAL_PORTS (LMK05318_MAX_OUT_PORTS - 2)
 
+enum xo_input_type
+{
+    XO_DC_DIFF_EXT = 0,
+    XO_AC_DIFF_EXT,
+    XO_AC_DIFF_INT_100,
+    XO_HCSL_INT_50,
+    XO_CMOS,
+    XO_SE_INT_50,
+};
+typedef enum xo_input_type xo_input_type_t;
+
+struct lmk05318_xo_settings
+{
+    unsigned input_divider_flag;
+    uint32_t fref;
+    xo_input_type_t type;
+    bool doubler_enabled;
+    bool fdet_bypass;
+};
+typedef struct lmk05318_xo_settings lmk05318_xo_settings_t;
+
 struct lmk05318_state {
     lldev_t dev;
     unsigned subdev;
@@ -28,12 +49,7 @@ struct lmk05318_state {
         int mux;
     } outputs[LMK05318_MAX_OUT_PORTS];
 
-    struct {
-        uint32_t fref;
-        int type;
-        bool doubler_enabled;
-        bool fdet_bypass;
-    } xo;
+    lmk05318_xo_settings_t xo;
 };
 
 enum lmk05318_type {
@@ -143,13 +159,14 @@ int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk);
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out);
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);
 
-int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, int xo_type,
-                         bool xo_doubler_enabled, bool xo_fdet_bypass);
-
-int lmk05318_tune_apll1(lmk05318_state_t* d,
-                        uint32_t xo_fref, int xo_type,
-                        bool xo_doubler_enabled, bool xo_fdet_bypass, bool dpll_mode);
+int lmk05318_set_xo_fref(lmk05318_state_t* d);
+int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode);
 
 int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs, bool dry_run);
+
+int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
+                       const lmk05318_xo_settings_t* xo, bool dpll_mode,
+                       lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
+                       lmk05318_state_t* out);
 
 #endif

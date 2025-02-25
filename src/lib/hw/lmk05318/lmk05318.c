@@ -84,6 +84,77 @@ int lmk05318_reg_wr_n(lmk05318_state_t* d, const uint32_t* regs, unsigned count)
     return 0;
 }
 
+int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
+                       const lmk05318_xo_settings_t* xo, bool dpll_mode,
+                       lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
+                       lmk05318_state_t* out)
+{
+    int res;
+    uint8_t dummy[4];
+
+    out->dev = dev;
+    out->subdev = subdev;
+    out->lsaddr = lsaddr;
+    out->vco2_freq = 0;
+    out->pd1 = 0;
+    out->pd2 = 0;
+    out->fref_pll2_div_rp = 3;
+    out->fref_pll2_div_rs = (((VCO_APLL1 + APLL2_PD_MAX - 1) / APLL2_PD_MAX) + out->fref_pll2_div_rp - 1) / out->fref_pll2_div_rp;
+    out->xo = *xo;
+
+    res = lmk05318_reg_get_u32(out, 0, &dummy[0]);
+    if (res)
+        return res;
+
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 DEVID[0/1/2/3] = %02x %02x %02x %02x\n", dummy[3], dummy[2], dummy[1], dummy[0]);
+
+    if ( dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x35 || dummy[0] != 0x42 ) {
+        return -ENODEV;
+    }
+
+    //
+    res = lmk05318_set_xo_fref(out);
+    if(res)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d setting XO", res);
+        return res;
+    }
+
+    res = lmk05318_tune_apll1(out, dpll_mode);
+    if(res)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d tuning APLL1", res);
+        return res;
+    }
+
+    res = lmk05318_solver(out, out_ports_cfg, out_ports_len, false);
+    if(res)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d solving output frequencies", res);
+        return res;
+    }
+
+    // Reset
+    uint32_t regs[] = {
+        lmk05318_rom[0] | (1 << RESET_SW_OFF),
+        lmk05318_rom[0] | (0 << RESET_SW_OFF),
+
+        MAKE_LMK05318_XO_CONFIG(xo->input_divider_flag > 1 ? 1 : 0),
+
+        MAKE_LMK05318_PLL1_CTRL0(0),
+        MAKE_LMK05318_PLL1_CTRL0(1),
+        MAKE_LMK05318_PLL1_CTRL0(0),
+
+    };
+    res = lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));
+    if (res)
+        return res;
+
+    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 initialized\n");
+    return 0;
+}
+
+
 int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int flags, lmk05318_state_t* out)
 {
     int res;
@@ -244,9 +315,13 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
     return 0;
 }
 
-int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, int xo_type,
-                         bool xo_doubler_enabled, bool xo_fdet_bypass)
+int lmk05318_set_xo_fref(lmk05318_state_t* d)
 {
+    const uint32_t xo_fref = d->xo.fref;
+    const int xo_type = d->xo.type;
+    const bool xo_doubler_enabled = d->xo.doubler_enabled;
+    const bool xo_fdet_bypass = d->xo.fdet_bypass;
+
     if(xo_fref < XO_FREF_MIN || xo_fref > XO_FREF_MAX)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 XO input fref should be in range [%" PRIu64 ";%" PRIu64 "] but got %d!\n",
@@ -254,15 +329,15 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, int xo_type,
         return -EINVAL;
     }
 
+    int xo_type_raw;
     switch((int)xo_type)
     {
-    case XO_TYPE_DC_DIFF_EXT:
-    case XO_TYPE_AC_DIFF_EXT:
-    case XO_TYPE_AC_DIFF_INT_100:
-    case XO_TYPE_HCSL_INT_50:
-    case XO_TYPE_CMOS:
-    case XO_TYPE_SE_INT_50:
-        break;
+    case XO_DC_DIFF_EXT: xo_type_raw = XO_TYPE_DC_DIFF_EXT; break;
+    case XO_AC_DIFF_EXT: xo_type_raw = XO_TYPE_AC_DIFF_EXT; break;
+    case XO_AC_DIFF_INT_100: xo_type_raw = XO_TYPE_AC_DIFF_INT_100; break;
+    case XO_HCSL_INT_50: xo_type_raw = XO_TYPE_HCSL_INT_50; break;
+    case XO_CMOS: xo_type_raw = XO_TYPE_CMOS; break;
+    case XO_SE_INT_50: xo_type_raw = XO_TYPE_SE_INT_50; break;
     default:
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 XO input type %d is not supported!\n", (int)xo_type);
         return -EINVAL;
@@ -270,26 +345,19 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d, uint32_t xo_fref, int xo_type,
 
     uint32_t regs[] = {
         MAKE_LMK05318_XO_CLKCTL1(xo_doubler_enabled ? 1 : 0, xo_fdet_bypass ? 1 : 0),
-        MAKE_LMK05318_XO_CLKCTL2(xo_type)
+        MAKE_LMK05318_XO_CLKCTL2(xo_type_raw)
     };
 
     int res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
     if(res)
         return res;
 
-    d->xo.fref = xo_fref;
-    d->xo.doubler_enabled = xo_doubler_enabled;
-    d->xo.type = xo_type;
-    d->xo.fdet_bypass = xo_fdet_bypass;
-
     return 0;
 }
 
-int lmk05318_tune_apll1(lmk05318_state_t* d,
-                        uint32_t xo_fref, int xo_type,
-                        bool xo_doubler_enabled, bool xo_fdet_bypass, bool dpll_mode)
+int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
 {
-    int res = lmk05318_set_xo_fref(d, xo_fref, xo_type, xo_doubler_enabled, xo_fdet_bypass);
+    int res = lmk05318_set_xo_fref(d);
     if(res)
         return res;
 
