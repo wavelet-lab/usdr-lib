@@ -498,7 +498,8 @@ void SoapyUSDR::setFrequency(const int direction, const size_t channel, const st
 
     uint64_t val = (((uint64_t)channel) << 32) | (uint32_t)frequency;
 
-    res = usdr_dme_set_uint(_dev->dev(), pname, val);
+    res = usdr_dme_set_uint(_dev->dev(), pname,
+                            type == RFIC_AFE79XX ? (uint64_t)frequency : val);
     if (res)
         throw std::runtime_error(std::string("SoapyUSDR::setFrequency(") + pname + ", " + ")");
 
