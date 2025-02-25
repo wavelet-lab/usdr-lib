@@ -95,6 +95,9 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int 
     out->dev = dev;
     out->subdev = subdev;
     out->lsaddr = lsaddr;
+    out->vco2_freq = 0;
+    out->pd1 = 0;
+    out->pd2 = 0;
 
     res = lmk05318_reg_get_u32(out, 0, &dummy[0]);
     if (res)
@@ -195,10 +198,10 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
     }
 
     if(fvco2 < VCO_APLL2_MIN || fvco2 > VCO_APLL2_MAX ||
-        pd1 < APLL2_PDIV_MIN || pd1 > APLL2_PDIV_MAX ||
-        pd2 < APLL2_PDIV_MIN || pd2 > APLL2_PDIV_MAX)
+        ((pd1 < APLL2_PDIV_MIN || pd1 > APLL2_PDIV_MAX) && (pd2 < APLL2_PDIV_MIN || pd2 > APLL2_PDIV_MAX))
+        )
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2: either FVCO2[%" PRIu64"] or PD1[%d] or PD2[%d] is out of range",
+        USDR_LOG("5318", USDR_LOG_WARNING, "LMK05318 APLL2: either FVCO2[%" PRIu64"] or (PD1[%d] && PD2[%d]) is out of range, APLL2 will be disabled",
                                           fvco2, pd1, pd2);
         // Disable
         uint32_t regs[] = {
@@ -211,7 +214,17 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
     unsigned num = (fvco2 - n * (uint64_t)fref) * (1ull << 24) / fref;
     int res;
 
-    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 FVCO=%" PRIu64 " N=%d NUM=%d PD1=%d PD2=%d\n", fvco2, n, num, pd1, pd2);
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL2 FVCO=%" PRIu64 " N=%d NUM=%d PD1=%d PD2=%d\n", fvco2, n, num, pd1, pd2);
+
+    // one of PDs may be unused (==0) -> we should fix it before registers set
+    if(pd1 < APLL2_PDIV_MIN || pd1 > APLL2_PDIV_MAX)
+    {
+        pd1 = pd2;
+    }
+    else if(pd2 < APLL2_PDIV_MIN || pd2 > APLL2_PDIV_MAX)
+    {
+        pd2 = pd1;
+    }
 
     uint32_t regs[] = {
         MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
@@ -886,16 +899,31 @@ static int lmk05318_comp_port(const void * elem1, const void * elem2)
 }
 
 
+static const char* lmk05318_decode_mux(enum lmk05318_out_pll_sel_t mux)
+{
+    switch(mux)
+    {
+    case OUT_PLL_SEL_APLL1_P1:      return "APLL1";
+    case OUT_PLL_SEL_APLL1_P1_INV:  return "APLL1 inv";
+    case OUT_PLL_SEL_APLL2_P1:      return "APLL2 PD1";
+    case OUT_PLL_SEL_APLL2_P2:      return "APLL2 PD2";
+    }
+    return "UNKNOWN";
+}
+
 VWLT_ATTRIBUTE(optimize("-Ofast"))
 int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs, bool dry_run)
 {
+    int pd1 = 0, pd2 = 0;
+    uint64_t fvco2 = 0;
+
     if(!_outs || !n_outs || n_outs > LMK05318_MAX_OUT_PORTS)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "input data is incorrect");
         return -EINVAL;
     }
 
-    // internally we have only _6_ out divs and freqs (0==1 and 2==3), except output type, but it does not matter here
+    // internally we have only _6_ out divs and freqs (0==1 and 2==3) - except the output type, but it does not matter here
     lmk05318_out_config_t outs[LMK05318_MAX_REAL_PORTS];
     memset(outs, 0, sizeof(outs));
 
@@ -930,7 +958,8 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
             (norm_out->wanted.freq != out->wanted.freq ||
              norm_out->wanted.freq_delta_plus != out->wanted.freq_delta_plus ||
              norm_out->wanted.freq_delta_minus != out->wanted.freq_delta_minus ||
-             norm_out->wanted.revert_phase != out->wanted.revert_phase
+             norm_out->wanted.revert_phase != out->wanted.revert_phase ||
+             norm_out->wanted.pll_affinity != out->wanted.pll_affinity
             ))
         {
             USDR_LOG("5318", USDR_LOG_ERROR, "dup ports values detected, or ports #0:1 & #2:3 differ");
@@ -965,21 +994,28 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
         if(out->solved)
             continue;
 
-        uint64_t odiv = 0;
-        int res = lmk05318_get_output_divider(out, VCO_APLL1, &odiv);
-        if(!res)
+        if(out->wanted.pll_affinity == AFF_ANY || out->wanted.pll_affinity == AFF_APLL1)
         {
-            out->solved = true;
-            out->result.out_div = odiv;
-            out->result.freq = (double)VCO_APLL1 / odiv;
-            out->result.mux = out->wanted.revert_phase ? OUT_PLL_SEL_APLL1_P1_INV : OUT_PLL_SEL_APLL1_P1;
+            uint64_t odiv = 0;
+            int res = lmk05318_get_output_divider(out, VCO_APLL1, &odiv);
+            if(!res)
+            {
+                out->solved = true;
+                out->result.out_div = odiv;
+                out->result.freq = (double)VCO_APLL1 / odiv;
+                out->result.mux = out->wanted.revert_phase ? OUT_PLL_SEL_APLL1_P1_INV : OUT_PLL_SEL_APLL1_P1;
 
-            USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d solved via APLL1 [OD:%" PRIu64 " freq:%.2f mux:%d]",
-                     out->port, out->result.out_div, out->result.freq, out->result.mux);
+                USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d solved via APLL1 [OD:%" PRIu64 " freq:%.2f mux:%d]",
+                         out->port, out->result.out_div, out->result.freq, out->result.mux);
+            }
+            else
+            {
+                USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d cannot solve it via APLL1, will try APLL2", out->port);
+            }
         }
         else
         {
-            USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d cannot solve it via APLL1, will try APLL2", out->port);
+            USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d forbidden to solve via APLL1 by config, will try APLL2", out->port);
         }
 
         //we cannot revert phase for ports NOT linked to APLL1
@@ -989,7 +1025,6 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
             return -EINVAL;
         }
     }
-
 
     //second - try routing to APLL2
     unsigned cnt_to_solve = 0;
@@ -1006,7 +1041,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     }
 
     if(!cnt_to_solve)
-        return 0;
+        goto have_complete_solution;
 
     static const uint64_t fvco2_pd_min = VCO_APLL2_MIN / APLL2_PDIV_MAX;
     static const uint64_t fvco2_pd_max = VCO_APLL2_MAX / APLL2_PDIV_MIN;
@@ -1037,10 +1072,6 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
         USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d pre-OD freq range:[%" PRIu64", %" PRIu64"], PD:[%d, %d]",
                  out->port, ifreq.min, ifreq.max, pd_min, pd_max);
     }
-
-
-    int pd1 = 0, pd2 = 0;
-    uint64_t fvco2 = 0;
 
     const uint64_t f_mid = (VCO_APLL2_MAX + VCO_APLL2_MIN) / 2;
     const uint64_t half_band = (VCO_APLL2_MAX - VCO_APLL2_MIN) / 2;
@@ -1082,6 +1113,9 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     if(res)
         return res;
 
+
+have_complete_solution:
+
     //if ok - update the results
 
     qsort(outs, LMK05318_MAX_REAL_PORTS, sizeof(lmk05318_out_config_t), lmk05318_comp_port);
@@ -1089,7 +1123,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
 
     bool complete_solution_check = true;
 
-    USDR_LOG("5318", USDR_LOG_DEBUG, "=== COMPLETE SOLUTION @ VCO2:%" PRIu64 " and PD1:%d PD2:%d ===", fvco2, pd1, pd2);
+    USDR_LOG("5318", USDR_LOG_DEBUG, "=== COMPLETE SOLUTION @ VCO1:%" PRIu64 " VCO2:%" PRIu64 " PD1:%d PD2:%d ===", VCO_APLL1, fvco2, pd1, pd2);
     for(unsigned i = 0; i < n_outs; ++i)
     {
         lmk05318_out_config_t* out_dst = _outs + i;
@@ -1112,13 +1146,30 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
         if(!is_freq_ok)
             complete_solution_check = false;
 
-        USDR_LOG("5318", is_freq_ok ? USDR_LOG_DEBUG : USDR_LOG_ERROR, "port:%d solved [OD:%" PRIu64 " freq:%.2f mux:%d] %s",
+        USDR_LOG("5318", is_freq_ok ? USDR_LOG_DEBUG : USDR_LOG_ERROR, "port:%d solved [OD:%" PRIu64 " freq:%.2f mux:%d(%s)] %s",
                  out_dst->port, out_dst->result.out_div, out_dst->result.freq, out_dst->result.mux,
+                 lmk05318_decode_mux(out_dst->result.mux),
                  is_freq_ok ? "**OK**" : "**BAD**");
     }
 
     if(complete_solution_check == false)
         return -EINVAL;
+
+    if(d)
+    {
+        //update params in context
+        d->vco2_freq = fvco2;
+        d->pd1 = pd1;
+        d->pd2 = pd2;
+
+        for(unsigned i = 0; i < n_outs; ++i)
+        {
+            const lmk05318_out_config_t* out = _outs + i;
+            d->outputs[out->port].freq = out->result.freq;
+            d->outputs[out->port].odiv = out->result.out_div;
+            d->outputs[out->port].mux  = out->result.mux;
+        }
+    }
 
     //update hw registers
     if(!dry_run)
@@ -1126,7 +1177,10 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
         //tune APLL2
         int res = lmk05318_tune_apll2_ex(d, fvco2, pd1, pd2);
         if(res)
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "error %d tuning APLL2", res);
             return res;
+        }
 
         //set output ports
         for(unsigned i = 0; i < n_outs; ++i)

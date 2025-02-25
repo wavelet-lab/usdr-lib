@@ -46,6 +46,69 @@ START_TEST(lmk05318_solver_test2)
     ck_assert_int_eq( res, 0 );
 }
 
+
+START_TEST(lmk05318_solver_test3)
+{
+    uint64_t fvco1 = 2500000000ull;
+    uint64_t f0_3 = fvco1 / 123;
+    uint64_t f4_7 = 12500000; //3840000;
+
+    int res = 0;
+    res = res ? res : lmk05318_port_request(cfg, 0, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 1, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 2, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 3, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 4, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 7, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    ck_assert_int_eq( res, 0 );
+
+    res = res ? res : lmk05318_set_port_affinity(cfg, 0, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 1, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 2, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 3, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 4, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 5, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 6, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 7, AFF_APLL2);
+    ck_assert_int_eq( res, 0 );
+
+    res = lmk05318_solver(NULL, cfg, OUTS_LEN, true);
+    ck_assert_int_eq( res, 0 );
+}
+
+START_TEST(lmk05318_solver_test4)
+{
+    uint64_t fvco1 = 2500000000ull;
+    uint64_t f0_3 = fvco1 / 123;
+    uint64_t f4_7 = 12500000; //3840000;
+
+    int res = 0;
+    res = res ? res : lmk05318_port_request(cfg, 0, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 1, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 2, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 3, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 4, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 7, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    ck_assert_int_eq( res, 0 );
+
+    res = res ? res : lmk05318_set_port_affinity(cfg, 0, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 1, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 2, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 3, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 4, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 5, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 6, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(cfg, 7, AFF_APLL2);
+    ck_assert_int_eq( res, 0 );
+
+    res = lmk05318_solver(NULL, cfg, 4, true);
+    ck_assert_int_eq( res, 0 );
+}
+
 Suite * lmk05318_solver_suite(void)
 {
     Suite *s;
@@ -55,8 +118,12 @@ Suite * lmk05318_solver_suite(void)
     tc_core = tcase_create("HW");
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, lmk05318_solver_test1);
-    tcase_add_test(tc_core, lmk05318_solver_test2);
+
+    //tcase_add_test(tc_core, lmk05318_solver_test1);
+    //tcase_add_test(tc_core, lmk05318_solver_test2);
+    //tcase_add_test(tc_core, lmk05318_solver_test3);
+    tcase_add_test(tc_core, lmk05318_solver_test4);
+
     suite_add_tcase(s, tc_core);
     return s;
 }

@@ -20,6 +20,13 @@ struct lmk05318_state {
 
     // VCO2 freq
     uint64_t vco2_freq;
+    unsigned pd1, pd2;
+
+    struct {
+        double freq;
+        uint64_t odiv;
+        int mux;
+    } outputs[LMK05318_MAX_OUT_PORTS];
 
     struct {
         uint32_t fref;
@@ -40,6 +47,14 @@ enum lmk05318_type {
 typedef struct lmk05318_state lmk05318_state_t;
 typedef enum lmk05318_type lmk05318_type_t;
 
+enum lmk05318_port_affinity
+{
+    AFF_ANY = 0,
+    AFF_APLL1,
+    AFF_APLL2
+};
+typedef enum lmk05318_port_affinity lmk05318_port_affinity_t;
+
 struct lmk05318_out_config
 {
     unsigned port; //0..7
@@ -51,6 +66,7 @@ struct lmk05318_out_config
         unsigned freq_delta_plus, freq_delta_minus;
         bool revert_phase;
         lmk05318_type_t type;
+        lmk05318_port_affinity_t pll_affinity;
     } wanted;
 
     // these fields are results
@@ -89,7 +105,19 @@ static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
     p->wanted.freq_delta_minus = freq_delta_minus;
     p->wanted.revert_phase = revert_phase;
     p->wanted.type = type;
+    p->wanted.pll_affinity = AFF_ANY;
     p->solved = false;
+    return 0;
+}
+
+static inline int lmk05318_set_port_affinity(lmk05318_out_config_t* cfg, unsigned port, lmk05318_port_affinity_t aff)
+{
+    if(port > LMK05318_MAX_OUT_PORTS - 1)
+        return -EINVAL;
+
+    lmk05318_out_config_t* p = cfg + port;
+    p->wanted.pll_affinity = aff;
+
     return 0;
 }
 
