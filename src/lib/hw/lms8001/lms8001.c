@@ -316,6 +316,19 @@ int lms8001a_ch_lna_pa_set(lms8001_state_t* state, unsigned chan, unsigned lna_l
     return lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
 }
 
+int lms8001b_hlmix_loss_set(lms8001_state_t* state, unsigned chan, unsigned loss)
+{
+    if (chan >= 4)
+        return -EINVAL;
+
+    unsigned choff = ((chan == 0) ? HLMIXA_HLMIXx_LOSS0 : (chan == 1) ? HLMIXB_HLMIXx_LOSS0 : (chan == 2) ? HLMIXC_HLMIXx_LOSS0 : HLMIXD_HLMIXx_LOSS0) - HLMIXA_HLMIXx_LOSS0;
+    uint32_t en_regs[] = {
+        MAKE_LMS8001_HLMIXA_HLMIXx_LOSS0(loss, 0) + (choff << 16),
+    };
+
+    return lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
+}
+
 int lms8001_core_enable(lms8001_state_t* out, bool en)
 {
     uint32_t lms_init[] = {

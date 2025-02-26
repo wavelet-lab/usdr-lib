@@ -90,7 +90,7 @@ int lms8001a_ch_enable(lms8001_state_t* state, unsigned mask, unsigned lna_loss[
 
 // lna_loss == ~0 means bypass LNA
 int lms8001a_ch_lna_pa_set(lms8001_state_t* state, unsigned chan, unsigned lna_loss, unsigned pa_loss);
-
+int lms8001b_hlmix_loss_set(lms8001_state_t* state, unsigned chan, unsigned loss);
 
 int lms8001_reg_set(lms8001_state_t* m, uint16_t addr, uint16_t val);
 int lms8001_reg_get(lms8001_state_t* m, uint16_t addr, uint16_t* oval);

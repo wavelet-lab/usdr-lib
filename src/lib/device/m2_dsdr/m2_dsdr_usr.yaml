@@ -237,6 +237,38 @@ pages:
           - bits: "22:18"
             name: D
             desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
-
+#
+      - addr: 0x4A
+        name: RX_8KB
+        fields:
+          - bits: "3:0"
+            name: A
+            desc: FE LMS8001B RX high band 0-15 PA Gain
+          - bits: "7:4"
+            name: B
+            desc: FE LMS8001A RX high band 0-15 PA Gain
+          - bits: "11:8"
+            name: C
+            desc: FE LMS8001A RX high band 0-15 PA Gain
+          - bits: "15:12"
+            name: D
+            desc: FE LMS8001A RX high band 0-15 PA Gain
+#
+      - addr: 0x4B
+        name: TX_8KB
+        fields:
+          - bits: "3:0"
+            name: A
+            desc: FE LMS8001B TX high band 0-15 PA Gain
+          - bits: "7:4"
+            name: B
+            desc: FE LMS8001A TX high band 0-15 PA Gain
+          - bits: "11:8"
+            name: C
+            desc: FE LMS8001A TX high band 0-15 PA Gain
+          - bits: "15:12"
+            name: D
+            desc: FE LMS8001A TX high band 0-15 PA Gain
+#
 
 

@@ -54,6 +54,8 @@ struct fe_chan_config {
 
     uint8_t lms8_pa_gain;
     uint8_t lms8_lna_gain;
+    uint8_t lms8_rx_hlmix_gain;
+    uint8_t lms8_tx_hlmix_gain;
 };
 typedef struct fe_chan_config fe_chan_config_t;
 
@@ -107,6 +109,7 @@ int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq
 
 
 int dsdr_hiper_fe_rx_gain_set(dsdr_hiper_fe_t* def, unsigned chno, unsigned gain, unsigned* actual_gain);
+int dsdr_hiper_fe_tx_gain_set(dsdr_hiper_fe_t* def, unsigned chno, unsigned gain, unsigned* actual_gain);
 
 
 int dsdr_hiper_fe_rx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_rx);
