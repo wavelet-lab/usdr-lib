@@ -245,10 +245,12 @@ const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
 static int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_dsdr_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
-static int dev_m2_dsdr_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-static int dev_m2_dsdr_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-static int dev_m2_dsdr_gain_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-static int dev_m2_dsdr_gain_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_gain_tx_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
+static int dev_m2_dsdr_gain_rx_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_gain_rx_auto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_gain_rx_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_gain_rx_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_dsdr_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 static int dev_m2_dsdr_debug_all_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
@@ -383,46 +385,55 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/sdr/0/rx/remap",       { dev_m2_dsdr_sdr_rx_remap_set, dev_m2_dsdr_sdr_rx_remap_get }},
     { "/dm/sdr/0/tx/remap",       { dev_m2_dsdr_sdr_tx_remap_set, dev_m2_dsdr_sdr_tx_remap_get }},
 
-    { "/dm/sdr/0/rx/gain",        { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/gain/0",      { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/gain/1",      { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/gain/2",      { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/gain/3",      { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/gain/a",      { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/gain/b",      { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/gain/c",      { dev_m2_dsdr_gain_set, NULL }},
-    { "/dm/sdr/0/rx/gain/d",      { dev_m2_dsdr_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain",        { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/0",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/1",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/2",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/3",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/a",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/b",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/c",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/d",      { dev_m2_dsdr_gain_rx_set, NULL }},
 
-    { "/dm/sdr/0/rx/gain/auto",   { dev_m2_dsdr_gain_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/0", { dev_m2_dsdr_gain_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/1", { dev_m2_dsdr_gain_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/2", { dev_m2_dsdr_gain_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/3", { dev_m2_dsdr_gain_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/a", { dev_m2_dsdr_gain_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/b", { dev_m2_dsdr_gain_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/c", { dev_m2_dsdr_gain_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/d", { dev_m2_dsdr_gain_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto",   { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/0", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/1", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/2", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/3", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/a", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/b", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/c", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/d", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
 
-    { "/dm/sdr/0/rx/gain/lna",    { dev_m2_dsdr_gain_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/0",  { dev_m2_dsdr_gain_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/1",  { dev_m2_dsdr_gain_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/2",  { dev_m2_dsdr_gain_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/3",  { dev_m2_dsdr_gain_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/a",  { dev_m2_dsdr_gain_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/b",  { dev_m2_dsdr_gain_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/c",  { dev_m2_dsdr_gain_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/d",  { dev_m2_dsdr_gain_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna",    { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/0",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/1",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/2",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/3",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/a",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/b",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/c",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/d",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
 
-    { "/dm/sdr/0/rx/gain/pga",    { dev_m2_dsdr_gain_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/0",  { dev_m2_dsdr_gain_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/1",  { dev_m2_dsdr_gain_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/2",  { dev_m2_dsdr_gain_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/3",  { dev_m2_dsdr_gain_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/a",  { dev_m2_dsdr_gain_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/b",  { dev_m2_dsdr_gain_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/c",  { dev_m2_dsdr_gain_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/d",  { dev_m2_dsdr_gain_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga",    { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/0",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/1",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/2",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/3",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/a",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/b",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/c",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/d",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
 
+    { "/dm/sdr/0/tx/gain",        { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/0",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/1",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/2",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/3",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/a",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/b",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/c",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/d",      { dev_m2_dsdr_gain_tx_set, NULL }},
 
     { "/dm/sdr/0/rx/freqency",    { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/freqency/0",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
@@ -797,7 +808,7 @@ int dev_m2_dsdr_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
     return dsdr_set_tx_frequency_chan(d, value, obj->full_path[1]);
 }
 
-int dev_m2_dsdr_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+int dev_m2_dsdr_gain_rx_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
     if (!d->st.libcapi79xx_set_dsa)
@@ -818,7 +829,23 @@ int dev_m2_dsdr_gain_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t valu
     return res;
 }
 
-int dev_m2_dsdr_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+int dev_m2_dsdr_gain_tx_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    if (!d->st.libcapi79xx_set_dsa)
+        return 0;
+
+    if (obj->full_path[0])
+        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/tx/gain", false);
+
+    int res = 0;
+    unsigned i = obj->full_path[1];
+    unsigned dsa_attn = (value > 29) ? 0 : 29 - value;
+    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_TX, i, dsa_attn);
+    return res;
+}
+
+int dev_m2_dsdr_gain_rx_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
     if (!d->st.libcapi79xx_set_dsa)
@@ -839,7 +866,7 @@ int dev_m2_dsdr_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t
     return res;
 }
 
-int dev_m2_dsdr_gain_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+int dev_m2_dsdr_gain_rx_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
     if (!dev_m2_dsdr_has_hiper(d))
@@ -853,7 +880,7 @@ int dev_m2_dsdr_gain_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     return res;
 }
 
-int dev_m2_dsdr_gain_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+int dev_m2_dsdr_gain_rx_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
     if (!d->st.libcapi79xx_set_dsa)
