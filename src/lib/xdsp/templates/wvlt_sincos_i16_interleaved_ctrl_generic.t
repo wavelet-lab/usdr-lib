@@ -13,7 +13,7 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
 
     while(i > 0)
     {
-        const float ph = WVLT_SINCOS_I16_PHSCALE * phase;
+        const float ph = WVLT_SINCOS_I32_PHSCALE * phase;
         float ssin, scos;
 
         sincosf(ph, &ssin, &scos);
@@ -21,7 +21,6 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
         *outdata++ = scos * WVLT_SINCOS_I16_SCALE * sign_cos;
 
         phase += delta_phase;
-        phase &= (WVLT_SINCOS_I16_TWO_PI - 1);
         --i;
     }
 

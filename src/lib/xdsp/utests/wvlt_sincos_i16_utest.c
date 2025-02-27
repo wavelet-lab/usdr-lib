@@ -70,8 +70,8 @@ static void setup()
 
     for(unsigned i = 0; i < SPEED_CYCLES; ++i)
     {
-        start_phase[i] = 32768 * 4 * ((float)(rand()) / (float)RAND_MAX) - 1;
-        delta_phase[i] = 1024 * ((float)(rand()) / (float)RAND_MAX);
+        start_phase[i] = (float)INT32_MAX * ((float)(rand()) / (float)RAND_MAX);
+        delta_phase[i] = (float)INT32_MAX * ((float)(rand()) / (float)RAND_MAX);
         invert_sin[i] = (float)(rand()) / (float)RAND_MAX > 0.5;
         invert_cos[i] = (float)(rand()) / (float)RAND_MAX > 0.5;
     }

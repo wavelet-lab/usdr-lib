@@ -8,9 +8,9 @@
 #include "conv.h"
 
 #define WVLT_SINCOS_I16_SCALE 32767
-#define WVLT_SINCOS_I16_HALF_PI 32768
-#define WVLT_SINCOS_I16_TWO_PI (32768 * 4)
-#define WVLT_SINCOS_I16_PHSCALE (M_PI * 2 / WVLT_SINCOS_I16_TWO_PI)
+#define WVLT_SINCOS_I32_PHSCALE (M_PI / INT32_MAX)
+#define WVLT_SINCOS_I16_PHSCALE (M_PI / (2 * INT16_MAX))
+
 
 conv_function_t get_wvlt_sincos_i16_c(generic_opts_t cpu_cap, const char** sfunc);
 conv_function_t get_wvlt_sincos_i16();

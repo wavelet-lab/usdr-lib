@@ -248,8 +248,8 @@ void* freq_gen_thread_ci16(void* obj)
 #ifdef USE_WVLT_SINCOS
     USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 sinus generator with USE_WVLT_SINCOS opt @ ch#%d F:%.6f MHz",
              p, (double)inp->samplerate * inp->delta_phase / 1000000.f);
-    int32_t phase             = WVLT_SINCOS_I16_TWO_PI * inp->start_phase;
-    const int32_t phase_delta = WVLT_SINCOS_I16_TWO_PI * inp->delta_phase;
+    int32_t phase             = (float)INT32_MAX * 2 * inp->start_phase;
+    const int32_t phase_delta = (float)INT32_MAX * 2 * inp->delta_phase;
 #else
     double phase             = inp->start_phase;
     const double phase_delta = inp->delta_phase;
