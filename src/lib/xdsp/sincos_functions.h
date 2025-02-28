@@ -35,6 +35,7 @@ sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl();
  *                       Diapazon [-PI..+PI) mapped to int32 range INT32_MIN..INT32_MAX.
  *                       The next starting phase for consequent calls is returned by ptr.
  * int32_t delta_phase:  Delta, applying to starting phase. int32_t range is just the same as for start_phase.
+ * int16_t gain:         Output max amplitude
  * bool inv_sin:         Invert result sin values
  * bool inv_cos:         Invert result cos values
  * int16_t* outdata:     Array of output data. Format is interleaved sin/cos int16_t pairs.
@@ -43,11 +44,12 @@ sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl();
  */
 static inline
     void wvlt_sincos_i16_interleaved_ctrl(int32_t* start_phase, int32_t delta_phase,
+                                     int16_t gain,
                                      bool inv_sin, bool inv_cos,
                                      int16_t* outdata,
                                      unsigned iters)
 {
-    return (*get_wvlt_sincos_i16_interleaved_ctrl())(start_phase, delta_phase, inv_sin, inv_cos, outdata, iters);
+    return (*get_wvlt_sincos_i16_interleaved_ctrl())(start_phase, delta_phase, gain, inv_sin, inv_cos, outdata, iters);
 }
 
 #endif // SINCOS_FUNCTIONS_H

@@ -64,6 +64,7 @@ struct tx_thread_input_s
     unsigned chan;
     unsigned samplerate;
     unsigned samples_count;
+    int16_t gain;
     double start_phase;
     double delta_phase;
 };
@@ -244,10 +245,11 @@ void* freq_gen_thread_ci16(void* obj)
     tx_thread_input_t* inp = (tx_thread_input_t*)obj;
     const unsigned p = inp->chan;
     const unsigned tx_get_samples = inp->samples_count;
+    const int16_t gain = inp->gain;
 
 #ifdef USE_WVLT_SINCOS
-    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 sinus generator with USE_WVLT_SINCOS opt @ ch#%d F:%.6f MHz",
-             p, (double)inp->samplerate * inp->delta_phase / 1000000.f);
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 sinus generator with USE_WVLT_SINCOS opt @ ch#%d F:%.6f MHz GAIN:%d",
+             p, (double)inp->samplerate * inp->delta_phase / 1000000.f, gain);
     int32_t phase             = WVLT_CONVPHASE_F32_I32(inp->start_phase);
     const int32_t phase_delta = WVLT_CONVPHASE_F32_I32(inp->delta_phase);
 #else
@@ -269,13 +271,13 @@ void* freq_gen_thread_ci16(void* obj)
         int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
 
 #ifdef USE_WVLT_SINCOS
-        wvlt_sincos_i16_interleaved_ctrl(&phase, phase_delta, true/*invert sin*/, false/*invert cos*/, iqp, tx_get_samples);
+        wvlt_sincos_i16_interleaved_ctrl(&phase, phase_delta, gain, true/*invert sin*/, false/*invert cos*/, iqp, tx_get_samples);
 #else
         for (unsigned i = 0; i < tx_get_samples; i++) {
             float ii, qq;
             sincosf(2 * M_PI * phase, &ii, &qq);
-            iqp[2 * i + 0] = -20000 * (ii) + 0.5;
-            iqp[2 * i + 1] = 20000 * (qq) + 0.5;
+            iqp[2 * i + 0] = -gain * (ii) + 0.5;
+            iqp[2 * i + 1] =  gain * (qq) + 0.5;
 
             phase += phase_delta;
             if (phase > 1.0)
@@ -400,6 +402,7 @@ static void usage(int severity, const char* me)
                                 "\t[-A Antenna configuration [0]] \n"
                                 "\t[-H comma-separated list of sin generator start phases (FP values)] \n"
                                 "\t[-d comma-separated list of sin generator phase deltas (FP values)] \n"
+                                "\t[-g comma-separated list of sin generator gains (int16 values)] \n"
                                 "\t[-X <flag: Skip initialization>] \n"
                                 "\t[-z <flag: Continue on error>] \n"
                                 "\t[-l loglevel [3(INFO)]] \n"
@@ -563,6 +566,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         tx_thread_input_t* inp = &tx_thread_inputs[i];
         inp->start_phase = -1;
         inp->delta_phase = -1;
+        inp->gain = 0;
     }
 
     //Device parameters
@@ -591,7 +595,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:JG:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -771,6 +775,19 @@ int main(UNUSED int argc, UNUSED char** argv)
             unsigned i = 0;
             while (pt != NULL && i < MAX_CHS) {
                 tx_thread_inputs[i++].delta_phase = atof(pt);
+                pt = strtok(NULL, ",");
+            }
+            break;
+        }
+        //Comma-separated list of sin generator gains (int16 values).
+        //Ordered by channel#
+        //If not specified or ==0, default sequence is applied (see gains[] below)
+        case 'g':
+        {
+            char *pt = strtok(optarg, ",");
+            unsigned i = 0;
+            while (pt != NULL && i < MAX_CHS) {
+                tx_thread_inputs[i++].gain = atoi(pt);
                 pt = strtok(NULL, ",");
             }
             break;
@@ -979,6 +996,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     static double start_phase[]  = { 0, 0.5, 0.25, 0.125 };
     static double start_dphase[] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
+    static int16_t gains[] = {32700, 32700, 32700, 32700};
 
     for(unsigned i = 0; i < tx_bufcnt; ++i)
     {
@@ -988,6 +1006,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         inp->samples_count = samples_tx;
         inp->start_phase = inp->start_phase >= 0 ? inp->start_phase : start_phase[i % (sizeof(start_phase) / sizeof(*start_phase))];
         inp->delta_phase = inp->delta_phase >= 0 ? inp->delta_phase : start_dphase[i % (sizeof(start_dphase) / sizeof(*start_dphase))];
+        inp->gain = inp->gain != 0 ? inp->gain : gains[i % (sizeof(gains) / sizeof(*gains))];
     }
 
     for(unsigned i = 0; i < MAX_CHS; ++i)

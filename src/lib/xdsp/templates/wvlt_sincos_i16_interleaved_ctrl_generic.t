@@ -1,6 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
                         int32_t delta_phase,
+                        int16_t gain,
                         bool inv_sin,
                         bool inv_cos,
                         int16_t *__restrict outdata,
@@ -17,8 +18,8 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
         float ssin, scos;
 
         sincosf(ph, &ssin, &scos);
-        *outdata++ = ssin * WVLT_SINCOS_I16_SCALE * sign_sin;
-        *outdata++ = scos * WVLT_SINCOS_I16_SCALE * sign_cos;
+        *outdata++ = ssin * gain * sign_sin;
+        *outdata++ = scos * gain * sign_cos;
 
         phase += delta_phase;
         --i;

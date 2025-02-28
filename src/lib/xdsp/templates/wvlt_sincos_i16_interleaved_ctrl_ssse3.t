@@ -1,6 +1,7 @@
 static
 void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
                         int32_t delta_phase,
+                        int16_t gain,
                         bool inv_sin,
                         bool inv_cos,
                         int16_t *__restrict outdata,
@@ -22,6 +23,7 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
     const __m128i mpi_2v  = _mm_set1_epi32(-32768);
     const __m128i  pi_2v  = _mm_set1_epi32( 32767);
     const __m128i  onev   = _mm_set1_epi16(1);
+    const __m128i  gainv  = _mm_set1_epi16(gain);
 
 #include "wvlt_sincos_i16_ssse3.inc"
 
@@ -56,6 +58,10 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
         reg_sin = _mm_sign_epi16(reg_sin, vsign_sin);
         reg_cos = _mm_sign_epi16(reg_cos, vsign_cos);
 
+        //apply amplitude normalization
+        reg_sin = _mm_mulhrs_epi16(reg_sin, gainv);
+        reg_cos = _mm_mulhrs_epi16(reg_cos, gainv);
+
         // interleave & store
         _mm_storeu_si128((__m128i*)(outdata + 0), _mm_unpacklo_epi16(reg_sin, reg_cos));
         _mm_storeu_si128((__m128i*)(outdata + 8), _mm_unpackhi_epi16(reg_sin, reg_cos));
@@ -73,8 +79,8 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase,
         float ssin, scos;
 
         sincosf(ph, &ssin, &scos);
-        *outdata++ = ssin * WVLT_SINCOS_I16_SCALE * sign_sin;
-        *outdata++ = scos * WVLT_SINCOS_I16_SCALE * sign_cos;
+        *outdata++ = ssin * gain * sign_sin;
+        *outdata++ = scos * gain * sign_cos;
 
         phase += delta_phase;
         --i;

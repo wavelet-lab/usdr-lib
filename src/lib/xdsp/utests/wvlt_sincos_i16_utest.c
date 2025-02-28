@@ -36,6 +36,7 @@ static int16_t* cosdata_etalon = NULL;
 static int16_t *sincosdata = NULL, *sincosdata_etalon = NULL;
 static int32_t start_phase[SPEED_CYCLES], delta_phase[SPEED_CYCLES];
 static bool invert_sin[SPEED_CYCLES], invert_cos[SPEED_CYCLES];
+static int16_t gain[SPEED_CYCLES];
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
@@ -71,6 +72,7 @@ static void setup()
     start_phase[0] = WVLT_CONVPHASE_F32_I32(0.25);
     delta_phase[0] = WVLT_CONVPHASE_F32_I32(0.0125);
     invert_sin[0] = invert_cos[0] = false;
+    gain[0] = 30000;
 
     for(unsigned i = 1; i < SPEED_CYCLES; ++i)
     {
@@ -78,6 +80,7 @@ static void setup()
         delta_phase[i] = WVLT_CONVPHASE_F32_I32((float)(rand()) / (float)RAND_MAX);
         invert_sin[i] = (float)(rand()) / (float)RAND_MAX > 0.5;
         invert_cos[i] = (float)(rand()) / (float)RAND_MAX > 0.5;
+        gain[i] = INT16_MAX * ((float)(rand()) / (float)RAND_MAX > 0.5);
     }
 }
 
@@ -159,9 +162,10 @@ START_TEST(wvlt_sincos_i16_interleaved_ctrl_check_simd)
     const int32_t delta_ph = delta_phase[0];
     const bool inv_sin = invert_sin[0];
     const bool inv_cos = invert_cos[0];
+    const int16_t gain_c = gain[0];
 
     //get etalon output data (generic foo)
-    (*get_fn_interleaved(OPT_GENERIC, 0))(&ph_etalon, delta_ph, inv_sin, inv_cos, sincosdata_etalon, WORD_COUNT);
+    (*get_fn_interleaved(OPT_GENERIC, 0))(&ph_etalon, delta_ph, gain_c, inv_sin, inv_cos, sincosdata_etalon, WORD_COUNT);
 
     fprintf(stderr, "-- start_phase:%d delta_phase:%d final_phase:%d\n", start_phase[0], delta_ph, ph_etalon);
 
@@ -174,7 +178,7 @@ START_TEST(wvlt_sincos_i16_interleaved_ctrl_check_simd)
             memset(sincosdata, 0, WORD_COUNT * 2 * sizeof(int16_t));
             int32_t ph = start_phase[0];
 
-            (*fn)(&ph, delta_ph, inv_sin, inv_cos, sincosdata, WORD_COUNT);
+            (*fn)(&ph, delta_ph, gain_c, inv_sin, inv_cos, sincosdata, WORD_COUNT);
 
             int32_t tmp_ph = start_phase[0];
             int32_t max_eps = 0;
@@ -234,13 +238,13 @@ START_TEST(wvlt_sincos_i16_interleaved_ctrl_speed)
         {
             int32_t ph = start_phase[0];
             //warming
-            for(int i = 0; i < 10; ++i) (*fn)(&ph, delta_phase[0], invert_sin[0], invert_cos[0], sincosdata, SPEED_WORD_COUNT);
+            for(int i = 0; i < 10; ++i) (*fn)(&ph, delta_phase[0], gain[0], invert_sin[0], invert_cos[0], sincosdata, SPEED_WORD_COUNT);
 
             //measuring
             uint64_t tk = clock_get_time();
             for(unsigned i = 0; i < SPEED_CYCLES; ++i)
             {
-                (*fn)(&start_phase[i], delta_phase[i], invert_sin[i], invert_cos[i], sincosdata, iters);
+                (*fn)(&start_phase[i], delta_phase[i], gain[i], invert_sin[i], invert_cos[i], sincosdata, iters);
             }
             uint64_t tk1 = clock_get_time() - tk;
             fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 IQ, ave speed = %.2f mln IQs/s \n",
