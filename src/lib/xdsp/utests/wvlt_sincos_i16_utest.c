@@ -11,7 +11,7 @@
 #include "sincos_functions.h"
 #include <math.h>
 
-#define DEBUG_PRINT
+//#define DEBUG_PRINT
 
 #define WORD_COUNT (65536)
 #define STREAM_SIZE_BZ (WORD_COUNT * sizeof(int16_t))
@@ -68,10 +68,14 @@ static void setup()
         in[i] = sign * (sign == -1 ? CONV_SCALE + 1 : CONV_SCALE) * (float)(rand()) / (float)RAND_MAX;
     }
 
-    for(unsigned i = 0; i < SPEED_CYCLES; ++i)
+    start_phase[0] = WVLT_CONVPHASE_F32_I32(0.25);
+    delta_phase[0] = WVLT_CONVPHASE_F32_I32(0.0125);
+    invert_sin[0] = invert_cos[0] = false;
+
+    for(unsigned i = 1; i < SPEED_CYCLES; ++i)
     {
-        start_phase[i] = (float)INT32_MAX * ((float)(rand()) / (float)RAND_MAX);
-        delta_phase[i] = (float)INT32_MAX * ((float)(rand()) / (float)RAND_MAX);
+        start_phase[i] = WVLT_CONVPHASE_F32_I32((float)(rand()) / (float)RAND_MAX);
+        delta_phase[i] = WVLT_CONVPHASE_F32_I32((float)(rand()) / (float)RAND_MAX);
         invert_sin[i] = (float)(rand()) / (float)RAND_MAX > 0.5;
         invert_cos[i] = (float)(rand()) / (float)RAND_MAX > 0.5;
     }
@@ -159,6 +163,9 @@ START_TEST(wvlt_sincos_i16_interleaved_ctrl_check_simd)
     //get etalon output data (generic foo)
     (*get_fn_interleaved(OPT_GENERIC, 0))(&ph_etalon, delta_ph, inv_sin, inv_cos, sincosdata_etalon, WORD_COUNT);
 
+    fprintf(stderr, "-- start_phase:%d delta_phase:%d final_phase:%d\n", start_phase[0], delta_ph, ph_etalon);
+
+
     while(opt != OPT_GENERIC)
     {
         sincos_i16_interleaved_ctrl_function_t fn = get_fn_interleaved(opt--, 1);
@@ -169,9 +176,28 @@ START_TEST(wvlt_sincos_i16_interleaved_ctrl_check_simd)
 
             (*fn)(&ph, delta_ph, inv_sin, inv_cos, sincosdata, WORD_COUNT);
 
+            int32_t tmp_ph = start_phase[0];
+            int32_t max_eps = 0;
+            for(unsigned i = 0; i < WORD_COUNT; ++i, tmp_ph += delta_ph)
+            {
+                int16_t ss = sincosdata[i*2];
+                int16_t cc = sincosdata[i*2 + 1];
+                int16_t sse = sincosdata_etalon[i*2];
+                int16_t cce = sincosdata_etalon[i*2 + 1];
+#ifdef DEBUG_PRINT
+                fprintf(stderr, "i#%d : phase:%12d, out{sin:%6d cos:%6d}, etalon{sin:%6d cos:%6d}, delta = {%4d %4d}\n",
+                        i, tmp_ph, ss, cc, sse, cce, abs(ss-sse), abs(cc-cce));
+#endif
+                if(abs(ss-sse) > max_eps)
+                    max_eps = abs(ss-sse);
+                if(abs(cc-cce) > max_eps)
+                    max_eps = abs(cc-cce);
+            }
+            fprintf(stderr, "-- final_phase:%d (est:%d) max_eps:%d\n", ph, tmp_ph, max_eps);
+
             int res = is_equal_interleaved();
             res >= 0 ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
-#ifdef DEBUG_PRINT
+
             for(int i = res - 20; res >= 0 && i <= res + 20; ++i)
             {
                 if(i >= 0 && i < WORD_COUNT)
@@ -180,7 +206,7 @@ START_TEST(wvlt_sincos_i16_interleaved_ctrl_check_simd)
                             i, in_check[i], sincosdata[i*2], sincosdata[i*2 + 1], sincosdata_etalon[i*2], sincosdata_etalon[i*2 + 1],
                             abs(sincosdata_etalon[i*2] - sincosdata[i*2]), abs(sincosdata_etalon[i*2 + 1] - sincosdata[i*2 + 1]));
             }
-#endif
+
             ck_assert_int_eq( res, -1 );
             ck_assert_int_eq( ph, ph_etalon );
         }

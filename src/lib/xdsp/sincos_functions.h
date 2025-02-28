@@ -7,9 +7,10 @@
 #include <stdint.h>
 #include "conv.h"
 
-#define WVLT_SINCOS_I16_SCALE 32767
+#define WVLT_SINCOS_I16_SCALE INT16_MAX
 #define WVLT_SINCOS_I32_PHSCALE (M_PI / INT32_MAX)
 #define WVLT_SINCOS_I16_PHSCALE (M_PI / (2 * INT16_MAX))
+#define WVLT_CONVPHASE_F32_I32(x) ((x) >= 0.5) ? INT32_MIN - (int32_t)(((x) - 0.5) * 2.0 * (float)INT32_MIN) : - (int32_t)((x) * 2.0 * (float)INT32_MIN)
 
 
 conv_function_t get_wvlt_sincos_i16_c(generic_opts_t cpu_cap, const char** sfunc);
@@ -31,15 +32,13 @@ sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl();
  * wvlt_sincos_i16_interleaved_ctrl()
  *
  * int32_t* start_phase: Starting phase.
- *                       Diapazon 0..2*PI mapped to int32 range [0..131072).
- *                       Must be 0 or positive.
+ *                       Diapazon [-PI..+PI) mapped to int32 range INT32_MIN..INT32_MAX.
  *                       The next starting phase for consequent calls is returned by ptr.
  * int32_t delta_phase:  Delta, applying to starting phase. int32_t range is just the same as for start_phase.
- *                       Must be 0 or positive.
  * bool inv_sin:         Invert result sin values
  * bool inv_cos:         Invert result cos values
  * int16_t* outdata:     Array of output data. Format is interleaved sin/cos int16_t pairs.
- *                       Sin & cos values are within (-32768..32767] range.
+ *                       Sin & cos values are within INT16_MIN..INT16_MAX range.
  * unsigned iters:       Iterations count. One iteration == sin+cos pair calculation for some phase, and phase incrementation.
  */
 static inline
