@@ -22,6 +22,7 @@
 
 #include "../common/ring_buffer.h"
 #include "sincos_functions.h"
+#include "fast_math.h"
 
 #define LOG_TAG "DMCR"
 
@@ -64,7 +65,7 @@ struct tx_thread_input_s
     unsigned chan;
     unsigned samplerate;
     unsigned samples_count;
-    int16_t gain;
+    float gain;
     double start_phase;
     double delta_phase;
 };
@@ -236,6 +237,7 @@ void* freq_gen_thread_ci16_lut(void* obj)
 
 
 #define USE_WVLT_SINCOS
+#define MAX_TXGEN_CI16_AMPL 32760
 
 /*
  *   Thread function - Sine generator to TX stream (ci16)
@@ -245,11 +247,11 @@ void* freq_gen_thread_ci16(void* obj)
     tx_thread_input_t* inp = (tx_thread_input_t*)obj;
     const unsigned p = inp->chan;
     const unsigned tx_get_samples = inp->samples_count;
-    const int16_t gain = inp->gain;
+    const int16_t gain = DBFS_TO_AMPLITUDE(inp->gain, MAX_TXGEN_CI16_AMPL);
 
 #ifdef USE_WVLT_SINCOS
-    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 sinus generator with USE_WVLT_SINCOS opt @ ch#%d F:%.6f MHz GAIN:%d",
-             p, (double)inp->samplerate * inp->delta_phase / 1000000.f, gain);
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 sinus generator with USE_WVLT_SINCOS opt @ ch#%d F:%.6f MHz GAIN:(%.2fdBFS = %d)",
+             p, (double)inp->samplerate * inp->delta_phase / 1000000.f, inp->gain, gain);
     int32_t phase             = WVLT_CONVPHASE_F32_I32(inp->start_phase);
     const int32_t phase_delta = WVLT_CONVPHASE_F32_I32(inp->delta_phase);
 #else
@@ -402,7 +404,7 @@ static void usage(int severity, const char* me)
                                 "\t[-A Antenna configuration [0]] \n"
                                 "\t[-H comma-separated list of sin generator start phases (FP values)] \n"
                                 "\t[-d comma-separated list of sin generator phase deltas (FP values)] \n"
-                                "\t[-g comma-separated list of sin generator gains (int16 values)] \n"
+                                "\t[-g comma-separated list of sin generator gains (FP values, dBFS -100..0)] \n"
                                 "\t[-X <flag: Skip initialization>] \n"
                                 "\t[-z <flag: Continue on error>] \n"
                                 "\t[-l loglevel [3(INFO)]] \n"
@@ -566,7 +568,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         tx_thread_input_t* inp = &tx_thread_inputs[i];
         inp->start_phase = -1;
         inp->delta_phase = -1;
-        inp->gain = 0;
+        inp->gain = INT16_MIN;
     }
 
     //Device parameters
@@ -779,15 +781,18 @@ int main(UNUSED int argc, UNUSED char** argv)
             }
             break;
         }
-        //Comma-separated list of sin generator gains (int16 values).
+        //Comma-separated list of sin generator gains (dBFS -100..0 range).
         //Ordered by channel#
-        //If not specified or ==0, default sequence is applied (see gains[] below)
+        //If not specified, default 0dBFS is applied (see gains[] below)
         case 'g':
         {
             char *pt = strtok(optarg, ",");
             unsigned i = 0;
             while (pt != NULL && i < MAX_CHS) {
-                tx_thread_inputs[i++].gain = atoi(pt);
+                float gn = atof(pt);
+                gn = (gn > 0.0 ? 0.0 : gn);
+                gn = (gn < -100.0 ? -100.0 : gn);
+                tx_thread_inputs[i++].gain = gn;
                 pt = strtok(NULL, ",");
             }
             break;
@@ -996,7 +1001,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     static double start_phase[]  = { 0, 0.5, 0.25, 0.125 };
     static double start_dphase[] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
-    static int16_t gains[] = {32700, 32700, 32700, 32700};
+    static int16_t gains[] = {0.0, 0.0, 0.0, 0.0};
 
     for(unsigned i = 0; i < tx_bufcnt; ++i)
     {
@@ -1006,7 +1011,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         inp->samples_count = samples_tx;
         inp->start_phase = inp->start_phase >= 0 ? inp->start_phase : start_phase[i % (sizeof(start_phase) / sizeof(*start_phase))];
         inp->delta_phase = inp->delta_phase >= 0 ? inp->delta_phase : start_dphase[i % (sizeof(start_dphase) / sizeof(*start_dphase))];
-        inp->gain = inp->gain != 0 ? inp->gain : gains[i % (sizeof(gains) / sizeof(*gains))];
+        inp->gain = inp->gain != INT16_MIN ? inp->gain : gains[i % (sizeof(gains) / sizeof(*gains))];
     }
 
     for(unsigned i = 0; i < MAX_CHS; ++i)
