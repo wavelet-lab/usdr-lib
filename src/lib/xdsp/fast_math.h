@@ -148,4 +148,8 @@ static inline
 
 #endif
 
+#define DBFS_TO_AMPLITUDE(dbfs, max_amplitude) ((max_amplitude) * pow(2, (float)(dbfs) / 6.020599913f))
+#define AMPLITUDE_TO_DBFS(amplitude, max_amplitude) \
+    (fabs(amplitude) < 1E-10 ? -100.0 : 6.020599913f * wvlt_polylog2f(fabs(amplitude) / fabs(max_amplitude)))
+
 #endif // FAST_MATH_H
