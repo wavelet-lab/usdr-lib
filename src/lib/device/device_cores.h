@@ -67,6 +67,7 @@ enum usdr_fe_cores {
     USDR_TFE_BRSTN = 1,
 
     USDR_EXFC_BRSTN = 16,
+    USDR_TXSFE = 32,
 };
 
 #define USDR_MAKE_COREID(family, coreid) \

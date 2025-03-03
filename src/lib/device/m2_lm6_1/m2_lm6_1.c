@@ -466,13 +466,13 @@ int dev_m2_lm6_1_sdr_atcrbs_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* val
 
 int dev_m2_lm6_1_sdr_tx_bbloopbackm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
-    int res;
-
-    res = sfe_tx4_ctl(d->base.dev, 0, M2PCI_REG_WR_TXDMA_CNF_L,
-                      value > 1 ? true : false,
-                      true, true);
-    return res;
+    //struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    //int res;
+    // res = sfe_tx4_ctl(d->base.dev, 0, M2PCI_REG_WR_TXDMA_CNF_L, 0, 0,
+    //                   value > 1 ? true : false,
+    //                   true);
+    //return res;
+    return -EINVAL;
 }
 
 

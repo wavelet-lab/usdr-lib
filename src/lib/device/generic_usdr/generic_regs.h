@@ -81,7 +81,8 @@ enum VIRT_BUS_ADDRS {
 };
 
 enum RFE_BUS_ADDRS {
-    CSR_RFE4_BASE = VIRT_CFG_SFX_BASE + 256,
+    CSR_RFE4_BASE = VIRT_CFG_SFX_BASE + 1 * 256,
+    CSR_TFE4_BASE = VIRT_CFG_SFX_BASE + 3 * 256,
 };
 
 // All I2C devices used accross the famaly

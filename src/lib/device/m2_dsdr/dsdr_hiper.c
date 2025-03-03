@@ -1553,7 +1553,7 @@ int dsdr_hiper_fe_txlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_txi
     }
 
     def->ucfg[chno].tx_nco = fIF;
-    *p_swap_txiq = 1;
+    *p_swap_txiq = high_path;
     *p_high_path = high_path;
 
     USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] TX_NCO=%.3f LO=%.3f SWAP_IQ=%d PATH=%s LMS8[%d]_MSK=%x\n", chno,
