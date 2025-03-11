@@ -19,6 +19,8 @@
 #include <unistd.h>
 #include <math.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <assert.h>
 
 #include "../common/ring_buffer.h"
 #include "sincos_functions.h"
@@ -118,6 +120,8 @@ void* disk_write_thread(void* obj)
     return NULL;
 }
 
+#define LOAD_FILE_TO_RAM_THREHOLD (size_t)(256*1024*1024)
+
 /*
  *  Thread function - read data from file to TX stream
  */
@@ -126,6 +130,52 @@ void* disk_read_thread(void* obj)
     tx_thread_input_t* inp = (tx_thread_input_t*)obj;
     const unsigned i = inp->chan;
     bool interrupt = false;
+
+    struct stat64 stat_buf;
+    const size_t file_bsz = fstat64(fileno(s_in_file[i]), &stat_buf) ? (size_t)-1 : stat_buf.st_size;
+    bool load_file_to_ram = (file_bsz <= LOAD_FILE_TO_RAM_THREHOLD);
+
+    if(file_bsz == (size_t)-1)
+        USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX thread[%u]: cannot determine file size! load_to_ram:%d", i, load_file_to_ram);
+    else
+        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX thread[%u]: file size:%" PRIu64 " bytes, load_to_ram:%d", i, file_bsz, load_file_to_ram);
+
+    void* file_dataptr = NULL;
+    if(load_file_to_ram)
+    {
+        if(posix_memalign(&file_dataptr, 64, file_bsz))
+        {
+            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX thread[%u]: cannot allocate RAM to load file! Will play from disk", i);
+            file_dataptr = NULL;
+            load_file_to_ram = false;
+        }
+        else
+        {
+            void* ptr = file_dataptr;
+            while(true)
+            {
+                unsigned len = fread(ptr, sizeof(char), s_tx_blksz, s_in_file[i]);
+                if(ferror(s_in_file[i]))
+                {
+                    USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX thread[%u]: can't read %u bytes! res=%u error=%d", i, s_tx_blksz, len, errno);
+                    goto finalize;
+                }
+                if(feof(s_in_file[i]))
+                    break;
+
+                ptr += len;
+                if(ptr - file_dataptr > file_bsz)
+                {
+                    USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX thread[%u]: file buffer out of bounds(pos:%" PRIu64 " > size:%" PRIu64 ")",
+                             i, ptr - file_dataptr, file_bsz);
+                    goto finalize;
+                }
+            }
+            USDR_LOG(LOG_TAG, USDR_LOG_INFO, "TX thread[%u]: file size:%" PRIu64 " bytes loaded into RAM", i, file_bsz);
+        }
+    }
+
+    void* ptr = file_dataptr;
 
     while (!s_stop && !thread_stop && !interrupt) {
 
@@ -136,43 +186,69 @@ void* disk_read_thread(void* obj)
         char* data = ring_buffer_at(tbuff[i], idx);
         tx_header_t* hdr = (tx_header_t*)data;
 
-        hdr->len = fread(data + sizeof(tx_header_t), sizeof(char), s_tx_blksz, s_in_file[i]);
-        hdr->flags = TXF_NONE;
-
-        if(ferror(s_in_file[i]))
+        if(load_file_to_ram)
         {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX thread[%u]: can't read %u bytes! res=%u error=%d", i, s_tx_blksz, hdr->len, errno);
-            hdr->flags |= TXF_READ_FILE_ERROR;
-            interrupt = true;
-        }
+            hdr->len = (ptr + s_tx_blksz <= file_dataptr + file_bsz) ? s_tx_blksz : (file_dataptr + file_bsz) - ptr;
+            assert(hdr->len <= s_tx_blksz);
+            hdr->flags = TXF_NONE;
+            memcpy(data + sizeof(tx_header_t), ptr, hdr->len);
 
-        if(feof(s_in_file[i]))
-        {
-            if(tx_file_cycle)
+            if(hdr->len != s_tx_blksz)
             {
-                rewind(s_in_file[i]);
-
-                if(hdr->len == 0)
-                    hdr->len = fread(data + sizeof(tx_header_t), sizeof(char), s_tx_blksz, s_in_file[i]);
-
-                if(hdr->len == 0)
+                ptr = file_dataptr;
+                if(!tx_file_cycle)
                 {
-                    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX thread[%u]: can't loop empty file", i);
                     hdr->flags |= TXF_READ_FILE_EOF;
                     interrupt = true;
                 }
             }
             else
             {
-                hdr->flags |= TXF_READ_FILE_EOF;
+                ptr += hdr->len;
+            }
+        }
+        else
+        {
+            hdr->len = fread(data + sizeof(tx_header_t), sizeof(char), s_tx_blksz, s_in_file[i]);
+            hdr->flags = TXF_NONE;
+
+            if(ferror(s_in_file[i]))
+            {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX thread[%u]: can't read %u bytes! res=%u error=%d", i, s_tx_blksz, hdr->len, errno);
+                hdr->flags |= TXF_READ_FILE_ERROR;
                 interrupt = true;
+            }
+
+            if(feof(s_in_file[i]))
+            {
+                if(tx_file_cycle)
+                {
+                    rewind(s_in_file[i]);
+
+                    if(hdr->len == 0)
+                        hdr->len = fread(data + sizeof(tx_header_t), sizeof(char), s_tx_blksz, s_in_file[i]);
+
+                    if(hdr->len == 0)
+                    {
+                        USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX thread[%u]: can't loop empty file", i);
+                        hdr->flags |= TXF_READ_FILE_EOF;
+                        interrupt = true;
+                    }
+                }
+                else
+                {
+                    hdr->flags |= TXF_READ_FILE_EOF;
+                    interrupt = true;
+                }
             }
         }
 
-        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX thread[%u]: read %u bytes from file to TX", i, hdr->len);
+        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX thread[%u]: read %u bytes from %s to TX", i, hdr->len, (load_file_to_ram ? "RAM" : "file"));
         ring_buffer_ppost(tbuff[i]);
     }
 
+finalize:
+    free(file_dataptr);
     return NULL;
 }
 
