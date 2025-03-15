@@ -10,9 +10,27 @@
 #include <string.h>
 #include <assert.h>
 
+#define TX_TO_FILE_IMITATION
+
+#ifdef TX_TO_FILE_IMITATION
+
+#include <stdio.h>
+static char* tx_imit_fname = "./tx_imit.iq";
+FILE* tx_imit_file = NULL;
+static usdr_dms_nfo_t snfo_tx;
+
+#endif
 
 int usdr_dms_destroy(pusdr_dms_t stream)
 {
+#ifdef TX_TO_FILE_IMITATION
+    if(tx_imit_file)
+    {
+        fclose(tx_imit_file);
+        tx_imit_file = NULL;
+    }
+#endif
+
     struct stream_handle* h = (struct stream_handle*)stream;
     return h->dev->unregister_stream(h->dev, h);
 }
@@ -82,6 +100,13 @@ int usdr_dms_create_ex2(pdm_dev_t device,
                         const char* parameters,
                         pusdr_dms_t* outu)
 {
+#ifdef TX_TO_FILE_IMITATION
+    if(!tx_imit_file)
+    {
+        tx_imit_file = fopen(tx_imit_fname, "wb+c");
+    }
+#endif
+
     device_t* dev = device->lldev->pdev;
     int res = dev->create_stream(dev, sobj, dformat,
                                  channels, pktsyms, flags, parameters,
@@ -132,14 +157,30 @@ int usdr_dms_recv(pusdr_dms_t stream,
     return h->ops->recv(h, (char**)stream_buffs, timeout_ms, nfo);
 }
 
+#ifdef TX_TO_FILE_IMITATION
+static int tx_dumper(pusdr_dms_t stream, const void **stream_buffs, unsigned samples)
+{
+    if(!tx_imit_file || usdr_dms_info(stream, &snfo_tx))
+        return -EIO;
+
+    unsigned bzsize = ((snfo_tx.pktbszie << 3) / snfo_tx.pktsyms * samples) >> 3;
+    int res = fwrite(stream_buffs[0], bzsize , 1, tx_imit_file);
+    return (res == 1) ? 0 : -EIO;
+}
+#endif
+
 int usdr_dms_send(pusdr_dms_t stream,
                   const void **stream_buffs,
                   unsigned samples,
                   dm_time_t timestamp,
                   unsigned timeout_ms)
 {
+#ifdef TX_TO_FILE_IMITATION
+    return tx_dumper(stream, stream_buffs, samples);
+#else
     struct stream_handle* h = (struct stream_handle*)stream;
     return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms, NULL);
+#endif
 }
 
 int usdr_dms_send_stat(pusdr_dms_t stream,
@@ -149,6 +190,10 @@ int usdr_dms_send_stat(pusdr_dms_t stream,
                        unsigned timeout_ms,
                        usdr_dms_send_stat_t* stat)
 {
+#ifdef TX_TO_FILE_IMITATION
+    return tx_dumper(stream, stream_buffs, samples);
+#else
     struct stream_handle* h = (struct stream_handle*)stream;
     return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms, stat);
+#endif
 }
