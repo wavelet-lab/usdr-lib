@@ -175,12 +175,12 @@ int usdr_dms_send(pusdr_dms_t stream,
                   dm_time_t timestamp,
                   unsigned timeout_ms)
 {
-#ifdef TX_TO_FILE_IMITATION
-    return tx_dumper(stream, stream_buffs, samples);
-#else
     struct stream_handle* h = (struct stream_handle*)stream;
-    return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms, NULL);
+    int res =  h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms, NULL);
+#ifdef TX_TO_FILE_IMITATION
+    res = res ? res : tx_dumper(stream, stream_buffs, samples);
 #endif
+    return res;
 }
 
 int usdr_dms_send_stat(pusdr_dms_t stream,
@@ -190,10 +190,10 @@ int usdr_dms_send_stat(pusdr_dms_t stream,
                        unsigned timeout_ms,
                        usdr_dms_send_stat_t* stat)
 {
-#ifdef TX_TO_FILE_IMITATION
-    return tx_dumper(stream, stream_buffs, samples);
-#else
     struct stream_handle* h = (struct stream_handle*)stream;
-    return h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms, stat);
+    int res = h->ops->send(h, (const char**)stream_buffs, samples, timestamp, timeout_ms, stat);
+#ifdef TX_TO_FILE_IMITATION
+    res = res ? res : tx_dumper(stream, stream_buffs, samples);
 #endif
+    return res;
 }
