@@ -146,7 +146,7 @@ pages:
       name: INSTCAL_DLY
       mode: RW
       dflt: 0x1F4
-      desc: "Sets the wait time for instant calibration. INSTCAL_DLY = T x fOSCIN / (2CAL_CLK_DIV). T = 2.5 x CBIASVCO / 4.7 \xB5F. CBIASVCO is the bypass capacitor at pin 3."
+      desc: "Sets the wait time for instant calibration. INSTCAL_DLY = T x fOSCIN / (2CAL_CLK_DIV). T = 2.5 x CBIASVCO / 4.7 mcF. CBIASVCO is the bypass capacitor at pin 3."
     - bits: '14:12'
       name: CAL_CLK_DIV
       mode: RW
@@ -357,8 +357,6 @@ pages:
       desc: Uses single PFD when PFDIN input is enabled. The actual charge pump current is equal to half the current setting made in CPG.
       opts:
         0x0: Normal operation
-        0x1: Not used
-        0x2: Not used
         0x3: Single PFD
     - bits: 11
       name: PFD_POL
@@ -386,19 +384,19 @@ pages:
       mode: RW
       dflt: 0xE
       desc: Sets charge pump gain value.
-#      opts:
-#        0x0: Tri-state
-#        0x1: 1.4 mA
-#        0x4: 5.6 mA
-#        0x5: 7 mA
-#        0x6: 11.2 mA
-#        0x7: 12.6 mA
-#        0x8: 2.8 mA
-#        0x9: 4.2 mA
-#        0x12: 8.4 mA
-#        0x13: 9.8 mA
-#        0x14: 14 mA
-#        0x15: 15.4 mA
+      opts:
+        0: Tri-state
+        1: 1.4 mA
+        4: 5.6 mA
+        5: 7 mA
+        6: 11.2 mA
+        7: 12.6 mA
+        8: 2.8 mA
+        9: 4.2 mA
+        12: 8.4 mA
+        13: 9.8 mA
+        14: 14 mA
+        15: 15.4 mA
     - bits: '15:5'
       name: R16_RESERVED_0
       mode: RW
@@ -1236,8 +1234,8 @@ pages:
       dflt: 0x0
       desc: Reads back lock detect status.
       opts:
-        0x0: Unlocked
-        0x1: Unlocked
+        0x0: Unlocked0
+        0x1: Unlocked1
         0x2: Locked
         0x3: Invalid
   - addr: 0x4B
@@ -1260,7 +1258,7 @@ pages:
       name: RB_TEMP_SENS
       mode: R
       dflt: 0x0
-      desc: "Reads back temperature sensor code. Temperature in \xB0C = 0.85 x code - 415. Resolution is 0.6\xB0C per code. Measurement accuracy is \xB15 degrees."
+      desc: "Reads back temperature sensor code. Temperature in C = 0.85 x code - 415. Resolution is 0.6C per code. Measurement accuracy is 5 degrees."
     - bits: '15:11'
       name: R76_RESERVED_0
       mode: R
