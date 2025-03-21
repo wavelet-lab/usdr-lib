@@ -82,6 +82,7 @@ class GenH:
                         .replace('>', 'GT')
                         .replace('<', 'LT')
                         .replace('=', 'EQ')
+                        .replace('+', 'PL')
                         .replace('.', '_')
                         .replace(',', '_')
                         .replace(' ', '_')
