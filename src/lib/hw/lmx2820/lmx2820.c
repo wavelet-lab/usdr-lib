@@ -735,8 +735,6 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
     else
         HP_fd_adj = FCAL_HPFD_ADJ_FPD_GT_200_MHZ;
 
-    bool vco_dblr_engaged = st->lmx2820_output_chain.outa_mux == OUTA_MUX_VCO_DOUBLER || st->lmx2820_output_chain.outb_mux == OUTB_MUX_VCO_DOUBLER;
-
     uint8_t cal_clk_div;
     if(osc_in <= 200000000)
         cal_clk_div = CAL_CLK_DIV_FOSCIN_LE_200_MHZ;
@@ -749,14 +747,21 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
 
     uint16_t instcal_dly = 0x1f4;
     uint32_t instcal_pll_num = 0;
+    uint8_t  instcal_dblr_en = INSTCAL_DBLR_EN_NORMAL_OPERATION;
 
     if(use_instcal)
     {
         instcal_dly = (2.5f * C_BIAS / 0.47) * ((double)osc_in / 1E6) / (1 << cal_clk_div);
         instcal_pll_num = (double)((uint64_t)1 << 32) * (double)st->lmx2820_input_chain.pll_num / st->lmx2820_input_chain.pll_den;
+
+        if(st->lmx2820_output_chain.outa_mux == OUTA_MUX_VCO_DOUBLER || st->lmx2820_output_chain.outb_mux == OUTB_MUX_VCO_DOUBLER)
+        {
+            instcal_dblr_en = INSTCAL_DBLR_EN_VCO_DOUBLER_IS_ENGAGED;
+        }
     }
 
-    USDR_LOG("2820", USDR_LOG_DEBUG, "REGS> LP_FD_ADJ:%d HP_FD_ADJ:%d CAL_CLK_DIV:%d INSTCAL_DLY:%d INSTCAL_PLL_NUM:%u", LP_fd_adj, HP_fd_adj, cal_clk_div, instcal_dly, instcal_pll_num);
+    USDR_LOG("2820", USDR_LOG_DEBUG, "REGS> LP_FD_ADJ:%d HP_FD_ADJ:%d CAL_CLK_DIV:%d INSTCAL_DLY:%d INSTCAL_PLL_NUM:%u INSTCAL_DBLR_EN:%d",
+             LP_fd_adj, HP_fd_adj, cal_clk_div, instcal_dly, instcal_pll_num, instcal_dblr_en);
 
     uint32_t regs[] =
     {
@@ -778,7 +783,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R11(0x30, st->lmx2820_input_chain.osc_2x ? 1 : 0, 0x3),
         MAKE_LMX2820_R2 (1, cal_clk_div, instcal_dly, QUICK_RECAL_EN_DISABLED),
         MAKE_LMX2820_R1 (PHASE_SYNC_EN_NORMAL_OPERATION, 0x15E, LD_VTUNE_EN_VCOCAL_AND_VTUNE_LOCK_DETECT, 0,
-                        vco_dblr_engaged ? INSTCAL_DBLR_EN_VCO_DOUBLER_IS_ENGAGED : INSTCAL_DBLR_EN_NORMAL_OPERATION,
+                        instcal_dblr_en,
                         use_instcal ? INSTCAL_EN_ENABLED : INSTCAL_EN_DISABLED),
         MAKE_LMX2820_R0 (1, 1, 0, HP_fd_adj, LP_fd_adj, DBLR_CAL_EN_ENABLED, 1, FCAL_EN_DISABLED, 0, RESET_NORMAL_OPERATION, POWERDOWN_NORMAL_OPERATION)
     };
