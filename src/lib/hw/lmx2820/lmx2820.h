@@ -45,6 +45,7 @@ typedef struct lmx2820_state lmx2820_state_t;
 
 int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_t* st);
 int lmx2820_destroy(lmx2820_state_t* st);
-int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, uint64_t rfouta, uint64_t rfoutb);
+int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb);
+int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb);
 
 #endif // LMX2820_H

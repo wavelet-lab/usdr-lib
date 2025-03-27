@@ -37,6 +37,8 @@ enum {
 
     PLL_R_DIV_MIN = 1,
     PLL_R_DIV_MAX = 255,
+    PLL_R_DIV_2_IN_FREQ_MAX = 500000000ull,
+    PLL_R_DIV_GT2_IN_FREQ_MAX = 250000000ull,
 
     OUT_DIV_LOG2_MIN = 1,
     OUT_DIV_LOG2_MAX = 7,
@@ -225,14 +227,17 @@ static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, 
     USDR_LOG("2820", USDR_LOG_DEBUG, "VCO:%" PRIu64 "    NMIN:%.0f NMAX:%.0f    FPD_MIN:%" PRIu64 " FPD_MAX:%" PRIu64,
                                      vco, min_n_total, max_n_total, fpd_min, fpd_max);
 
-    const bool osc_2x = (fosc_in <= OSC_IN_MAX_DBLR);
+    bool need_mult = (fosc_in < fpd_min) || force_mult;
+    const bool osc_2x = (fosc_in <= OSC_IN_MAX_DBLR && !need_mult);
     uint64_t osc_in = fosc_in * (osc_2x ? 2 : 1);
     USDR_LOG("2820", USDR_LOG_DEBUG, "OSC_2X:%d -> effective OSC_IN:%" PRIu64, osc_2x, osc_in);
 
-    //Do we need mult?
-    if(osc_in < fpd_min || force_mult)
+    if((osc_in < fpd_min) || force_mult)
     {
-        USDR_LOG("2820", USDR_LOG_DEBUG, "Need mult");
+        if(force_mult)
+            USDR_LOG("2820", USDR_LOG_DEBUG, "Mult:%d forced by user", force_mult);
+        else
+            USDR_LOG("2820", USDR_LOG_DEBUG, "Need mult");
 
         //need mult
         mult = MAX(force_mult ? force_mult : (unsigned)ceil((double)fpd_min / osc_in), MULT_MIN);
@@ -314,7 +319,21 @@ static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, 
         pll_r = 1;
     }
 
-    uint64_t fpd = osc_in * mult / (pll_r_pre * pll_r);
+    if(pll_r > PLL_R_DIV_MAX)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "PLL_R:%d out of range", pll_r);
+        return -EINVAL;
+    }
+
+    uint64_t f_in_pll_r = osc_in * mult / pll_r_pre;
+    uint64_t max_f_in_pll_r = (pll_r <= 2) ? PLL_R_DIV_2_IN_FREQ_MAX : PLL_R_DIV_GT2_IN_FREQ_MAX;
+    if(f_in_pll_r > max_f_in_pll_r)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "Input freq for PLL_R:%d is out of range, %" PRIu64 " > %" PRIu64, pll_r, f_in_pll_r, max_f_in_pll_r);
+        return -EINVAL;
+    }
+
+    uint64_t fpd = (uint64_t)((double)osc_in * mult / (pll_r_pre * pll_r) + 0.5);
     USDR_LOG("2820", USDR_LOG_DEBUG, "For VCO:%" PRIu64 " -> FPD:%" PRIu64, vco, fpd);
 
     if(fpd < fpd_min || fpd > fpd_max)
@@ -371,7 +390,7 @@ static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, 
 
 }
 
-int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, uint64_t rfouta, uint64_t rfoutb)
+int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb)
 {
     if(osc_in < OSC_IN_MIN || osc_in > OSC_IN_MAX)
     {
@@ -523,7 +542,7 @@ int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, ui
 
     USDR_LOG("2820", USDR_LOG_DEBUG, "Will tune for VCO:%" PRIu64, vco);
 
-    int res = lmx2820_calculate_input_chain(st, osc_in, vco, mash_order, 0);
+    int res = lmx2820_calculate_input_chain(st, osc_in, vco, mash_order, force_mult);
     if(res)
         return res;
 
@@ -583,9 +602,9 @@ int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, ui
     return 0;
 }
 
-int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, uint64_t rfouta, uint64_t rfoutb)
+int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb)
 {
-    int res = lmx2820_solver(st, osc_in, mash_order, rfouta, rfoutb);
+    int res = lmx2820_solver(st, osc_in, mash_order, force_mult, rfouta, rfoutb);
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_solver() failed, err:%d", res);

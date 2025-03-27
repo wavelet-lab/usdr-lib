@@ -17,7 +17,7 @@ START_TEST(lmx2820_solver_test1)
     uint64_t out_freq1 = 45000000;
     uint64_t out_freq2 = out_freq1;
 
-    int res = lmx2820_solver(&st, osc_in, mash_order, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -28,7 +28,7 @@ START_TEST(lmx2820_solver_test2)
     uint64_t out_freq1 = 45000000;
     uint64_t out_freq2 = out_freq1;
 
-    int res = lmx2820_solver(&st, osc_in, mash_order, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -39,10 +39,9 @@ START_TEST(lmx2820_solver_test3)
     uint64_t out_freq1 = 22600000000ull;
     uint64_t out_freq2 = out_freq1;
 
-    int res = lmx2820_solver(&st, osc_in, mash_order, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
-
 
 START_TEST(lmx2820_solver_test4)
 {
@@ -51,7 +50,7 @@ START_TEST(lmx2820_solver_test4)
     uint64_t out_freq1 = 22600000000ull;
     uint64_t out_freq2 = out_freq1;
 
-    int res = lmx2820_solver(&st, osc_in, mash_order, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -62,7 +61,7 @@ START_TEST(lmx2820_solver_test5)
     uint64_t out_freq1 = 5600000000ull;
     uint64_t out_freq2 = out_freq1 >> 3;
 
-    int res = lmx2820_solver(&st, osc_in, mash_order, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -73,7 +72,7 @@ START_TEST(lmx2820_solver_test6)
     uint64_t out_freq1 = 5600000000ull;
     uint64_t out_freq2 = out_freq1 << 1;
 
-    int res = lmx2820_solver(&st, osc_in, mash_order, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -84,7 +83,7 @@ START_TEST(lmx2820_solver_test7)
     uint64_t out_freq1 = 5800000000ull;
     uint64_t out_freq2 = out_freq1 << 1;
 
-    int res = lmx2820_solver(&st, osc_in, mash_order, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -95,7 +94,40 @@ START_TEST(lmx2820_solver_test8)
     uint64_t out_freq1 = 20000987000ull;
     uint64_t out_freq2 = out_freq1 >> 4;
 
-    int res = lmx2820_solver(&st, osc_in, mash_order, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
+    ck_assert_int_eq( res, 0 );
+}
+
+START_TEST(lmx2820_solver_test9_force_mult)
+{
+    const uint64_t osc_in = 250000000ull;
+    const int mash_order = 0;
+    uint64_t out_freq1 = 20000987000ull;
+    uint64_t out_freq2 = out_freq1 >> 4;
+
+    int res = lmx2820_solver(&st, osc_in, mash_order, _i, out_freq1, out_freq2);
+    ck_assert_int_eq( res, 0 );
+}
+
+START_TEST(lmx2820_solver_test10_mash_order)
+{
+    const uint64_t osc_in = 250000000ull;
+    const int mash_order = 0;
+    uint64_t out_freq1 = 5600000000ull;
+    uint64_t out_freq2 = out_freq1 >> 3;
+
+    int res = lmx2820_solver(&st, osc_in, _i, 0, out_freq1, out_freq2);
+    ck_assert_int_eq( res, 0 );
+}
+
+START_TEST(lmx2820_solver_test11_mash_order)
+{
+    const uint64_t osc_in = 1400000000ull;
+    const int mash_order = 0;
+    uint64_t out_freq1 = 45000000;
+    uint64_t out_freq2 = out_freq1;
+
+    int res = lmx2820_solver(&st, osc_in, _i, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -117,6 +149,9 @@ Suite * lmx2820_solver_suite(void)
     tcase_add_test(tc_core, lmx2820_solver_test6);
     tcase_add_test(tc_core, lmx2820_solver_test7);
     tcase_add_test(tc_core, lmx2820_solver_test8);
+    tcase_add_loop_test(tc_core, lmx2820_solver_test9_force_mult, 3, 8);
+    tcase_add_loop_test(tc_core, lmx2820_solver_test10_mash_order, 0, 4);
+    tcase_add_loop_test(tc_core, lmx2820_solver_test11_mash_order, 0, 4);
 
     suite_add_tcase(s, tc_core);
     return s;
