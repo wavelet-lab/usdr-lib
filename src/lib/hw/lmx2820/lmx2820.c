@@ -48,6 +48,9 @@ enum {
 #define RF_ACCURACY 1.0f
 #define OUT_DIV_DIAP_MAX (OUT_DIV_LOG2_MAX - OUT_DIV_LOG2_MIN + 1 + 1)
 
+//Pin3 bias capacitor, uF
+#define C_BIAS 4.7f
+
 enum {
     PLL_N_MIN = 12,
     PLL_N_MAX = 32767,
@@ -130,7 +133,6 @@ static int lmx2820_get_worst_vco_core(uint64_t vco_freq, unsigned mash_order, un
         }
     }
 
-    assert(1); // should never reach this line
     return -EINVAL;
 }
 
@@ -149,10 +151,15 @@ static int lmx2820_reset(lmx2820_state_t* st)
 
     uint32_t reg = MAKE_LMX2820_REG_WR(R0, r0);
 
-    return lmx2820_spi_post(st, &reg, 1);
+    res = lmx2820_spi_post(st, &reg, 1);
+    if(res)
+        return res;
+
+    usleep(5); //reset takes <1us
+    return 0;
 }
 
-static int lmx2820_calibrate(lmx2820_state_t* st)
+static int lmx2820_calibrate(lmx2820_state_t* st, bool set_flag)
 {
     uint16_t r0;
 
@@ -160,7 +167,10 @@ static int lmx2820_calibrate(lmx2820_state_t* st)
     if(res)
         return res;
 
-    r0 |= (uint16_t)1 << FCAL_EN_OFF;
+    if(set_flag)
+        r0 |= (uint16_t)1 << FCAL_EN_OFF;
+    else
+        r0 &= ~((uint16_t)1 << FCAL_EN_OFF);
 
     uint32_t reg = MAKE_LMX2820_REG_WR(R0, r0);
 
@@ -190,6 +200,62 @@ static int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout)
         }
     }
 
+    return -ETIMEDOUT;
+}
+
+int lmx2820_get_temperature(lmx2820_state_t* st, float* value)
+{
+    if(!value)
+        return -EINVAL;
+
+    uint16_t r76;
+
+    int res = lmx2820_spi_get(st, R76, &r76);
+    if(res)
+        return res;
+
+    int16_t code = (r76 & RB_TEMP_SENS_MSK) >> RB_TEMP_SENS_OFF;
+    *value = 0.85f * code - 415.0f;
+
+    return 0;
+}
+
+static inline const char* lmx2820_decode_lock_status(uint8_t ld)
+{
+    switch(ld)
+    {
+    case RB_LD_UNLOCKED0:
+    case RB_LD_UNLOCKED1: return "UNLOCKED";
+    case RB_LD_LOCKED: return "LOCKED";
+    case RB_LD_INVALID: return "INVALID";
+    }
+    return "UNKNOWN";
+}
+
+int lmx2820_read_status(lmx2820_state_t* st, lmx2820_stats_t* status)
+{
+    if(!status)
+        return -EINVAL;
+
+    uint16_t r74, r75;
+
+    int res = lmx2820_get_temperature(st, &status->temperature);
+    res = res ? res : lmx2820_spi_get(st, R74, &r74);
+    res = res ? res : lmx2820_spi_get(st, R75, &r75);
+    if(res)
+        return res;
+
+    status->lock_detect_status = (r74 & RB_LD_MSK) >> RB_LD_OFF;
+    status->vco_capctrl = (r74 & RB_VCO_CAPCTRL_MSK) >> RB_VCO_CAPCTRL_OFF;
+    status->vco_sel = (r74 & RB_VCO_SEL_MSK) >> RB_VCO_SEL_OFF;
+    status->vco_daciset = (r75 & RB_VCO_DACISET_MSK) >> RB_VCO_DACISET_OFF;
+
+    USDR_LOG("2820", USDR_LOG_DEBUG, "STATUS> Temp:%.2fC LOCK:%d(%s) VCO_CAPCTRL:%d VCO_SEL:%d VCO_DACISET:%d",
+                    status->temperature, status->lock_detect_status,
+                    lmx2820_decode_lock_status(status->lock_detect_status),
+                    status->vco_capctrl, status->vco_sel, status->vco_daciset
+             );
+
     return 0;
 }
 
@@ -199,7 +265,41 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
     st->subdev = subdev;
     st->lsaddr = lsaddr;
 
-    return lmx2820_reset(st);
+    int res = lmx2820_reset(st);
+    if(res)
+        return res;
+
+    //this list is incompleted
+    uint32_t regs[] =
+    {
+        MAKE_LMX2820_R19(0x109, TEMPSENSE_EN_ENABLED, 0x0), //enable temperature sensor
+    };
+
+    res = lmx2820_spi_post(st, regs, sizeof(regs));
+    if(res)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
+        return res;
+    }
+
+    usleep(10);
+
+    lmx2820_stats_t status;
+    res = lmx2820_read_status(st, &status);
+    if(res)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "Status check failed, err:%d", res);
+        return res;
+    }
+
+    USDR_LOG("2820", USDR_LOG_DEBUG, "Create OK");
+    return 0;
+}
+
+int lmx2820_destroy(lmx2820_state_t* st)
+{
+    USDR_LOG("2820", USDR_LOG_DEBUG, "Destroy OK");
+    return 0;
 }
 
 static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, uint64_t vco, unsigned mash_order, unsigned force_mult)
@@ -212,7 +312,10 @@ static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, 
     unsigned vco_core;
     res = lmx2820_get_worst_vco_core(vco, mash_order, &vco_core, &min_pll_n);
     if(res)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "VCO core detection failed [VCO:%" PRIu64 " MASH_ORDER:%d], res=%d", vco, mash_order, res);
         return res;
+    }
 
     USDR_LOG("2820", USDR_LOG_DEBUG, "VCO:%" PRIu64 " -> VCO_CORE%d PLL_N_MIN:%d", vco, vco_core, min_pll_n);
 
@@ -602,7 +705,7 @@ int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, un
     return 0;
 }
 
-int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb)
+static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb, bool use_instcal)
 {
     int res = lmx2820_solver(st, osc_in, mash_order, force_mult, rfouta, rfoutb);
     if(res)
@@ -644,10 +747,23 @@ int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsi
     else
         cal_clk_div = CAL_CLK_DIV_ALL_OTHER_FOSCIN_VALUES;
 
+    uint16_t instcal_dly = 0x1f4;
+    uint32_t instcal_pll_num = 0;
+
+    if(use_instcal)
+    {
+        instcal_dly = (2.5f * C_BIAS / 0.47) * ((double)osc_in / 1E6) / (1 << cal_clk_div);
+        instcal_pll_num = (double)((uint64_t)1 << 32) * (double)st->lmx2820_input_chain.pll_num / st->lmx2820_input_chain.pll_den;
+    }
+
+    USDR_LOG("2820", USDR_LOG_DEBUG, "REGS> LP_FD_ADJ:%d HP_FD_ADJ:%d CAL_CLK_DIV:%d INSTCAL_DLY:%d INSTCAL_PLL_NUM:%u", LP_fd_adj, HP_fd_adj, cal_clk_div, instcal_dly, instcal_pll_num);
+
     uint32_t regs[] =
     {
         MAKE_LMX2820_R79(0, OUTB_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outb_mux, 0x7, 0),
         MAKE_LMX2820_R78(0, OUTA_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outa_mux),
+        MAKE_LMX2820_R45(instcal_pll_num),
+        MAKE_LMX2820_R44(instcal_pll_num >> 16),
         MAKE_LMX2820_R43((uint16_t)st->lmx2820_input_chain.pll_num),
         MAKE_LMX2820_R42((uint16_t)(st->lmx2820_input_chain.pll_num >> 16)),
         MAKE_LMX2820_R39((uint16_t)st->lmx2820_input_chain.pll_den),
@@ -660,8 +776,10 @@ int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsi
         MAKE_LMX2820_R13(0, st->lmx2820_input_chain.pll_r, 0x18),
         MAKE_LMX2820_R12(0, st->lmx2820_input_chain.mult, 0x8),
         MAKE_LMX2820_R11(0x30, st->lmx2820_input_chain.osc_2x ? 1 : 0, 0x3),
-        MAKE_LMX2820_R2 (1, cal_clk_div, 0x1F4, QUICK_RECAL_EN_DISABLED),
-        MAKE_LMX2820_R1 (0, 0x15E, 1, 0, vco_dblr_engaged ? 1 : 0, 0),
+        MAKE_LMX2820_R2 (1, cal_clk_div, instcal_dly, QUICK_RECAL_EN_DISABLED),
+        MAKE_LMX2820_R1 (PHASE_SYNC_EN_NORMAL_OPERATION, 0x15E, LD_VTUNE_EN_VCOCAL_AND_VTUNE_LOCK_DETECT, 0,
+                        vco_dblr_engaged ? INSTCAL_DBLR_EN_VCO_DOUBLER_IS_ENGAGED : INSTCAL_DBLR_EN_NORMAL_OPERATION,
+                        use_instcal ? INSTCAL_EN_ENABLED : INSTCAL_EN_DISABLED),
         MAKE_LMX2820_R0 (1, 1, 0, HP_fd_adj, LP_fd_adj, DBLR_CAL_EN_ENABLED, 1, FCAL_EN_DISABLED, 0, RESET_NORMAL_OPERATION, POWERDOWN_NORMAL_OPERATION)
     };
 
@@ -674,11 +792,21 @@ int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsi
 
     usleep(10000);
 
-    res = lmx2820_calibrate(st);
+    res = lmx2820_calibrate(st, true);
     if(res)
     {
-        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_calibrate() failed, err:%d", res);
+        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_calibrate(1) failed, err:%d", res);
         return res;
+    }
+
+    if(use_instcal)
+    {
+        res = lmx2820_calibrate(st, false);
+        if(res)
+        {
+            USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_calibrate(0) failed, err:%d", res);
+            return res;
+        }
     }
 
     res = lmx2820_wait_pll_lock(st, 10000);
@@ -691,7 +819,25 @@ int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsi
     return 0;
 }
 
-int lmx2820_destroy(lmx2820_state_t* st)
+/*
+ * Full tuning, including input circuit calculation OSC_IN->FPD->VCO->RFOUT
+ */
+int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb)
 {
+    return lmx2820_tune_internal(st, osc_in, mash_order, force_mult, rfouta, rfoutb, false);
+}
+
+
+/*
+ * Initialize LMX for instant calibration
+ */
+int lmx2820_instant_calibration_init(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult)
+{
+    int res = lmx2820_tune_internal(st, osc_in, mash_order, force_mult, VCO_MIN, VCO_MIN, true);
+    if(res)
+        return res;
+
+    USDR_LOG("2820", USDR_LOG_DEBUG, "Device is initialized for the particular phase detector frequency = %.2f", st->lmx2820_input_chain.fpd);
+
     return 0;
 }
