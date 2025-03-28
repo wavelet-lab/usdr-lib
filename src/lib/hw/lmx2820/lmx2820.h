@@ -45,17 +45,21 @@ struct lmx2820_state {
     unsigned subdev;
     unsigned lsaddr;
 
+    uint16_t instcal_dly;
     lmx2820_input_chain_t lmx2820_input_chain;
     lmx2820_output_chain_t lmx2820_output_chain;
 };
 typedef struct lmx2820_state lmx2820_state_t;
 
+int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb);
+int lmx2820_solver_instcal(lmx2820_state_t* st, uint64_t rfouta, uint64_t rfoutb);
+
 int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_t* st);
 int lmx2820_destroy(lmx2820_state_t* st);
 int lmx2820_get_temperature(lmx2820_state_t* st, float* value);
 int lmx2820_read_status(lmx2820_state_t* st, lmx2820_stats_t* status);
-int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb);
 int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb);
 int lmx2820_instant_calibration_init(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult);
+int lmx2820_tune_instcal(lmx2820_state_t* st, uint64_t rfouta, uint64_t rfoutb);
 
 #endif // LMX2820_H
