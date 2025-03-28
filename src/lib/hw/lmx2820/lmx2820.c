@@ -86,7 +86,7 @@ static uint64_t FPD_MAX[MASH_ORDER_THIRD_ORDER + 1] =
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
-#define INSTCAL_R0_MASK (((uint16_t)1 << FCAL_EN_OFF) | ((uint16_t)1 << DBLR_CAL_EN_OFF))
+#define INSTCAL_R0_MASK (((uint16_t)1 << FCAL_EN_OFF) | ((uint16_t)1 << DBLR_CAL_EN_OFF) | ((uint16_t)1 << INSTCAL_SKIP_ACAL_OFF))
 
 static int lmx2820_spi_post(lmx2820_state_t* obj, uint32_t* regs, unsigned count)
 {
