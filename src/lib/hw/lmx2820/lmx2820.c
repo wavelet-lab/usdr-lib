@@ -866,7 +866,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
     if(use_instcal)
     {
         instcal_dly = (uint16_t)((2.5f * C_BIAS / 0.47) * ((double)osc_in / 1E6) / (1 << cal_clk_div) + 0.5);
-        instcal_pll_num = (double)((uint64_t)1 << 32) * (double)st->lmx2820_input_chain.pll_num / st->lmx2820_input_chain.pll_den;
+        instcal_pll_num = (double)((uint64_t)1 << 32) * ((double)st->lmx2820_input_chain.pll_num / st->lmx2820_input_chain.pll_den);
         instcal_dblr_en = INSTCAL_DBLR_EN_VCO_DOUBLER_IS_ENGAGED;
     }
 
@@ -879,8 +879,8 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
     {
         MAKE_LMX2820_R79(0, OUTB_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outb_mux, 0x7, 0),
         MAKE_LMX2820_R78(0, OUTA_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outa_mux),
-        MAKE_LMX2820_R45(instcal_pll_num),
-        MAKE_LMX2820_R44(instcal_pll_num >> 16),
+        MAKE_LMX2820_R45((uint16_t)instcal_pll_num),
+        MAKE_LMX2820_R44((uint16_t)(instcal_pll_num >> 16)),
         MAKE_LMX2820_R43((uint16_t)st->lmx2820_input_chain.pll_num),
         MAKE_LMX2820_R42((uint16_t)(st->lmx2820_input_chain.pll_num >> 16)),
         MAKE_LMX2820_R39((uint16_t)st->lmx2820_input_chain.pll_den),
@@ -969,7 +969,7 @@ int lmx2820_tune_instcal(lmx2820_state_t* st, uint64_t rfouta, uint64_t rfoutb)
     if(res)
         return res;
 
-    const uint32_t instcal_pll_num = (double)((uint64_t)1 << 32) * (double)st->lmx2820_input_chain.pll_num / st->lmx2820_input_chain.pll_den;
+    const uint32_t instcal_pll_num = (double)((uint64_t)1 << 32) * ((double)st->lmx2820_input_chain.pll_num / st->lmx2820_input_chain.pll_den);
 
     uint16_t r0;
     res = lmx2820_spi_get(st, R0, &r0);
@@ -982,8 +982,8 @@ int lmx2820_tune_instcal(lmx2820_state_t* st, uint64_t rfouta, uint64_t rfoutb)
         {
             MAKE_LMX2820_R79(0, OUTB_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outb_mux, 0x7, 0),
             MAKE_LMX2820_R78(0, OUTA_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outa_mux),
-            MAKE_LMX2820_R45(instcal_pll_num),
-            MAKE_LMX2820_R44(instcal_pll_num >> 16),
+            MAKE_LMX2820_R45((uint16_t)instcal_pll_num),
+            MAKE_LMX2820_R44((uint16_t)(instcal_pll_num >> 16)),
             MAKE_LMX2820_R43((uint16_t)st->lmx2820_input_chain.pll_num),
             MAKE_LMX2820_R42((uint16_t)(st->lmx2820_input_chain.pll_num >> 16)),
             MAKE_LMX2820_R39((uint16_t)st->lmx2820_input_chain.pll_den),
