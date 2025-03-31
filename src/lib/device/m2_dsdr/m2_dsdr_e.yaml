@@ -65,50 +65,42 @@ pages:
           - bits: "8,23,22"
             name: IN_CHA
             desc: RX IN filters switch for Channel A
-            opts:
-                <<: *rx-filt-in-opts
+            opts: *rx-filt-in-opts
 #
           - bits: "15,6,7"
             name: OUT_CHA
             desc: RX OUT filters switch for Channel A
-            opts:
-                <<: *rx-filt-out-opts
+            opts: *rx-filt-out-opts
 #
           - bits: "9,21,20"
             name: IN_CHB
             desc: RX IN filters switch for Channel B
-            opts:
-                <<: *rx-filt-in-opts
+            opts: *rx-filt-in-opts
 #
           - bits: "14,4,5"
             name: OUT_CHB
             desc: RX OUT filters switch for Channel B
-            opts:
-                <<: *rx-filt-out-opts
+            opts: *rx-filt-out-opts
 #
           - bits: "10,19,18"
             name: IN_CHC
             desc: RX IN filters switch for Channel C
-            opts:
-                <<: *rx-filt-in-opts
+            opts: *rx-filt-in-opts
 #
           - bits: "13,3,2"
             name: OUT_CHC
             desc: RX OUT filters switch for Channel C
-            opts:
-                <<: *rx-filt-out-opts
+            opts: *rx-filt-out-opts
 #
           - bits: "11,17,16"
             name: IN_CHD
             desc: RX IN filters switch for Channel D
-            opts:
-                <<: *rx-filt-in-opts
+            opts: *rx-filt-in-opts
 #
           - bits: "12,0,1"
             name: OUT_CHD
             desc: RX OUT filters switch for Channel D
-            opts:
-                <<: *rx-filt-out-opts
+            opts: *rx-filt-out-opts
 #
       - addr: 0x21
         name: IF_LNA
@@ -116,26 +108,22 @@ pages:
           - bits: "7:6"
             name: CTRL_CHD
             desc: IF LNA control mask for Channel D
-            opts:
-                <<: *if-lna-opts
+            opts: *if-lna-opts
 #
           - bits: "5:4"
             name: CTRL_CHC
             desc: IF LNA control mask for Channel C
-            opts:
-                <<: *if-lna-opts
+            opts: *if-lna-opts
 #
           - bits: "3:2"
             name: CTRL_CHB
             desc: IF LNA control mask for Channel B
-            opts:
-                <<: *if-lna-opts
+            opts: *if-lna-opts
 #
           - bits: "1:0"
             name: CTRL_CHA
             desc: IF LNA control mask for Channel A
-            opts:
-                <<: *if-lna-opts
+            opts: *if-lna-opts
 #
       - addr: 0x22
         name: SW_OUT

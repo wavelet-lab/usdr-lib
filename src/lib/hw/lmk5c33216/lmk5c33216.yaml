@@ -159,36 +159,28 @@ pages:
     regs:
       - addr: 0x0
         name: VNDRID_BY1
-        fields:
-
+        
       - addr: 0x1
         name: VNDRID_BY0
-        fields:
-
+        
       - addr: 0x2
         name: PRODID
-        fields:
-
+        
       - addr: 0x3
         name: REVID
-        fields:
-
+        
       - addr: 0x10
         name: NVMCNT
-        fields:
-
+        
       - addr: 0x12
         name: SLAVEADR
-        fields:
-
+        
       - addr: 0x13
         name: EEREV
-        fields:
-
+        
       - addr: 0x14
         name: EE_ROM_PAGE
-        fields:
-
+        
       - addr: 0x15
         name: DEV_CTL1
         fields:
@@ -251,8 +243,7 @@ pages:
             desc: Software SYSREF request trigger ROM=N, EEPROM=N 
       - addr: "0x1B:0x1F"
         name: TOD
-        fields:
-
+        
       - addr: 0x20
         name: TOD_CTRL
         fields:
@@ -688,8 +679,7 @@ pages:
           - bits: "5:0"
             name: GPIO0_MODE
             desc: Select GPIO0 Pin Operating Mode. ROM=Y, EEPROM=N 
-            opts:
-                <<: *opt-gpio-mod
+            opts: *opt-gpio-mod
       - addr: 0x37
         name: GPIO1_CONFIG
         fields:
@@ -699,8 +689,7 @@ pages:
           - bits: "5:0"
             name: GPIO1_MODE
             desc: Select GPIO1 Pin Operating Mode. ROM=Y, EEPROM=N 
-            opts:
-                <<: *opt-gpio-mod
+            opts: *opt-gpio-mod
       - addr: 0x38
         name: GPIO2_CONFIG
         fields:
@@ -710,32 +699,28 @@ pages:
           - bits: "5:0"
             name: GPIO2_MODE
             desc: Select GPIO2 Pin Operating Mode. ROM=Y, EEPROM=N 
-            opts:
-                <<: *opt-gpio-mod
+            opts: *opt-gpio-mod
       - addr: 0x39
         name: GPIO0_SEL
         fields:
           - bits: "6:0"
             name: GPIO0_SEL
             desc: GPIO0 Status Signal Select. ROM=Y, EEPROM=N 
-            opts:
-                <<: *opt-gpio-sel
+            opts: *opt-gpio-sel
       - addr: 0x3A
         name: GPIO1_SEL
         fields:
           - bits: "6:0"
             name: GPIO1_SEL
             desc: GPIO1 Status Signal Select. ROM=Y, EEPROM=N 
-            opts:
-                <<: *opt-gpio-sel
+            opts: *opt-gpio-sel
       - addr: 0x3B
         name: GPIO2_SEL
         fields:
           - bits: "6:0"
             name: GPIO2_SEL
             desc: GPIO2 Status Signal Select. ROM=Y, EEPROM=N 
-            opts:
-                <<: *opt-gpio-sel
+            opts: *opt-gpio-sel
       - addr: 0x3C
         name: GPIO_OUT_CTL
         fields:
@@ -763,8 +748,7 @@ pages:
           - bits: "4:2"
             name: GPIO_SYSREF_SEL
             desc: Select SYSREF output for GPIO output. When GPIOx_SEL choses SYSREF, this is the SYSREF source which is output on the GPIO. Select SYSREF after static digital delay but before the analog and digital delay. ROM=Y, EEPROM=N
-            opts:
-                <<: *opts-gpio-sysref-ref
+            opts: *opts-gpio-sysref-ref
           - bits: "1"
             name: MUTE_DPLL3_PHLOCK
             desc: DPLL3 mute enabled during phase lock ROM=Y, EEPROM=Y 
@@ -801,8 +785,7 @@ pages:
           - bits: "3:0"
             name: XO_ITYPE
             desc: To be updated. XO interface type control. ROM=Y, EEPROM=Y
-            opts:
-                <<: *in-opts
+            opts: *in-opts
       - addr: 0x40
         name: XO_OUT_SEL
         fields:
@@ -833,8 +816,7 @@ pages:
           - bits: "3:0"
             name: REF1_ITYPE
             desc: To be updated. REF1 interface type control. ROM=Y, EEPROM=N
-            opts:
-                <<: *in-opts
+            opts: *in-opts
       - addr: 0x44
         name: REF0_CTL
         fields:
@@ -847,8 +829,7 @@ pages:
           - bits: "3:0"
             name: REF0_ITYPE
             desc: To be updated. REF1 interface type control. ROM=Y, EEPROM=N
-            opts:
-                <<: *in-opts
+            opts: *in-opts
       - addr: 0x45
         name: OUT0_1_CMV
         fields:
@@ -902,32 +883,25 @@ pages:
             desc: Sets the common-mode DC voltage for OUT15. ROM=Y, EEPROM=N 
       - addr: 0x4B
         name: TDC3_ZDLY
-        fields:
-
+        
       - addr: 0x4C
         name: TDC2_ZDLY
-        fields:
-
+        
       - addr: 0x4D
         name: TDC1_ZDLY
-        fields:
-
+        
       - addr: 0x4E
         name: REF_OUT_SEL
-        fields:
-
+        
       - addr: 0x4F
         name: REF0_DETEN
-        fields:
-
+        
       - addr: 0x50
         name: REF1_DETEN
-        fields:
-
+        
       - addr: 0x53
         name: REF0_3_CLK_DIV
-        fields:
-
+        
       - addr: "0x54:0x56"
         name: REF0_MISSCLK_DIV
 
@@ -960,12 +934,10 @@ pages:
         
       - addr: 0x9D
         name: REF0_VLDTMR
-        fields:
-
+        
       - addr: 0x9E
         name: REF1_VLDTMR
-        fields:
-
+        
       - addr: "0xA1:0xA2"
         name: REF0_PH_VALID_THR
 
@@ -974,24 +946,19 @@ pages:
 
       - addr: 0xAA
         name: NVMSCRC
-        fields:
-
+        
       - addr: 0xAB
         name: NVMCTL
-        fields:
-
+        
       - addr: "0xAD:0xAE"
         name: MEMADR
-        fields:
-
+        
       - addr: 0xB0
         name: RAMDAT
-        fields:
-
+        
       - addr: 0xB4
         name: NVMUNLK
-        fields:
-
+        
       - addr: 0xDE
         name: DFT_CTL
         fields:
@@ -1152,8 +1119,7 @@ pages:
         
       - addr: "0x149:0x14D"
         name: DPLL1_FBDIV2
-        fields:
-
+        
       - addr: "0x14E:0x152"
         name: DPLL1_FBNUM2
 
@@ -1831,8 +1797,7 @@ pages:
           - bits: "1:0"
             name: PLL1_RDIV_MUX_SEL
             desc: Select R Divider input. When enabling reference from feedback divider, the APLL PLLx_VCO_BUF_2REF_EN bit must also be set appropriately. ROM=Y, EEPROM=Y; 0x0 = XO; 0x1 = VCO2 feedback divider; 0x2 = VCO3 feedback divider
-            opts:
-                <<: *pll1-rdiv-mux-sel
+            opts: *pll1-rdiv-mux-sel
       - addr: "0x2CC:0x2CD"
         name: APLL1_NDIV
         fields:
@@ -2000,8 +1965,7 @@ pages:
           - bits: "1:0"
             name: PLL2_RDIV_MUX_SEL
             desc: "Select R Divider input: 0=XO, 1=VCO1 feedback divider, 2=VCO3 feedback divider ROM=Y, EEPROM=Y; 0x0 = XO; 0x1 = VCO1 feedback divider; 0x2 = VCO3 feedback divider"
-            opts:
-                <<: *pll2-rdiv-mux-sel
+            opts: *pll2-rdiv-mux-sel
       - addr: "0x312:0x313"
         name: APLL2_NDIV
         fields:
@@ -2148,8 +2112,7 @@ pages:
           - bits: "1:0"
             name: PLL3_RDIV_MUX_SEL
             desc: "Select R Divider input: 0=XO, 1=VCO1 feedback divider, 2=VCO2 feedback divider ROM=Y, EEPROM=Y; 0x0 = XO; 0x1 = VCO1 feedback divider; 0x2 = VCO2 feedback divider"
-            opts:
-                <<: *pll3-rdiv-mux-sel
+            opts: *pll3-rdiv-mux-sel
       - addr: "0x351:0x352"
         name: APLL3_NDIV
         fields:
@@ -2258,8 +2221,7 @@ pages:
           - bits: "2:0"
             name: OUT_0_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS; 0x4 = CMOS
-            opts:
-                <<: *out-fmt-01
+            opts: *out-fmt-01
       - addr: 0x3C2
         name: OUT0_CTL_P
         fields:
@@ -2281,8 +2243,7 @@ pages:
           - bits: "7:0"
             name: OUT_0_CONFIGURATION
             desc: OUT0 Configuration. Selects from CH0 Bypass, CH1 Bypass, CHDIV0, CHDIV1, CH0/2 low-noise divide by two path, SYSREF, SYSREF + Analog Delay, or static DC H/L. ROM=N, EEPROM=N; 0x0 = CH0/2; 0x14 = CHDIV1; 0x20 = SYSREF+ADLY; 0x21 = SYSREF; 0x22 = Static DC; 0x28 = CHDIV0; 0x40 = CH1 Bypass; 0x80 = CH0 Bypass
-            opts:
-                <<: *out-configuration-01
+            opts: *out-configuration-01
       - addr: 0x3C4
         name: OUT1_MODE
         fields:
@@ -2301,8 +2262,7 @@ pages:
           - bits: "2:0"
             name: OUT_1_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS; 0x4 = CMOS
-            opts:
-                <<: *out-fmt-01
+            opts: *out-fmt-01
       - addr: 0x3C5
         name: OUT1_CTL_P
         fields:
@@ -2324,8 +2284,7 @@ pages:
           - bits: "7:0"
             name: OUT_1_CONFIGURATION
             desc: OUT1 Configuration. Selects from CH0 Bypass, CH1 Bypass, CHDIV0, CHDIV1, CH0/2 low-noise divide by two path, SYSREF, SYSREF + Analog Delay, or static DC H/L. ROM=N, EEPROM=N; 0x0 = CH0/2; 0x14 = CHDIV1; 0x20 = SYSREF+ADLY; 0x21 = SYSREF; 0x22 = Static DC; 0x28 = CHDIV0; 0x40 = CH1 Bypass; 0x80 = CH0 Bypass
-            opts:
-                <<: *out-configuration-01
+            opts: *out-configuration-01
       - addr: 0x3C7
         name: OUT0_1_CMOS_CTL
         fields:
@@ -2380,8 +2339,7 @@ pages:
           - bits: "7:2"
             name: OUT_0_1_CLK_IN_FANOUT
             desc: OUT0_1 input clock fanout. Distributes the input clock to the channel dividers and the standalone divide-by-2s. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x3 = IN1 to CHDIV1; 0x4 = IN0 to SYSREF; 0x7 = IN0 to SYSREF, IN1 to CHDIV1; 0xC = IN0 to CHDIV0; 0xF = IN0 to CHDIV0, IN1 to CHDIV1; 0x10 = IN0 to CH0/2 (OUT0); 0x13 = IN0 to CH0/2 (OUT0), IN1 to CHDIV1 (OUT1); 0x14 = IN0 to CH0/2 (OUT0) and SYSREF (OUT1); 0x1C = IN0 to CH0/2 (OUT0) and CHDIV0 (OUT1); 0x20 = IN0 to CH0/2 (OUT1); 0x23 = IN0 to CH0/2 (OUT1), IN1 to CHDIV1 (OUT0); 0x24 = IN0 to CH0/2 (OUT1) and SYSREF (OUT0); 0x2C = IN0 to CH0/2 (OUT1) and CHDIV0 (OUT0); 0x30 = IN0 to CH0/2 (OUT0 and OUT1)
-            opts:
-                <<: *clk-in-fanout
+            opts: *clk-in-fanout
       - addr: "0x3CE:0x3CF"
         name: CH0_1_CH0_STATIC_OFFSET
         fields:
@@ -2479,8 +2437,7 @@ pages:
           - bits: "2:0"
             name: OUT_2_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x401
         name: OUT2_CTL
         fields:
@@ -2496,8 +2453,7 @@ pages:
           - bits: "6:5"
             name: OUT_2_CLK_MUX
             desc: OUT2 Input Clock Select. Selects the input clock which will be used to drive the output. ROM=N, EEPROM=N; 0x0 = PLL1_SEC; 0x1 = PLL2; 0x2 = PLL1_PRI 
-            opts:
-                <<: *clk-in-mux-23
+            opts: *clk-in-mux-23
           - bits: "3"
             name: OUT_2_DIV_EN
             desc: "OUT2 ChanDiv Enable. Enables the channel divider. Note: SYSREF/ chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
@@ -2538,8 +2494,7 @@ pages:
           - bits: "2:0"
             name: OUT_3_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x421
         name: OUT3_CTL
         fields:
@@ -2555,8 +2510,7 @@ pages:
           - bits: "6:5"
             name: OUT_3_CLK_MUX
             desc: OUT3 Input Clock Select. Selects the input clock which will be used to drive the output. ROM=N, EEPROM=N; 0x0 = PLL1_SEC; 0x1 = PLL2; 0x2 = PLL1_PRI 
-            opts:
-                <<: *clk-in-mux-23
+            opts: *clk-in-mux-23
           - bits: "3"
             name: OUT_3_DIV_EN
             desc: "OUT3 ChanDiv Enable. Enables the channel divider. Note: SYSREF/ chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
@@ -2604,8 +2558,7 @@ pages:
           - bits: "2:0"
             name: OUT_4_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS; 0x4 = Reserved; 0x5 = CML
-            opts:
-                <<: *out-fmt-46
+            opts: *out-fmt-46
       - addr: 0x442
         name: OUT4_CTL
         fields:
@@ -2627,8 +2580,7 @@ pages:
           - bits: "2:0"
             name: OUT_5_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x444
         name: OUT5_CTL
         fields:
@@ -2662,8 +2614,7 @@ pages:
           - bits: "5"
             name: OUT_4_5_CLK_IN_SEL
             desc: "OUT4_5 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
-            opts:
-                <<: *clk-in-mux
+            opts: *clk-in-mux
           - bits: "4"
             name: OUT_4_5_CH_DIV_SR_MUX_CLK_SEL
             desc: OUT4_5 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
@@ -2753,8 +2704,7 @@ pages:
           - bits: "2:0"
             name: OUT_6_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS; 0x4 = Reserved; 0x5 = CML
-            opts:
-                <<: *out-fmt-46
+            opts: *out-fmt-46
       - addr: 0x462
         name: OUT6_CTL
         fields:
@@ -2776,8 +2726,7 @@ pages:
           - bits: "2:0"
             name: OUT_7_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x464
         name: OUT7_CTL
         fields:
@@ -2808,8 +2757,7 @@ pages:
           - bits: "5"
             name: OUT_6_7_CLK_IN_SEL
             desc: "OUT6_7 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
-            opts:
-                <<: *clk-in-mux
+            opts: *clk-in-mux
           - bits: "4"
             name: OUT_6_7_CH_DIV_SR_MUX_CLK_SEL
             desc: OUT6_7 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
@@ -2900,8 +2848,7 @@ pages:
           - bits: "2:0"
             name: OUT_8_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x482
         name: OUT8_CTL
         fields:
@@ -2923,8 +2870,7 @@ pages:
           - bits: "2:0"
             name: OUT_9_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x484
         name: OUT9_CTL
         fields:
@@ -2955,8 +2901,7 @@ pages:
           - bits: "5"
             name: OUT_8_9_CLK_IN_SEL
             desc: "OUT8_9 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
-            opts:
-                <<: *clk-in-mux
+            opts: *clk-in-mux
           - bits: "4"
             name: OUT_8_9_CH_DIV_SR_MUX_CLK_SEL
             desc: OUT8_9 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
@@ -3040,8 +2985,7 @@ pages:
           - bits: "2:0"
             name: OUT_10_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x4A2
         name: OUT10_CTL
         fields:
@@ -3063,8 +3007,7 @@ pages:
           - bits: "2:0"
             name: OUT_11_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x4A4
         name: OUT11_CTL
         fields:
@@ -3098,8 +3041,7 @@ pages:
           - bits: "5"
             name: OUT_10_11_CLK_IN_SEL
             desc: "OUT10_11 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
-            opts:
-                <<: *clk-in-mux
+            opts: *clk-in-mux
           - bits: "4"
             name: OUT_10_11_CH_DIV_SR_MUX_CLK_SEL
             desc: OUT10_11 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
@@ -3190,8 +3132,7 @@ pages:
           - bits: "2:0"
             name: OUT_12_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x4C2
         name: OUT12_CTL
         fields:
@@ -3213,8 +3154,7 @@ pages:
           - bits: "2:0"
             name: OUT_13_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x4C4
         name: OUT13_CTL
         fields:
@@ -3245,8 +3185,7 @@ pages:
           - bits: "5"
             name: OUT_12_13_CLK_IN_SEL
             desc: "OUT12_13 Input Clock Select. Selects the input clock which will be used to drive the output: 0 = VCO2, 1 = VCO3 ROM=Y, EEPROM=Y; 0x0 = PLL2; 0x1 = PLL3"
-            opts:
-                <<: *clk-in-mux
+            opts: *clk-in-mux
           - bits: "4"
             name: OUT_12_13_CH_DIV_SR_MUX_CLK_SEL
             desc: OUT12_13 ChanDiv to SYSREF Clock Select. When set, the channel divider output is inverted before being fed to the SYSREF. ROM=Y, EEPROM=N 
@@ -3337,8 +3276,7 @@ pages:
           - bits: "2:0"
             name: OUT_14_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x4E1
         name: OUT14_CTL
         fields:
@@ -3354,8 +3292,7 @@ pages:
           - bits: "6:5"
             name: OUT_14_CLK_MUX
             desc: OUT14 Input Clock Select. Selects the input clock which will be used to drive the output. ROM=N, EEPROM=N; 0x0 = VCO3; 0x1 = VCO2; 0x2 = VCO1_PRI
-            opts:
-                <<: *clk-in-mux-ef
+            opts: *clk-in-mux-ef
           - bits: "3"
             name: OUT_14_DIV_EN
             desc: "OUT14 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
@@ -3396,8 +3333,7 @@ pages:
           - bits: "2:0"
             name: OUT_15_FMT
             desc: Selects the output type which the multimode output driver will generate. ROM=Y, EEPROM=Y; 0x0 = DISABLED; 0x1 = LVDS; 0x2 = LVPECL; 0x3 = HSDS
-            opts:
-                <<: *out-fmt
+            opts: *out-fmt
       - addr: 0x501
         name: OUT15_CTL
         fields:
@@ -3413,8 +3349,7 @@ pages:
           - bits: "6:5"
             name: OUT_15_CLK_MUX
             desc: OUT15 Input Clock Select. Selects the input clock which will be used to drive the output. ROM=N, EEPROM=N; 0x0 = VCO3; 0x1 = VCO2; 0x2 = VCO1_PRI 
-            opts:
-                <<: *clk-in-mux-ef
+            opts: *clk-in-mux-ef
           - bits: "3"
             name: OUT_15_DIV_EN
             desc: "OUT15 ChanDiv Enable. Enables the channel divider. Note: SYSREF/chandiv mode must be configured separately. ROM=Y, EEPROM=Y" 
