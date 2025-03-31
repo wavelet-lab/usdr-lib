@@ -907,6 +907,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         return res;
     }
 
+    //Wait 10 ms to allow the internal LDOs to power up.
     usleep(10000);
 
     res = lmx2820_calibrate(st, true);
