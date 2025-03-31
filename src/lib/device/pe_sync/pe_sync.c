@@ -223,6 +223,29 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     // OUT7: Dual CMOS        1 Hz
     // res = res ? res : lmk05318_create()
 
+    if(res)
+        return res;
+
+    lmk05318_xo_settings_t xo;
+    xo.fref = 25000000;
+    xo.doubler_enabled = true;
+    xo.fdet_bypass = false;
+    xo.pll1_fref_rdiv = 1;
+    xo.type = XO_CMOS;
+
+    const int out_accuracy = 2;
+    lmk05318_out_config_t lmk05318_outs_cfg[8];
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 0, 125000000, out_accuracy, out_accuracy, false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 1, 125000000, out_accuracy, out_accuracy, false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 2, 250000000, out_accuracy, out_accuracy, false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 3, 250000000, out_accuracy, out_accuracy, false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 4, 156250000, out_accuracy, out_accuracy, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 5, 156250000, out_accuracy, out_accuracy, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6,  10000000, out_accuracy, out_accuracy, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7,         1, out_accuracy, out_accuracy, false, LVCMOS);
+
+    res = res ? res : lmk05318_create_ex(dev, 0, I2C_ADDR_LMK05318B, &xo, false, lmk05318_outs_cfg, 8, &d->gen);
+
     return res;
 }
 

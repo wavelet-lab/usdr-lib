@@ -112,6 +112,20 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return -ENODEV;
     }
 
+    // Reset
+    uint32_t regs[] = {
+        lmk05318_rom[0] | (1 << RESET_SW_OFF),
+        lmk05318_rom[0] | (0 << RESET_SW_OFF),
+
+        MAKE_LMK05318_PLL1_CTRL0(0),
+        MAKE_LMK05318_PLL1_CTRL0(1),
+        MAKE_LMK05318_PLL1_CTRL0(0),
+
+    };
+    res = lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));
+    if (res)
+        return res;
+
     //
     res = lmk05318_set_xo_fref(out);
     if(res)
@@ -127,28 +141,12 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return res;
     }
 
-    res = lmk05318_solver(out, out_ports_cfg, out_ports_len, false);
+    res = lmk05318_solver(out, out_ports_cfg, out_ports_len, false /*dry_run*/);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d solving output frequencies", res);
         return res;
     }
-
-    // Reset
-    uint32_t regs[] = {
-        lmk05318_rom[0] | (1 << RESET_SW_OFF),
-        lmk05318_rom[0] | (0 << RESET_SW_OFF),
-
-        MAKE_LMK05318_XO_CONFIG(xo->input_divider_flag > 1 ? 1 : 0),
-
-        MAKE_LMK05318_PLL1_CTRL0(0),
-        MAKE_LMK05318_PLL1_CTRL0(1),
-        MAKE_LMK05318_PLL1_CTRL0(0),
-
-    };
-    res = lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));
-    if (res)
-        return res;
 
     USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 initialized\n");
     return 0;
@@ -207,7 +205,7 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int 
     out->xo.fref = 0;
     out->xo.doubler_enabled = false;
     out->xo.fdet_bypass = false;
-    out->xo.type = XO_TYPE_DC_DIFF_EXT;
+    out->xo.type = XO_CMOS;
 
     USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 initialized\n");
     return 0;
@@ -357,11 +355,13 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
 
 int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
 {
-    int res = lmk05318_set_xo_fref(d);
-    if(res)
-        return res;
+    if(d->xo.pll1_fref_rdiv < APLL1_DIVIDER_MIN || d->xo.pll1_fref_rdiv > APLL1_DIVIDER_MAX)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APPL1_RDIV:%d out of range [%d;%d]", d->xo.pll1_fref_rdiv, (int)APLL1_DIVIDER_MIN, (int)APLL1_DIVIDER_MAX);
+        return -EINVAL;
+    }
 
-    unsigned fref = (d->xo.fref / APLL1_DIVIDER_MAX) * (d->xo.doubler_enabled ? 2 : 1);
+    unsigned fref = (d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2 : 1);
     uint64_t fvco = VCO_APLL1;
     unsigned n = fvco / fref;
     uint64_t num = (fvco - n * (uint64_t)fref) * (1ull << 40) / fref;
@@ -370,7 +370,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
 
     uint32_t regs[] = {
         MAKE_LMK05318_PLL1_CTRL0(1),
-        MAKE_LMK05318_XO_CONFIG(APLL1_DIVIDER_MAX - 1),
+        MAKE_LMK05318_XO_CONFIG(d->xo.pll1_fref_rdiv - 1),
         MAKE_LMK05318_PLL1_MODE(dpll_mode ? 1 : 0),
         MAKE_LMK05318_PLL1_NDIV_BY0(n),
         MAKE_LMK05318_PLL1_NDIV_BY1(n),
@@ -382,7 +382,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
         MAKE_LMK05318_PLL1_CTRL0(0),
     };
 
-    res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    int res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
     if (res)
         return res;
 

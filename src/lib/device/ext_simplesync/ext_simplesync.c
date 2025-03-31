@@ -88,7 +88,7 @@ int board_ext_simplesync_init(lldev_t dev,
     xo.doubler_enabled = true;
     xo.fdet_bypass = true;
     xo.fref = 26000000;
-    xo.input_divider_flag = 0;
+    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     lmk05318_out_config_t cfg[4];

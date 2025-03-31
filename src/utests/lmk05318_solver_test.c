@@ -116,6 +116,38 @@ START_TEST(lmk05318_solver_test4)
     ck_assert_int_eq( res, 0 );
 }
 
+START_TEST(lmk05318_solver_test5)
+{
+/*  // TODO: Initialize LMK05318B
+    // XO: 25Mhz
+    //
+    // OUT0: LVDS       125.000 Mhz
+    // OUT1: LVDS       125.000 Mhz
+    // OUT2: LVDS       250.000 Mhz MASH_ORD 0/1/2 | 156.250 Mhz MASH_ORD 3
+    // OUT3: LVDS       250.000 Mhz MASH_ORD 0/1/2 | 156.250 Mhz MASH_ORD 3
+    // OUT4: LVDS OFF   156.250 Mhz  | OFF by default
+    // OUT5: LVDS OFF   156.250 Mhz  | OFF by default
+    // OUT6: Dual CMOS   10.000 Mhz
+    // OUT7: Dual CMOS        1 Hz
+    // res = res ? res : lmk05318_create()
+ */
+
+    int res = 0;
+    res = res ? res : lmk05318_port_request(cfg, 0, 125000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 1, 125000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 2, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 3, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 4, 156250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5, 156250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6,  10000000, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(cfg, 7,         1, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
+    ck_assert_int_eq( res, 0 );
+
+    res = lmk05318_solver(NULL, cfg, OUTS_LEN, true);
+    ck_assert_int_eq( res, 0 );
+
+}
+
 Suite * lmk05318_solver_suite(void)
 {
     Suite *s;
@@ -129,7 +161,8 @@ Suite * lmk05318_solver_suite(void)
     //tcase_add_test(tc_core, lmk05318_solver_test1);
     //tcase_add_test(tc_core, lmk05318_solver_test2);
     //tcase_add_test(tc_core, lmk05318_solver_test3);
-    tcase_add_test(tc_core, lmk05318_solver_test4);
+    //tcase_add_test(tc_core, lmk05318_solver_test4);
+    tcase_add_test(tc_core, lmk05318_solver_test5);
 
     suite_add_tcase(s, tc_core);
     return s;

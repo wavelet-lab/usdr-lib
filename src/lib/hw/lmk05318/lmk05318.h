@@ -22,7 +22,7 @@ typedef enum xo_input_type xo_input_type_t;
 
 struct lmk05318_xo_settings
 {
-    unsigned input_divider_flag;
+    unsigned pll1_fref_rdiv;
     uint32_t fref;
     xo_input_type_t type;
     bool doubler_enabled;
