@@ -31,6 +31,7 @@ static const usb_pidvid_map_t s_known_devices[] = {
 /* LimeSDR-mini */  { 0x601e, 0x0403,  "usbft601", SDR_LIME, U3_LIMESDR_DEVICE_ID   },
 /* XSDR new vidpid*/{ 0x1011, 0x3727,  "usb",      SDR_XSDR, M2_LM7_1_DEVICE_ID     },
 /* USDR new vidpid*/{ 0x1001, 0x3727,  "usb",      SDR_USDR, M2_LM6_1_DEVICE_ID     },
+/* SYNC new vidpid*/{ 0xE001, 0x3727,  "usb",      SDR_NONE, PE_SYNC_DEVICE_ID      },
 };
 
 #define KNOWN_USB_DEVICES (sizeof(s_known_devices)/sizeof(s_known_devices[0]))
