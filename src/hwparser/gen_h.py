@@ -77,6 +77,13 @@ class GenH:
 
     def normalize(self, name: str) -> str:
         return (name.replace('-', '_')
+                        .replace('<=', 'LE')
+                        .replace('>=', 'GE')
+                        .replace('>', 'GT')
+                        .replace('<', 'LT')
+                        .replace('=', 'EQ')
+                        .replace('+', 'PL')
+                        .replace("'", 'MARK')
                         .replace('.', '_')
                         .replace(',', '_')
                         .replace(' ', '_')
