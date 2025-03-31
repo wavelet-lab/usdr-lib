@@ -84,6 +84,24 @@ int lmk05318_reg_wr_n(lmk05318_state_t* d, const uint32_t* regs, unsigned count)
     return 0;
 }
 
+static int lmk05318_reset(lmk05318_state_t* out)
+{
+    uint8_t reg_ctrl;
+    const uint8_t mask = ((uint8_t)1 << RESET_SW_OFF);
+
+    int res = lmk05318_reg_rd(out, DEV_CTL, &reg_ctrl);
+    if(res)
+        return res;
+
+    uint32_t regs[] =
+    {
+        MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl |  mask),
+        MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl & ~mask),
+    };
+
+    return lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));;
+}
+
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
                        const lmk05318_xo_settings_t* xo, bool dpll_mode,
                        lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
@@ -111,7 +129,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     if ( dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x35 || dummy[0] != 0x42 ) {
         return -ENODEV;
     }
-
+/*
     // Reset
     uint32_t regs[] = {
         lmk05318_rom[0] | (1 << RESET_SW_OFF),
@@ -125,8 +143,14 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     res = lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));
     if (res)
         return res;
+*/
+    res = lmk05318_reset(out);
+    if(res)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d lmk05318_reset()", res);
+        return res;
+    }
 
-    //
     res = lmk05318_set_xo_fref(out);
     if(res)
     {
