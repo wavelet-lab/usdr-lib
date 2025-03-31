@@ -23,6 +23,7 @@ add_subdirectory(ext_fe_100_5000)
 
 
 add_subdirectory(u3_limesdr)
+add_subdirectory(pe_sync)
 
 
 list(APPEND USDR_LIBRARY_FILES ${USDR_DEVICE_LIB_FILES})

@@ -68,23 +68,19 @@ pages:
           - bits: "1:0"
             name: A
             desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts:
-                <<: *x-band-opts
+            opts: *x-band-opts
           - bits: "5:4"
             name: B
             desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts:
-                <<: *x-band-opts
+            opts: *x-band-opts
           - bits: "9:8"
             name: C
             desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts:
-                <<: *x-band-opts
+            opts: *x-band-opts
           - bits: "13:12"
             name: D
             desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts:
-                <<: *x-band-opts
+            opts: *x-band-opts
 #
       - addr: 0x42
         name: RX_FILTER_BANK
@@ -92,23 +88,19 @@ pages:
           - bits: "3:0"
             name: A
             desc: Filter bank selector 
-            opts:
-                <<: *rx-filt-opts
+            opts: *rx-filt-opts
           - bits: "7:4"
             name: B
             desc: Filter bank selector 
-            opts:
-                <<: *rx-filt-opts  
+            opts: *rx-filt-opts  
           - bits: "11:8"
             name: C
             desc: Filter bank selector 
-            opts:
-                <<: *rx-filt-opts  
+            opts: *rx-filt-opts  
           - bits: "15:12"
             name: D
             desc: Filter bank selector 
-            opts:
-                <<: *rx-filt-opts 
+            opts: *rx-filt-opts 
 #
       - addr: 0x43
         name: RX_ATTN
@@ -132,23 +124,19 @@ pages:
           - bits: "1:0"
             name: A
             desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts:
-                <<: *x-band-opts
+            opts: *x-band-opts
           - bits: "5:4"
             name: B
             desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts:
-                <<: *x-band-opts
+            opts: *x-band-opts
           - bits: "9:8"
             name: C
             desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts:
-                <<: *x-band-opts
+            opts: *x-band-opts
           - bits: "13:12"
             name: D
             desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts:
-                <<: *x-band-opts
+            opts: *x-band-opts
 #
       - addr: 0x45
         name: ANT_SEL
@@ -156,23 +144,19 @@ pages:
           - bits: "2:0"
             name: A
             desc: Antenna path selector
-            opts:
-                <<: *x-ant-opts
+            opts: *x-ant-opts
           - bits: "6:4"
             name: B
             desc: Antenna path selector
-            opts:
-                <<: *x-ant-opts
+            opts: *x-ant-opts
           - bits: "10:8"
             name: C
             desc: Antenna path selector
-            opts:
-                <<: *x-ant-opts 
+            opts: *x-ant-opts 
           - bits: "14:12"
             name: D
             desc: Antenna path selector
-            opts:
-                <<: *x-ant-opts
+            opts: *x-ant-opts
 #
       - addr: 0x46
         name: RX_CHEN
@@ -206,6 +190,69 @@ pages:
             name: D
             desc: FE Chan enabled
 #
-
+      - addr: 0x48
+        name: RX_8KA_LNA
+        fields:
+          - bits: "4:0"
+            name: A
+            desc: FE LMS8001A RX low band 0-15 LNA Gain, 16 bypass
+          - bits: "10:6"
+            name: B
+            desc: FE LMS8001A RX low band 0-15 LNA Gain, 16 bypass
+          - bits: "16:12"
+            name: C
+            desc: FE LMS8001A RX low band 0-15 LNA Gain, 16 bypass
+          - bits: "22:18"
+            name: D
+            desc: FE LMS8001A RX low band 0-15 LNA Gain, 16 bypass
+#
+      - addr: 0x49
+        name: RX_8KA_PA
+        fields:
+          - bits: "4:0"
+            name: A
+            desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
+          - bits: "10:6"
+            name: B
+            desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
+          - bits: "16:12"
+            name: C
+            desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
+          - bits: "22:18"
+            name: D
+            desc: FE LMS8001A RX low band 0-15 PA Gain, 16 bypass
+#
+      - addr: 0x4A
+        name: RX_8KB
+        fields:
+          - bits: "3:0"
+            name: A
+            desc: FE LMS8001B RX high band 0-15 PA Gain
+          - bits: "7:4"
+            name: B
+            desc: FE LMS8001A RX high band 0-15 PA Gain
+          - bits: "11:8"
+            name: C
+            desc: FE LMS8001A RX high band 0-15 PA Gain
+          - bits: "15:12"
+            name: D
+            desc: FE LMS8001A RX high band 0-15 PA Gain
+#
+      - addr: 0x4B
+        name: TX_8KB
+        fields:
+          - bits: "3:0"
+            name: A
+            desc: FE LMS8001B TX high band 0-15 PA Gain
+          - bits: "7:4"
+            name: B
+            desc: FE LMS8001A TX high band 0-15 PA Gain
+          - bits: "11:8"
+            name: C
+            desc: FE LMS8001A TX high band 0-15 PA Gain
+          - bits: "15:12"
+            name: D
+            desc: FE LMS8001A TX high band 0-15 PA Gain
+#
 
 

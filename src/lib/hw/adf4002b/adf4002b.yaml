@@ -94,8 +94,7 @@ pages:
           - bits: "6:4"
             name: MUXOUT
             desc: Mux control
-            opts:
-                <<: *muxcontrol-opts
+            opts: *muxcontrol-opts
           - bits: "2"
             name: CNTR_RST
             desc: COUNTER OPERATION; 0 - Normal; 1 - R and N held in reset
@@ -137,8 +136,7 @@ pages:
           - bits: "6:4"
             name: MUXOUT
             desc: Mux control
-            opts:
-                <<: *muxcontrol-opts
+            opts: *muxcontrol-opts
           - bits: "2"
             name: CNTR_RST
             desc: COUNTER OPERATION; 0 - Normal; 1 - R and N held in reset

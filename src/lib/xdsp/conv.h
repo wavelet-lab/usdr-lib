@@ -76,18 +76,19 @@ typedef void (*filter_function_t)(const int16_t *__restrict data,
 
 
 typedef void (*sincos_i16_interleaved_ctrl_function_t)(int32_t *__restrict start_phase,
-                                int32_t delta_phase, bool inv_sin, bool inv_cos,
+                                int32_t delta_phase, int16_t gain, bool inv_sin, bool inv_cos,
                                 int16_t *__restrict outdata,
                                 unsigned iters);
 
 #define DECLARE_TR_FUNC_SINCOS_I16_INTERLEAVED_CTRL(conv_fn) \
 void tr_##conv_fn (int32_t *__restrict start_phase, \
                   int32_t delta_phase, \
+                  int16_t gain, \
                   bool inv_sin, \
                   bool inv_cos, \
                   int16_t *__restrict outdata, \
                   unsigned iters) \
-    { conv_fn(start_phase, delta_phase, inv_sin, inv_cos, outdata, iters); }
+    { conv_fn(start_phase, delta_phase, gain, inv_sin, inv_cos, outdata, iters); }
 
 
 struct transform_info {

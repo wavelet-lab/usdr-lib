@@ -547,8 +547,7 @@ pages:
                     1101 - 1.25;
                     1110 - 0.875;
                     1111 - 0.75;
-            opts:
-                <<: *lpf-codes
+            opts: *lpf-codes
           - name: EN
             bits: '1'
             desc: LPF modules enable; 0 - LPF modules powered down; 1 - LPF modules enabled
@@ -577,10 +576,10 @@ pages:
             desc: Calibration value, coming from TRX_LPF_CAL module
           - name: PD_DCODAC_LPF
             bits: '2'
-            desc: Power down for the DAC in the DC offset cancellation block; 1 -  Powered Down; 0 - Enabled (default)
+            desc: "Power down for the DAC in the DC offset cancellation block; 1 - Powered Down; 0 - Enabled (default)"
           - name: PD_DCOREF_LPF
             bits: '1'
-            desc: Power down signal for the dc_ref_con3 block; 1 - Powered Down; 0 -  Enabled (default)
+            desc: "Power down signal for the dc_ref_con3 block; 1 - Powered Down; 0 - Enabled (default)"
           - name: PD_FIL_LPF
             bits: '0'
             desc: Power down for the filter; 1 - Powered Down; 0 - Enabled (default)
@@ -590,7 +589,7 @@ pages:
         fields:
           - name: PD
             bits: '7'
-            desc: Power down DC offset comparators in DC offset cancellation block. Should be powered up only when DC offset cancellation algorithm is running; 1 -  Powered Down; 0 - Enabled (default)
+            desc: "Power down DC offset comparators in DC offset cancellation block. Should be powered up only when DC offset cancellation algorithm is running; 1 -  Powered Down; 0 - Enabled (default)"
 
   - name: TRF
     regs:
@@ -832,8 +831,7 @@ pages:
                     1101 - 1.25;
                     1110 - 0.875;
                     1111 - 0.75;
-            opts:
-                <<: *lpf-codes
+            opts: *lpf-codes
           - name: EN
             bits: '1'
             desc: LPF modules enable; 0 - LPF modules powered down; 1 - LPF modules enabled
@@ -859,10 +857,10 @@ pages:
             desc: Calibration value, coming from TRX_LPF_CAL module
           - name: PD_DCODAC_LPF
             bits: '2'
-            desc: Power down for the DAC in the DC offset cancellation block; 1 -  Powered Down; 0 - Enabled (default)
+            desc: "Power down for the DAC in the DC offset cancellation block; 1 - Powered Down; 0 - Enabled (default)"
           - name: PD_DCOREF_LPF
             bits: '1'
-            desc: Power down signal for the dc_ref_con3 block; 1 - Powered Down; 0 -  Enabled (default)
+            desc: "Power down signal for the dc_ref_con3 block; 1 - Powered Down; 0 - Enabled (default)"
           - name: PD_FIL_LPF
             bits: '0'
             desc: Power down for the filter; 1 - Powered Down; 0 - Enabled (default)
@@ -1048,7 +1046,7 @@ pages:
         fields:
           - name: DCOCMP_LPF_PD
             bits: '7'
-            desc: Power down DC offset comparators in DC offset cancellation block. Should be powered up only when DC offset cancellation algorithm is running; 1 -  Powered Down; 0 - Enabled (default)
+            desc: "Power down DC offset comparators in DC offset cancellation block. Should be powered up only when DC offset cancellation algorithm is running; 1 - Powered Down; 0 - Enabled (default)"
           - name: EN_DAC
             bits: '4'
             desc: Enable DAC

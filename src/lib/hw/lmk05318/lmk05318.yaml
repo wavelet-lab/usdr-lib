@@ -272,46 +272,38 @@ pages:
           - bits: "7-6"
             name: CH3_MUTE_LVL
             desc: Output 3 Mute Level See CH0_MUTE_LVL for description and bit settings.
-            opts:
-                <<: *mute-lvl
+            opts: *mute-lvl
           - bits: "5-4"
             name: CH2_MUTE_LVL
             desc: Output 2 Mute Level See CH0_MUTE_LVL for description and bit settings.
-            opts:
-                <<: *mute-lvl
+            opts: *mute-lvl
           - bits: "3-2"
             name: CH1_MUTE_LVL
             desc: Output 1 Mute Level See CH0_MUTE_LVL for description and bit settings.
-            opts:
-                <<: *mute-lvl
+            opts: *mute-lvl
           - bits: "1-0"
             name: CH0_MUTE_LVL
             desc: Output 0 Mute Level Determines the configuration of the Output Driver during mute. 0x0 = Bypass Mute (Normal Operation) 0x1 = For DIFF or HCSL mute to differential Vocm. For LVCMOS, P is Bypass Mute and N is Mute Low. 0x2 = For DIFF or HCSL mute to differntial High. For LVCMOS, P is Mute Low and N is Bypass Mute. 0x3 = For DIFF or HCSL mute to differential Low. For LVCMOS, P is Mute Low and N is Mute Low.
-            opts:
-                <<: *mute-lvl
+            opts: *mute-lvl
       - addr: 0x18
         name: MUTELVL2
         fields:
           - bits: "7-6"
             name: CH7_MUTE_LVL
             desc: Output 7 Mute Level See CH0_MUTE_LVL for description and bit settings.
-            opts:
-                <<: *mute-lvl
+            opts: *mute-lvl
           - bits: "5-4"
             name: CH6_MUTE_LVL
             desc: Output 6 Mute Level See CH0_MUTE_LVL for description and bit settings.
-            opts:
-                <<: *mute-lvl
+            opts: *mute-lvl
           - bits: "3-2"
             name: CH5_MUTE_LVL
             desc: Output 5 Mute Level See CH0_MUTE_LVL for description and bit settings.
-            opts:
-                <<: *mute-lvl
+            opts: *mute-lvl
           - bits: "1-0"
             name: CH4_MUTE_LVL
             desc: Output 4 Mute Level See CH0_MUTE_LVL for description and bit settings.
-            opts:
-                <<: *mute-lvl
+            opts: *mute-lvl
       - addr: 0x19
         name: OUT_MUTE
         fields:
@@ -399,8 +391,7 @@ pages:
           - bits: "6-3"
             name: XO_TYPE
             desc: XO Input Type; 0x0 = DC-Differential (external termination); 0x1 = AC-Differential (external termination); 0x3 = AC-Differential (internal termination 100-Ω); 0x4 = HCSL (internal termination 50-Ω); 0x8 = CMOS; 0xC = Single-ended (internal termination 50-Ω)
-            opts:
-                <<: *in-opts
+            opts: *in-opts
       - addr: 0x2C
         name: XO_CONFIG
         fields:
@@ -422,13 +413,11 @@ pages:
           - bits: "7-4"
             name: SECREF_TYPE
             desc: SECREF Input Type See PRIREF_TYPE for input type bit settings.
-            opts:
-                <<: *in-opts
+            opts: *in-opts
           - bits: "3-0"
             name: PRIREF_TYPE
             desc: PRIREF Input Type; 0x0 = DC-Differential (external termination); 0x1 = AC-Differential (external termination); 0x3 = AC-Differential (internal termination 100-Ω); 0x4 = HCSL (internal termination 50-Ω); 0x8 = CMOS; 0xC = Single-ended (internal termination 50-Ω)
-            opts:
-                <<: *in-opts
+            opts: *in-opts
       - addr: 0x2F
         name: PLL_CLK_CFG
         fields:
@@ -479,21 +468,18 @@ pages:
           - bits: "7-6"
             name: CH0_1_MUX
             desc: Channel 0 and 1 Output Mux; Selects frequency source for OUT0 and OUT1; 0x0 = APLL1 P1; 0x1 = APLL1 P1 Inverted; 0x2 = APLL2 P1; 0x3 = APLL2 P2
-            opts:
-                <<: *out-pll-sel
+            opts: *out-pll-sel
           - bits: "5-0"
             name: OUT0_FMT
             desc: OUT0 Clock Format; Values not desplayed below are reserved; 0x00 = Disabled; 0x10 = AC-LVDS; 0x14 = AC-CML; 0x18 = AC-LVPECL; 0x2C = HCSL (external termination 50-Ω); 0x2D = HCSL (internal termination 50-Ω)
-            opts:
-                <<: *out-opts
+            opts: *out-opts
       - addr: 0x34
         name: OUTCTL_1
         fields:
           - bits: "5-0"
             name: OUT1_FMT
             desc: OUT1 Clock Format See OUT0_FMT for bit settings
-            opts:
-                <<: *out-opts
+            opts: *out-opts
       - addr: 0x35
         name: OUTDIV_0_1
         fields:
@@ -506,21 +492,18 @@ pages:
           - bits: "7-6"
             name: CH2_3_MUX
             desc: Channel 2 and 3 Output Mux Selects frequency source for OUT2 and OUT3. See CH0_1_MUX for bit settings
-            opts:
-                <<: *out-pll-sel
+            opts: *out-pll-sel
           - bits: "5-0"
             name: OUT2_FMT
             desc: OUT2 Clock Format See OUT0_FMT for bit settings.
-            opts:
-                <<: *out-opts
+            opts: *out-opts
       - addr: 0x37
         name: OUTCTL_3
         fields:
           - bits: "5-0"
             name: OUT3_FMT
             desc: OUT3 Clock Format See OUT0_FMT for bit settings.
-            opts:
-                <<: *out-opts
+            opts: *out-opts
       - addr: 0x38
         name: OUTDIV_2_3
         fields:
@@ -533,13 +516,11 @@ pages:
           - bits: "7-6"
             name: CH4_MUX
             desc: Channel 4 Output Mux Selects frequency source for OUT4. See CH0_1_MUX for bit settings.
-            opts:
-                <<: *out-pll-sel
+            opts: *out-pll-sel
           - bits: "5-0"
             name: OUT4_FMT
             desc: OUT4 Clock Format Values not desplayed below are reserved. 0x00 = Disabled; 0x10 = AC-LVDS; 0x14 = AC-CML; 0x18 = AC-LVPECL; 0x2C = HCSL (external termination 50-Ω); 0x2D = HCSL (internal termination 50-Ω); 0x30 = LVCMOS(HiZ/HiZ); 0x32 = LVCMOS(HiZ/-); 0x33 = LVCMOS(HiZ/+); 0x35 = LVCMOS(low/low); 0x38 = LVCMOS(-/HiZ); 0x3A = LVCMOS(-/-); 0x3B = LVCMOS(-/+); 0x3C = LVCMOS(+/HiZ); 0x3E = LVCMOS(+/-); 0x3F = LVCMOS(+/+)
-            opts:
-                <<: *out-opts
+            opts: *out-opts
       - addr: 0x3A
         name: OUTDIV_4
         fields:
@@ -552,13 +533,11 @@ pages:
           - bits: "7-6"
             name: CH5_MUX
             desc: Channel 5 Output Mux Selects frequency source for OUT5. See CH0_1_MUX for bit settings.
-            opts:
-                <<: *out-pll-sel
+            opts: *out-pll-sel
           - bits: "5-0"
             name: OUT5_FMT
             desc: OUT5 Clock Format See OUT4_FMT for bit settings. 
-            opts:
-                <<: *out-opts
+            opts: *out-opts
       - addr: 0x3C
         name: OUTDIV_5
         fields:
@@ -571,13 +550,11 @@ pages:
           - bits: "7-6"
             name: CH6_MUX
             desc: Channel 6 Output Mux Selects frequency source for OUT6. See CH0_1_MUX for bit settings.
-            opts:
-                <<: *out-pll-sel
+            opts: *out-pll-sel
           - bits: "5-0"
             name: OUT6_FMT
             desc: OUT6 Clock Format See OUT4_FMT for bit settings
-            opts:
-                <<: *out-opts
+            opts: *out-opts
       - addr: 0x3E
         name: OUTDIV_6
         fields:
@@ -590,13 +567,11 @@ pages:
           - bits: "7-6"
             name: CH7_MUX
             desc: Channel 7 Output Mux Selects frequency source for OUT7. See CH0_1_MUX for bit settings.
-            opts:
-                <<: *out-pll-sel
+            opts: *out-pll-sel
           - bits: "5-0"
             name: OUT7_FMT
             desc: OUT7 Clock Format See OUT4_FMT for bit settings
-            opts:
-                <<: *out-opts
+            opts: *out-opts
       - addr: "0x40:0x42"
         name: OUTDIV_7_STG2
         fields:
@@ -673,7 +648,6 @@ pages:
             desc: BAW VCO Lock Detection 
       - addr: 0x51
         name: BAW_LOCKDET_PPM_MAX_BY0
-        fields:
 
       - addr: "0x52:0x55"
         name: BAW_LOCKDET_CNTSTRT
@@ -719,7 +693,6 @@ pages:
             desc: PLL2 Post-Divider1 Note A RESET is required after changing Divider values; 0x0 = Invalid; 0x1 = 2; 0x2 = 3; 0x3 = 4; 0x4 = 5; 0x5 = 6; 0x6 = 7; 0x7 = Invalid 
       - addr: 0x68
         name: PLL2_CTRL4
-        fields:
 
       - addr: 0x69
         name: PLL2_CALCTRL0
@@ -753,15 +726,12 @@ pages:
 
       - addr: 0x81
         name: PLL1_LF_R2
-        fields:
 
       - addr: 0x83
         name: PLL1_LF_R3
-        fields:
 
       - addr: 0x84
         name: PLL1_LF_R4
-        fields:
 
       - addr: "0x86:0x87"
         name: PLL2_NDIV
@@ -780,19 +750,15 @@ pages:
             desc: APLL2 SDM Order; 0x0 = Integer Mode; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th 
       - addr: 0x8C
         name: PLL2_LF_R2
-        fields:
 
       - addr: 0x8E
         name: PLL2_LF_R3
-        fields:
 
       - addr: 0x8F
         name: PLL2_LF_R4
-        fields:
 
       - addr: 0x90
         name: PLL2_LF_C3C4
-        fields:
 
       - addr: 0x91
         name: XO_OFFSET_SW_TIMER
@@ -805,11 +771,9 @@ pages:
 
       - addr: 0xB9
         name: DPLL_REF_HISTCTL
-        fields:
 
       - addr: 0xBA
         name: DPLL_REF_HISTCNT
-        fields:
 
       - addr: "0xBB:0xBE"
         name: DPLL_REF_HISTDLY
@@ -918,11 +882,9 @@ pages:
 
       - addr: 0xE9
         name: REF0_VLDTMR
-        fields:
 
       - addr: 0xEA
         name: REF1_VLDTMR
-        fields:
 
       - addr: "0xEB:0xEE"
         name: REF0_PH_VALID_CNT
@@ -932,11 +894,9 @@ pages:
 
       - addr: 0xF3
         name: REF0_PH_VALID_THR
-        fields:
 
       - addr: 0xF4
         name: REF1_PH_VALID_THR
-        fields:
   - name: DPllControl
     regs:
       - addr: 0xF9
@@ -992,7 +952,6 @@ pages:
             desc: DPLL Switchover Time 
       - addr: 0xFF
         name: DPLL_SWITCHOVER_TMR_MANT_BY0
-        fields:
 
       - addr: "0x100:0x101"
         name: DPLL_REF0_RDIV
@@ -1008,150 +967,114 @@ pages:
             desc: Disable Cycle Slip 
       - addr: 0x105
         name: DPLL_REF_DLY_GEN
-        fields:
 
       - addr: "0x106:0x10A"
         name: DPLL_REF_CYCSLIP_OFFSET
 
       - addr: 0x10B
         name: DPLL_REF_LOOPCTL
-        fields:
 
       - addr: 0x10C
         name: DPLL_REF_LOOPCTL_CHG
-        fields:
 
       - addr: 0x10D
         name: DPLL_REF_DECIMATION
-        fields:
 
       - addr: 0x10E
         name: DPLL_REF_FILTSCALAR_BY1
-        fields:
 
       - addr: 0x10F
         name: DPLL_REF_FILTSCALAR_BY0
-        fields:
 
       - addr: 0x110
         name: DPLL_REF_FILTGAIN
-        fields:
 
       - addr: 0x111
         name: DPLL_REF_FILTGAIN_FL1
-        fields:
 
       - addr: 0x112
         name: DPLL_REF_FILTGAIN_FL2
-        fields:
 
       - addr: 0x113
         name: DPLL_REF_LOOPGAIN
-        fields:
 
       - addr: 0x114
         name: DPLL_REF_LOOPGAIN_FL1
-        fields:
 
       - addr: 0x115
         name: DPLL_REF_LOOPGAIN_FL2
-        fields:
 
       - addr: 0x116
         name: DPLL_REF_LPF0GAIN
-        fields:
 
       - addr: 0x117
         name: DPLL_REF_LPF0GAIN_FL1
-        fields:
 
       - addr: 0x118
         name: DPLL_REF_LPF0GAIN_FL2
-        fields:
 
       - addr: 0x119
         name: DPLL_REF_LPF1GAIN
-        fields:
 
       - addr: 0x11A
         name: DPLL_REF_LPF1GAIN_FL1
-        fields:
 
       - addr: 0x11B
         name: DPLL_REF_LPF1GAIN_FL2
-        fields:
 
       - addr: 0x11C
         name: DPLL_REF_LPF0GAIN2_FL
-        fields:
 
       - addr: 0x11D
         name: DPLL_REF_LPF1GAIN2_FL
-        fields:
 
       - addr: 0x11E
         name: DPLL_REF_TMR_FL1_BY1
-        fields:
 
       - addr: 0x11F
         name: DPLL_REF_TMR_FL1_BY0
-        fields:
 
       - addr: 0x120
         name: DPLL_REF_TMR_FL2_BY1
-        fields:
 
       - addr: 0x121
         name: DPLL_REF_TMR_FL2_BY0
-        fields:
 
       - addr: 0x122
         name: DPLL_REF_TMR_LCK_BY1
-        fields:
 
       - addr: 0x123
         name: DPLL_REF_TMR_LCK_BY0
-        fields:
 
       - addr: 0x124
         name: DPLL_REF_PHC_LPF
-        fields:
 
       - addr: 0x125
         name: DPLL_REF_PHC_CTRL
-        fields:
 
       - addr: 0x126
         name: DPLL_REF_PHC_TIMER_BY1
-        fields:
 
       - addr: 0x127
         name: DPLL_REF_PHC_TIMER_BY0
-        fields:
 
       - addr: 0x128
         name: DPLL_REF_QUANT
-        fields:
 
       - addr: 0x129
         name: DPLL_REF_QUANT_FL1
-        fields:
 
       - addr: 0x12A
         name: DPLL_REF_QUANT_FL2
-        fields:
 
       - addr: 0x12C
         name: DPLL_PL_LPF_GAIN
-        fields:
 
       - addr: 0x12D
         name: DPLL_PL_THRESH
-        fields:
 
       - addr: 0x12E
         name: DPLL_PL_UNLK_THRESH
-        fields:
 
       - addr: 0x130
         name: DPLL_REF_FB_PREDIV
@@ -1161,19 +1084,15 @@ pages:
             desc: DPLL REF Feedback Pre Divider value Divider value ranges from 2 to 17; Divider value = DPLL_REF_FB_PRE_DIV + 2 
       - addr: "0x131:0x134"
         name: DPLL_REF_FB_DIV
-        fields:
 
       - addr: "0x135:0x139"
         name: DPLL_REF_NUM
-        fields:
 
       - addr: "0x13A:0x13E"
         name: DPLL_REF_DEN
-        fields:
 
       - addr: 0x13F
         name: DPLL_REF_MASHCTL
-        fields:
 
       - addr: "0x140:0x141"
         name: DPLL_REF_LOCKDET_PPM_MAX

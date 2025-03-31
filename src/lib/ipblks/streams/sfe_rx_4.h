@@ -4,25 +4,7 @@
 #ifndef SFE_RX_4
 #define SFE_RX_4
 
-#include <usdr_port.h>
-#include <usdr_logging.h>
-#include <usdr_lowlevel.h>
-
-#include "streams.h"
-
-struct sfe_cfg {
-    lldev_t dev;
-    subdev_t subdev;
-
-    unsigned cfg_fecore_id;
-
-    unsigned cfg_base;
-    unsigned cfg_fifomaxbytes;
-    unsigned cfg_word_bytes;
-    unsigned cfg_raw_chans;
-};
-typedef struct sfe_cfg sfe_cfg_t;
-
+#include "sfe_txrx_4.h"
 
 int sfe_rx4_check_format(const struct stream_config* psc);
 
@@ -43,11 +25,11 @@ int exfe_rx4_configure(const sfe_cfg_t* fe,
                        const struct stream_config* psc,
                        struct fifo_config* pfc);
 
-int exfe_rx4_update_chmap(const sfe_cfg_t* fe,
+int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
                           bool complex,
                           unsigned total_chan_num,
                           const channel_info_t *newmap);
 
-
+int exfe_tx4_mute(const sfe_cfg_t* fe, uint64_t mutemask);
 
 #endif

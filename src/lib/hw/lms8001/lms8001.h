@@ -81,11 +81,16 @@ typedef struct lms8001_state lms8001_state_t;
 int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms8001_state_t *out);
 int lms8001_destroy(lms8001_state_t* m);
 
+int lms8001_core_enable(lms8001_state_t* state, bool enable);
+
 int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out);
 int lms8001_ch_enable(lms8001_state_t* state, unsigned mask);
 
-int lms8001a_ch_enable(lms8001_state_t* state, unsigned mask, unsigned lna_loss, unsigned pa_loss);
+int lms8001a_ch_enable(lms8001_state_t* state, unsigned mask, unsigned lna_loss[4], unsigned pa_loss[4]);
 
+// lna_loss == ~0 means bypass LNA
+int lms8001a_ch_lna_pa_set(lms8001_state_t* state, unsigned chan, unsigned lna_loss, unsigned pa_loss);
+int lms8001b_hlmix_loss_set(lms8001_state_t* state, unsigned chan, unsigned loss);
 
 int lms8001_reg_set(lms8001_state_t* m, uint16_t addr, uint16_t val);
 int lms8001_reg_get(lms8001_state_t* m, uint16_t addr, uint16_t* oval);

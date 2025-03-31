@@ -37,6 +37,8 @@ enum exfe_rx_cmd_regs {
     EXFE_CMD_PACKER         = 0x04,
     EXFE_CMD_ENABLE_EXT     = 0x08,
 
+    EXFE_CMD_MUTE           = 0x0f,
+
     EXFE_CMD_SHUFFLE_0      = 0x10,
     EXFE_CMD_SHUFFLE_1      = 0x11,
     EXFE_CMD_SHUFFLE_2      = 0x12,
@@ -549,7 +551,7 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_COMPACTER, chlg);
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_PACKER, bps == 12 ? 1 : 0);
 
-    res = res ? res : exfe_rx4_update_chmap(fe, bfmt.complex, chns, &psc->channels);
+    res = res ? res : exfe_trx4_update_chmap(fe, bfmt.complex, chns, &psc->channels);
 
     pfc->bpb = bbytes;
     pfc->burstspblk = bursts;
@@ -559,7 +561,7 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
 }
 
 
-int exfe_rx4_update_chmap(const sfe_cfg_t* fe,
+int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
                           bool complex,
                           unsigned total_chan_num,
                           const channel_info_t* newmap)
@@ -599,10 +601,10 @@ int exfe_rx4_update_chmap(const sfe_cfg_t* fe,
     }
 
     for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
-        USDR_LOG("STRM", USDR_LOG_INFO, "EXFERX: CH%d => %d (orig %d) %s", g, chmap[g], chmap_o[g], flag_swap_iq[g] ? "SWAP_IQ" : "");
+        USDR_LOG("STRM", USDR_LOG_INFO, "EXFE: CH%d => %d (orig %d) %s", g, chmap[g], chmap_o[g], flag_swap_iq[g] ? "SWAP_IQ" : "");
     }
     for (unsigned f = 0; f < lg_chans; f++) {
-        USDR_LOG("STRM", USDR_LOG_INFO, "EXFERX: STAGE_%d: %04x", f, ch_remapped[f]);
+        USDR_LOG("STRM", USDR_LOG_INFO, "EXFE: STAGE_%d: %04x", f, ch_remapped[f]);
     }
 
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_SHUFFLE_0, ch_remapped[0]);
@@ -610,4 +612,9 @@ int exfe_rx4_update_chmap(const sfe_cfg_t* fe,
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_SHUFFLE_2, ch_remapped[2]);
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_SHUFFLE_3, ch_remapped[3]);
     return res;
+}
+
+int exfe_tx4_mute(const sfe_cfg_t *fe, uint64_t mutemask)
+{
+    return _sfe_exrx_reg_set(fe, EXFE_CMD_MUTE, mutemask);
 }

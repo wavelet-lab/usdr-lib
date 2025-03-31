@@ -62,6 +62,8 @@ struct stream_sfetrx_dma32 {
     int fd;
     unsigned burst_count;
 
+    uint8_t  fe_old_tx_mute; // keep OLD TX FE in sync with host state
+    uint8_t  fe_old_tx_swap; // keep OLD TX FE in sync with host state
     unsigned fe_chans;  // Number of active channels in frontend
     unsigned fe_complex;// Compex data streaming
     union {
@@ -336,8 +338,13 @@ static int _sfetrx4_op(stream_handle_t* str,
         if (res)
             return res;
     } else {
-        res = sfe_tx4_ctl(dev, 0, stream->cnf_base,
-                          stream->channels != 1, false, start);
+        // Assuming Compex IQ
+        unsigned lgchcnt = (stream->fe_chans == 1) ? 0 :
+                           (stream->fe_chans == 2) ? 1 :
+                           (stream->fe_chans == 4) ? 2 : 3;
+        res = sfe_tx4_ctl(&stream->storage.srx4, stream->cnf_base,
+                          lgchcnt, stream->fe_old_tx_swap, stream->fe_old_tx_mute,
+                          false, start);
         if (res)
             return res;
     }
@@ -374,14 +381,46 @@ int _sfetrx4_option_set(stream_handle_t* str, const char* name, int64_t in_val)
         uint8_t skip = in_val;
 
         return sfe_rx4_throttle(&stream->storage.srx4, enable, en, skip);
-    } else if (stream->type == USDR_ZCPY_RX && strcmp(name, "chmap") == 0) {
-        if (stream->storage.srx4.cfg_fecore_id != CORE_EXFERX_DMA32_R0)
-            return -ENOTSUP;
+    } else if (strcmp(name, "chmap") == 0) {
+        const channel_info_t *new_map = (const channel_info_t *)in_val;
 
-        return exfe_rx4_update_chmap(&stream->storage.srx4,
+        if (stream->type == USDR_ZCPY_RX) {
+            if (stream->storage.srx4.cfg_fecore_id != CORE_EXFERX_DMA32_R0)
+                return -ENOTSUP;
+        } else if (stream->type == USDR_ZCPY_TX) {
+            if (stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0) {
+                unsigned swap_ab_flag;
+                int res = fe_tx4_swap_ab_get(stream->fe_chans, new_map, &swap_ab_flag);
+                if (res)
+                    return res;
+
+                stream->fe_old_tx_swap = swap_ab_flag;
+                if (stream->fe_chans == 1 && stream->fe_old_tx_mute != 0) {
+                    stream->fe_old_tx_mute = (stream->fe_old_tx_swap) ? 1 : 2;
+                }
+                return sfe_tx4_upd(&stream->storage.srx4,
+                                   stream->cfg_base + 2,
+                                   stream->fe_old_tx_mute,
+                                   stream->fe_old_tx_swap);
+            }
+        } else {
+            return -EINVAL;
+        }
+
+        return exfe_trx4_update_chmap(&stream->storage.srx4,
                                      stream->fe_complex,
                                      (stream->fe_complex ? 2 : 1) * stream->fe_chans,
                                      (const channel_info_t *)in_val);
+    } else if (stream->type == USDR_ZCPY_TX && (strcmp(name, "mute") == 0)) {
+        if (stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0) {
+            stream->fe_old_tx_mute = in_val & 3;
+            return sfe_tx4_upd(&stream->storage.srx4,
+                               stream->cfg_base + 2,
+                               stream->fe_old_tx_mute,
+                               stream->fe_old_tx_swap);
+        }
+
+        return exfe_tx4_mute(&stream->storage.srx4, in_val);
     }
     return -EINVAL;
 }
@@ -647,8 +686,7 @@ static int initialize_stream_tx_32(device_t* device,
                                    unsigned chcount,
                                    channel_info_t *channels,
                                    unsigned pktsyms,
-                                   //unsigned fe_fifobsz,
-                                   //unsigned fe_base,
+                                   sfe_cfg_t* fecfg,
                                    unsigned sx_base,
                                    unsigned sx_cfg_base,
                                    struct parsed_data_format pfmt,
@@ -669,7 +707,7 @@ static int initialize_stream_tx_32(device_t* device,
     sc.sfmt = (pfmt.wire_fmt == NULL) ? pfmt.host_fmt : pfmt.wire_fmt;
     sc.spburst = pktsyms;
 
-    if (logicchs > 2)
+    if (logicchs > fecfg->cfg_raw_chans)
         return -EINVAL;
 
     if (!dont_check_fw) {
@@ -714,6 +752,35 @@ static int initialize_stream_tx_32(device_t* device,
         // Wire format not supported, need transform function
         // suppose i16 but maintain complex / real format
         sc.sfmt = (*pfmt.host_fmt == 'C' || *pfmt.host_fmt == 'c') ? "ci16" : "i16";
+    }
+
+    struct bitsfmt bfmt = get_bits_fmt(sc.sfmt);
+    if (!bfmt.complex || bfmt.bits != 16) {
+        USDR_LOG("DSTR", USDR_LOG_ERROR, "Only 16 bit complex signals supported in TX FE!\n");
+        return -EINVAL;
+    }
+
+    // Check core fe sanity
+    unsigned fe_old_tx_swap = 0;
+    unsigned fe_old_tx_mute = 0;
+    if (fecfg->cfg_fecore_id == CORE_SFETX_DMA32_R0) {
+        if (sc.chcnt > 2)
+            return -EINVAL;
+
+        if (!fe_tx4_swap_ab_get(sc.chcnt, &sc.channels, &fe_old_tx_swap))
+            return -EINVAL;
+
+        fe_old_tx_mute = (sc.chcnt == 1) ? (fe_old_tx_swap ? 1 : 2) : 0;
+    } else {
+        if (sc.chcnt == 3 || sc.chcnt > fecfg->cfg_raw_chans / 2)
+            return -EINVAL;
+
+        res = res ? res : exfe_tx4_mute(fecfg, 0);
+
+        res = res ? res : exfe_trx4_update_chmap(fecfg, bfmt.complex, (bfmt.complex ? 2 : 1) * sc.chcnt, &sc.channels);
+        if (res) {
+            return res;
+        }
     }
 
     //Find transform function
@@ -803,6 +870,13 @@ static int initialize_stream_tx_32(device_t* device,
 
     strdev->burst_mask = 0;
     strdev->burst_count = 0; //TODO: fill actual maximum burst count
+
+    strdev->fe_old_tx_mute = fe_old_tx_mute;
+    strdev->fe_old_tx_swap = fe_old_tx_swap;
+    strdev->fe_chans = sc.chcnt;
+    strdev->fe_complex = bfmt.complex;
+    strdev->storage.srx4 = *fecfg;
+
     *outu = strdev;
     return 0;
 }
@@ -829,6 +903,13 @@ int create_sfetrx4_stream(device_t* device,
     char dfmt[256];
     int res;
 
+    sfe_cfg_t fecfg;
+    fecfg.dev = device->dev;
+    fecfg.subdev = 0;
+    fecfg.cfg_fecore_id = core_id;
+    fecfg.cfg_base = fe_base;
+    fecfg.cfg_fifomaxbytes = fe_fifobsz;
+
     strncpy(dfmt, dformat, sizeof(dfmt));
     struct parsed_data_format pfmt;
     if (stream_parse_dformat(dfmt, &pfmt)) {
@@ -838,14 +919,6 @@ int create_sfetrx4_stream(device_t* device,
     switch (core_id) {
     case CORE_SFERX_DMA32_R0:
     case CORE_EXFERX_DMA32_R0:
-    {
-        sfe_cfg_t fecfg;
-        fecfg.dev = device->dev;
-        fecfg.subdev = 0;
-        fecfg.cfg_fecore_id = core_id;
-        fecfg.cfg_base = fe_base;
-        fecfg.cfg_fifomaxbytes = fe_fifobsz;
-
         // TODO obtain dynamic config
         fecfg.cfg_word_bytes = (core_id == CORE_SFERX_DMA32_R0) ? 8 : 16;
         fecfg.cfg_raw_chans = (core_id == CORE_SFERX_DMA32_R0) ? 4 : 8;
@@ -855,10 +928,14 @@ int create_sfetrx4_stream(device_t* device,
                                       (stream_sfetrx_dma32_t** )outu,
                                       need_fd, need_tx_stat, bifurcation);
         break;
-    }
     case CORE_SFETX_DMA32_R0:
+    case CORE_EXFETX_DMA32_R0:
+        // TODO obtain dynamic config
+        fecfg.cfg_word_bytes = (core_id == CORE_SFETX_DMA32_R0) ? 8 : 16;
+        fecfg.cfg_raw_chans = (core_id == CORE_SFETX_DMA32_R0) ? 4 : 8;
+
         res = initialize_stream_tx_32(device, chcount, channels, pktsyms,
-                                       sx_base, sx_cfg_base, pfmt,
+                                       &fecfg, sx_base, sx_cfg_base, pfmt,
                                        (stream_sfetrx_dma32_t** )outu,
                                        need_fd, bifurcation, dontcheck);
         break;

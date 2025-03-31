@@ -108,7 +108,7 @@ const char* SoapyUSDR::get_sdr_param(int sdridx, const char* dir, const char* pa
 
 
 
-SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
+SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
  : _actual_tx_rate(0)
  , _actual_rx_rate(0)
  , _desired_rx_pkt(0)
@@ -125,6 +125,17 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
         loglevel = atoi(lenv);
     }
 #endif
+
+    std::string env_str;
+    if (getenv("SOAPY_USDR_ARGS")) {
+        env_str = std::string(getenv("SOAPY_USDR_ARGS"));
+
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() overriding default parameters to `%s`", env_str.c_str());
+    }
+    SoapySDR::Kwargs env_args = SoapySDR::KwargsFromString(env_str);
+    const SoapySDR::Kwargs &args = (env_str.length() > 0) ? env_args : args_orig;
+
+
     std::string dev = (args.count("dev")) ? args.at("dev") : "";
 
     if (args.count("loglevel")) {
@@ -196,6 +207,8 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args)
             type = RFIC_LMS7002M;
         else if (strcmp(rfic, "ad45lb49") == 0)
             type = RFIC_AD45LB49;
+        else if (strcmp(rfic, "afe79xx") == 0)
+            type = RFIC_AFE79XX;
     }
 
     if (args.count("rx_bw")) {
@@ -485,7 +498,8 @@ void SoapyUSDR::setFrequency(const int direction, const size_t channel, const st
 
     uint64_t val = (((uint64_t)channel) << 32) | (uint32_t)frequency;
 
-    res = usdr_dme_set_uint(_dev->dev(), pname, val);
+    res = usdr_dme_set_uint(_dev->dev(), pname,
+                            type == RFIC_AFE79XX ? (uint64_t)frequency : val);
     if (res)
         throw std::runtime_error(std::string("SoapyUSDR::setFrequency(") + pname + ", " + ")");
 
@@ -514,7 +528,11 @@ SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const 
     SoapySDR::RangeList ranges;
     if (name == "RF")
     {
-        ranges.push_back(SoapySDR::Range(1e5, 3.8e9));
+        if (type == RFIC_AFE79XX) {
+            ranges.push_back(SoapySDR::Range(5e6, 12.5e9));
+        } else {
+            ranges.push_back(SoapySDR::Range(1e5, 3.8e9));
+        }
     }
     else if (name == "BB")
     {
@@ -530,7 +548,11 @@ SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const 
 SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const size_t /*channel*/) const
 {
     SoapySDR::RangeList ranges;
-    ranges.push_back(SoapySDR::Range(0e6, 3.8e9));
+    if (type == RFIC_AFE79XX) {
+        ranges.push_back(SoapySDR::Range(5e6, 12.5e9));
+    } else {
+        ranges.push_back(SoapySDR::Range(0e6, 3.8e9));
+    }
     return ranges;
 }
 
@@ -591,7 +613,8 @@ double SoapyUSDR::getSampleRate(const int direction, const size_t /*channel*/) c
 SoapySDR::RangeList SoapyUSDR::getSampleRateRange(const int /*direction*/, const size_t /*channel*/) const
 {
     SoapySDR::RangeList ranges;
-    ranges.push_back(SoapySDR::Range(0.1e6, (type == RFIC_AD45LB49) ? 130e6 : 80e6));
+    ranges.push_back(SoapySDR::Range((type == RFIC_AFE79XX) ? 1.92e6 : 0.1e6,
+                                     (type == RFIC_AFE79XX) ? 500e6 : (type == RFIC_AD45LB49) ? 130e6 : 80e6));
     return ranges;
 }
 

@@ -3316,12 +3316,12 @@ pages:
             name: HLMIXx_VGCAS0
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS0
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD0
             mode: RW
@@ -3345,12 +3345,12 @@ pages:
             name: HLMIXx_VGCAS1
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS1
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD1
             mode: RW
@@ -3374,12 +3374,12 @@ pages:
             name: HLMIXx_VGCAS2
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS2
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD2
             mode: RW
@@ -3403,12 +3403,12 @@ pages:
             name: HLMIXx_VGCAS3
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS3
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD3
             mode: RW
@@ -3619,12 +3619,12 @@ pages:
             name: HLMIXx_VGCAS0
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS0
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD0
             mode: RW
@@ -3648,12 +3648,12 @@ pages:
             name: HLMIXx_VGCAS1
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS1
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD1
             mode: RW
@@ -3677,12 +3677,12 @@ pages:
             name: HLMIXx_VGCAS2
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS2
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD2
             mode: RW
@@ -3706,12 +3706,12 @@ pages:
             name: HLMIXx_VGCAS3
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS3
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD3
             mode: RW
@@ -3922,12 +3922,12 @@ pages:
             name: HLMIXx_VGCAS0
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS0
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD0
             mode: RW
@@ -3951,12 +3951,12 @@ pages:
             name: HLMIXx_VGCAS1
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS1
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD1
             mode: RW
@@ -3980,12 +3980,12 @@ pages:
             name: HLMIXx_VGCAS2
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS2
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD2
             mode: RW
@@ -4009,12 +4009,12 @@ pages:
             name: HLMIXx_VGCAS3
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS3
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD3
             mode: RW
@@ -4225,12 +4225,12 @@ pages:
             name: HLMIXx_VGCAS0
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS0
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD0
             mode: RW
@@ -4254,12 +4254,12 @@ pages:
             name: HLMIXx_VGCAS1
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS1
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD1
             mode: RW
@@ -4283,12 +4283,12 @@ pages:
             name: HLMIXx_VGCAS2
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS2
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD2
             mode: RW
@@ -4312,12 +4312,12 @@ pages:
             name: HLMIXx_VGCAS3
             mode: RW
             dflt: 0b1000000
-            desc: HLMIXx LO bias voltage.     HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib
+            desc: "HLMIXx LO bias voltage. HLMIXx_VGCAS<6:5> = 00 - Rb = 20 kOhmHLMIXx_VGCAS<6:5> = 01, 10 - Rb = 15 kOhm     HLMIXx_VGCAS<6:5> = 11 - Rb = 10 kOhmIb = Inom * HLMIXx_VGCAS<4:0>/16 Vb = VDD - Rb * Ib"
           - bits: '6:2'
             name: HLMIXx_ICT_BIAS3
             mode: RW
             dflt: 0b10000
-            desc: HLMIXx core bias current control.     Ibias = Inom * HLMIXx_ICT_BIAS/16
+            desc: "HLMIXx core bias current control. Ibias = Inom * HLMIXx_ICT_BIAS/16"
           - bits: 1
             name: HLMIXx_BIAS_PD3
             mode: RW
@@ -4594,7 +4594,7 @@ pages:
             name: FCAL_START
             mode: RW
             dflt: 0
-            desc: Starts the automatic VCO frequency calibration algorithm (sticky-bit)     Writing 1 starts the calibration, automatically cleared when calibration is finished.
+            desc: Starts the automatic VCO frequency calibration algorithm (sticky-bit) Writing 1 starts the calibration, automatically cleared when calibration is finished.
           - bits: 11
             name: VCO_SEL_FINAL_VAL
             mode: R
@@ -4628,7 +4628,7 @@ pages:
             name: VCO_SEL_FORCE
             mode: RW
             dflt: 0
-            desc: Forces the user-defined VCO_SEL_INIT<1:0> word to select the active LC-VCO core and skips the VCO auto-select process during automatic VCO frequency calibration     0 - Runs VCO auto-select process (default)     1 - Skips VCO auto-select process and forces VCO_SEL_INIT<1:0>
+            desc: Forces the user-defined VCO_SEL_INIT<1:0> word to select the active LC-VCO core and skips the VCO auto-select process during automatic VCO frequency calibration 0 - Runs VCO auto-select process (default) 1 - Skips VCO auto-select process and forces VCO_SEL_INIT<1:0>
           - bits: '12:11'
             name: VCO_SEL_INIT
             mode: RW
@@ -4638,7 +4638,7 @@ pages:
             name: FREQ_INIT_POS
             mode: RW
             dflt: 0b111
-            desc: "Defines the starting bit-position for optimal cap-bank binary search process for the active LC-VCO core.     111(7) - Algorithm starts from MSB and determines the complete word (default).     110(6) - Algorithm determines bits from (MSB-1)-th position down to LSB.          000(0) - Algorithm determines only the LSB bit of the cap-bank code."
+            desc: "Defines the starting bit-position for optimal cap-bank binary search process for the active LC-VCO core. 111(7) - Algorithm starts from MSB and determines the complete word (default). 110(6) - Algorithm determines bits from (MSB-1)-th position down to LSB. 000(0) - Algorithm determines only the LSB bit of the cap-bank code."
           - bits: '7:0'
             name: FREQ_INIT
             mode: RW
@@ -4872,7 +4872,7 @@ pages:
             name: SEL_BIAS_CORE
             mode: RW
             dflt: 0
-            desc: Selects the bias for the core of  LO Distribution Network.
+            desc: Selects the bias for the core of LO Distribution Network.
             opts:
               0: PVT Compensated Bias
               1: IP20FRP Bias
@@ -4880,12 +4880,12 @@ pages:
             name: PLL_LODIST_ICT_CORE
             mode: RW
             dflt: 0b10000
-            desc: Controls the IP20FRP bias current value when SEL_BIAS_CORE=1.  Ibias = Inom * PLL_LODIST_ICT_CORE / 16
+            desc: Controls the IP20FRP bias current value when SEL_BIAS_CORE=1. Ibias = Inom * PLL_LODIST_ICT_CORE / 16
           - bits: '4:0'
             name: PLL_LODIST_ICT_BUF
             mode: RW
             dflt: 0b10000
-            desc: Controls the input bias current value for LO Distribution Network output buffers.  Ibias = Inom * PLL_LODIST_ICT_BUF / 16
+            desc: Controls the input bias current value for LO Distribution Network output buffers. Ibias = Inom * PLL_LODIST_ICT_BUF / 16
       - addr: 0x400F
         name: PLL_LODIST_CFG2
         fields:
@@ -4992,12 +4992,12 @@ pages:
             name: PLL_EN_FFDIV_n
             mode: RW
             dflt: 0
-            desc: Enable for feed-forward divider in PLL.     0 - Output clock is not divided
+            desc: Enable for feed-forward divider in PLL. 0 - Output clock is not divided
           - bits: 3
             name: PLL_EN_FB_PDIV2_n
             mode: RW
             dflt: 0
-            desc: Enable for feedback pre-divider.     0 - Output clock is directly fed to feedback divider
+            desc: Enable for feedback pre-divider. 0 - Output clock is directly fed to feedback divider
           - bits: 2
             name: PLL_EN_FFCORE_n
             mode: RW
@@ -5082,12 +5082,12 @@ pages:
             name: PULSE_n
             mode: RW
             dflt: 0b000100
-            desc: Charge pump pulse current     I = 25 uA * PULSE<5:0>
+            desc: Charge pump pulse current I = 25 uA * PULSE<5:0>
           - bits: '5:0'
             name: OFS_n
             mode: RW
             dflt: 0b000000
-            desc: Charge pump offset (bleeding) current     I = 6.25 uA * OFS<5:0>
+            desc: Charge pump offset (bleeding) current I = 6.25 uA * OFS<5:0>
       - addr: 0x4104
         name: PLL_CP_CFG1_n
         fields:
@@ -5144,12 +5144,12 @@ pages:
             name: VCO_SEL_n
             mode: RW
             dflt: 0b11
-            desc: VCO core selection     00 - External VCO,     01 - Low-frequency band VCO (4 - 6 GHz),     10 - Mid-frequency band VCO (6 - 8 GHz),     11 - High-frequency band VCO (8 - 10 GHz).
+            desc: VCO core selection 00 - External VCO, 01 - Low-frequency band VCO (4 - 6 GHz), 10 - Mid-frequency band VCO (6 - 8 GHz), 11 - High-frequency band VCO (8 - 10 GHz).
           - bits: '6:0'
             name: VCO_AMP_n
             mode: RW
             dflt: 0b0000001
-            desc: VCO amplitude control word.     0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
+            desc: VCO amplitude control word. 0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
       - addr: 0x4107
         name: PLL_FF_CFG_n
         fields:
@@ -5445,12 +5445,12 @@ pages:
             name: PLL_EN_FFDIV_n
             mode: RW
             dflt: 0
-            desc: Enable for feed-forward divider in PLL.     0 - Output clock is not divided
+            desc: Enable for feed-forward divider in PLL. 0 - Output clock is not divided
           - bits: 3
             name: PLL_EN_FB_PDIV2_n
             mode: RW
             dflt: 0
-            desc: Enable for feedback pre-divider.     0 - Output clock is directly fed to feedback divider
+            desc: Enable for feedback pre-divider. 0 - Output clock is directly fed to feedback divider
           - bits: 2
             name: PLL_EN_FFCORE_n
             mode: RW
@@ -5535,12 +5535,12 @@ pages:
             name: PULSE_n
             mode: RW
             dflt: 0b000100
-            desc: Charge pump pulse current     I = 25 uA * PULSE<5:0>
+            desc: Charge pump pulse current I = 25 uA * PULSE<5:0>
           - bits: '5:0'
             name: OFS_n
             mode: RW
             dflt: 0b000000
-            desc: Charge pump offset (bleeding) current     I = 6.25 uA * OFS<5:0>
+            desc: Charge pump offset (bleeding) current I = 6.25 uA * OFS<5:0>
       - addr: 0x4114
         name: PLL_CP_CFG1_n
         fields:
@@ -5597,12 +5597,12 @@ pages:
             name: VCO_SEL_n
             mode: RW
             dflt: 0b11
-            desc: VCO core selection     00 - External VCO,     01 - Low-frequency band VCO (4 - 6 GHz),     10 - Mid-frequency band VCO (6 - 8 GHz),     11 - High-frequency band VCO (8 - 10 GHz).
+            desc: VCO core selection 00 - External VCO, 01 - Low-frequency band VCO (4 - 6 GHz), 10 - Mid-frequency band VCO (6 - 8 GHz), 11 - High-frequency band VCO (8 - 10 GHz).
           - bits: '6:0'
             name: VCO_AMP_n
             mode: RW
             dflt: 0b0000001
-            desc: VCO amplitude control word.     0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
+            desc: VCO amplitude control word. 0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
       - addr: 0x4117
         name: PLL_FF_CFG_n
         fields:
@@ -5898,12 +5898,12 @@ pages:
             name: PLL_EN_FFDIV_n
             mode: RW
             dflt: 0
-            desc: Enable for feed-forward divider in PLL.     0 - Output clock is not divided
+            desc: Enable for feed-forward divider in PLL. 0 - Output clock is not divided
           - bits: 3
             name: PLL_EN_FB_PDIV2_n
             mode: RW
             dflt: 0
-            desc: Enable for feedback pre-divider.     0 - Output clock is directly fed to feedback divider
+            desc: Enable for feedback pre-divider. 0 - Output clock is directly fed to feedback divider
           - bits: 2
             name: PLL_EN_FFCORE_n
             mode: RW
@@ -5988,12 +5988,12 @@ pages:
             name: PULSE_n
             mode: RW
             dflt: 0b000100
-            desc: Charge pump pulse current     I = 25 uA * PULSE<5:0>
+            desc: Charge pump pulse current I = 25 uA * PULSE<5:0>
           - bits: '5:0'
             name: OFS_n
             mode: RW
             dflt: 0b000000
-            desc: Charge pump offset (bleeding) current     I = 6.25 uA * OFS<5:0>
+            desc: Charge pump offset (bleeding) current I = 6.25 uA * OFS<5:0>
       - addr: 0x4124
         name: PLL_CP_CFG1_n
         fields:
@@ -6050,12 +6050,12 @@ pages:
             name: VCO_SEL_n
             mode: RW
             dflt: 0b11
-            desc: VCO core selection     00 - External VCO,     01 - Low-frequency band VCO (4 - 6 GHz),     10 - Mid-frequency band VCO (6 - 8 GHz),     11 - High-frequency band VCO (8 - 10 GHz).
+            desc: VCO core selection 00 - External VCO, 01 - Low-frequency band VCO (4 - 6 GHz), 10 - Mid-frequency band VCO (6 - 8 GHz), 11 - High-frequency band VCO (8 - 10 GHz).
           - bits: '6:0'
             name: VCO_AMP_n
             mode: RW
             dflt: 0b0000001
-            desc: VCO amplitude control word.     0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
+            desc: VCO amplitude control word. 0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
       - addr: 0x4127
         name: PLL_FF_CFG_n
         fields:
@@ -6350,12 +6350,12 @@ pages:
             name: PLL_EN_FFDIV_n
             mode: RW
             dflt: 0
-            desc: Enable for feed-forward divider in PLL.     0 - Output clock is not divided
+            desc: Enable for feed-forward divider in PLL. 0 - Output clock is not divided
           - bits: 3
             name: PLL_EN_FB_PDIV2_n
             mode: RW
             dflt: 0
-            desc: Enable for feedback pre-divider.     0 - Output clock is directly fed to feedback divider
+            desc: Enable for feedback pre-divider. 0 - Output clock is directly fed to feedback divider
           - bits: 2
             name: PLL_EN_FFCORE_n
             mode: RW
@@ -6440,12 +6440,12 @@ pages:
             name: PULSE_n
             mode: RW
             dflt: 0b000100
-            desc: Charge pump pulse current     I = 25 uA * PULSE<5:0>
+            desc: Charge pump pulse current I = 25 uA * PULSE<5:0>
           - bits: '5:0'
             name: OFS_n
             mode: RW
             dflt: 0b000000
-            desc: Charge pump offset (bleeding) current     I = 6.25 uA * OFS<5:0>
+            desc: Charge pump offset (bleeding) current I = 6.25 uA * OFS<5:0>
       - addr: 0x4134
         name: PLL_CP_CFG1_n
         fields:
@@ -6502,12 +6502,12 @@ pages:
             name: VCO_SEL_n
             mode: RW
             dflt: 0b11
-            desc: VCO core selection     00 - External VCO,     01 - Low-frequency band VCO (4 - 6 GHz),     10 - Mid-frequency band VCO (6 - 8 GHz),     11 - High-frequency band VCO (8 - 10 GHz).
+            desc: VCO core selection 00 - External VCO, 01 - Low-frequency band VCO (4 - 6 GHz), 10 - Mid-frequency band VCO (6 - 8 GHz), 11 - High-frequency band VCO (8 - 10 GHz).
           - bits: '6:0'
             name: VCO_AMP_n
             mode: RW
             dflt: 0b0000001
-            desc: VCO amplitude control word.     0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
+            desc: VCO amplitude control word. 0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
       - addr: 0x4137
         name: PLL_FF_CFG_n
         fields:
@@ -6802,12 +6802,12 @@ pages:
             name: PLL_EN_FFDIV_n
             mode: RW
             dflt: 0
-            desc: Enable for feed-forward divider in PLL.     0 - Output clock is not divided
+            desc: Enable for feed-forward divider in PLL. 0 - Output clock is not divided
           - bits: 3
             name: PLL_EN_FB_PDIV2_n
             mode: RW
             dflt: 0
-            desc: Enable for feedback pre-divider.     0 - Output clock is directly fed to feedback divider
+            desc: Enable for feedback pre-divider. 0 - Output clock is directly fed to feedback divider
           - bits: 2
             name: PLL_EN_FFCORE_n
             mode: RW
@@ -6892,12 +6892,12 @@ pages:
             name: PULSE_n
             mode: RW
             dflt: 0b000100
-            desc: Charge pump pulse current     I = 25 uA * PULSE<5:0>
+            desc: Charge pump pulse current I = 25 uA * PULSE<5:0>
           - bits: '5:0'
             name: OFS_n
             mode: RW
             dflt: 0b000000
-            desc: Charge pump offset (bleeding) current     I = 6.25 uA * OFS<5:0>
+            desc: Charge pump offset (bleeding) current I = 6.25 uA * OFS<5:0>
       - addr: 0x4144
         name: PLL_CP_CFG1_n
         fields:
@@ -6954,12 +6954,12 @@ pages:
             name: VCO_SEL_n
             mode: RW
             dflt: 0b11
-            desc: VCO core selection     00 - External VCO,     01 - Low-frequency band VCO (4 - 6 GHz),     10 - Mid-frequency band VCO (6 - 8 GHz),     11 - High-frequency band VCO (8 - 10 GHz).
+            desc: VCO core selection 00 - External VCO, 01 - Low-frequency band VCO (4 - 6 GHz), 10 - Mid-frequency band VCO (6 - 8 GHz), 11 - High-frequency band VCO (8 - 10 GHz).
           - bits: '6:0'
             name: VCO_AMP_n
             mode: RW
             dflt: 0b0000001
-            desc: VCO amplitude control word.     0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
+            desc: VCO amplitude control word. 0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
       - addr: 0x4147
         name: PLL_FF_CFG_n
         fields:
@@ -7254,12 +7254,12 @@ pages:
             name: PLL_EN_FFDIV_n
             mode: RW
             dflt: 0
-            desc: Enable for feed-forward divider in PLL.     0 - Output clock is not divided
+            desc: Enable for feed-forward divider in PLL. 0 - Output clock is not divided
           - bits: 3
             name: PLL_EN_FB_PDIV2_n
             mode: RW
             dflt: 0
-            desc: Enable for feedback pre-divider.     0 - Output clock is directly fed to feedback divider
+            desc: Enable for feedback pre-divider. 0 - Output clock is directly fed to feedback divider
           - bits: 2
             name: PLL_EN_FFCORE_n
             mode: RW
@@ -7344,12 +7344,12 @@ pages:
             name: PULSE_n
             mode: RW
             dflt: 0b000100
-            desc: Charge pump pulse current     I = 25 uA * PULSE<5:0>
+            desc: Charge pump pulse current I = 25 uA * PULSE<5:0>
           - bits: '5:0'
             name: OFS_n
             mode: RW
             dflt: 0b000000
-            desc: Charge pump offset (bleeding) current     I = 6.25 uA * OFS<5:0>
+            desc: Charge pump offset (bleeding) current I = 6.25 uA * OFS<5:0>
       - addr: 0x4154
         name: PLL_CP_CFG1_n
         fields:
@@ -7406,12 +7406,12 @@ pages:
             name: VCO_SEL_n
             mode: RW
             dflt: 0b11
-            desc: VCO core selection     00 - External VCO,     01 - Low-frequency band VCO (4 - 6 GHz),     10 - Mid-frequency band VCO (6 - 8 GHz),     11 - High-frequency band VCO (8 - 10 GHz).
+            desc: VCO core selection 00 - External VCO, 01 - Low-frequency band VCO (4 - 6 GHz), 10 - Mid-frequency band VCO (6 - 8 GHz), 11 - High-frequency band VCO (8 - 10 GHz).
           - bits: '6:0'
             name: VCO_AMP_n
             mode: RW
             dflt: 0b0000001
-            desc: VCO amplitude control word.     0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
+            desc: VCO amplitude control word. 0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
       - addr: 0x4157
         name: PLL_FF_CFG_n
         fields:
@@ -7706,12 +7706,12 @@ pages:
             name: PLL_EN_FFDIV_n
             mode: RW
             dflt: 0
-            desc: Enable for feed-forward divider in PLL.     0 - Output clock is not divided
+            desc: Enable for feed-forward divider in PLL. 0 - Output clock is not divided
           - bits: 3
             name: PLL_EN_FB_PDIV2_n
             mode: RW
             dflt: 0
-            desc: Enable for feedback pre-divider.     0 - Output clock is directly fed to feedback divider
+            desc: Enable for feedback pre-divider. 0 - Output clock is directly fed to feedback divider
           - bits: 2
             name: PLL_EN_FFCORE_n
             mode: RW
@@ -7796,12 +7796,12 @@ pages:
             name: PULSE_n
             mode: RW
             dflt: 0b000100
-            desc: Charge pump pulse current     I = 25 uA * PULSE<5:0>
+            desc: Charge pump pulse current I = 25 uA * PULSE<5:0>
           - bits: '5:0'
             name: OFS_n
             mode: RW
             dflt: 0b000000
-            desc: Charge pump offset (bleeding) current     I = 6.25 uA * OFS<5:0>
+            desc: Charge pump offset (bleeding) current I = 6.25 uA * OFS<5:0>
       - addr: 0x4164
         name: PLL_CP_CFG1_n
         fields:
@@ -7858,12 +7858,12 @@ pages:
             name: VCO_SEL_n
             mode: RW
             dflt: 0b11
-            desc: VCO core selection     00 - External VCO,     01 - Low-frequency band VCO (4 - 6 GHz),     10 - Mid-frequency band VCO (6 - 8 GHz),     11 - High-frequency band VCO (8 - 10 GHz).
+            desc: VCO core selection 00 - External VCO, 01 - Low-frequency band VCO (4 - 6 GHz), 10 - Mid-frequency band VCO (6 - 8 GHz), 11 - High-frequency band VCO (8 - 10 GHz).
           - bits: '6:0'
             name: VCO_AMP_n
             mode: RW
             dflt: 0b0000001
-            desc: VCO amplitude control word.     0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
+            desc: VCO amplitude control word. 0000000 - minimum amplitude Lowest two bits control the VCO core current. Other bits are used for fine amplitude control, automatically determined when VCO_AAC_EN=1
       - addr: 0x4167
         name: PLL_FF_CFG_n
         fields:

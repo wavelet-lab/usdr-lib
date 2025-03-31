@@ -77,6 +77,7 @@ int usdr_device_register_m2_lm7_1();
 int usdr_device_register_limesdr();
 int usdr_device_register_m2_d09_4_ad45_2();
 int usdr_device_register_m2_dsdr();
+int usdr_device_register_pe_sync();
 
 int usdr_device_init()
 {
@@ -88,7 +89,7 @@ int usdr_device_init()
     usdr_device_register_limesdr();
     usdr_device_register_m2_d09_4_ad45_2();
     usdr_device_register_m2_dsdr();
-
+    usdr_device_register_pe_sync();
 
     // Dynamic Device initialization
     return 0;

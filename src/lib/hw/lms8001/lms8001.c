@@ -254,12 +254,17 @@ int lms8001_ch_enable(lms8001_state_t* state, unsigned mask)
 }
 
 
-int lms8001a_ch_enable(lms8001_state_t* state, unsigned mask, unsigned lna_loss, unsigned pa_loss)
+int lms8001a_ch_enable(lms8001_state_t* state, unsigned mask, unsigned lna_loss[4], unsigned pa_loss[4])
 {
     int res;
     unsigned e[] = { (mask >> 0) & 1, (mask >> 1) & 1, (mask >> 2) & 1, (mask >> 3) & 1 };
-    unsigned lna_bp = (lna_loss == ~0u) ? 1 : 0;
-    unsigned pa_bp = (pa_loss == ~0u) ? 1 : 0;
+    unsigned lna_bp[4];
+    unsigned pa_bp[4];
+
+    for (unsigned i = 0; i < 4; i++) {
+        lna_bp[i] = (lna_loss[i] == ~0u) ? 1 : 0;
+        pa_bp[i] = (pa_loss[i] == ~0u) ? 1 : 0;
+    }
 
     state->chan_mask = mask;
 
@@ -274,24 +279,64 @@ int lms8001a_ch_enable(lms8001_state_t* state, unsigned mask, unsigned lna_loss,
         MAKE_LMS8001_BIASLDOCONFIG_HFLNAC_LDO_Config(0, 0, e[2], LMS_LDO_1P25),
         MAKE_LMS8001_BIASLDOCONFIG_HFLNAD_LDO_Config(0, 0, e[3], LMS_LDO_1P25),
 
-        MAKE_LMS8001_CHANNEL_A_CHx_PD0(0, pa_bp, pa_bp || !e[0], !lna_bp || !e[0], 1, lna_bp || !e[0], 1, lna_bp || !e[0]),
-        MAKE_LMS8001_CHANNEL_B_CHx_PD0(0, pa_bp, pa_bp || !e[1], !lna_bp || !e[1], 1, lna_bp || !e[1], 1, lna_bp || !e[1]),
-        MAKE_LMS8001_CHANNEL_C_CHx_PD0(0, pa_bp, pa_bp || !e[2], !lna_bp || !e[2], 1, lna_bp || !e[2], 1, lna_bp || !e[2]),
-        MAKE_LMS8001_CHANNEL_D_CHx_PD0(0, pa_bp, pa_bp || !e[3], !lna_bp || !e[3], 1, lna_bp || !e[3], 1, lna_bp || !e[3]),
+        MAKE_LMS8001_CHANNEL_A_CHx_PD0(0, pa_bp[0], pa_bp[0] || !e[0], !lna_bp[0] || !e[0], 1, lna_bp[0] || !e[0], 1, lna_bp[0] || !e[0]),
+        MAKE_LMS8001_CHANNEL_B_CHx_PD0(0, pa_bp[1], pa_bp[1] || !e[1], !lna_bp[1] || !e[1], 1, lna_bp[1] || !e[1], 1, lna_bp[1] || !e[1]),
+        MAKE_LMS8001_CHANNEL_C_CHx_PD0(0, pa_bp[2], pa_bp[2] || !e[2], !lna_bp[2] || !e[2], 1, lna_bp[2] || !e[2], 1, lna_bp[2] || !e[2]),
+        MAKE_LMS8001_CHANNEL_D_CHx_PD0(0, pa_bp[3], pa_bp[3] || !e[3], !lna_bp[3] || !e[3], 1, lna_bp[3] || !e[3], 1, lna_bp[3] || !e[3]),
 
-        MAKE_LMS8001_CHANNEL_A_CHx_LNA_CTRL0(16, 16, 10, lna_loss),
-        MAKE_LMS8001_CHANNEL_B_CHx_LNA_CTRL0(16, 16, 10, lna_loss),
-        MAKE_LMS8001_CHANNEL_C_CHx_LNA_CTRL0(16, 16, 10, lna_loss),
-        MAKE_LMS8001_CHANNEL_D_CHx_LNA_CTRL0(16, 16, 10, lna_loss),
+        MAKE_LMS8001_CHANNEL_A_CHx_LNA_CTRL0(16, 16, 10, lna_loss[0]),
+        MAKE_LMS8001_CHANNEL_B_CHx_LNA_CTRL0(16, 16, 10, lna_loss[1]),
+        MAKE_LMS8001_CHANNEL_C_CHx_LNA_CTRL0(16, 16, 10, lna_loss[2]),
+        MAKE_LMS8001_CHANNEL_D_CHx_LNA_CTRL0(16, 16, 10, lna_loss[3]),
 
-        MAKE_LMS8001_CHANNEL_A_CHx_PA_CTRL0(pa_loss, pa_loss),
-        MAKE_LMS8001_CHANNEL_B_CHx_PA_CTRL0(pa_loss, pa_loss),
-        MAKE_LMS8001_CHANNEL_C_CHx_PA_CTRL0(pa_loss, pa_loss),
-        MAKE_LMS8001_CHANNEL_D_CHx_PA_CTRL0(pa_loss, pa_loss),
+        MAKE_LMS8001_CHANNEL_A_CHx_PA_CTRL0(pa_loss[0], pa_loss[0]),
+        MAKE_LMS8001_CHANNEL_B_CHx_PA_CTRL0(pa_loss[1], pa_loss[1]),
+        MAKE_LMS8001_CHANNEL_C_CHx_PA_CTRL0(pa_loss[2], pa_loss[2]),
+        MAKE_LMS8001_CHANNEL_D_CHx_PA_CTRL0(pa_loss[3], pa_loss[3]),
     };
 
     res = lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
     return res;
+}
+
+int lms8001a_ch_lna_pa_set(lms8001_state_t* state, unsigned chan, unsigned lna_loss, unsigned pa_loss)
+{
+    if (chan >= 4)
+        return -EINVAL;
+
+    unsigned choff = ((chan == 0) ? CHANNEL_A_CHx_PD0 : (chan == 1) ? CHANNEL_B_CHx_PD0 : (chan == 2) ? CHANNEL_C_CHx_PD0 : CHANNEL_D_CHx_PD0) - CHANNEL_A_CHx_PD0;
+    unsigned lna_bp = (lna_loss == ~0u) ? 1 : 0;
+    unsigned pa_bp = (pa_loss == ~0u) ? 1 : 0;
+    uint32_t en_regs[] = {
+        MAKE_LMS8001_CHANNEL_A_CHx_PD0(0, pa_bp, pa_bp, !lna_bp, 1, lna_bp, 1, lna_bp) + (choff << 16),
+        MAKE_LMS8001_CHANNEL_A_CHx_LNA_CTRL0(16, 16, 10, lna_loss) + (choff << 16),
+        MAKE_LMS8001_CHANNEL_A_CHx_PA_CTRL0(pa_loss, pa_loss) + (choff << 16),
+    };
+
+    return lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
+}
+
+int lms8001b_hlmix_loss_set(lms8001_state_t* state, unsigned chan, unsigned loss)
+{
+    if (chan >= 4)
+        return -EINVAL;
+
+    unsigned choff = ((chan == 0) ? HLMIXA_HLMIXx_LOSS0 : (chan == 1) ? HLMIXB_HLMIXx_LOSS0 : (chan == 2) ? HLMIXC_HLMIXx_LOSS0 : HLMIXD_HLMIXx_LOSS0) - HLMIXA_HLMIXx_LOSS0;
+    uint32_t en_regs[] = {
+        MAKE_LMS8001_HLMIXA_HLMIXx_LOSS0(loss, 0) + (choff << 16),
+    };
+
+    return lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
+}
+
+int lms8001_core_enable(lms8001_state_t* out, bool en)
+{
+    uint32_t lms_init[] = {
+        MAKE_LMS8001_BIASLDOCONFIG_CLK_BUF_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_DIV_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_CP_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
+    };
+    return lms8001_spi_post(out, lms_init, SIZEOF_ARRAY(lms_init));
 }
 
 int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms8001_state_t *out)

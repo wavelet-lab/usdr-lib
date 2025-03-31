@@ -33,7 +33,7 @@ int usdr_channel_info_map_default(const usdr_channel_info_t* channels, const cha
 
 int usdr_channel_info_string_parse(char* chanlist, unsigned max_chans, usdr_channel_info_t* cinfo)
 {
-    const char* delim = ":_-";
+    const char* delim = ":_-/";
     unsigned ncount = 0;
     unsigned scount = 0;
 

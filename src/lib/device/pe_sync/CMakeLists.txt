@@ -1,0 +1,9 @@
+# Copyright (c) 2025 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+set(USDR_D_LIB_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/pe_sync.c
+)
+
+list(APPEND USDR_LIBRARY_FILES ${USDR_D_LIB_FILES})
+set(USDR_LIBRARY_FILES ${USDR_LIBRARY_FILES} PARENT_SCOPE)

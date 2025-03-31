@@ -47,7 +47,7 @@ pages:
             desc: Power good fault flag for VOUT rail; 1 = Power fault detected; 0 = Power good
           - bits: "1:0"
             name: TEMP
-            desc: indicates the die temperature as follows; 00 = die temperature lower than 85ºC; 01 = 85ºC ≤ die temperature < 120ºC; 10 = 120ºC ≤ die temperature < 150ºC;  11 = die temperature 150ºC or higher
+            desc: "indicates the die temperature as follows; 00 = die temperature lower than 85ºC; 01 = 85ºC ≤ die temperature < 120ºC; 10 = 120ºC ≤ die temperature < 150ºC;  11 = die temperature 150ºC or higher"
 
       - addr: 0x11
         name: RESET
