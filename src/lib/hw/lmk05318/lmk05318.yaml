@@ -407,6 +407,12 @@ pages:
           - bits: "2"
             name: PRIREF_CMOS_SLEW
             desc: PRIREF input buffer slew rate; 0x0 = Select Amplitude Detector Mode; 0x1 = Select CMOS Amplitude Detector Mode 
+          - bits: "1"
+            name: SECREF_BUF_MODE
+            desc: SECREF buffer mode. 0x0 - Set AC buffer hysteresis to 50mV or enable DC buffer hysteresis; 0x1 = Set AC buffer hysteresis to 200mV or disable DC buffer hysteresis
+          - bits: "0"
+            name: PRIREF_BUF_MODE
+            desc: PRIREF buffer mode. 0x0 - Set AC buffer hysteresis to 50mV or enable DC buffer hysteresis; 0x1 = Set AC buffer hysteresis to 200mV or disable DC buffer hysteresis
       - addr: 0x2E
         name: REF_CLKCTL2
         fields:
@@ -423,7 +429,10 @@ pages:
         fields:
           - bits: "7"
             name: PLL2_RCLK_SEL
-            desc: PLL2 Reference clock selection; 0x0 = VCO1 - Cascaded Mode; 0x1 = XO 
+            desc: PLL2 Reference clock selection; 0x0 = VCO1 - Cascaded Mode; 0x1 = XO
+          - bits: "2-0"
+            name: PLL1_VCO_TO_CNTRS_EN
+            desc: PLL1 VCO to counters enable. Enables VCO1 output drivers to PLL1 N counter, DPLL, digital top, PLL2 R divider. Bit 0 enables VCO1 output for DPLL TDC, reference window detect, DPLL loop filter high speed clock and ppm checker clock. Bit 1 enables VCO1 output to PLL1 N counter Bit 2 enables the PLL1_P1 output to PLL2 R divider for loop-back mode.
       - addr: 0x30
         name: STAT0_SEL
         fields:
@@ -648,6 +657,10 @@ pages:
             desc: BAW VCO Lock Detection 
       - addr: 0x51
         name: BAW_LOCKDET_PPM_MAX_BY0
+        fields:
+          - bits: "7-0"
+            name: BAW_LOCK_DET_2
+            desc: BAW VCO Lock Detection
 
       - addr: "0x52:0x55"
         name: BAW_LOCKDET_CNTSTRT
@@ -693,6 +706,10 @@ pages:
             desc: PLL2 Post-Divider1 Note A RESET is required after changing Divider values; 0x0 = Invalid; 0x1 = 2; 0x2 = 3; 0x3 = 4; 0x4 = 5; 0x5 = 6; 0x6 = 7; 0x7 = Invalid 
       - addr: 0x68
         name: PLL2_CTRL4
+        fields:
+          - bits: "5-0"
+            name: PLL2_RBLEED_CP
+            desc: PLL2 Bleed resistor selection
 
       - addr: 0x69
         name: PLL2_CALCTRL0
@@ -726,12 +743,24 @@ pages:
 
       - addr: 0x81
         name: PLL1_LF_R2
+        fields:
+          - bits: "5-0"
+            name: PLL1_LF_R2
+            desc: PLL1 Loop Filter R2, Ohm
 
       - addr: 0x83
         name: PLL1_LF_R3
+        fields:
+          - bits: "5-0"
+            name: PLL1_LF_R3
+            desc: PLL1 Loop Filter R3, Ohm
 
       - addr: 0x84
         name: PLL1_LF_R4
+        fields:
+          - bits: "5-0"
+            name: PLL1_LF_R4
+            desc: PLL1 Loop Filter R4, Ohm
 
       - addr: "0x86:0x87"
         name: PLL2_NDIV
@@ -750,15 +779,34 @@ pages:
             desc: APLL2 SDM Order; 0x0 = Integer Mode; 0x1 = 1st; 0x2 = 2nd; 0x3 = 3rd; 0x4 = 4th 
       - addr: 0x8C
         name: PLL2_LF_R2
+        fields:
+          - bits: "5-0"
+            name: PLL2_LR_R2
+            desc: PLL2 Loop Filter R2 (Ohm)
 
       - addr: 0x8E
         name: PLL2_LF_R3
+        fields:
+          - bits: "5-0"
+            name: PLL2_LR_R3
+            desc: PLL2 Loop Filter R3 (Ohm)
 
       - addr: 0x8F
         name: PLL2_LF_R4
+        fields:
+          - bits: "5-0"
+            name: PLL2_LF_R4
+            desc: PLL2 Loop Filter R4 (Ohm)
 
       - addr: 0x90
         name: PLL2_LF_C3C4
+        fields:
+          - bits: "6-4"
+            name: PLL2_LF_C4
+            desc: PLL2 Loop Filter C4, pF
+          - bits: "2:0"
+            name: PLL2_LF_C3
+            desc: PLL2 Loop Filter C3, pF
 
       - addr: 0x91
         name: XO_OFFSET_SW_TIMER
@@ -894,9 +942,18 @@ pages:
 
       - addr: 0xF3
         name: REF0_PH_VALID_THR
+        fields:
+          - bits: "5-0"
+            name: REF0_PH_VALID_THR
+            desc: PRIREF Phase Valid Threshold
 
       - addr: 0xF4
         name: REF1_PH_VALID_THR
+        fields:
+          - bits: "5-0"
+            name: REF1_PH_VALID_THR
+            desc: SECREF Phase Valid Threshold
+
   - name: DPllControl
     regs:
       - addr: 0xF9

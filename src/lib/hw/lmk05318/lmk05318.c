@@ -102,6 +102,223 @@ static int lmk05318_softreset(lmk05318_state_t* out)
     return lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));;
 }
 
+static int lmk05318_init(lmk05318_state_t* d)
+{
+    uint32_t regs[] =
+    {
+        MAKE_LMK05318_DEV_CTL(0,0,0,1,1),                //R12 +
+        MAKE_LMK05318_INT_FLAG_POL0(1,1,1,1),            //R17 +
+        MAKE_LMK05318_INT_FLAG_POL1(1,1,1,1,1,1,1,1),    //R18 +
+        MAKE_LMK05318_INT_FLAG0(0,1,0,0),                //R19
+        MAKE_LMK05318_INT_FLAG1(0,0,1,0,0,0,0,0),        //R20
+        MAKE_LMK05318_MUTELVL1(1,1,1,1),                 //R23
+        MAKE_LMK05318_MUTELVL2(1,1,1,1),                 //R24
+        MAKE_LMK05318_OUT_MUTE(0,0,0,0,0,0,0,0),         //R25 +
+        MAKE_LMK05318_GPIO_OUT(1,1),                     //R36 +
+        MAKE_LMK05318_SPARE_NVMBASE2_BY2(1,0),           //R39 +
+        MAKE_LMK05318_SPARE_NVMBASE2_BY1(1,1,0),         //R40 +
+        MAKE_LMK05318_REF_CLKCTL1(0,0,1,0),              //R45 +
+        MAKE_LMK05318_REF_CLKCTL2(SECREF_TYPE_AC_DIFF_EXT, PRIREF_TYPE_AC_DIFF_EXT),    //R46 +
+        MAKE_LMK05318_PLL_CLK_CFG(0, 0b111),             //R47 +++++++++++++
+        MAKE_LMK05318_STAT0_SEL(0x50),                   //R48 +
+        MAKE_LMK05318_STAT1_SEL(0x4a),                   //R49 +
+        MAKE_LMK05318_PREDRIVER(0x08),                   //R68 +
+        MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(1,0),      //R80
+        MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY0(0x0a),     //R81
+        0x005200,  //R82 BAW LOCKDET/UNLOCKDET begin
+        0x005307,
+        0x00549E,
+        0x005500,
+        0x005600,
+        0x00571E,
+        0x005884,
+        0x005980,
+        0x005A00,
+        0x005B14,
+        0x005C00,
+        0x005D07,
+        0x005E9E,
+        0x005F00,
+        0x006000,
+        0x00611E,
+        0x006284,
+        0x006380,  //R99 BAW LOCKDET/UNLOCKDET end
+        MAKE_LMK05318_PLL2_CTRL1(0x01),        //R101 +
+        MAKE_LMK05318_PLL2_CTRL4(0x1F),        //R104 +
+        MAKE_LMK05318_PLL2_CALCTRL0(0x01),     //R105 0x1 = 3ms +
+        MAKE_LMK05318_PLL1_MASHCTRL(0, 0x03),  //R115 0x3 = APLL1 mash_order3 +
+        MAKE_LMK05318_PLL1_LF_R2(0x01),        //R129 0x1 = APLL1 Loop filter R2=414 Ohm +
+        MAKE_LMK05318_PLL1_LF_R3(0x01),        //R131 0x1 = APLL1 Loop filter R3=200 Ohm +
+        MAKE_LMK05318_PLL1_LF_R4(0x01),        //R132 0x1 = APLL1 Loop filter R4=200 Ohm +
+        MAKE_LMK05318_PLL2_MASHCTRL(0, 0x03),  //R139 0x3 = APLL2 mash_order3 +
+        MAKE_LMK05318_PLL2_LF_R2(0x02),        //R140 APLL2 Loop Filter R2=300 Ohm +
+        MAKE_LMK05318_PLL2_LF_R3(0x01),        //R142 APLL2 Loop filter R3=200 Ohm +
+        MAKE_LMK05318_PLL2_LF_R4(0x01),        //R143 APLL2 Loop filter R4=200 Ohm +
+        MAKE_LMK05318_PLL2_LF_C3C4(0x7, 0x7),  //R144 APLL2 Loop Filter C3 = 70pF, C4 = 70pF +
+        MAKE_LMK05318_XO_OFFSET_SW_TIMER(0x1), //R145 3.3ms +
+        0x00A0FC, //R160 MEMADR ?
+
+#ifdef LMK05380_DPLL_EN
+        0x00B9F5, //R185 DPLL_REF settings ???
+        0x00BA01, //R186 DPLL REF Tuning history timer ???
+#endif
+        MAKE_LMK05318_REF01_DETAMP(1,1,0,0),        //R192
+        MAKE_LMK05318_REF0_DETEN(0,1,0,0,0,0),      //R193
+        MAKE_LMK05318_REF0_MISSCLK_DIV_BY0(0x00),   //R195
+        MAKE_LMK05318_REF0_MISSCLK_DIV_BY1(0x00),   //R196
+        MAKE_LMK05318_REF0_MISSCLK_DIV_BY2(0x1d),   //R197
+        MAKE_LMK05318_REF1_MISSCLK_DIV_BY0(0x00),   //R198
+        MAKE_LMK05318_REF1_MISSCLK_DIV_BY1(0x00),   //R199
+        MAKE_LMK05318_REF1_MISSCLK_DIV_BY2(0x1d),   //R200
+        MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY2(0x00), //R202
+        MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY2(0x00), //R203
+        MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY2(0x15), //R204
+        MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY2(0x00), //R205
+        MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY2(0x00), //R206
+        MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY2(0x15), //R207
+        0x00D000, //R208 REF0/1 settings begin
+        0x00D114,
+        0x00D200,
+        0x00D316,
+        0x00D400,
+        0x00D514,
+        0x00D600,
+        0x00D716,
+        0x00D900,
+        0x00DA00,
+        0x00DB19,
+        0x00DC6E,
+        0x00DD00,
+        0x00DE03,
+        0x00DF0D,
+        0x00E047,
+        0x00E100,
+        0x00E200,
+        0x00E319,
+        0x00E46E,
+        0x00E500,
+        0x00E603,
+        0x00E70D,
+        0x00E847,
+        0x00E90A,
+        0x00EA0A, //R234 REF0/1 settings end
+        MAKE_LMK05318_REF0_PH_VALID_CNT_BY0(0x01),  //R235
+        MAKE_LMK05318_REF0_PH_VALID_CNT_BY1(0x8c),  //R236
+        MAKE_LMK05318_REF0_PH_VALID_CNT_BY2(0xba),  //R237
+        MAKE_LMK05318_REF0_PH_VALID_CNT_BY3(0x80),  //R238
+        MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(0x00),  //R239
+        MAKE_LMK05318_REF1_PH_VALID_CNT_BY1(0xc3),  //R240
+        MAKE_LMK05318_REF1_PH_VALID_CNT_BY2(0x50),  //R241
+        MAKE_LMK05318_REF1_PH_VALID_CNT_BY3(0x00),  //R242
+        MAKE_LMK05318_REF0_PH_VALID_THR(0x3f),      //R243
+        MAKE_LMK05318_REF1_PH_VALID_THR(0x00),      //R244
+
+#ifdef LMK05380_DPLL_EN
+        MAKE_LMK05318_DPLL_REF01_PRTY(2,1), //R249 DPLL ref priority???
+        MAKE_LMK05318_DPLL_REF_SWMODE(0,0,3), //R251 DPLL sw ctrls ???
+        MAKE_LMK05318_DPLL_GEN_CTL(0,1,0,1,1), //R252 DPLL ctrls ???
+        MAKE_LMK05318_DPLL_REF0_RDIV_BY0(0), //R256 DPLL RDIV ???
+        MAKE_LMK05318_DPLL_REF0_RDIV_BY1(1), //R257 DPLL RDIV ???
+        MAKE_LMK05318_DPLL_REF1_RDIV_BY0(0), //R258 ???
+        MAKE_LMK05318_DPLL_REF1_RDIV_BY1(0), //R259 ???
+        MAKE_LMK05318_DPLL_REF_TDC_CTL(1), //R260 DPLL cycle slip ???
+        0x010580,
+        0x010601,
+        0x01072A,
+        0x010805,
+        0x0109F2,
+        0x010A00,
+        0x010BA0,
+        0x010C04,
+        0x010D00,
+        0x010E02,
+        0x010F8C,
+        0x011000,
+        0x011100,
+        0x011200,
+        0x011316,
+        0x011416,
+        0x011516,
+        0x011600,
+        0x011700,
+        0x011800,
+        0x011900,
+        0x011A00,
+        0x011B00,
+        0x011C1E,
+        0x011D1E,
+        0x011E00,
+        0x011F00,
+        0x012000,
+        0x012100,
+        0x012203,
+        0x012322,
+        0x012409,
+        0x012501,
+        0x012600,
+        0x01272C,
+        0x012809,
+        0x012909,
+        0x012A09,
+        0x012B01,
+        0x012C00,
+        0x012D1B,
+        0x012E1E,
+        0x012F01,
+        0x01300F,
+        0x013104,
+        0x013261,
+        0x0133F8,
+        0x013443,
+        0x0135C3,
+        0x0136C3,
+        0x0137C3,
+        0x0138C3,
+        0x0139C3,
+        0x013AFF,
+        0x013BFF,
+        0x013CFF,
+        0x013DFF,
+        0x013EFF,
+        0x013F03,
+        0x014000,
+        0x01410A,
+        0x014200,
+        0x014300,
+        0x014400,
+        0x014501,
+        0x014606,
+        0x014735,
+        0x014875,
+        0x01490B,
+        0x014A00,
+        0x014B64,
+        0x014C00,   //R332 ^^DPLL ???
+        0x015000,
+        0x015198,
+        0x015296,   //R338 DPLL ??
+        0x015400,
+        0x015500,
+        0x015600,
+        0x015700,
+        0x015800,
+        0x015900,
+        0x015A02,
+        0x015B00,
+        0x015C00,
+        0x015D00,
+        0x015E00,
+        0x015F00,   //R352 DPLL ???
+#endif
+    };
+
+    int res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    if (res)
+        return res;
+
+    return 0;
+}
+
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
                        const lmk05318_xo_settings_t* xo, bool dpll_mode,
                        lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
@@ -128,6 +345,13 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
 
     if ( dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x35 || dummy[0] != 0x42 ) {
         return -ENODEV;
+    }
+
+    res = lmk05318_init(out);
+    if(res)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d on init()", res);
+        return res;
     }
 
     res = lmk05318_set_xo_fref(out);
