@@ -28,11 +28,17 @@
 // [6] 24bit 20Mhz AD5662  WR DAC
 
 enum i2c_addrs {
-    I2C_ADDR_LMK05318B = 0x65,
+    I2C_ADDR_LMK05318B = 0x64,
+    I2C_ADDR_LP87524 = 0x60,
 };
 
 enum BUSIDX_I2C {
-    I2C_BUS_LMK05318B = MAKE_LSOP_I2C_ADDR(0, 0, 0x67),
+    I2C_BUS_LMK05318B = MAKE_LSOP_I2C_ADDR(0, 0, I2C_ADDR_LMK05318B),
+
+    I2C_BUS_LMK1D1208I_LCK = MAKE_LSOP_I2C_ADDR(0, 1, 0x68),
+    I2C_BUS_LMK1D1208I_LRF = MAKE_LSOP_I2C_ADDR(0, 1, 0x69),
+
+    I2C_BUS_LP87524 = MAKE_LSOP_I2C_ADDR(1, 0, I2C_ADDR_LP87524),
 
     SPI_INREF_DAC = 0,
     SPI_OCXO_DAC = 1,
@@ -53,7 +59,7 @@ const usdr_dev_param_constant_t s_params_pe_sync_rev000[] = {
     { DNLL_RFE_COUNT, 0 },
     { DNLL_TFE_COUNT, 0 },
     { DNLL_IDX_REGSP_COUNT, 0 },
-    { DNLL_IRQ_COUNT, 16 },
+    { DNLL_IRQ_COUNT, 10 },
 
     // low level buses
     { "/ll/irq/0/core", USDR_MAKE_COREID(USDR_CS_AUX, USDR_AC_PIC32_PCI) },
@@ -157,12 +163,19 @@ static void usdr_device_pe_sync_destroy(pdevice_t udev)
     usdr_device_base_destroy(udev);
 }
 
+static int i2c_reg_rd8(lldev_t dev, unsigned lsaddr, uint8_t reg, uint8_t* val)
+{
+    uint8_t addr[1] = { reg };
+    return lowlevel_ls_op(dev, 0, USDR_LSOP_I2C_DEV, lsaddr, 1, val, 1, addr);
+}
+
 static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const char** devparam, const char** devval)
 {
     struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
     lldev_t dev = d->base.dev;
     int res = 0;
-    uint32_t v = 0;
+    uint32_t v = 0, s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+    uint8_t r = 0, r4 = 0, r5 = 0;
 
     if (getenv("USDR_BARE_DEV")) {
         USDR_LOG("SYNC", USDR_LOG_WARNING, "USDR_BARE_DEV is set, skipping initialization!\n");
@@ -182,18 +195,28 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : dev_gpo_set(dev, IGPO_SY1_CTRL, 3); // Enable LMX2820 1
 
     // gpo_gen_ctrl[0] -- En LDO for LMK05318B
-    // gpo_gen_ctrl[1] -- PD for LMK05318B
+    // gpo_gen_ctrl[1] -- PDN for LMK05318B
     // gpo_gen_ctrl[2] -- En LDO for OCXO and OCXO DAC
     // gpo_gen_ctrl[3] -- En distribution buffer REFCLK
     // gpo_gen_ctrl[4] -- En distribution buffer 1PPS
-    res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (1 << 0) | (1 << 2));
+    // gpo_gen_ctrl[5] -- clk_gpio[0]
+    // gpo_gen_ctrl[6] -- clk_gpio[1]
+    // gpo_gen_ctrl[7] -- clk_gpio[2]
+    // res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (0 << 0) | (0 << 1) | (1 << 2) | (0 << 5));
+    // usleep(1000);
+    // res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (1 << 0) | (0 << 1) | (1 << 2) | (1 << 5));
+    // usleep(25000);
+    res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (1 << 0) | (1 << 1) | (1 << 2) | (1 << 5) | (1 << 3) | (1 << 4));
 
     // gpo_distrib_ctrl[0]   -- En global LDO for all distribution logic
     // gpo_distrib_ctrl[2:1] -- En LDO for LMX1204/LMX1214
     // gpo_distrib_ctrl[3]   -- 0 - buffers LMK1D1208I disable, 1 - en
     // gpo_distrib_ctrl[4]   -- En LDO FCLK4..0 CMOS buffers
     // gpo_distrib_ctrl[5]   -- 0 - internal path, 1 - external LO/REFCLK/SYSREF
-    res = res ? res : dev_gpo_set(dev, IGPO_DISTRIB_CTRL, (1 << 0));
+    res = res ? res : dev_gpo_set(dev, IGPO_DISTRIB_CTRL, (1 << 0) /* | (15 << 1) */ );
+
+    // Wait for all LDOs to settle
+    usleep(200000);
 
     // gpo_led_ctrl[0] -- LEDG[0]
     // gpo_led_ctrl[1] -- LEDR[0]
@@ -205,10 +228,25 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     // gpo_led_ctrl[7] -- LEDR[3]
     res = res ? res : dev_gpo_set(dev, IGPO_LED_CTRL, 0xff);
 
-    usleep(1000);
-
     res = res ? res : dev_gpi_get32(dev, IGPI_STAT, &v);
-    USDR_LOG("SYNC", USDR_LOG_WARNING, "STAT = %08x\n", v);
+    res = res ? res : i2c_reg_rd8(dev, I2C_BUS_LP87524, 0x01, &r);
+
+    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX2820_0, 0x9c0000, &s0);
+    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX2820_1, 0x9c0000, &s1);
+
+    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1204, 0x176040, NULL); //Enable MUXOUT as SPI readback
+    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1204, 0xA10000, &s2);
+
+    // TODO check LMX1214 readback settings
+    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1214, 0x560004, NULL); //Enable MUXOUT_EN_OVRD
+    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1214, 0x176000, NULL); //Enable MUXOUT
+    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1214, 0xCF0000, &s3);
+
+    res = res ? res : i2c_reg_rd8(dev, I2C_BUS_LMK1D1208I_LCK, 0x05, &r4);
+    res = res ? res : i2c_reg_rd8(dev, I2C_BUS_LMK1D1208I_LRF, 0x05, &r5);
+
+    USDR_LOG("SYNC", USDR_LOG_WARNING, "STAT=%08x LP87524_OTP=%02x LMS2820[0/1]=%04x/%04x LMX1204/LMX1214=%04x/%04x LMK1D1208I_LCK/LRF=%02x/%02x\n",
+             v, r, s0, s1, s2, s3, r4, r5);
 
     // TODO: Initialize LMK05318B
     // XO: 25Mhz
@@ -244,7 +282,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6,  10000000, out_accuracy, out_accuracy, false, LVCMOS);
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7,         1, out_accuracy, out_accuracy, false, LVCMOS);
 
-    res = res ? res : lmk05318_create_ex(dev, 0, I2C_ADDR_LMK05318B, &xo, false, lmk05318_outs_cfg, 8, &d->gen);
+    res = res ? res : lmk05318_create_ex(dev, 0, I2C_BUS_LMK05318B, &xo, false, lmk05318_outs_cfg, 8, &d->gen);
 
     return res;
 }
