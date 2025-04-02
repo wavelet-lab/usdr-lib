@@ -1,0 +1,224 @@
+name: LMK1D1208I
+revision: 0.0.1
+addr_width: 16
+data_width: 16
+
+pages:
+- name: Main
+  regs:
+  - addr: 0x0
+    name: R0
+    fields:
+    - bits: 0
+      name: OUT0_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the output enable signal for output channel OUT0_P/OUT0_N.
+      opts:
+        0b0: Output Disabled (Hi-Z)
+        0b1: Output Enabled
+    - bits: 1
+      name: OUT1_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the output enable signal for output channel OUT1_P/OUT1_N.
+      opts:
+        0b0: Output Disabled (Hi-Z)
+        0b1: Output Enabled
+    - bits: 2
+      name: OUT2_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the output enable signal for output channel OUT2_P/OUT2_N.
+      opts:
+        0b0: Output Disabled (Hi-Z)
+        0b1: Output Enabled
+    - bits: 3
+      name: OUT3_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the output enable signal for output channel OUT3_P/OUT3_N.
+      opts:
+        0b0: Output Disabled (Hi-Z)
+        0b1: Output Enabled
+    - bits: 4
+      name: OUT4_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the output enable signal for output channel OUT4_P/OUT4_N.
+      opts:
+        0b0: Output Disabled (Hi-Z)
+        0b1: Output Enabled
+    - bits: 5
+      name: OUT5_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the output enable signal for output channel OUT5_P/OUT5_N.
+      opts:
+        0b0: Output Disabled (Hi-Z)
+        0b1: Output Enabled
+    - bits: 6
+      name: OUT6_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the output enable signal for output channel OUT6_P/OUT6_N.
+      opts:
+        0b0: Output Disabled (Hi-Z)
+        0b1: Output Enabled
+    - bits: 7
+      name: OUT7_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the output enable signal for output channel OUT7_P/OUT7_N.
+      opts:
+        0b0: Output Disabled (Hi-Z)
+        0b1: Output Enabled
+  - addr: 0x1
+    name: R1
+    fields:
+    - bits: 0
+      name: OUT0_AMP_SEL
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the output amplitude for output channel OUT0_P/ OUT0_N.
+      opts:
+        0b0: Standard LVDS Swing (350 mV)
+        0b1: Boosted LVDS Swing (500 mV)
+    - bits: 1
+      name: OUT1_AMP_SEL
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the output amplitude for output channel OUT1_P/ OUT1_N.
+      opts:
+        0b0: Standard LVDS Swing (350 mV)
+        0b1: Boosted LVDS Swing (500 mV)
+    - bits: 2
+      name: OUT2_AMP_SEL
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the output amplitude for output channel OUT2_P/ OUT2_N.
+      opts:
+        0b0: Standard LVDS Swing (350 mV)
+        0b1: Boosted LVDS Swing (500 mV)
+    - bits: 3
+      name: OUT3_AMP_SEL
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the output amplitude for output channel OUT3_P/ OUT3_N.
+      opts:
+        0b0: Standard LVDS Swing (350 mV)
+        0b1: Boosted LVDS Swing (500 mV)
+    - bits: 4
+      name: OUT4_AMP_SEL
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the output amplitude for output channel OUT4_P/ OUT4_N.
+      opts:
+        0b0: Standard LVDS Swing (350 mV)
+        0b1: Boosted LVDS Swing (500 mV)
+    - bits: 5
+      name: OUT5_AMP_SEL
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the output amplitude for output channel OUT5_P/ OUT5_N.
+      opts:
+        0b0: Standard LVDS Swing (350 mV)
+        0b1: Boosted LVDS Swing (500 mV)
+    - bits: 6
+      name: OUT6_AMP_SEL
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the output amplitude for output channel OUT6_P/ OUT6_N.
+      opts:
+        0b0: Standard LVDS Swing (350 mV)
+        0b1: Boosted LVDS Swing (500 mV)
+    - bits: 7
+      name: OUT7_AMP_SEL
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the output amplitude for output channel OUT7_P/ OUT7_N.
+      opts:
+        0b0: Standard LVDS Swing (350 mV)
+        0b1: Boosted LVDS Swing (500 mV)
+  - addr: 0x2
+    name: R2
+    fields:
+    - bits: 0
+      name: IN0_EN
+      mode: RW
+      dflt: 0x1
+      desc: This bit controls the input enable signal for input channel IN0_P/ IN0_N.
+      opts:
+        0b0: Input Disabled (reduces power consumption)
+        0b1: Input Enabled
+    - bits: 1
+      name: IN1_EN
+      mode: RW
+      dflt: 0x0
+      desc: This bit controls the input enable signal for input channel IN1_P/ IN1_N.
+      opts:
+        0b0: Input Disabled (reduces power consumption)
+        0b1: Input Enabled
+    - bits: 2
+      name: BANK0_MUTE
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the outputs in Bank 0 to logic low level.
+      opts:
+        0b0: INx_P/INx_N
+        0b1: Logic low
+    - bits: 3
+      name: BANK1_MUTE
+      mode: RW
+      dflt: 0x0
+      desc: This bit sets the outputs in Bank 1 to logic low level.
+      opts:
+        0b0: INx_P/INx_N
+        0b1: Logic low
+    - bits: 4
+      name: BANK0_IN_SEL
+      mode: RW
+      dflt: 0x1
+      desc: This bit sets the input channel for Bank 0.
+      opts:
+        0b0: IN1_P/IN1_N
+        0b1: IN0_P/IN0_N
+    - bits: 5
+      name: BANK1_IN_SEL
+      mode: RW
+      dflt: 0x1
+      desc: This bit sets the input channel for Bank 1.
+      opts:
+        0b0: IN1_P/IN1_N
+        0b1: IN0_P/IN0_N
+    - bits: 6
+      name: R2_RESERVED_1
+      mode: RW
+      dflt: 0x1
+      desc: Register bit can be written to 1. Writing a different value than 1 will affect device functionality.
+    - bits: 7
+      name: R2_RESERVED_0
+      mode: RW
+      dflt: 0x1
+      desc: Register bit can be written to 1. Writing a different value than 1 will affect device functionality.
+  - addr: 0x5
+    name: R5
+    fields:
+    - bits: '3:0'
+      name: DEV_ID
+      mode: R
+      dflt: 0x0
+      desc: These bits provide the device identification code.
+    - bits: '7:4'
+      name: REV_ID
+      mode: R
+      dflt: 0x2
+      desc: These bits provide the silicon revision code.
+  - addr: 0xE
+    name: R14
+    fields:
+    - bits: '7:0'
+      name: IDX_RB
+      mode: R
+      dflt: 0x0
+      desc: These bits report the I2C address state.

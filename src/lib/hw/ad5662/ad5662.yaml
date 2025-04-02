@@ -1,0 +1,29 @@
+name: AD5662
+revision: 0.0.1
+addr_width: 16
+data_width: 24
+
+pages:
+- name: Main
+  regs:
+  - addr: 0x0
+    name: OUTPUT
+    fields:
+    - bits: '5:0'
+      name: NOT_USED
+      mode: W
+      desc: Not used bits
+    - bits: '7:6'
+      name: POWER_DOWN
+      mode: W
+      dflt: 0b00
+      desc: Power down setting
+      opts:
+        0b00: Normal operation
+        0b01: 1kOmh to GND
+        0b10: 100kOhm to GND
+        0b11: Tree-state
+    - bits: '23:8'
+      name: OUTPUT
+      mode: W
+      desc: Output value

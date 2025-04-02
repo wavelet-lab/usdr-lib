@@ -1,0 +1,66 @@
+name: LP87524J_Q1
+revision: 0.0.1
+addr_width: 16
+data_width: 16
+
+pages:
+- name: Main
+  regs:
+  - addr: 0x04
+    name: BUCK1_CTRL1
+    fields:
+    - bits: 7
+      name: EN_BUCK1
+      mode: RW
+      dflt: 1
+      desc: Enable Buck1 regulator
+      opts:
+        0: Buck1 regulator is disabled
+        1: Buck1 regulator is enabled
+    - bits: 6
+      name: EN_PIN_CTRL1
+      mode: RW
+      dflt: 1
+      desc: Enable EN1/2/3 pin control for Buck1
+      opts:
+        0: Only EN_BUCK1 bit controls Buck1
+        1: EN_BUCK1 bit AND ENx pin control Buck1
+    - bits: '5:4'
+      name: BUCK1_EN_PIN_SELECT
+      mode: RW
+      dflt: 0x0
+      desc: Enable EN1/2/3 pin control for Buck1
+      opts:
+        0x0: EN_BUCK1 bit AND EN1 pin control Buck1
+        0x1: EN_BUCK1 bit AND EN2 pin control Buck1
+        0x2: EN_BUCK1 bit AND EN3 pin control Buck1
+        0x3: Reserved
+    - bits: 3
+      name: EN_ROOF_FLOOR1
+      mode: RW
+      dflt: 0
+      desc: Enable Roof/Floor control of EN1/2/3 pin if EN_PIN_CTRL1 = 1
+      opts:
+        0: Enable/Disable (1/0) control
+        1: Roof/Floor (1/0) control
+    - bits: 2
+      name: EN_RDIS1
+      mode: RW
+      dflt: 1
+      desc: Enable output discharge resistor when Buck1 is disabled
+      opts:
+        0: Discharge resistor disabled
+        1: Discharge resistor enabled
+    - bits: 1
+      name: BUCK1_FPWM
+      mode: RW
+      dflt: 0
+      desc: Forces the Buck1 regulator to operate in PWM mode
+      opts:
+        0: Automatic transitions between PFM and PWM modes (AUTO mode).
+        1: Forced to PWM operation
+    - bits: 0
+      name: BUCK1_CTRL1_RESERVED_0
+      mode: RW
+      dflt: 0
+      desc: ''
