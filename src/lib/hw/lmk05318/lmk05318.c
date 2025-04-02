@@ -44,6 +44,7 @@ enum {
 };
 
 
+
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out)
 {
     uint8_t data[3] = { reg >> 8, reg, out };
@@ -84,6 +85,66 @@ int lmk05318_reg_wr_n(lmk05318_state_t* d, const uint32_t* regs, unsigned count)
     return 0;
 }
 
+
+enum
+{
+    LMK05318_REGADDR_MIN = 0x0000,
+    LMK05318_REGADDR_MAX = 0x019B,
+};
+
+static uint32_t registers_map[LMK05318_REGADDR_MAX - LMK05318_REGADDR_MIN + 1];
+
+void lmk05318_registers_map_reset()
+{
+    memset(registers_map, 0xFF, sizeof(registers_map));
+}
+
+static int lmk05318_add_reg_to_map(lmk05318_state_t* d, const uint32_t* regs, unsigned count)
+{
+    for (unsigned j = 0; j < count; j++)
+    {
+        const uint16_t regaddr = (uint16_t)(regs[j] >> 8) & ~0x8000;
+        if(regaddr < LMK05318_REGADDR_MIN || regaddr > LMK05318_REGADDR_MAX)
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 REGADDR 0x%04x out of range", regaddr);
+            return -EINVAL;
+        }
+
+        const unsigned idx = regaddr - LMK05318_REGADDR_MIN;
+        uint32_t* ptr = registers_map + idx;
+        if(*ptr != (uint32_t)(-1) && (uint8_t)(*ptr) != (uint8_t)regs[j])
+        {
+            USDR_LOG("5318", USDR_LOG_WARNING, "LMK05318 Rewriting REGADDR 0x%04x : 0x%02x -> 0x%02x", regaddr, (uint8_t)(*ptr), (uint8_t)regs[j]);
+        }
+        *ptr = regs[j];
+    }
+    return 0;
+}
+
+static int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run)
+{
+    for(unsigned j = 0; j < SIZEOF_ARRAY(registers_map); ++j)
+    {
+        if(registers_map[j] == (uint32_t)(-1))
+            continue;
+
+        uint16_t addr = registers_map[j] >> 8;
+        uint8_t  data = registers_map[j];
+
+        USDR_LOG("5318", USDR_LOG_DEBUG, "LMK05318 Writing register R%03u: 0x%04x = 0x%02x [0x%06x]", j, addr, data, registers_map[j]);
+
+        int res = dry_run ? 0 : lmk05318_reg_wr(d, addr, data);
+        if (res)
+            return res;
+    }
+
+    lmk05318_registers_map_reset();
+    return 0;
+}
+
+
+
+
 static int lmk05318_softreset(lmk05318_state_t* out)
 {
     uint8_t reg_ctrl;
@@ -101,6 +162,18 @@ static int lmk05318_softreset(lmk05318_state_t* out)
 
     return lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));;
 }
+
+static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
+{
+    uint32_t regs[] =
+    {
+        MAKE_LMK05318_DEV_CTL(0, 0, dpllmode ? 1 : 0, 1, 1),   //R12
+    };
+
+    return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+}
+
+#if 0
 
 #undef LMK05380_DPLL_EN
 
@@ -145,19 +218,19 @@ static int lmk05318_init(lmk05318_state_t* d)
         0x00611E,
         0x006284,
         0x006380,  //R99 BAW LOCKDET/UNLOCKDET end
-        MAKE_LMK05318_PLL2_CTRL1(0x01),        //R101 +
-        MAKE_LMK05318_PLL2_CTRL4(0x1F),        //R104 +
-        MAKE_LMK05318_PLL2_CALCTRL0(0x01),     //R105 0x1 = 3ms +
-        MAKE_LMK05318_PLL1_MASHCTRL(0, 0x03),  //R115 0x3 = APLL1 mash_order3 +
-        MAKE_LMK05318_PLL1_LF_R2(0x01),        //R129 0x1 = APLL1 Loop filter R2=414 Ohm +
-        MAKE_LMK05318_PLL1_LF_R3(0x01),        //R131 0x1 = APLL1 Loop filter R3=200 Ohm +
-        MAKE_LMK05318_PLL1_LF_R4(0x01),        //R132 0x1 = APLL1 Loop filter R4=200 Ohm +
-        MAKE_LMK05318_PLL2_MASHCTRL(0, 0x03),  //R139 0x3 = APLL2 mash_order3 +
-        MAKE_LMK05318_PLL2_LF_R2(0x02),        //R140 APLL2 Loop Filter R2=300 Ohm +
-        MAKE_LMK05318_PLL2_LF_R3(0x01),        //R142 APLL2 Loop filter R3=200 Ohm +
-        MAKE_LMK05318_PLL2_LF_R4(0x01),        //R143 APLL2 Loop filter R4=200 Ohm +
-        MAKE_LMK05318_PLL2_LF_C3C4(0x7, 0x7),  //R144 APLL2 Loop Filter C3 = 70pF, C4 = 70pF +
-        MAKE_LMK05318_XO_OFFSET_SW_TIMER(0x1), //R145 3.3ms +
+        MAKE_LMK05318_PLL2_CTRL1(0x01),        //R101 PLL2 charge pump drain 0x1=3.2mA [default 4.8mA] +
+        MAKE_LMK05318_PLL2_CTRL4(0x1F),        //R104 PLL2 bleed resisror 0x1F=766.96 Ohm [default open]+
+        MAKE_LMK05318_PLL2_CALCTRL0(0x01),     //R105 0x1 = VCO calibration time per step (up to 7 steps) 0x1=3ms [default 0.3ms]+
+        MAKE_LMK05318_PLL1_MASHCTRL(0, 0x03),  //R115 0x3 = APLL1 mash_order3 [default 0 (int mode)]+
+        MAKE_LMK05318_PLL1_LF_R2(0x01),        //R129 0x1 = APLL1 Loop filter R2=414 Ohm [default 9650]+
+        MAKE_LMK05318_PLL1_LF_R3(0x01),        //R131 0x1 = APLL1 Loop filter R3=200 Ohm [default 2400] +
+        MAKE_LMK05318_PLL1_LF_R4(0x01),        //R132 0x1 = APLL1 Loop filter R4=200 Ohm [default 2400]+
+        MAKE_LMK05318_PLL2_MASHCTRL(0, 0x03),  //R139 0x3 = APLL2 mash_order3 [default 0 (int mode)]+
+        MAKE_LMK05318_PLL2_LF_R2(0x02),        //R140 APLL2 Loop Filter R2=300 Ohm [default 1867]+
+        MAKE_LMK05318_PLL2_LF_R3(0x01),        //R142 APLL2 Loop filter R3=200 Ohm [default 2400]+
+        MAKE_LMK05318_PLL2_LF_R4(0x01),        //R143 APLL2 Loop filter R4=200 Ohm [default 2400]+
+        MAKE_LMK05318_PLL2_LF_C3C4(0x7, 0x7),  //R144 APLL2 Loop Filter C3 = 70pF, C4 = 70pF [defailt C3=0(open), C4=0(open)]+
+        MAKE_LMK05318_XO_OFFSET_SW_TIMER(0x1), //R145 XO input wait timer 3.3ms [default 52.4ms]+
         0x00A0FC, //R160 MEMADR ?
 
 #ifdef LMK05380_DPLL_EN
@@ -320,14 +393,17 @@ static int lmk05318_init(lmk05318_state_t* d)
 
     return 0;
 }
+#endif
 
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
                        const lmk05318_xo_settings_t* xo, bool dpll_mode,
                        lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
-                       lmk05318_state_t* out)
+                       lmk05318_state_t* out, bool dry_run)
 {
     int res;
-    uint8_t dummy[4];
+    uint8_t dummy[4] = {0,0,0,0};
+
+    lmk05318_registers_map_reset();
 
     out->dev = dev;
     out->subdev = subdev;
@@ -339,23 +415,23 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     out->fref_pll2_div_rs = (((VCO_APLL1 + APLL2_PD_MAX - 1) / APLL2_PD_MAX) + out->fref_pll2_div_rp - 1) / out->fref_pll2_div_rp;
     out->xo = *xo;
 
-    res = lmk05318_reg_get_u32(out, 0, &dummy[0]);
+    res = dry_run ? 0 : lmk05318_reg_get_u32(out, 0, &dummy[0]);
     if (res)
         return res;
 
     USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 DEVID[0/1/2/3] = %02x %02x %02x %02x\n", dummy[3], dummy[2], dummy[1], dummy[0]);
 
-    if ( dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x35 || dummy[0] != 0x42 ) {
+    if (!dry_run && (dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x35 || dummy[0] != 0x42)) {
         return -ENODEV;
     }
-#if 0
-    res = lmk05318_init(out);
+
+    res = lmk05318_init(out, dpll_mode);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d on init()", res);
         return res;
     }
-#endif
+
     res = lmk05318_set_xo_fref(out);
     if(res)
     {
@@ -377,14 +453,16 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return res;
     }
 
-    res = lmk05318_softreset(out);
+    lmk05318_reg_wr_from_map(out, dry_run);
+
+    res = dry_run ? 0 : lmk05318_softreset(out);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d lmk05318_softreset()", res);
         return res;
     }
 
-    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 initialized\n");
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 initialized\n");
     return 0;
 }
 
@@ -512,7 +590,7 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
         uint32_t regs[] = {
             MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
         };
-        return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));;
+        return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
     }
 
     unsigned n = fvco2 / fref;
@@ -532,7 +610,7 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
     }
 
     uint32_t regs[] = {
-        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),  //R100
+        //MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),  //R100
         MAKE_LMK05318_PLL2_CTRL2(pd2 - 1, pd1 - 1),                                     //R102
         MAKE_LMK05318_PLL2_NDIV_BY0(n),                                                 //R135
         MAKE_LMK05318_PLL2_NDIV_BY1(n),                                                 //R134
@@ -542,7 +620,7 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
         MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 0),  //R100
     };
 
-    res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
     if (res)
         return res;
 
@@ -589,14 +667,13 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
         MAKE_LMK05318_XO_CONFIG(d->xo.pll1_fref_rdiv - 1),                              //R44
     };
 
-    int res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
     if(res)
         return res;
 
     return 0;
 }
 
-//R74,
 int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
 {
     unsigned fref = (d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2 : 1);
@@ -604,10 +681,10 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
     unsigned n = fvco / fref;
     uint64_t num = (fvco - n * (uint64_t)fref) * (1ull << 40) / fref;
 
-    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 "\n", fvco, n, num);
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 "\n", fvco, n, num);
 
     uint32_t regs[] = {
-        MAKE_LMK05318_PLL1_CTRL0(1),                    //R74
+        //MAKE_LMK05318_PLL1_CTRL0(1),                    //R74
         MAKE_LMK05318_PLL1_MODE(dpll_mode ? 1 : 0),     //R116
         MAKE_LMK05318_PLL1_NDIV_BY0(n),                 //R109
         MAKE_LMK05318_PLL1_NDIV_BY1(n),                 //R108
@@ -619,7 +696,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
         MAKE_LMK05318_PLL1_CTRL0(0),                    //R74
     };
 
-    int res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
     if (res)
         return res;
 
@@ -642,7 +719,7 @@ int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
         (port == 4) ? MAKE_LMK05318_OUTDIV_4(div) :
         (port == 3 || port == 2) ? MAKE_LMK05318_OUTDIV_2_3(div) : MAKE_LMK05318_OUTDIV_0_1(div),
     };
-    return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
 }
 
 static int lmk05318_set_out_mux_ex(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
@@ -668,7 +745,7 @@ static int lmk05318_set_out_mux_ex(lmk05318_state_t* d, unsigned port, unsigned 
         (port == 5) ? MAKE_LMK05318_OUTCTL_5(mux, ot) :
         (port == 6) ? MAKE_LMK05318_OUTCTL_6(mux, ot) : MAKE_LMK05318_OUTCTL_7(mux, ot),
     };
-    return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+    return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
 }
 
 int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype)
@@ -1514,7 +1591,7 @@ have_complete_solution:
     return 0;
 }
 
-int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk)
+int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent)
 {
     uint8_t los[3];
     int res = 0;
@@ -1535,15 +1612,16 @@ int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk)
              ((los[1] & LOFL_DPLL_POL_MSK) ? LMK05318_LOFL_DPLL : 0);
 
 
-    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 LOS_MAK=[%s%s%s%s%s%s%s] %02x:%02x:%02x\n",
-            (los[0] & LOS_XO_POL_MSK) ? "XO" : "",
-            (los[0] & LOL_PLL1_POL_MSK) ? " PLL1" : "",
-            (los[0] & LOL_PLL2_POL_MSK) ? " PLL2" : "",
-            (los[0] & LOS_FDET_XO_POL_MSK) ? " XO_FDET" : "",
-            (los[1] & LOPL_DPLL_POL_MSK) ? " DPLL_P" : "",
-            (los[1] & LOFL_DPLL_POL_MSK) ? " DPLL_F" : "",
-            (los[2] & BAW_LOCK_MSK) ? "" : " BAW",
-            los[0], los[1], los[2]);
+    if(!silent)
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 LOS_MAK=[%s%s%s%s%s%s%s] %02x:%02x:%02x\n",
+                (los[0] & LOS_XO_POL_MSK) ? "XO" : "",
+                (los[0] & LOL_PLL1_POL_MSK) ? " PLL1" : "",
+                (los[0] & LOL_PLL2_POL_MSK) ? " PLL2" : "",
+                (los[0] & LOS_FDET_XO_POL_MSK) ? " XO_FDET" : "",
+                (los[1] & LOPL_DPLL_POL_MSK) ? " DPLL_P" : "",
+                (los[1] & LOFL_DPLL_POL_MSK) ? " DPLL_F" : "",
+                (los[2] & BAW_LOCK_MSK) ? "" : " BAW",
+                los[0], los[1], los[2]);
 
     *los_msk = losval;
     return 0;

@@ -101,7 +101,7 @@ int board_ext_simplesync_init(lldev_t dev,
     lmk05318_set_port_affinity(cfg, 6, AFF_APLL1);
     lmk05318_set_port_affinity(cfg, 7, AFF_APLL1);
 
-    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, false, cfg, 4, &ob->lmk);
+    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, false, cfg, 4, &ob->lmk, false /*dry_run*/);
 #endif
 
     if (res)

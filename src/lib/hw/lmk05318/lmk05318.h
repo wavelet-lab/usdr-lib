@@ -154,7 +154,7 @@ enum lock_msk {
 
 };
 
-int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk);
+int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent);
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out);
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);
@@ -167,6 +167,6 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
                        const lmk05318_xo_settings_t* xo, bool dpll_mode,
                        lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
-                       lmk05318_state_t* out);
+                       lmk05318_state_t* out, bool dry_run);
 
 #endif

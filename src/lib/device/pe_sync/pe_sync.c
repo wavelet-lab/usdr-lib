@@ -271,6 +271,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
+    const bool use_dpll = false;
+
     const int out_accuracy = 2;
     lmk05318_out_config_t lmk05318_outs_cfg[8];
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 0, 125000000, out_accuracy, out_accuracy, false, LVDS);
@@ -282,7 +284,49 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6,  10000000, out_accuracy, out_accuracy, false, LVCMOS);
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7,         1, out_accuracy, out_accuracy, false, LVCMOS);
 
-    res = res ? res : lmk05318_create_ex(dev, 0, I2C_BUS_LMK05318B, &xo, false, lmk05318_outs_cfg, 8, &d->gen);
+    res = res ? res : lmk05318_create_ex(dev, 0, I2C_BUS_LMK05318B, &xo, use_dpll, lmk05318_outs_cfg, 8, &d->gen, false /*dry_run*/);
+    if(res)
+        return res;
+
+    //wait for lock
+    unsigned lock_msk = 0;
+    unsigned cnt = 0;
+    bool locked = false;
+
+    const unsigned lock_expected = LMK05318_LOS_XO | LMK05318_LOL_PLL1 |
+                                   (d->gen.vco2_freq ? LMK05318_LOL_PLL2 : 0) |
+                                   (xo.fdet_bypass ? 0 : LMK05318_LOS_FDET_XO) |
+                                   (use_dpll ? (LMK05318_LOPL_DPLL | LMK05318_LOFL_DPLL) : 0);
+
+    //waiting 10ms (100*100 us)
+    while(cnt < 100)
+    {
+        res = lmk05318_check_lock(&d->gen, &lock_msk, true /*silent*/);
+        if(res)
+        {
+            USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 lmk05318_check_lock() error:%d", res);
+            return res;
+        }
+
+        locked = (lock_msk & lock_expected) == lock_expected;
+        if(locked)
+            break;
+
+        usleep(100);
+        ++cnt;
+    }
+
+    if(!locked)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 is not locked! expected:%u got:%u", lock_expected, lock_msk);
+        return -ETIMEDOUT;
+    }
+    else
+        USDR_LOG("SYNC", USDR_LOG_INFO, "LMK05318 locked OK");
+
+    lmk05318_check_lock(&d->gen, &lock_msk, false /*silent*/); //produce debug log
+
+
 
     return res;
 }
