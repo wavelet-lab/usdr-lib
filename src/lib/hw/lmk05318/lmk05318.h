@@ -151,10 +151,11 @@ enum lock_msk {
 
     LMK05318_LOPL_DPLL = 16,
     LMK05318_LOFL_DPLL = 32,
-
+    LMK05318_BAW_LOCK = 64,
 };
 
 int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent);
+int lmk05318_wait_lock(lmk05318_state_t* d, unsigned lock_expected, unsigned timeout);
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out);
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);

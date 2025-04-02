@@ -167,7 +167,8 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
 {
     uint32_t regs[] =
     {
-        MAKE_LMK05318_DEV_CTL(0, 0, dpllmode ? 1 : 0, 1, 1),   //R12
+        MAKE_LMK05318_DEV_CTL(0, 0, dpllmode ? 1 : 0, 1, 1),        //R12
+        MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, dpllmode ? 1 : 0),   //R252
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -1591,6 +1592,30 @@ have_complete_solution:
     return 0;
 }
 
+static void lmk05318_decode_lock_mask(unsigned m, char* s)
+{
+    if(!s)
+        return;
+
+    unsigned len = 0;
+    *s = 0;
+
+    if(m & LMK05318_LOS_XO)
+        len += sprintf(s + len, "%s ", "XO");
+    if(m & LMK05318_LOL_PLL1)
+        len += sprintf(s + len, "%s ", "PLL1");
+    if(m & LMK05318_LOL_PLL2)
+        len += sprintf(s + len, "%s ", "PLL2");
+    if(m & LMK05318_LOS_FDET_XO)
+        len += sprintf(s + len, "%s ", "XO_FDET");
+    if(m & LMK05318_LOPL_DPLL)
+        len += sprintf(s + len, "%s ", "DPLL_P");
+    if(m & LMK05318_LOFL_DPLL)
+        len += sprintf(s + len, "%s ", "DPLL_F");
+    if(m & LMK05318_BAW_LOCK)
+        len += sprintf(s + len, "%s ", "BAW");
+}
+
 int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent)
 {
     uint8_t los[3];
@@ -1609,20 +1634,54 @@ int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent)
              ((los[0] & LOL_PLL2_POL_MSK) ? LMK05318_LOL_PLL2 : 0) |
              ((los[0] & LOS_FDET_XO_POL_MSK) ? LMK05318_LOS_FDET_XO : 0) |
              ((los[1] & LOPL_DPLL_POL_MSK) ? LMK05318_LOPL_DPLL : 0) |
-             ((los[1] & LOFL_DPLL_POL_MSK) ? LMK05318_LOFL_DPLL : 0);
-
+             ((los[1] & LOFL_DPLL_POL_MSK) ? LMK05318_LOFL_DPLL : 0) |
+             ((los[2] & BAW_LOCK_MSK) ? LMK05318_BAW_LOCK : 0);
 
     if(!silent)
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 LOS_MAK=[%s%s%s%s%s%s%s] %02x:%02x:%02x\n",
-                (los[0] & LOS_XO_POL_MSK) ? "XO" : "",
-                (los[0] & LOL_PLL1_POL_MSK) ? " PLL1" : "",
-                (los[0] & LOL_PLL2_POL_MSK) ? " PLL2" : "",
-                (los[0] & LOS_FDET_XO_POL_MSK) ? " XO_FDET" : "",
-                (los[1] & LOPL_DPLL_POL_MSK) ? " DPLL_P" : "",
-                (los[1] & LOFL_DPLL_POL_MSK) ? " DPLL_F" : "",
-                (los[2] & BAW_LOCK_MSK) ? "" : " BAW",
-                los[0], los[1], los[2]);
+    {
+        char ss[255];
+        lmk05318_decode_lock_mask(losval, ss);
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 LOS_MASK=[%s] %02x:%02x:%02x\n", ss, los[0], los[1], los[2]);
+    }
 
     *los_msk = losval;
+    return 0;
+}
+
+int lmk05318_wait_lock(lmk05318_state_t* d, unsigned lock_expected, unsigned timeout)
+{
+    int res = 0;
+    unsigned lock_msk = 0;
+    unsigned elapsed = 0;
+    bool locked = false;
+
+    while(timeout == 0 || elapsed < timeout)
+    {
+        res = lmk05318_check_lock(d, &lock_msk, true /*silent*/);
+        if(res)
+        {
+            USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 lmk05318_check_lock() error:%d", res);
+            return res;
+        }
+
+        locked = (lock_msk & lock_expected) == lock_expected;
+        if(locked)
+            break;
+
+        usleep(100);
+        elapsed += 100;
+    }
+
+    char sexp[255], sgot[255];
+    lmk05318_decode_lock_mask(lock_expected, sexp);
+    lmk05318_decode_lock_mask(lock_msk, sgot);
+
+    if(!locked)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 is not locked! expected:[%s] got:[%s]", sexp, sgot);
+        return -ETIMEDOUT;
+    }
+
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 locked OK [%s]", sgot);
     return 0;
 }

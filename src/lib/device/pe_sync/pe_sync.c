@@ -288,43 +288,17 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
-    //wait for lock
-    unsigned lock_msk = 0;
-    unsigned cnt = 0;
-    bool locked = false;
+    usleep(1000); //wait until lmk digests all this
 
+    //wait for lock
     const unsigned lock_expected = LMK05318_LOS_XO | LMK05318_LOL_PLL1 |
                                    (d->gen.vco2_freq ? LMK05318_LOL_PLL2 : 0) |
                                    (xo.fdet_bypass ? 0 : LMK05318_LOS_FDET_XO) |
                                    (use_dpll ? (LMK05318_LOPL_DPLL | LMK05318_LOFL_DPLL) : 0);
 
-    //waiting 10ms (100*100 us)
-    while(cnt < 100)
-    {
-        res = lmk05318_check_lock(&d->gen, &lock_msk, true /*silent*/);
-        if(res)
-        {
-            USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 lmk05318_check_lock() error:%d", res);
-            return res;
-        }
-
-        locked = (lock_msk & lock_expected) == lock_expected;
-        if(locked)
-            break;
-
-        usleep(100);
-        ++cnt;
-    }
-
-    if(!locked)
-    {
-        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 is not locked! expected:%u got:%u", lock_expected, lock_msk);
-        return -ETIMEDOUT;
-    }
-    else
-        USDR_LOG("SYNC", USDR_LOG_INFO, "LMK05318 locked OK");
-
-    lmk05318_check_lock(&d->gen, &lock_msk, false /*silent*/); //produce debug log
+    res = lmk05318_wait_lock(&d->gen, lock_expected, 10000);
+    if(res)
+        return res;
 
 
 
