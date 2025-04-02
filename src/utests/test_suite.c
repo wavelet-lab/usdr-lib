@@ -12,6 +12,7 @@ Suite * ring_buffer_suite(void);
 Suite * trig_suite(void);
 Suite * clockgen_suite(void);
 Suite * lmk05318_solver_suite(void);
+Suite * lmx2820_solver_suite(void);
 
 int main(int argc, char** argv)
 {
@@ -25,14 +26,18 @@ int main(int argc, char** argv)
     fprintf(stderr, "Running with %s CPU features\n", buffer);
     usdrlog_setlevel(NULL, (argc > 1) ? USDR_LOG_TRACE : USDR_LOG_INFO);
     usdrlog_enablecolorize(NULL);
+
 #if 0
     sr = srunner_create(ring_buffer_suite());
     srunner_add_suite(sr, trig_suite());
     srunner_add_suite(sr, clockgen_suite());
     srunner_add_suite(sr, lmk05318_solver_suite());
+    srunner_add_suite(sr, lmx2820_solver_suite());
 #else
     sr = srunner_create(lmk05318_solver_suite());
 #endif
+
+    srunner_set_fork_status (sr, CK_NOFORK);
     srunner_run_all(sr, (argc > 1) ? CK_VERBOSE : CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);
     srunner_free(sr);
