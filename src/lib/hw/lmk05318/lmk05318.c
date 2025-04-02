@@ -102,6 +102,8 @@ static int lmk05318_softreset(lmk05318_state_t* out)
     return lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));;
 }
 
+#undef LMK05380_DPLL_EN
+
 static int lmk05318_init(lmk05318_state_t* d)
 {
     uint32_t regs[] =
@@ -346,14 +348,14 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     if ( dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x35 || dummy[0] != 0x42 ) {
         return -ENODEV;
     }
-
+#if 0
     res = lmk05318_init(out);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d on init()", res);
         return res;
     }
-
+#endif
     res = lmk05318_set_xo_fref(out);
     if(res)
     {
