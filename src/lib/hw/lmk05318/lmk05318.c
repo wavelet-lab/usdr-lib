@@ -426,6 +426,15 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return -ENODEV;
     }
 
+#if 1
+    res = lmk05318_reg_wr_n(out, lmk05318_rom_test, SIZEOF_ARRAY(lmk05318_rom_test));
+    if (res)
+        return res;
+
+    return 0;
+#endif
+
+#if 0
     res = lmk05318_init(out, dpll_mode);
     if(res)
     {
@@ -460,6 +469,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d writing registers", res);
         return res;
     }
+#endif
 
     res = dry_run ? 0 : lmk05318_softreset(out);
     if(res)
