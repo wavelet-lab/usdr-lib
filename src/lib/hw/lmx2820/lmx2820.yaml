@@ -1,5 +1,13 @@
+# Copyright (c) 2025 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
 name: LMX2820
 revision: 0.0.1
+processors: [ c ]
+bus:
+    type: SPI
+    wr_mask: 0x80000000
+    usdr_path: /debug/hw/lmx2820/*/reg
 addr_width: 16
 data_width: 16
 
