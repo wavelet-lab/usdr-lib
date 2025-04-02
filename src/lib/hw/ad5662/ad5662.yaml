@@ -1,5 +1,10 @@
 name: AD5662
 revision: 0.0.1
+processors: [ c ]
+bus:
+    type: SPI
+    wr_mask: 0x80000000
+    usdr_path: /debug/hw/ad5662/*/reg
 addr_width: 16
 data_width: 24
 

@@ -1,5 +1,10 @@
-name: LP87524J_Q1
+name: LP87524J
 revision: 0.0.1
+processors: [ c ]
+bus:
+    type: I2C
+    wr_mask: 0x80000000
+    usdr_path: /debug/hw/lp87524j/*/reg
 addr_width: 16
 data_width: 16
 

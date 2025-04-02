@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: MIT
 
 set(HW_FILES si549 si5332 ads42lbx9 tps6594 tmp108 tmp114 lms6002d lms7002m lms8001 lp8758 lmk05318 lmk5c33216 tps6381x dac80501
-             lmk04832 tca6424a adf4002b lp875484 afe79xx lmx1204 lmx1214 lmk1d1208i ad5662 lmx1205 lp87524j_q1 lmx2820)
+             lmk04832 tca6424a adf4002b lp875484 afe79xx lmx1204 lmx1214 lmk1d1208i ad5662 lmx1205 lp87524j lmx2820)
 # YAML registers generators
 set(HW_FILES_YAML si5332 lmk05318 lmk5c33216 lms6002d lms7002m lms8001 tps6381x dac80501
-                  lmk04832 xra1405 tca6424a adf4002b lp875484 lmx1204 lmx1214 lmk1d1208i ad5662 lmx1205 lp87524j_q1 lmx2820)
+                  lmk04832 xra1405 tca6424a adf4002b lp875484 lmx1204 lmx1214 lmk1d1208i ad5662 lmx1205 lp87524j lmx2820)
 
 foreach(I ${HW_FILES})
     aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/${I} HW_DIR_FILES)
