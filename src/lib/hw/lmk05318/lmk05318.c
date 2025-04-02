@@ -454,7 +454,12 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return res;
     }
 
-    lmk05318_reg_wr_from_map(out, dry_run);
+    res = lmk05318_reg_wr_from_map(out, dry_run);
+    if(res)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d writing registers", res);
+        return res;
+    }
 
     res = dry_run ? 0 : lmk05318_softreset(out);
     if(res)
