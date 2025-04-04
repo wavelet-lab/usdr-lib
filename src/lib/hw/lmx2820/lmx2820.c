@@ -105,7 +105,7 @@ static int lmx2820_spi_post(lmx2820_state_t* obj, uint32_t* regs, unsigned count
 static int lmx2820_spi_get(lmx2820_state_t* obj, uint16_t addr, uint16_t* out)
 {
     uint32_t v;
-    int res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, addr << 16, &v);
+    int res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, MAKE_LMX2820_REG_RD((uint32_t)addr), &v);
     if (res)
         return res;
 

@@ -185,10 +185,18 @@ class GenH:
         print(all_regs)
 
         # Make register define
+        if (self.parser.wr_mask is not None) and (self.parser.rd_mask is not None):
+            raise (Exception("You should specify rd_mask OR wr_mask, but not both!"))
+
         def_macro = "MAKE_%s_REG_WR" % self.h_name
         def_wr_msk = "0x%x | " % self.parser.wr_mask if self.parser.wr_mask is not None else ""
         def_wr = "#define %s(a, v) (%s((a) << %d) | ((v) & 0x%x))" % (def_macro, def_wr_msk, self.data_width, (1 << self.data_width) - 1)
         print(def_wr)
+
+        def_macro_rd = "MAKE_%s_REG_RD" % self.h_name
+        def_rd_msk = "0x%x | " % self.parser.rd_mask if self.parser.rd_mask is not None else ""
+        def_rd = "#define %s(a) (%s((a) << %d))" % (def_macro_rd, def_rd_msk, self.data_width)
+        print(def_rd)
 
         # Predefined universal enums
         for e in self.enums:
