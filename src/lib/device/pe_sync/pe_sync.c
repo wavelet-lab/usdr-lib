@@ -301,7 +301,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     if(res)
     {
-        USDR_LOG("SYNC", USDR_LOG_WARNING, "PLLs not locked during specified timeout");
+        USDR_LOG("SYNC", USDR_LOG_WARNING, "LMK03518 PLLs not locked during specified timeout");
         return res;
     }
 
