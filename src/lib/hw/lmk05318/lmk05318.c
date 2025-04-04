@@ -203,8 +203,8 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
     {
         MAKE_LMK05318_DEV_CTL(0, 0, dpllmode ? 1 : 0, 1, 1, 1, 1),   //R12   set APLL1 mode - DPLL | Free-run
         MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, 0, dpllmode ? 1 : 0), //R252  enable/disable DPLL
-        MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, dpllmode ? 0 : 1),       //R39   set fixed APLL1 denumerator for DPLL en, programmed den otherwise
-        MAKE_LMK05318_SPARE_NVMBASE2_BY1(0, 0, 0),                   //R40   set fixed APPL2 denumerator always
+        MAKE_LMK05318_SPARE_NVMBASE2_BY2(1, dpllmode ? 0 : 1),       //R39 ***  set fixed APLL1 denumerator for DPLL en, programmed den otherwise
+        MAKE_LMK05318_SPARE_NVMBASE2_BY1(1, 1, 0),                   //R40 ***  set fixed APPL2 denumerator always
         MAKE_LMK05318_PLL_CLK_CFG(0, 0b111),                         //R47   set PLL clock cfg
         MAKE_LMK05318_OUTSYNCCTL(1, 1, 1),                           //R70   enable APLL1/APLL2 channel sync
         MAKE_LMK05318_OUTSYNCEN(1, 1, 1, 1, 1, 1),                   //R71   enable ch0..ch7 out sync
@@ -216,6 +216,37 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
                                CH6_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH5_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH4_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW),   //R24   set ch4..7 mute levels
+
+
+        MAKE_LMK05318_INT_FLAG_POL0(1,1,1,1),            //R17 +
+        MAKE_LMK05318_INT_FLAG_POL1(1,1,1,1,1,1,1,1),    //R18 +
+        MAKE_LMK05318_GPIO_OUT(1,1),                     //R36 +
+        MAKE_LMK05318_REF_CLKCTL1(0,0,1,0),              //R45 +
+        MAKE_LMK05318_REF_CLKCTL2(SECREF_TYPE_AC_DIFF_EXT, PRIREF_TYPE_AC_DIFF_EXT),    //R46 +
+        MAKE_LMK05318_STAT0_SEL(0x50),                   //R48 +
+        MAKE_LMK05318_STAT1_SEL(0x4a),                   //R49 +
+        MAKE_LMK05318_PREDRIVER(0xF, 0x08),              //R68 +
+        MAKE_LMK05318_XO_OFFSET_SW_TIMER(0x1), //R145 XO input wait timer 3.3ms [default 52.4ms]+
+
+
+
+        MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0, 0x03),  //R115 0x3 = APLL1 mash_order3 [default 0 (int mode)]+
+        MAKE_LMK05318_PLL1_LF_R2(0x01),        //R129 0x1 = APLL1 Loop filter R2=414 Ohm [default 9650]+
+        MAKE_LMK05318_PLL1_LF_R3(0x01),        //R131 0x1 = APLL1 Loop filter R3=200 Ohm [default 2400] +
+        MAKE_LMK05318_PLL1_LF_R4(0x01),        //R132 0x1 = APLL1 Loop filter R4=200 Ohm [default 2400]+
+
+
+
+        MAKE_LMK05318_PLL2_CTRL1(0,0x01),      //R101 PLL2 charge pump drain 0x1=3.2mA [default 4.8mA] +
+        MAKE_LMK05318_PLL2_CTRL4(0x1F),        //R104 PLL2 bleed resisror 0x1F=766.96 Ohm [default open]+
+        MAKE_LMK05318_PLL2_CALCTRL0(0x01, 0x01),     //R105 0x1 = VCO calibration time per step (up to 7 steps) 0x1=3ms [default 0.3ms]+
+        MAKE_LMK05318_PLL2_MASHCTRL(0, 0x03),  //R139 0x3 = APLL2 mash_order3 [default 0 (int mode)]+
+        MAKE_LMK05318_PLL2_LF_R2(0x02),        //R140 APLL2 Loop Filter R2=300 Ohm [default 1867]+
+        MAKE_LMK05318_PLL2_LF_R3(0x01),        //R142 APLL2 Loop filter R3=200 Ohm [default 2400]+
+        MAKE_LMK05318_PLL2_LF_R4(0x01),        //R143 APLL2 Loop filter R4=200 Ohm [default 2400]+
+        MAKE_LMK05318_PLL2_LF_C3C4(0x7, 0x7),  //R144 APLL2 Loop Filter C3 = 70pF, C4 = 70pF [defailt C3=0(open), C4=0(open)]+
+
+
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));

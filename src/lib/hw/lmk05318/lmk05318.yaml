@@ -8,7 +8,7 @@ revision:     "0.0.1"
 processors:   [ c ]
 bus:
     type: I2C
-    wr_mask: 0x800000
+    rd_mask: 0x800000
     usdr_path: /debug/hw/lmk05318/0/reg
 addr_width:   16
 data_width:   8

@@ -310,6 +310,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMK03518 outputs synced");
+
     return res;
 }
 
