@@ -217,8 +217,8 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
                                CH5_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH4_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW),   //R24   set ch4..7 mute levels
 
-        MAKE_LMK05318_INT_FLAG0(0,1,0,0),                //R19
-        MAKE_LMK05318_INT_FLAG1(0,0,1,0,0,0,0,0),        //R20
+        MAKE_LMK05318_INT_FLAG0(0,0,0,0),                //R19
+        MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),        //R20
 
     };
 
@@ -477,13 +477,13 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return -ENODEV;
     }
 
-#if 1
+#if 0
     res = lmk05318_reg_wr_n(out, lmk05318_rom_test, SIZEOF_ARRAY(lmk05318_rom_test));
     if (res)
         return res;
 #endif
 
-#if 0
+#if 1
     res = lmk05318_init(out, dpll_mode);
     if(res)
     {
@@ -938,7 +938,7 @@ static inline int lmk05318_get_output_divider(const lmk05318_out_config_t* cfg, 
     return freq_invalid;
 }
 
-#define LMK05318_SOLVER_DEBUG
+//#define LMK05318_SOLVER_DEBUG
 
 VWLT_ATTRIBUTE(optimize("-Ofast"))
 static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned cnt_to_solve, uint64_t f_in,
