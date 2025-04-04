@@ -216,6 +216,10 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
                                CH6_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH5_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH4_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW),   //R24   set ch4..7 mute levels
+
+        MAKE_LMK05318_INT_FLAG0(0,1,0,0),                //R19
+        MAKE_LMK05318_INT_FLAG1(0,0,1,0,0,0,0,0),        //R20
+
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
