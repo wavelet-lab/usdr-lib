@@ -477,15 +477,13 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return -ENODEV;
     }
 
-#if 0
+#if 1
     res = lmk05318_reg_wr_n(out, lmk05318_rom_test, SIZEOF_ARRAY(lmk05318_rom_test));
     if (res)
         return res;
-
-    return 0;
 #endif
 
-#if 1
+#if 0
     res = lmk05318_init(out, dpll_mode);
     if(res)
     {
@@ -661,10 +659,11 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
     }
 
     unsigned n = fvco2 / fref;
-    unsigned num = (fvco2 - n * (uint64_t)fref) * ((1ull << 24) - 1) / fref;
+    unsigned num = (fvco2 - n * (uint64_t)fref) * (1ull << 24) / fref;
     int res;
 
-    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL2 FVCO=%" PRIu64 " N=%d NUM=%d PD1=%d PD2=%d\n", fvco2, n, num, pd1, pd2);
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL2 RS=%u RP=%u FPD2=%u FVCO2=%" PRIu64 " N=%d NUM=%d PD1=%d PD2=%d\n",
+             d->fref_pll2_div_rs, d->fref_pll2_div_rp, fref, fvco2, n, num, pd1, pd2);
 
     // one of PDs may be unused (==0) -> we should fix it before registers set
     if(pd1 < APLL2_PDIV_MIN || pd1 > APLL2_PDIV_MAX)
@@ -749,7 +748,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
     //in DPLL mode we use FIXED 40-bit APLL1 denominator and programmed 40-bit numerator
     if(dpll_mode)
     {
-        uint64_t num = (fvco - n * (uint64_t)fref) * ((1ull << 40) - 1) / fref;
+        uint64_t num = (fvco - n * (uint64_t)fref) * (1ull << 40) / fref;
 
         USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 " DEN=FIXED\n", fvco, n, num);
 
@@ -939,7 +938,7 @@ static inline int lmk05318_get_output_divider(const lmk05318_out_config_t* cfg, 
     return freq_invalid;
 }
 
-//#define LMK05318_SOLVER_DEBUG
+#define LMK05318_SOLVER_DEBUG
 
 VWLT_ATTRIBUTE(optimize("-Ofast"))
 static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned cnt_to_solve, uint64_t f_in,
@@ -1826,6 +1825,7 @@ int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
     bool locked = false;
     uint8_t reg;
     unsigned los_msk;
+    bool pll2_vm_inside;
 
     while(timeout == 0 || elapsed < timeout)
     {
@@ -1835,7 +1835,7 @@ int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
             USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 read(PLL2_CALSTAT1) error:%d", res);
             return res;
         }
-        const bool pll2_vm_inside = reg & PLL2_VM_INSIDE_MSK;
+        pll2_vm_inside = reg & PLL2_VM_INSIDE_MSK;
 
         res = lmk05318_check_lock(d, &los_msk, true/*silent*/);
         if(res)
@@ -1855,7 +1855,8 @@ int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
 
     if(!locked)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "APLL2 is not locked!");
+        USDR_LOG("5318", USDR_LOG_ERROR, "APLL2 is not locked! [PLL2_CALSTAT1:%u PLL2_VM_INSIDE:0x%02x LOS_MASK:0x%02x LMK05318_LOL_PLL2:%u]",
+                 reg, pll2_vm_inside ? 1 : 0, los_msk,(los_msk & LMK05318_LOL_PLL2) ? 1 : 0);
         return -ETIMEDOUT;
     }
 

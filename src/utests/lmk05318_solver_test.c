@@ -170,8 +170,8 @@ START_TEST(lmk05318_solver_test6)
     res = res ? res : lmk05318_port_request(cfg, 2, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
     res = res ? res : lmk05318_port_request(cfg, 3, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
     res = res ? res : lmk05318_port_request(cfg, 4, 156250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, 156250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6,  10000000, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(cfg, 5,  13000000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6,  13000000, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
     res = res ? res : lmk05318_port_request(cfg, 7,         1, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
 
