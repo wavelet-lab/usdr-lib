@@ -1044,7 +1044,7 @@ static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned c
             fvco2_range_t* rr_sec = &fvco2_ranges[j];
 
             //ignore equal port variants with different PDs
-            if(outs[rr_sec->port_idx].port == outs[rr_prim->port_idx].port)
+            if(outs[rr_sec->port_idx].port == outs[rr_prim->port_idx].port && cnt_to_solve != 1)
                 continue;
 
             uint64_t nmin = MAX(intersection.min, rr_sec->fvco2.min);
