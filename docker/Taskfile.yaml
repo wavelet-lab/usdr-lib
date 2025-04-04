@@ -1,57 +1,61 @@
 version: '3'
 
+vars:
+  PACKAGE_DIR_NAME:
+    sh: "echo $PACKAGE_DIR_NAME"
+  PACKAGE_ARCH_NAME:
+    sh: "echo $PACKAGE_ARCH_NAME"
+  OUTPUT_DIR_NAME:
+    sh: "echo $PACKAGE_DIR_NAME-$PACKAGE_ARCH_NAME"
+
 tasks:
-  deb-ubuntu:
-    desc: Build the debian packages for Ubuntu
-    dir: /work/work
-    cmds:
-      - rm -f debian
-      - ln -s packaging/ubuntu debian
-      - debuild -us -uc -eDH_VERBOSE=1
 
-  deb-ubuntu-bionic:
-    desc: Build the debian packages for Ubuntu Bionic(18.04)
-    dir: /work/work
-    cmds:
-      - rm -f debian
-      - ln -s packaging/ubuntu-bionic debian
-      - debuild -us -uc -eDH_VERBOSE=1
-
-  deb-debian-bookworm:
-    desc: Build the debian packages for Debian Bookworm(12)
-    dir: /work/work
-    cmds:
-      - rm -f debian
-      - ln -s packaging/debian-bookworm debian
-      - debuild -us -uc -eDH_VERBOSE=1
-
-  deb-clean:
-    desc: Cleans after the debian package build
-    cmds:
-      - rm -f /work/*.deb /work/*.ddeb /work/*.dsc /work/*.changes /work/*.tar.gz /work/*.build /work/*.buildinfo
-      - rm -rf /work/work/debian
-      - rm -rf /work/work/obj-*
-
-  build:
-    desc: Build the project
+  clean:
+    desc: Clean the build environment
     preconditions:
-      - test -d /work/build
-    dir: /work/build
+      - sh: test -n "{{.PACKAGE_DIR_NAME}}"
+        msg: "PACKAGE_DIR_NAME env var is not set"
+      - sh: test -n "{{.PACKAGE_ARCH_NAME}}"
+        msg: "PACKAGE_ARCH_NAME env var is not set"
+      - sh: test -d "/work/source/packaging/{{.PACKAGE_DIR_NAME}}"
+        msg: "Package `{{.PACKAGE_DIR_NAME}}` directory not found"
     cmds:
-      - rm -rf /work/build/.*
-      - rm -rf /work/build/*
-      - cmake /work/work/src
-      - make VERBOSE=1
+      - rm -rf /work/build
+      - rm -rf /work/output/{{.OUTPUT_DIR_NAME}}
+      - mkdir -p /work/build
+      - mkdir -p /work/output/{{.OUTPUT_DIR_NAME}}
+
+  prepare:
+    desc: Prepare the build environment
+    deps:
+      - clean
+    preconditions:
+      - test -d /work/source
+    dir: /work/build/source
+    cmds:
+      - cp -ra /work/source /work/build/
+      - ln -s packaging/{{.PACKAGE_DIR_NAME}} debian
+
+  deb:
+    desc: Build the debian packages
+    deps:
+      - prepare
+    dir: /work/build/source
+    cmds:
+      - debuild -us -uc -eDH_VERBOSE=1
+      - cp -ra /work/build/*.deb /work/output/{{.OUTPUT_DIR_NAME}}/
 
   ppa:
-    desc: Upload the debian package to the ppa
+    desc: Upload the package to the launchpad/ppa
+    deps:
+      - prepare
     preconditions:
       - test -d /mnt/gnupg
-      - test -d debian/
+    dir: /work/build/source
     cmds:
       - rm -rf /root/.gnupg
       - cp -ra /mnt/gnupg /root/.gnupg 2>/dev/null | true
       - rm -rf /root/.gnupg/S.* /root/.gnupg/public-keys.d/.* /root/.gnupg/public-keys.d/*.lock
       - gpg-agent --daemon
       - debuild -S
-      - dput ppa:wavelet-lab/usdr-lib /work/*.changes
+      - dput ppa:wavelet-lab/usdr-lib /work/build/*.changes

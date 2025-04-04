@@ -8,7 +8,7 @@ Vcs-Browser: https://github.com/wavelet-lab/usdr-lib
 Vcs-Git: https://github.com/wavelet-lab/usdr-lib.git
 Build-Depends:
      debhelper (>= 12.10),
-     dkms | dh-dkms,
+     dkms,
      build-essential,
      cmake,
      python3,

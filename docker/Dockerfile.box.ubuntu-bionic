@@ -1,3 +1,4 @@
+# Ubuntu Bionic Beaver (18.04)
 FROM ubuntu:18.04
 
 ENV TZ=UTC
@@ -31,8 +32,11 @@ RUN apt-get install dh-make devscripts debhelper dkms -y
 
 RUN sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
 
-RUN mkdir -p /work/work
 RUN mkdir -p /work/build
-WORKDIR /work/work/
+RUN mkdir -p /work/source
+RUN mkdir -p /work/output
+ENV PACKAGE_DIR_NAME=ubuntu-bionic
+ENV PACKAGE_ARCH_NAME=unknown
+WORKDIR /work/
 
 CMD ["tail", "-f", "/dev/null"]

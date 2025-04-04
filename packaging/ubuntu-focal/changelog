@@ -1,4 +1,4 @@
-usdr (0.9.9~bionic0) bionic; urgency=low
+usdr (0.9.9~focal0) focal; urgency=low
 
   * Fixes and improvements
 

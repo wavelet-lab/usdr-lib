@@ -1,0 +1,93 @@
+version: '3'
+
+env:
+  DOCKER_CLI_HINTS: "false"
+  DEBIAN_FRONTEND: "noninteractive"
+vars:
+  NOW:
+    sh: "date +%Y%m%d%H%m%S"
+  LABEL:
+    sh: "echo box-$(basename {{.ROOT_DIR}})"
+  DOCKER_FILE_PREFIX: "docker/Dockerfile.box"
+
+tasks:
+
+  _box:
+    internal: true
+    interactive: true
+    requires:
+      vars:
+        - name: OS
+          enum: [ 'ubuntu', 'debian' ]
+        - name: DISTRO_NAME
+          enum: [ 'bookworm', 'bionic', 'focal', 'jammy', 'noble' ]
+        - name: ARCH
+          enum: [ 'amd64', 'aarch64' ]
+        - COMMAND
+    vars:
+      PLATFORM: 'linux/{{.ARCH}}'
+      DOCKER_IMAGE: '{{.LABEL}}-{{.OS}}-{{.DISTRO_NAME}}-{{.ARCH}}'
+      DOCKER_FILE: '{{.DOCKER_FILE_PREFIX}}.{{.OS}}-{{.DISTRO_NAME}}'
+      COMMAND: '{{.COMMAND}}'
+      CONTAINER_NAME: '{{.DOCKER_IMAGE}}-{{.NOW}}'
+    cmds:
+      - docker build --platform {{.PLATFORM}} -t {{.DOCKER_IMAGE}} -f {{.DOCKER_FILE}} --label {{.LABEL}}=true .
+      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work/source:ro -v $(pwd)/output:/work/output -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml:ro -v ~/.gnupg:/mnt/gnupg:ro -e PACKAGE_ARCH_NAME={{.ARCH}} --name {{.CONTAINER_NAME}} {{.DOCKER_IMAGE}}
+      - silent: true
+        cmd: |
+          docker exec -ti {{.CONTAINER_NAME}} {{.COMMAND}}
+
+  '*-*-*-deb':
+    desc: Build the debian packages
+    summary: |
+      Use this task to build deb packages for the specified OS and distro.
+      Results will be saved in the ./output directory.
+    cmds:
+      - task: _box
+        vars:
+          OS: '{{index .MATCH 0}}'
+          DISTRO_NAME: '{{index .MATCH 1}}'
+          ARCH: '{{index .MATCH 2}}'
+          COMMAND: 'task deb'
+
+  '*-*-*-int':
+    desc: The build environment in interactive mode
+    summary: |
+      Use this task to start the build environment in interactive mode.
+    cmds:
+      - task: _box
+        vars:
+          OS: '{{index .MATCH 0}}'
+          DISTRO_NAME: '{{index .MATCH 1}}'
+          ARCH: '{{index .MATCH 2}}'
+          COMMAND: '/bin/bash'
+
+  clean:
+    desc: Stops and removes build containers
+    cmds:
+      - silent: true
+        cmd: |
+          containers=$(docker ps -aq -f label={{.LABEL}})
+          
+          if [ -z "$containers" ]; then
+             echo "No containers found!"
+             exit 0
+          fi
+          
+          docker rm -f -v $containers
+
+  clean-all:
+    desc: Removes all all build images
+    deps:
+      - clean
+    cmds:
+      - silent: true
+        cmd: |
+          images=$(docker image ls -aq -f label={{.LABEL}})
+          
+          if [ -z "$images" ]; then
+             echo "No images found!"
+             exit 0
+          fi
+          
+          docker image rm -f $images
