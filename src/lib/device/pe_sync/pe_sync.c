@@ -288,19 +288,27 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
-    usleep(1000); //wait until lmk digests all this
+    usleep(100); //wait until lmk digests all this
 
     //wait for lock
-    const unsigned lock_expected = LMK05318_LOS_XO | LMK05318_LOL_PLL1 |
-                                   (d->gen.vco2_freq ? LMK05318_LOL_PLL2 : 0) |
-                                   (xo.fdet_bypass ? 0 : LMK05318_LOS_FDET_XO) |
-                                   (use_dpll ? (LMK05318_LOPL_DPLL | LMK05318_LOFL_DPLL) : 0);
+    //APLL1/DPLL
+    res = lmk05318_wait_apll1_lock(&d->gen, use_dpll, 10000);
+    //APLL2 (if needed)
+    res = res ? res : (d->gen.vco2_freq ? lmk05318_wait_apll2_lock(&d->gen, 10000) : 0);
 
-    res = lmk05318_wait_lock(&d->gen, lock_expected, 10000);
+    unsigned los_msk;
+    lmk05318_check_lock(&d->gen, &los_msk, false /*silent*/); //just to log state
+
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_WARNING, "PLLs not locked during specified timeout");
+        return res;
+    }
+
+    //sync
+    res = lmk05318_sync(&d->gen);
     if(res)
         return res;
-
-
 
     return res;
 }

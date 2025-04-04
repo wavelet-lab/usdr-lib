@@ -163,12 +163,59 @@ static int lmk05318_softreset(lmk05318_state_t* out)
     return lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));;
 }
 
+int lmk05318_sync(lmk05318_state_t* out)
+{
+    uint8_t reg_ctrl;
+    const uint8_t mask = ((uint8_t)1 << SYNC_SW_OFF);
+
+    int res = lmk05318_reg_rd(out, DEV_CTL, &reg_ctrl);
+    if(res)
+        return res;
+
+    uint32_t regs[] =
+        {
+            MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl |  mask),
+            MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl & ~mask),
+        };
+
+    return lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));;
+}
+
+int lmk05318_mute(lmk05318_state_t* out, uint8_t chmask)
+{
+    for(unsigned ch = 0; ch < 8; ++ch)
+    {
+        bool muted = ((chmask >> ch) & 0x1) == 0x1;
+        if(muted)
+        {
+            USDR_LOG("5318", USDR_LOG_WARNING, "LMK05318 OUT CH%u is MUTED", ch);
+        }
+    }
+
+    uint32_t reg = MAKE_LMK05318_REG_WR(OUT_MUTE, chmask);
+    return lmk05318_reg_wr_n(out, &reg, 1);
+}
+
+
 static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
 {
     uint32_t regs[] =
     {
-        MAKE_LMK05318_DEV_CTL(0, 0, dpllmode ? 1 : 0, 1, 1),        //R12
-        MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, dpllmode ? 1 : 0),   //R252
+        MAKE_LMK05318_DEV_CTL(0, 0, dpllmode ? 1 : 0, 1, 1, 1, 1),   //R12   set APLL1 mode - DPLL | Free-run
+        MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, 0, dpllmode ? 1 : 0), //R252  enable/disable DPLL
+        MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, dpllmode ? 0 : 1),       //R39   set fixed APLL1 denumerator for DPLL en, programmed den otherwise
+        MAKE_LMK05318_SPARE_NVMBASE2_BY1(0, 0, 0),                   //R40   set fixed APPL2 denumerator always
+        MAKE_LMK05318_PLL_CLK_CFG(0, 0b111),                         //R47   set PLL clock cfg
+        MAKE_LMK05318_OUTSYNCCTL(1, 1, 1),                           //R70   enable APLL1/APLL2 channel sync
+        MAKE_LMK05318_OUTSYNCEN(1, 1, 1, 1, 1, 1),                   //R71   enable ch0..ch7 out sync
+        MAKE_LMK05318_MUTELVL1(CH3_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
+                               CH2_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
+                               CH1_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
+                               CH0_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW),   //R23   set ch0..3 mute levels
+        MAKE_LMK05318_MUTELVL2(CH7_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
+                               CH6_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
+                               CH5_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
+                               CH4_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW),   //R24   set ch4..7 mute levels
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -426,7 +473,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return -ENODEV;
     }
 
-#if 1
+#if 0
     res = lmk05318_reg_wr_n(out, lmk05318_rom_test, SIZEOF_ARRAY(lmk05318_rom_test));
     if (res)
         return res;
@@ -434,7 +481,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     return 0;
 #endif
 
-#if 0
+#if 1
     res = lmk05318_init(out, dpll_mode);
     if(res)
     {
@@ -604,13 +651,13 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
                                           fvco2, pd1, pd2);
         // Disable
         uint32_t regs[] = {
-            MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
+            MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1), //R100 Deactivate APLL2
         };
         return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
     }
 
     unsigned n = fvco2 / fref;
-    unsigned num = (fvco2 - n * (uint64_t)fref) * (1ull << 24) / fref;
+    unsigned num = (fvco2 - n * (uint64_t)fref) * ((1ull << 24) - 1) / fref;
     int res;
 
     USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL2 FVCO=%" PRIu64 " N=%d NUM=%d PD1=%d PD2=%d\n", fvco2, n, num, pd1, pd2);
@@ -626,14 +673,13 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d, uint64_t fvco2, unsigned 
     }
 
     uint32_t regs[] = {
-        //MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),  //R100
         MAKE_LMK05318_PLL2_CTRL2(pd2 - 1, pd1 - 1),                                     //R102
         MAKE_LMK05318_PLL2_NDIV_BY0(n),                                                 //R135
         MAKE_LMK05318_PLL2_NDIV_BY1(n),                                                 //R134
         MAKE_LMK05318_PLL2_NUM_BY0(num),                                                //R138
         MAKE_LMK05318_PLL2_NUM_BY1(num),                                                //R137
         MAKE_LMK05318_PLL2_NUM_BY2(num),                                                //R136
-        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 0),  //R100
+        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 0),  //R100  Activate APLL2
     };
 
     res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -678,9 +724,9 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
     }
 
     uint32_t regs[] = {
-        MAKE_LMK05318_XO_CLKCTL1(xo_doubler_enabled ? 1 : 0, xo_fdet_bypass ? 1 : 0),   //R42
-        MAKE_LMK05318_XO_CLKCTL2(xo_type_raw),                                          //R43
-        MAKE_LMK05318_XO_CONFIG(d->xo.pll1_fref_rdiv - 1),                              //R44
+        MAKE_LMK05318_XO_CLKCTL1(xo_doubler_enabled ? 1 : 0, xo_fdet_bypass ? 1 : 0, 0, 1),   //R42
+        MAKE_LMK05318_XO_CLKCTL2(1, xo_type_raw, 2),                                          //R43
+        MAKE_LMK05318_XO_CONFIG(d->xo.pll1_fref_rdiv - 1),                                    //R44
     };
 
     int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -695,47 +741,120 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
     unsigned fref = (d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2 : 1);
     uint64_t fvco = VCO_APLL1;
     unsigned n = fvco / fref;
-    uint64_t num = (fvco - n * (uint64_t)fref) * (1ull << 40) / fref;
 
-    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 "\n", fvco, n, num);
+    //in DPLL mode we use FIXED 40-bit APLL1 denominator and programmed 40-bit numerator
+    if(dpll_mode)
+    {
+        uint64_t num = (fvco - n * (uint64_t)fref) * ((1ull << 40) - 1) / fref;
 
-    uint32_t regs[] = {
-        //MAKE_LMK05318_PLL1_CTRL0(1),                    //R74
-        MAKE_LMK05318_PLL1_MODE(dpll_mode ? 1 : 0),     //R116
-        MAKE_LMK05318_PLL1_NDIV_BY0(n),                 //R109
-        MAKE_LMK05318_PLL1_NDIV_BY1(n),                 //R108
-        MAKE_LMK05318_PLL1_NUM_BY0(num),                //R114
-        MAKE_LMK05318_PLL1_NUM_BY1(num),                //R113
-        MAKE_LMK05318_PLL1_NUM_BY2(num),                //R112
-        MAKE_LMK05318_PLL1_NUM_BY3(num),                //R111
-        MAKE_LMK05318_PLL1_NUM_BY4(num),                //R110
-        MAKE_LMK05318_PLL1_CTRL0(0),                    //R74
-    };
+        USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 " DEN=FIXED\n", fvco, n, num);
 
-    int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
-    if (res)
-        return res;
+        uint32_t regs[] = {
+            MAKE_LMK05318_PLL1_MODE(0, 0, 1),               //R116  DPLL mode
+            MAKE_LMK05318_PLL1_NDIV_BY0(n),                 //R109  NDIV
+            MAKE_LMK05318_PLL1_NDIV_BY1(n),                 //R108  NDIV
+            MAKE_LMK05318_PLL1_NUM_BY0(num),                //R110 |
+            MAKE_LMK05318_PLL1_NUM_BY1(num),                //R111 |
+            MAKE_LMK05318_PLL1_NUM_BY2(num),                //R112 | 40-bit NUM
+            MAKE_LMK05318_PLL1_NUM_BY3(num),                //R113 |
+            MAKE_LMK05318_PLL1_NUM_BY4(num),                //R114 |
+            MAKE_LMK05318_PLL1_CTRL0(0),                    //R74   Activate APLL1
+        };
+
+        int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+        if (res)
+            return res;
+    }
+    // without DPLL we use programmed 24-bit numerator & programmed 24-bit denominator
+    else
+    {
+        double frac = (double)fvco / fref - n;
+        const uint32_t den = ((uint32_t)1 << 24) - 1; //max 24-bit
+        const uint32_t num = (frac * den + 0.5);
+
+        USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu32 " DEN=%" PRIu32 "\n", fvco, n, num, den);
+
+        uint32_t regs[] = {
+            MAKE_LMK05318_PLL1_MODE(0, 0, 0),                         //R116  free-run mode
+            MAKE_LMK05318_PLL1_NDIV_BY0(n),                           //R109  NDIV
+            MAKE_LMK05318_PLL1_NDIV_BY1(n),                           //R108  NDIV
+
+            MAKE_LMK05318_REG_WR(PLL1_NUM_BY4, (uint8_t)den),         //R114
+            MAKE_LMK05318_REG_WR(PLL1_NUM_BY3, (uint8_t)(den >> 8)),  //R113 | 24-bit DEN
+            MAKE_LMK05318_REG_WR(PLL1_NUM_BY2, (uint8_t)(den >> 16)), //R112
+
+            MAKE_LMK05318_REG_WR(PLL1_NUM_BY1, (uint8_t)num),         //R111
+            MAKE_LMK05318_REG_WR(PLL1_NUM_BY0, (uint8_t)(num >> 8)),  //R110 | 24-bit NUM
+            MAKE_LMK05318_PLL1_24B_NUM_23_16((uint8_t)(num >> 16)),   //R339
+
+            MAKE_LMK05318_PLL1_CTRL0(0),                              //R74   Activate APLL1
+        };
+
+        int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+        if (res)
+            return res;
+    }
 
     return 0;
 }
 
+static inline uint64_t lmk05318_max_odiv(unsigned port)
+{
+    switch(port)
+    {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6: return ((uint64_t)1 <<  8);
+    case 7: return ((uint64_t)1 << 32);
+    }
+    return 1;
+}
 
 int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
 {
-    if (port > 7)
-        return -EINVAL;
-    if (udiv == 0)
+    if (port > (LMK05318_MAX_OUT_PORTS - 1) || udiv < 1 || udiv > lmk05318_max_odiv(port))
         return -EINVAL;
 
-    unsigned div = udiv - 1;
-    uint32_t regs[] = {
-        (port == 7) ? MAKE_LMK05318_OUTDIV_7(div) :
-        (port == 6) ? MAKE_LMK05318_OUTDIV_6(div) :
-        (port == 5) ? MAKE_LMK05318_OUTDIV_5(div) :
-        (port == 4) ? MAKE_LMK05318_OUTDIV_4(div) :
-        (port == 3 || port == 2) ? MAKE_LMK05318_OUTDIV_2_3(div) : MAKE_LMK05318_OUTDIV_0_1(div),
-    };
-    return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+    //out7 is special
+    if(port == 7)
+    {
+        uint64_t div_stage2 = udiv >> 8;
+        div_stage2 = div_stage2 ? div_stage2 : 1;
+        uint8_t div_stage1 = udiv / div_stage2;
+
+        --div_stage1;
+        --div_stage2;
+
+        uint32_t regs[] =
+        {
+            MAKE_LMK05318_OUTDIV_7(div_stage1),
+            MAKE_LMK05318_OUTDIV_7_STG2_BY0(div_stage2),
+            MAKE_LMK05318_OUTDIV_7_STG2_BY1(div_stage2),
+            MAKE_LMK05318_OUTDIV_7_STG2_BY2(div_stage2),
+        };
+
+        return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+    }
+
+    uint32_t reg = 0;
+    switch(port)
+    {
+    case 6: reg = MAKE_LMK05318_OUTDIV_6(udiv - 1); break;
+    case 5: reg = MAKE_LMK05318_OUTDIV_5(udiv - 1); break;
+    case 4: reg = MAKE_LMK05318_OUTDIV_4(udiv - 1); break;
+    case 3:
+    case 2: reg = MAKE_LMK05318_OUTDIV_2_3(udiv - 1); break;
+    case 1:
+    case 0: reg = MAKE_LMK05318_OUTDIV_0_1(udiv-1); break;
+    default:
+        return -EINVAL;
+    }
+
+    return lmk05318_add_reg_to_map(d, &reg, 1);
 }
 
 static int lmk05318_set_out_mux_ex(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
@@ -767,24 +886,6 @@ static int lmk05318_set_out_mux_ex(lmk05318_state_t* d, unsigned port, unsigned 
 int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype)
 {
     return lmk05318_set_out_mux_ex(d, port, (pll1 ? OUT_PLL_SEL_APLL1_P1 : OUT_PLL_SEL_APLL2_P1), otype);
-}
-
-static uint64_t lmk05318_max_odiv(unsigned port)
-{
-    assert(port < LMK05318_MAX_OUT_PORTS);
-
-    switch(port)
-    {
-    case 0:
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-    case 5:
-    case 6: return 256ull;
-    case 7: return 256ull * 256 * 256 * 256;
-    }
-    return 1;
 }
 
 static range_t lmk05318_get_freq_range(const lmk05318_out_config_t* cfg)
@@ -1607,7 +1708,7 @@ have_complete_solution:
     return 0;
 }
 
-static void lmk05318_decode_lock_mask(unsigned m, char* s)
+static inline void lmk05318_decode_los_mask(unsigned m, char* s)
 {
     if(!s)
         return;
@@ -1655,7 +1756,7 @@ int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent)
     if(!silent)
     {
         char ss[255];
-        lmk05318_decode_lock_mask(losval, ss);
+        lmk05318_decode_los_mask(losval, ss);
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 LOS_MASK=[%s] %02x:%02x:%02x\n", ss, los[0], los[1], los[2]);
     }
 
@@ -1663,23 +1764,40 @@ int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent)
     return 0;
 }
 
-int lmk05318_wait_lock(lmk05318_state_t* d, unsigned lock_expected, unsigned timeout)
+int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeout)
 {
     int res = 0;
-    unsigned lock_msk = 0;
     unsigned elapsed = 0;
     bool locked = false;
+    uint8_t reg;
+    unsigned los_msk;
 
     while(timeout == 0 || elapsed < timeout)
     {
-        res = lmk05318_check_lock(d, &lock_msk, true /*silent*/);
+        res = lmk05318_reg_rd(d, PLL1_CALSTAT1, &reg);
+        if(res)
+        {
+            USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 read(PLL1_CALSTAT1) error:%d", res);
+            return res;
+        }
+        const bool pll1_vm_inside = reg & PLL1_VM_INSIDE_MSK;
+
+        res = lmk05318_check_lock(d, &los_msk, true/*silent*/);
         if(res)
         {
             USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 lmk05318_check_lock() error:%d", res);
             return res;
         }
 
-        locked = (lock_msk & lock_expected) == lock_expected;
+        if(dpll_mode)
+        {
+            locked = pll1_vm_inside && !(los_msk & LMK05318_LOPL_DPLL) && !(los_msk & LMK05318_LOFL_DPLL);
+        }
+        else
+        {
+            locked = pll1_vm_inside && (los_msk & LMK05318_BAW_LOCK);
+        }
+
         if(locked)
             break;
 
@@ -1687,16 +1805,56 @@ int lmk05318_wait_lock(lmk05318_state_t* d, unsigned lock_expected, unsigned tim
         elapsed += 100;
     }
 
-    char sexp[255], sgot[255];
-    lmk05318_decode_lock_mask(lock_expected, sexp);
-    lmk05318_decode_lock_mask(lock_msk, sgot);
-
     if(!locked)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 is not locked! expected:[%s] got:[%s]", sexp, sgot);
+        USDR_LOG("5318", USDR_LOG_ERROR, "APLL1 is not locked!");
         return -ETIMEDOUT;
     }
 
-    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 locked OK [%s]", sgot);
+    USDR_LOG("5318", USDR_LOG_INFO, "APLL1 locked OK");
+    return 0;
+}
+
+int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
+{
+    int res = 0;
+    unsigned elapsed = 0;
+    bool locked = false;
+    uint8_t reg;
+    unsigned los_msk;
+
+    while(timeout == 0 || elapsed < timeout)
+    {
+        res = lmk05318_reg_rd(d, PLL2_CALSTAT1, &reg);
+        if(res)
+        {
+            USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 read(PLL2_CALSTAT1) error:%d", res);
+            return res;
+        }
+        const bool pll2_vm_inside = reg & PLL2_VM_INSIDE_MSK;
+
+        res = lmk05318_check_lock(d, &los_msk, true/*silent*/);
+        if(res)
+        {
+            USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 lmk05318_check_lock() error:%d", res);
+            return res;
+        }
+
+        locked = pll2_vm_inside && !(los_msk & LMK05318_LOL_PLL2);
+
+        if(locked)
+            break;
+
+        usleep(100);
+        elapsed += 100;
+    }
+
+    if(!locked)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "APLL2 is not locked!");
+        return -ETIMEDOUT;
+    }
+
+    USDR_LOG("5318", USDR_LOG_INFO, "APLL2 locked OK");
     return 0;
 }

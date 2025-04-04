@@ -78,6 +78,12 @@ pages:
           - bits: "3"
             name: SYNC_MUTE
             desc: Determines if the output drivers are muted during a SYNC event, 0x0 = Do not mute any outputs during SYNC, 0x1 = Mute all outputs during SYNC
+          - bits: "1"
+            name: PLLSTRTMODE
+            desc: PLL Startup Mode . When using cascade mode, PLL1 is fixed to a center value while PLL2 locks. Then PLL1 performs final lock.
+          - bits: "0"
+            name: AUTOSTRT
+            desc: Autostart. If AUTOSTRT is set to 1, the device will automatically initiate the PLL and output start-up sequence after a device reset. A device reset can be triggered by the power-on-reset, PDN pin, or by writing to the RESET_SW bit. If AUTOSTRT is 0, the device will halt after the configuration phase; a subsequent write to set the AUTOSTRT bit will initiate the start-up sequence. In Test mode, the AUTOSTRT bit is ignored after device reset, but start-up can be triggered by a subsequent write to set the AUTOSTART bit.
       - addr: 0xD
         name: INT_LIVE0
         fields:
@@ -385,13 +391,25 @@ pages:
           - bits: "3"
             name: XO_FDET_BYP
             desc: XO Frequency Detector Bypass If bypassed, the XO detector status is ignored and the XO input is considered valid by the PLL control state machines 
+          - bits: "2"
+            name: XO_DETECT_BYP
+            desc: XO Amplitude Detector Bypass. If bypassed, the XO input is considered to be valid by the PLL control state machines. XO_DETECT_BYP bit has no effect on the Interrupt register or status outputs.
+          - bits: "0"
+            name: XO_BUFSEL
+            desc: XO Input Buffer Enable
       - addr: 0x2B
         name: XO_CLKCTL2
         fields:
+          - bits: "7"
+            name: XO_CLKCTL2_RESERVED7
+            desc: reset=1
           - bits: "6-3"
             name: XO_TYPE
             desc: XO Input Type; 0x0 = DC-Differential (external termination); 0x1 = AC-Differential (external termination); 0x3 = AC-Differential (internal termination 100-Ω); 0x4 = HCSL (internal termination 50-Ω); 0x8 = CMOS; 0xC = Single-ended (internal termination 50-Ω)
             opts: *in-opts
+          - bits: "2-0"
+            name: XO_CLKCTL2_RESERVED0
+            desc: reset=0x10
       - addr: 0x2C
         name: XO_CONFIG
         fields:
@@ -596,6 +614,8 @@ pages:
       - addr: 0x44
         name: PREDRIVER
         fields:
+          - bits: "7-4"
+            name: PREDRIVER_RESERVED
           - bits: "3-0"
             name: PLL1_CP_BAW
             desc: APLL1 Charge Pump Current Gain PLL1_CP_BAW ranges from 0 to 15. Gain = PLL1_CP_BAW x 100 μA. 
@@ -646,6 +666,12 @@ pages:
           - bits: "4"
             name: BAW_LOCKDET_EN
             desc: BAW Lock Detect Enable 
+          - bits: "3-2"
+            name: PLL1_CLSDWAIT
+            desc: Closed Loop Wait Period, VCO calibration time per step (up to 7 steps).
+          - bits: "1-0"
+            name: PLL1_VCOWAIT
+            desc: VCO Wait Period. Timeout counter before starting VCO calibration.
       - addr: 0x50
         name: BAW_LOCKDET_PPM_MAX_BY1
         fields:
@@ -692,6 +718,9 @@ pages:
       - addr: 0x65
         name: PLL2_CTRL1
         fields:
+          - bits: "2"
+            name: PLL2_VM_BYP
+            desc: PLL2 Vtune Monitor Bypass
           - bits: "1-0"
             name: PLL2_CP
             desc: PLL2 Charge Pump Gain; 0x0 = 1.6 mA; 0x1 = 3.2 mA; 0x2 = 4.8 mA; 0x3 = 6.4 mA
@@ -716,7 +745,10 @@ pages:
         fields:
           - bits: "3-2"
             name: PLL2_CLSDWAIT
-            desc: Closed Loop Wait Period VCO calibration time per step (up to 7 steps); 0x0 = 0.3 ms; 0x1 = 3 ms; 0x2 = 30 ms; 0x3 = 300 ms 
+            desc: Closed Loop Wait Period VCO calibration time per step (up to 7 steps); 0x0 = 0.3 ms; 0x1 = 3 ms; 0x2 = 30 ms; 0x3 = 300 ms
+          - bits: "1-0"
+            name: PLL2_VCOWAIT
+            desc: VCO Wait Period. Timeout counter before starting VCO calibration.
       - addr: "0x6C:0x6D"
         name: PLL1_NDIV
 
@@ -726,6 +758,15 @@ pages:
       - addr: 0x73
         name: PLL1_MASHCTRL
         fields:
+          - bits: "7"
+            name: PLL1_DUAL_PH_EN
+            desc: PLL1 DUAL PHASE functionality on the feedback path enabled
+          - bits: "6"
+            name: PLL1_MASHSEED1
+            desc: Mash Engine seed for second stage
+          - bits: "5"
+            name: PLL1_MASHSEED0
+            desc: Mash Engine seed for first stage
           - bits: "4-3"
             name: PLL1_DTHRMODE
             desc: APLL1 SDM Dither Mode; 0x0 = Weak; 0x1 = Medium; 0x2 = Strong; 0x3 = Disabled 
@@ -735,6 +776,12 @@ pages:
       - addr: 0x74
         name: PLL1_MODE
         fields:
+          - bits: "2"
+            name: PLL1_IGNORE_GPIO_PIN
+            desc: Ignore PLL1 frequency increment or decrement updates via pins
+          - bits: "1"
+            name: PLL1_FDEV_EN
+            desc: Enable PLL1 frequency increment or decrement via pins or registers
           - bits: "0"
             name: PLL1_MODE
             desc: PLL1 operational mode; 0x0 = Free-run mode (APLL only); 0x1 = DPLL mode 
@@ -747,6 +794,13 @@ pages:
           - bits: "5-0"
             name: PLL1_LF_R2
             desc: PLL1 Loop Filter R2, Ohm
+
+      - addr: 0x82
+        name: PLL1_LF_C1
+        fields:
+          - bits: "2-0"
+            name: PLL1_LF_C1
+            desc: PLL1 Loop Filter C1. Not Used, fixed 100 pF
 
       - addr: 0x83
         name: PLL1_LF_R3
@@ -983,6 +1037,9 @@ pages:
           - bits: "7"
             name: DPLL_ZDM_SYNC_EN
             desc: DPLL Zero Delay Synchronization enable 
+          - bits: "6"
+            name: DPLL_ZDM_NDIV_RST_DIS
+            desc: DPLL NDIV reset disable when ZDM mode is enabled
           - bits: "5"
             name: DPLL_SWITCHOVER_1
             desc: DPLL Switchover Timer 
@@ -1019,6 +1076,9 @@ pages:
       - addr: 0x104
         name: DPLL_REF_TDC_CTL
         fields:
+          - bits: "4"
+            name: DPLL_TDC_SW_MODE
+            desc: DPLL TDC Software Control Enable. Value of TDC control word into the loop-filter is from register dpll_ref_frc_val[35:0].
           - bits: "1"
             name: DPLL_REF_AVOID_SLIP
             desc: Disable Cycle Slip 
@@ -1166,8 +1226,15 @@ pages:
       - addr: "0x14C:0x14F"
         name: DPLL_REF_UNLOCKDET_CNTSTRT
 
-      - addr: "0x150:0x153"
+      - addr: "0x150:0x152"
         name: DPLL_REF_UNLOCKDET_VCO_CNTSTRT
+
+      - addr: 0x153
+        name: PLL1_24B_NUM_23_16
+        fields:
+          - bits: "7-0"
+            name: PLL1_24B_NUM_23_16
+            desc: APPL1 24-bit numerator bits 23:16
 
       - addr: "0x154:0x159"
         name: DPLL_REF_SYNC_PH_OFFSET

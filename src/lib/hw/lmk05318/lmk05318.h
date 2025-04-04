@@ -154,8 +154,11 @@ enum lock_msk {
     LMK05318_BAW_LOCK = 64,
 };
 
+int lmk05318_sync(lmk05318_state_t* out);
+int lmk05318_mute(lmk05318_state_t* out, uint8_t chmask);
 int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent);
-int lmk05318_wait_lock(lmk05318_state_t* d, unsigned lock_expected, unsigned timeout);
+int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeout);
+int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout);
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out);
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);
