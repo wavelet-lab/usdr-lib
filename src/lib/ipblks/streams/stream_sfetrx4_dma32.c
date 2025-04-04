@@ -767,8 +767,10 @@ static int initialize_stream_tx_32(device_t* device,
         if (sc.chcnt > 2)
             return -EINVAL;
 
-        if (!fe_tx4_swap_ab_get(sc.chcnt, &sc.channels, &fe_old_tx_swap))
-            return -EINVAL;
+        res = fe_tx4_swap_ab_get(sc.chcnt, &sc.channels, &fe_old_tx_swap);
+        if (res) {
+            return res;
+        }
 
         fe_old_tx_mute = (sc.chcnt == 1) ? (fe_old_tx_swap ? 1 : 2) : 0;
     } else {
