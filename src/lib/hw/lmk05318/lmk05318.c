@@ -196,6 +196,16 @@ int lmk05318_mute(lmk05318_state_t* out, uint8_t chmask)
     return lmk05318_reg_wr_n(out, &reg, 1);
 }
 
+int lmk05318_reset_los_flags(lmk05318_state_t* d)
+{
+    uint32_t regs[] =
+        {
+            MAKE_LMK05318_INT_FLAG0(0,0,0,0),                //R19
+            MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),        //R20
+        };
+
+    return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
+}
 
 static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
 {
@@ -216,10 +226,6 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
                                CH6_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH5_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH4_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW),   //R24   set ch4..7 mute levels
-
-        MAKE_LMK05318_INT_FLAG0(0,0,0,0),                //R19
-        MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),        //R20
-
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -520,7 +526,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     }
 #endif
 
-    //res = dry_run ? 0 : lmk05318_softreset(out);
+    res = dry_run ? 0 : lmk05318_softreset(out);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d lmk05318_softreset()", res);

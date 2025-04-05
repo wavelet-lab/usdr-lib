@@ -156,6 +156,7 @@ enum lock_msk {
 
 int lmk05318_sync(lmk05318_state_t* out);
 int lmk05318_mute(lmk05318_state_t* out, uint8_t chmask);
+int lmk05318_reset_los_flags(lmk05318_state_t* d);
 int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent);
 int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeout);
 int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout);

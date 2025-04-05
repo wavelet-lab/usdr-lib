@@ -288,13 +288,24 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
-    usleep(100); //wait until lmk digests all this
+    usleep(10000); //wait until lmk digests all this
+
+    //reset LOS flags after soft-reset (inside lmk05318_create_ex())
+    res = lmk05318_reset_los_flags(&d->gen);
+    if(res)
+        return res;
 
     //wait for lock
     //APLL1/DPLL
     res = lmk05318_wait_apll1_lock(&d->gen, use_dpll, 10000);
+
     //APLL2 (if needed)
-    res = res ? res : (d->gen.vco2_freq ? lmk05318_wait_apll2_lock(&d->gen, 10000) : 0);
+    if(res == 0 && d->gen.vco2_freq)
+    {
+        //reset LOS flags once again because APLL2 LOS is set after APLL1 tuning
+        res = lmk05318_reset_los_flags(&d->gen);
+        res = res ? res : lmk05318_wait_apll2_lock(&d->gen, 10000);
+    }
 
     unsigned los_msk;
     lmk05318_check_lock(&d->gen, &los_msk, false /*silent*/); //just to log state
@@ -305,7 +316,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return res;
     }
 
-    //sync
+    //sync to make APLL1/APLL2 & out channels in-phase
     res = lmk05318_sync(&d->gen);
     if(res)
         return res;
