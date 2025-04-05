@@ -230,6 +230,10 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
         MAKE_LMK05318_INT_FLAG0(0,0,0,0),                            //R19   |
         MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),                    //R20   | reset interrupt LOS flags
 
+
+
+
+        MAKE_LMK05318_PREDRIVER(0, 0x08),              //R68 +
         MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(0, 0),     //R80
         MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY0(0x0a),     //R81  |  BAW LOCKDET status
         0x005200,  //R82 BAW LOCKDET/UNLOCKDET begin
@@ -250,6 +254,86 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
         0x00611E,
         0x006284,
         0x006380,  //R99 BAW LOCKDET/UNLOCKDET end
+
+
+        MAKE_LMK05318_INT_FLAG_POL0(1,1,1,1),            //R17 +
+        MAKE_LMK05318_INT_FLAG_POL1(1,1,1,1,1,1,1,1),    //R18 +
+        MAKE_LMK05318_GPIO_OUT(1,1),                     //R36 +
+        MAKE_LMK05318_REF_CLKCTL1(0,0,1,0),              //R45 +
+        MAKE_LMK05318_REF_CLKCTL2(SECREF_TYPE_AC_DIFF_EXT, PRIREF_TYPE_AC_DIFF_EXT),    //R46 +
+        MAKE_LMK05318_STAT0_SEL(0x50),                   //R48 +
+        MAKE_LMK05318_STAT1_SEL(0x4a),                   //R49 +
+        MAKE_LMK05318_PLL2_CTRL1(0, 0x01),               //R101 PLL2 charge pump drain 0x1=3.2mA [default 4.8mA] +
+        MAKE_LMK05318_PLL2_CTRL4(0x1F),                  //R104 PLL2 bleed resisror 0x1F=766.96 Ohm [default open]+
+        MAKE_LMK05318_PLL2_CALCTRL0(0x02, 0x01),         //R105 0x1 = VCO calibration time per step (up to 7 steps) 0x1=3ms [default 0.3ms]+
+        MAKE_LMK05318_PLL1_MASHCTRL(0, 0, 0, 0, 0x03),   //R115 0x3 = APLL1 mash_order3 [default 0 (int mode)]+
+        MAKE_LMK05318_PLL1_LF_R2(0x01),                  //R129 0x1 = APLL1 Loop filter R2=414 Ohm [default 9650]+
+        MAKE_LMK05318_PLL1_LF_R3(0x01),                  //R131 0x1 = APLL1 Loop filter R3=200 Ohm [default 2400] +
+        MAKE_LMK05318_PLL1_LF_R4(0x01),                  //R132 0x1 = APLL1 Loop filter R4=200 Ohm [default 2400]+
+        MAKE_LMK05318_PLL2_MASHCTRL(0, 0x03),            //R139 0x3 = APLL2 mash_order3 [default 0 (int mode)]+
+        MAKE_LMK05318_PLL2_LF_R2(0x02),                  //R140 APLL2 Loop Filter R2=300 Ohm [default 1867]+
+        MAKE_LMK05318_PLL2_LF_R3(0x01),                  //R142 APLL2 Loop filter R3=200 Ohm [default 2400]+
+        MAKE_LMK05318_PLL2_LF_R4(0x01),                  //R143 APLL2 Loop filter R4=200 Ohm [default 2400]+
+        MAKE_LMK05318_PLL2_LF_C3C4(0x7, 0x7),            //R144 APLL2 Loop Filter C3 = 70pF, C4 = 70pF [defailt C3=0(open), C4=0(open)]+
+        MAKE_LMK05318_XO_OFFSET_SW_TIMER(0x1),           //R145 XO input wait timer 3.3ms [default 52.4ms]+
+
+        0x00A0FC,                                        //R160 MEMADR ?
+
+        0x00C050, //R192
+        0x00C100,
+        0x00C200,
+        0x00C300,
+        0x00C400,
+        0x00C51D,
+        0x00C600,
+        0x00C700,
+        0x00C81D,
+        0x00C900,
+        0x00CA00,
+        0x00CB00,
+        0x00CC15,
+        0x00CD00,
+        0x00CE00,
+        0x00CF15, //R207
+
+        0x00D000, //R208 REF0/1 settings begin
+        0x00D114,
+        0x00D200,
+        0x00D316,
+        0x00D400,
+        0x00D514,
+        0x00D600,
+        0x00D716,
+        0x00D900,
+        0x00DA00,
+        0x00DB19,
+        0x00DC6E,
+        0x00DD00,
+        0x00DE03,
+        0x00DF0D,
+        0x00E047,
+        0x00E100,
+        0x00E200,
+        0x00E319,
+        0x00E46E,
+        0x00E500,
+        0x00E603,
+        0x00E70D,
+        0x00E847,
+        0x00E90A,
+        0x00EA0A, //R234 REF0/1 settings end
+
+        MAKE_LMK05318_REF0_PH_VALID_CNT_BY0(0x01),  //R235
+        MAKE_LMK05318_REF0_PH_VALID_CNT_BY1(0x8c),  //R236
+        MAKE_LMK05318_REF0_PH_VALID_CNT_BY2(0xba),  //R237
+        MAKE_LMK05318_REF0_PH_VALID_CNT_BY3(0x80),  //R238
+        MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(0x00),  //R239
+        MAKE_LMK05318_REF1_PH_VALID_CNT_BY1(0xc3),  //R240
+        MAKE_LMK05318_REF1_PH_VALID_CNT_BY2(0x50),  //R241
+        MAKE_LMK05318_REF1_PH_VALID_CNT_BY3(0x00),  //R242
+        MAKE_LMK05318_REF0_PH_VALID_THR(0x3f),      //R243
+        MAKE_LMK05318_REF1_PH_VALID_THR(0x00),      //R244
+
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
