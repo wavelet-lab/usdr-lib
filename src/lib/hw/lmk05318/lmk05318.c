@@ -226,6 +226,8 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
                                CH6_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH5_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH4_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW),   //R24   set ch4..7 mute levels
+        MAKE_LMK05318_INT_FLAG0(0,0,0,0),                            //R19   |
+        MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),                    //R20   | reset interrupt LOS flags
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -526,7 +528,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     }
 #endif
 
-    res = dry_run ? 0 : lmk05318_softreset(out);
+    //res = dry_run ? 0 : lmk05318_softreset(out);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d lmk05318_softreset()", res);
@@ -1780,6 +1782,7 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeo
     bool locked = false;
     uint8_t reg;
     unsigned los_msk;
+    bool pll1_vm_inside;
 
     while(timeout == 0 || elapsed < timeout)
     {
@@ -1789,7 +1792,7 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeo
             USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 read(PLL1_CALSTAT1) error:%d", res);
             return res;
         }
-        const bool pll1_vm_inside = reg & PLL1_VM_INSIDE_MSK;
+        pll1_vm_inside = reg & PLL1_VM_INSIDE_MSK;
 
         res = lmk05318_check_lock(d, &los_msk, true/*silent*/);
         if(res)
@@ -1816,7 +1819,9 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeo
 
     if(!locked)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "APLL1 is not locked!");
+        USDR_LOG("5318", USDR_LOG_ERROR, "APLL1 is not locked! [PLL1_CALSTAT1:%u PLL1_VM_INSIDE:0x%02x LOS_MASK:0x%02x LMK05318_BAW_LOCK:%u]",
+                 reg, pll1_vm_inside ? 1 : 0, los_msk,(los_msk & LMK05318_BAW_LOCK) ? 1 : 0);
+
         return -ETIMEDOUT;
     }
 
