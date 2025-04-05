@@ -230,26 +230,27 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
         MAKE_LMK05318_INT_FLAG0(0,0,0,0),                            //R19   |
         MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),                    //R20   | reset interrupt LOS flags
 
-        0x004F11,   //R79
-        0x005080,
-        0x00510A,
-        0x005200,
-        0x00530E,
-        0x0054A6,
-        0x005500,
-        0x005600,
-        0x00571E,
-        0x005884,
-        0x005980,   //  | BAW detect, lock&unlock settings
-        0x005A00,
-        0x005B14,
-        0x005C00,
-        0x005D0E,
-        0x005EA6,
-        0x005F00,
-        0x006000,
-        0x00611E,
-        0x006284,
+        MAKE_LMK05318_PLL1_CALCTRL0(1, 0, 1),                        //R79 BAW_LOCKDET_EN=1 PLL1_VCOWAIT=1
+        MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(1, 0),                 //R80 BAW_LOCK=1
+
+        0x00510A,   //R81
+        0x005200,   //      |
+        0x00530E,   //      |
+        0x0054A6,   //      |
+        0x005500,   //      |
+        0x005600,   //      |
+        0x00571E,   //      |
+        0x005884,   //      |
+        0x005980,   //      | BAW lock&unlock detection
+        0x005A00,   //      |
+        0x005B14,   //      |
+        0x005C00,   //      |
+        0x005D0E,   //      |
+        0x005EA6,   //      |
+        0x005F00,   //      |
+        0x006000,   //      |
+        0x00611E,   //      |
+        0x006284,   //      |
         0x006380,   //R99
     };
 
