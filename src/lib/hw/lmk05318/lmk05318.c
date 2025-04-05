@@ -226,8 +226,30 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
                                CH6_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH5_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH4_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW),   //R24   set ch4..7 mute levels
+
         MAKE_LMK05318_INT_FLAG0(0,0,0,0),                            //R19   |
         MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),                    //R20   | reset interrupt LOS flags
+
+        MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(0, 0),     //R80
+        MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY0(0x0a),     //R81  |  BAW LOCKDET status
+        0x005200,  //R82 BAW LOCKDET/UNLOCKDET begin
+        0x005307,
+        0x00549E,
+        0x005500,
+        0x005600,
+        0x00571E,
+        0x005884,
+        0x005980,
+        0x005A00,
+        0x005B14,
+        0x005C00,
+        0x005D07,
+        0x005E9E,
+        0x005F00,
+        0x006000,
+        0x00611E,
+        0x006284,
+        0x006380,  //R99 BAW LOCKDET/UNLOCKDET end
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -528,7 +550,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     }
 #endif
 
-    //res = dry_run ? 0 : lmk05318_softreset(out);
+    res = dry_run ? 0 : lmk05318_softreset(out);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d lmk05318_softreset()", res);
