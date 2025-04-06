@@ -1211,20 +1211,17 @@ pages:
       - addr: 0x13F
         name: DPLL_REF_MASHCTL
 
-      - addr: "0x140:0x141"
-        name: DPLL_REF_LOCKDET_PPM_MAX
+      - addr: "0x140:0x144"
+        name: DPLL_REF_LOCKDET_1_5
 
-      - addr: "0x142:0x145"
-        name: DPLL_REF_LOCKDET_CNTSTRT
+      - addr: "0x145:0x149"
+        name: DPLL_REF_LOCKDET_6_10
 
-      - addr: "0x146:0x149"
-        name: DPLL_REF_LOCKDET_VCO_CNTSTRT
+      - addr: "0x14A:0x14C"
+        name: DPLL_REF_UNLOCKDET_1_3
 
-      - addr: "0x14A:0x14B"
-        name: DPLL_REF_UNLOCKDET_PPM_MAX
-
-      - addr: "0x14C:0x14F"
-        name: DPLL_REF_UNLOCKDET_CNTSTRT
+      - addr: "0x14D:0x14F"
+        name: PLL2_DEN
 
       - addr: "0x150:0x152"
         name: DPLL_REF_UNLOCKDET_VCO_CNTSTRT

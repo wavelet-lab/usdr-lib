@@ -6,10 +6,15 @@
 #define DELTA_MINUS 2
 
 static lmk05318_out_config_t cfg[OUTS_LEN];
+static lmk05318_state_t dev;
 
 static void setup()
 {
     memset(cfg, 0, sizeof(cfg));
+    memset(&dev, 0, sizeof(dev));
+
+    dev.fref_pll2_div_rp = 3;
+    dev.fref_pll2_div_rs = 6;
 
     int res = 0;
     res = res ? res : lmk05318_port_request(cfg, 0, 100000000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
@@ -29,14 +34,14 @@ static void teardown()
 
 START_TEST(lmk05318_solver_test1)
 {
-    int res = lmk05318_solver(NULL, cfg, OUTS_LEN, true);
+    int res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
     ck_assert_int_eq( res, 0 );
 }
 
 START_TEST(lmk05318_solver_test2)
 {
     int res = 0;
-    const uint64_t f = 5659995555ull;
+    const uint64_t f = 5650000000ull;
 
     res = res ? res : lmk05318_port_request(cfg, 2, f/7/256, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
     res = res ? res : lmk05318_port_request(cfg, 3, f/7/256, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
@@ -44,7 +49,7 @@ START_TEST(lmk05318_solver_test2)
     res = res ? res : lmk05318_port_request(cfg, 6,  f/7/17, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(NULL, cfg, OUTS_LEN, true);
+    res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -52,7 +57,7 @@ START_TEST(lmk05318_solver_test2)
 START_TEST(lmk05318_solver_test3)
 {
     uint64_t fvco1 = 2500000000ull;
-    uint64_t f0_3 = fvco1 / 123;
+    uint64_t f0_3 = fvco1 / 16;
     uint64_t f4_7 = 12500000; //3840000;
 
     int res = 0;
@@ -76,14 +81,14 @@ START_TEST(lmk05318_solver_test3)
     res = res ? res : lmk05318_set_port_affinity(cfg, 7, AFF_APLL2);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(NULL, cfg, OUTS_LEN, true);
+    res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
     ck_assert_int_eq( res, 0 );
 }
 
 START_TEST(lmk05318_solver_test4)
 {
     uint64_t fvco1 = 2500000000ull;
-    uint64_t f0_3 = fvco1 / 123;
+    uint64_t f0_3 = fvco1 / 16;
     uint64_t f4_7 = 12500000; //3840000;
 
     memset(cfg, 0, sizeof(cfg));
@@ -109,10 +114,10 @@ START_TEST(lmk05318_solver_test4)
     res = res ? res : lmk05318_set_port_affinity(cfg, 7, AFF_APLL2);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(NULL, cfg, 4, true);
+    res = lmk05318_solver(&dev, cfg, 4, true);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(NULL, cfg + 4, 4, true);
+    res = lmk05318_solver(&dev, cfg + 4, 4, true);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -143,7 +148,7 @@ START_TEST(lmk05318_solver_test5)
     res = res ? res : lmk05318_port_request(cfg, 7,         1, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(NULL, cfg, OUTS_LEN, true);
+    res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
     ck_assert_int_eq( res, 0 );
 
 }
@@ -170,7 +175,7 @@ START_TEST(lmk05318_solver_test6)
     res = res ? res : lmk05318_port_request(cfg, 2, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
     res = res ? res : lmk05318_port_request(cfg, 3, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
     res = res ? res : lmk05318_port_request(cfg, 4, 156250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5,  17000000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5,  26000000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
     res = res ? res : lmk05318_port_request(cfg, 6,  13000000, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
     res = res ? res : lmk05318_port_request(cfg, 7,         1, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
@@ -200,11 +205,11 @@ Suite * lmk05318_solver_suite(void)
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
 
-    //tcase_add_test(tc_core, lmk05318_solver_test1);
+    tcase_add_test(tc_core, lmk05318_solver_test1);
     //tcase_add_test(tc_core, lmk05318_solver_test2);
-    //tcase_add_test(tc_core, lmk05318_solver_test3);
-    //tcase_add_test(tc_core, lmk05318_solver_test4);
-    //tcase_add_test(tc_core, lmk05318_solver_test5);
+    tcase_add_test(tc_core, lmk05318_solver_test3);
+    tcase_add_test(tc_core, lmk05318_solver_test4);
+    tcase_add_test(tc_core, lmk05318_solver_test5);
     tcase_add_test(tc_core, lmk05318_solver_test6);
 
     suite_add_tcase(s, tc_core);

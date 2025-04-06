@@ -41,6 +41,7 @@ struct lmk05318_state {
 
     // VCO2 freq
     uint64_t vco2_freq;
+    unsigned vco2_n, vco2_num, vco2_den;
     unsigned pd1, pd2;
 
     struct {
