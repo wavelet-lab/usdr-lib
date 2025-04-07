@@ -11,6 +11,8 @@
 #include <usdr_logging.h>
 #include "../cal/opt_func.h"
 
+#include "lmx2820_dump.h"
+
 enum {
 
     OSC_IN_MIN = 5000000ull,
@@ -88,6 +90,14 @@ static uint64_t FPD_MAX[MASH_ORDER_THIRD_ORDER + 1] =
 static int lmx2820_spi_post(lmx2820_state_t* obj, uint32_t* regs, unsigned count)
 {
     int res;
+
+    for (unsigned i = 0; i < count; i++)
+    {
+        uint8_t  rn = regs[i] >> 16;
+        uint16_t rv = (uint16_t)regs[i];
+        USDR_LOG("2820", USDR_LOG_DEBUG, "WRITE#%u: R%03u (0x%x02) -> %0x04 [0x%x06]", i, rn, rn, rv, regs[i]);
+    }
+
     for (unsigned i = 0; i < count; i++) {
         res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, regs[i], NULL);
         if (res)
@@ -276,6 +286,20 @@ int lmx2820_read_status(lmx2820_state_t* st, lmx2820_stats_t* status)
     return 0;
 }
 
+int lmx2820_loaddump(lmx2820_state_t* st)
+{
+    int res = lmx2820_spi_post(st, lmx2820_rom_test, SIZEOF_ARRAY(lmx2820_rom_test));
+    if(res)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_loaddump() err:%d", res);
+    }
+    else
+    {
+        USDR_LOG("2820", USDR_LOG_DEBUG, "lmx2820_loaddump() OK");
+    }
+    return res;
+}
+
 int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_t* st)
 {
     memset(st, 0, sizeof(*st));
@@ -287,7 +311,7 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
     int res = lmx2820_reset(st);
     if(res)
         return res;
-
+/*
     //this list is incompleted
     uint32_t regs[] =
     {
@@ -300,8 +324,8 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
         USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
         return res;
     }
-
-    usleep(10);
+*/
+    usleep(1000);
 
     lmx2820_stats_t status;
     res = lmx2820_read_status(st, &status);
