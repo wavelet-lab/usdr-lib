@@ -158,8 +158,6 @@ int lmx2820_sync(lmx2820_state_t* st)
 
 int lmx2820_reset(lmx2820_state_t* st)
 {
-    memset(st, 0, sizeof(*st));
-
     uint16_t r0;
 
     int res = lmx2820_spi_get(st, R0, &r0);
@@ -280,6 +278,8 @@ int lmx2820_read_status(lmx2820_state_t* st, lmx2820_stats_t* status)
 
 int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_t* st)
 {
+    memset(st, 0, sizeof(*st));
+
     st->dev = dev;
     st->subdev = subdev;
     st->lsaddr = lsaddr;
