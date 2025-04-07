@@ -308,10 +308,14 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
     st->subdev = subdev;
     st->lsaddr = lsaddr;
 
-    int res = lmx2820_reset(st);
+    int res;
+
+#if 0
+    res = lmx2820_reset(st);
     if(res)
         return res;
-/*
+#endif
+
     //this list is incompleted
     uint32_t regs[] =
     {
@@ -324,8 +328,6 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
         USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
         return res;
     }
-*/
-    usleep(1000);
 
     lmx2820_stats_t status;
     res = lmx2820_read_status(st, &status);
@@ -440,7 +442,8 @@ static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, 
                                      vco, min_n_total, max_n_total, fpd_min, fpd_max);
 
     bool need_mult = (fosc_in < fpd_min) || force_mult;
-    const bool osc_2x = (fosc_in <= OSC_IN_MAX_DBLR && !need_mult);
+    const bool osc_2x = (fosc_in <= OSC_IN_MAX_DBLR && (fosc_in << 1) <= fpd_max && !need_mult);
+
     uint64_t osc_in = fosc_in * (osc_2x ? 2 : 1);
     USDR_LOG("2820", USDR_LOG_DEBUG, "OSC_2X:%d -> effective OSC_IN:%" PRIu64, osc_2x, osc_in);
 
