@@ -9,6 +9,7 @@
 #include "lmx2820.h"
 #include "def_lmx2820.h"
 #include <usdr_logging.h>
+#include "../cal/opt_func.h"
 
 enum {
 
@@ -81,9 +82,6 @@ static uint64_t FPD_MAX[MASH_ORDER_THIRD_ORDER + 1] =
 {
     400000000, 300000000, 300000000, 250000000
 };
-
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 #define INSTCAL_R0_MASK (((uint16_t)1 << FCAL_EN_OFF) | ((uint16_t)1 << DBLR_CAL_EN_OFF) | ((uint16_t)1 << INSTCAL_SKIP_ACAL_OFF))
 
@@ -306,7 +304,6 @@ int lmx2820_destroy(lmx2820_state_t* st)
     return 0;
 }
 
-
 static int lmx2820_tune_vco(lmx2820_state_t* st, uint64_t vco)
 {
     int res = 0;
@@ -334,14 +331,27 @@ static int lmx2820_tune_vco(lmx2820_state_t* st, uint64_t vco)
     USDR_LOG("2820", USDR_LOG_DEBUG, "PLL_N:%u PLL_FRAC:%.8f", pll_n, pll_frac);
 
     const unsigned pll_r_div = settings->pll_r * settings->pll_r_pre;
-    if(settings->fpd * pll_r_div > UINT32_MAX)
+    uint64_t pll_den64 =  settings->fpd * pll_r_div;
+    uint64_t pll_num64 = (uint64_t)(pll_frac * pll_den64 + 0.5);
+    uint64_t nod = find_gcd(pll_num64, pll_den64);
+
+    if(nod > 1)
+    {
+        USDR_LOG("2820", USDR_LOG_DEBUG, "PLL NUM/DEN reduced NOD:%" PRIu64 ": %" PRIu64 "/%" PRIu64" -> %" PRIu64 "/%" PRIu64,
+                 nod, pll_num64, pll_den64, pll_num64/nod, pll_den64/nod);
+        pll_num64 /= nod;
+        pll_den64 /= nod;
+    }
+
+    if(pll_den64 > UINT32_MAX)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "PLL_DEN overflow, cannot solve in integer values. Try lower OSC_IN.");
         return -EINVAL;
     }
 
-    uint32_t pll_den =  settings->fpd * pll_r_div;
-    uint32_t pll_num = (uint32_t)(pll_frac * pll_den + 0.5);
+    uint32_t pll_num = pll_num64;
+    uint32_t pll_den = pll_den64;
+
     const double ff = (double)settings->fosc_in * (settings->osc_2x ? 2 : 1) * settings->mult;
     double vco_fact = ff * pll_n / pll_r_div + ff * pll_num / pll_r_div / pll_den;
 

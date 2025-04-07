@@ -8,6 +8,7 @@
 #ifndef OPT_FUNC_H
 #define OPT_FUNC_H
 
+#include "stdint.h"
 
 #define MAX(a, b) \
   ({ __typeof__ (a) _a = (a); \
@@ -55,5 +56,6 @@ struct opt_iteration2d
 int find_best_2d(struct opt_iteration2d *ops, unsigned max_count, void* param, int stop_when,
                  int *px, int *py, int *pfxy);
 
+uint64_t find_gcd(uint64_t a, uint64_t b);
 
 #endif

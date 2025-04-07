@@ -3,11 +3,6 @@
 
 #include <stdint.h>
 
-#define DIAP_MAX 6
-
-#define MAX(a, b) (a) > (b) ? (a) : (b)
-#define MIN(a, b) (a) < (b) ? (a) : (b)
-
 struct range
 {
     uint64_t min, max;

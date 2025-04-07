@@ -170,3 +170,36 @@ int find_best_2d(struct opt_iteration2d *ops, unsigned max_count, void* param, i
     return 0;
 }
 
+// Function to implement Stein's Algorithm
+// Borrowed from: https://www.geeksforgeeks.org/steins-algorithm-for-finding-gcd/ (C)
+//
+uint64_t find_gcd(uint64_t a, uint64_t b)
+{
+    if (a == b)
+        return a;
+
+    // GCD(0, b) == b; GCD(a, 0) == a,
+    // GCD(0, 0) == 0
+    if (a == 0)
+        return b;
+    if (b == 0)
+        return a;
+
+    // look for factors of 2
+    if (~a & 1) // a is even
+    {
+        if (b & 1) // b is odd
+            return find_gcd(a >> 1, b);
+        else // both a and b are even
+            return find_gcd(a >> 1, b >> 1) << 1;
+    }
+
+    if (~b & 1) // a is odd, b is even
+        return find_gcd(a, b >> 1);
+
+    // reduce larger number
+    if (a > b)
+        return find_gcd((a - b) >> 1, b);
+
+    return find_gcd((b - a) >> 1, a);
+}

@@ -15,6 +15,7 @@
 
 #include <usdr_logging.h>
 #include "../../xdsp/attribute_switch.h"
+#include "../cal/opt_func.h"
 
 //#define LMK05318_SOLVER_DEBUG
 
@@ -458,14 +459,37 @@ int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div)
 VWLT_ATTRIBUTE(optimize("-Ofast"))
 static inline double lmk05318_calc_vco2_div(lmk05318_state_t* d, uint64_t fvco2, unsigned* pn, unsigned* pnum, unsigned* pden)
 {
-    const unsigned den = VCO_APLL1 >> 8; //fit to 24 bit -> 9 765 625 (0x9502f9)
+    const uint64_t pll2_tot_prediv = d->fref_pll2_div_rp * d->fref_pll2_div_rs;
 
-    double r = (double)(fvco2 * d->fref_pll2_div_rp * d->fref_pll2_div_rs) / VCO_APLL1;
+    uint64_t den64 = VCO_APLL1 * pll2_tot_prediv;
+    double r = (double)(fvco2 * pll2_tot_prediv) / VCO_APLL1;
     unsigned n = (unsigned)r;
     double n_frac = r - n;
-    unsigned num = (unsigned)(n_frac * den);
+    uint64_t num64 = (uint64_t)(n_frac * den64 + 0.5);
 
-    const double fvco2_fact = (double)VCO_APLL1 * (n + (double)num / den) / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
+    uint64_t nod = find_gcd(num64, den64);
+    if(nod > 1)
+    {
+#ifdef LMK05318_SOLVER_DEBUG
+        USDR_LOG("5318", USDR_LOG_DEBUG, "PLL2 NUM/DEN reduced NOD:%" PRIu64 ": %" PRIu64 "/%" PRIu64" -> %" PRIu64 "/%" PRIu64,
+                 nod, num64, den64, num64/nod, den64/nod);
+#endif
+        num64 /= nod;
+        den64 /= nod;
+    }
+
+    if(den64 > 0xFFFFFF)
+    {
+#ifdef LMK05318_SOLVER_DEBUG
+        USDR_LOG("5318", USDR_LOG_ERROR, "PLL2_DEN overflow, cannot solve in integer values");
+#endif
+        return -EINVAL;
+    }
+
+    uint32_t num = num64;
+    uint32_t den = den64;
+
+    const double fvco2_fact = (double)VCO_APLL1 * (n + (double)num / den) / pll2_tot_prediv;
 
 #ifdef LMK05318_SOLVER_DEBUG
     USDR_LOG("5318", USDR_LOG_ERROR, "WANTED_VCO2:%" PRIu64 "  N:%u NUM:%u DEN:%u VCO2:%.8f", fvco2, n, num, den, fvco2_fact);
