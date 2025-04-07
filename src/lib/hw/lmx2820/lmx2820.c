@@ -347,6 +347,12 @@ static int lmx2820_tune_vco(lmx2820_state_t* st, uint64_t vco)
     double pll_frac = n_total - pll_n;
     USDR_LOG("2820", USDR_LOG_DEBUG, "PLL_N:%u PLL_FRAC:%.8f", pll_n, pll_frac);
 
+    if(pll_n != n_total && settings->mash_order == MASH_ORDER_INTEGER_MODE)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "PLL frac=%.8f, MASH_ORDER_INTEGER_MODE is inapplicable", pll_frac);
+        return -EINVAL;
+    }
+
     const unsigned pll_r_div = settings->pll_r * settings->pll_r_pre;
     uint64_t pll_den64 =  settings->fpd * pll_r_div;
     uint64_t pll_num64 = (uint64_t)(pll_frac * pll_den64 + 0.5);

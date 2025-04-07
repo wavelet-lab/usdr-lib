@@ -25,7 +25,7 @@ START_TEST(lmx2820_solver_test1)
 START_TEST(lmx2820_solver_test2)
 {
     const uint64_t osc_in = 1400000000ull;
-    const int mash_order = 0;
+    const int mash_order = 2;
     uint64_t out_freq1 = 45000000;
     uint64_t out_freq2 = out_freq1;
 
@@ -47,7 +47,7 @@ START_TEST(lmx2820_solver_test3)
 START_TEST(lmx2820_solver_test4)
 {
     const uint64_t osc_in = 1400000000ull;
-    const int mash_order = 0;
+    const int mash_order = 2;
     uint64_t out_freq1 = 22600000000ull;
     uint64_t out_freq2 = out_freq1;
 
@@ -58,7 +58,7 @@ START_TEST(lmx2820_solver_test4)
 START_TEST(lmx2820_solver_test5)
 {
     const uint64_t osc_in = 250000000ull;
-    const int mash_order = 0;
+    const int mash_order = 2;
     uint64_t out_freq1 = 5600000000ull;
     uint64_t out_freq2 = out_freq1 >> 3;
 
@@ -69,7 +69,7 @@ START_TEST(lmx2820_solver_test5)
 START_TEST(lmx2820_solver_test6)
 {
     const uint64_t osc_in = 250000000ull;
-    const int mash_order = 0;
+    const int mash_order = 2;
     uint64_t out_freq1 = 5600000000ull;
     uint64_t out_freq2 = out_freq1 << 1;
 
@@ -80,7 +80,7 @@ START_TEST(lmx2820_solver_test6)
 START_TEST(lmx2820_solver_test7)
 {
     const uint64_t osc_in = 250000000ull;
-    const int mash_order = 0;
+    const int mash_order = 2;
     uint64_t out_freq1 = 5800000000ull;
     uint64_t out_freq2 = out_freq1 << 1;
 
@@ -91,7 +91,7 @@ START_TEST(lmx2820_solver_test7)
 START_TEST(lmx2820_solver_test8)
 {
     const uint64_t osc_in = 250000000ull;
-    const int mash_order = 0;
+    const int mash_order = 2;
     uint64_t out_freq1 = 2000098000ull;
     uint64_t out_freq2 = out_freq1 >> 4;
 
@@ -102,7 +102,7 @@ START_TEST(lmx2820_solver_test8)
 START_TEST(lmx2820_solver_test9_force_mult)
 {
     const uint64_t osc_in = 250000000ull;
-    const int mash_order = 0;
+    const int mash_order = 2;
     uint64_t out_freq1 = 20000988000ull;
     uint64_t out_freq2 = out_freq1 >> 4;
 
@@ -113,7 +113,6 @@ START_TEST(lmx2820_solver_test9_force_mult)
 START_TEST(lmx2820_solver_test10_mash_order)
 {
     const uint64_t osc_in = 250000000ull;
-    const int mash_order = 0;
     uint64_t out_freq1 = 5600000000ull;
     uint64_t out_freq2 = out_freq1 >> 3;
 
@@ -124,7 +123,6 @@ START_TEST(lmx2820_solver_test10_mash_order)
 START_TEST(lmx2820_solver_test11_mash_order)
 {
     const uint64_t osc_in = 1400000000ull;
-    const int mash_order = 0;
     uint64_t out_freq1 = 45000000;
     uint64_t out_freq2 = out_freq1;
 
@@ -139,7 +137,7 @@ START_TEST(lmx2820_solver_test12_instcal)
     uint64_t out_freq1 = 45000000ull << 8;
     uint64_t out_freq2 = out_freq1 >> 3;
 
-    int res = lmx2820_solver(&st, osc_in, 0, 0, 5650000000ull, 5650000000ull);
+    int res = lmx2820_solver(&st, osc_in, 2, 0, 5650000000ull, 5650000000ull);
     ck_assert_int_eq( res, 0 );
 
     fprintf(stderr, "Calibrating for INSTCAL, fixing at FPD:%.2f\n", st.lmx2820_input_chain.fpd);
@@ -151,11 +149,11 @@ START_TEST(lmx2820_solver_test12_instcal)
 START_TEST(lmx2820_solver_test13_pesync)
 {
     const uint64_t osc_in = 250000000ull;
-    const int mash_order = 0;
+    const int mash_order = 2;
     uint64_t out_freq1 = 580000000ull;
     uint64_t out_freq2 = out_freq1 >> 2;
 
-    int res = lmx2820_solver(&st, osc_in, 0, 0, out_freq1, out_freq2);
+    int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -168,7 +166,7 @@ Suite * lmx2820_solver_suite(void)
     tc_core = tcase_create("HW");
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
-/*
+
     tcase_add_test(tc_core, lmx2820_solver_test1);
     tcase_add_test(tc_core, lmx2820_solver_test2);
     tcase_add_test(tc_core, lmx2820_solver_test3);
@@ -178,10 +176,9 @@ Suite * lmx2820_solver_suite(void)
     tcase_add_test(tc_core, lmx2820_solver_test7);
     tcase_add_test(tc_core, lmx2820_solver_test8);
     tcase_add_loop_test(tc_core, lmx2820_solver_test9_force_mult, 3, 8);
-    tcase_add_loop_test(tc_core, lmx2820_solver_test10_mash_order, 0, 4);
-    tcase_add_loop_test(tc_core, lmx2820_solver_test11_mash_order, 0, 4);
+    tcase_add_loop_test(tc_core, lmx2820_solver_test10_mash_order, 1, 4);
+    tcase_add_loop_test(tc_core, lmx2820_solver_test11_mash_order, 1, 4);
     tcase_add_test(tc_core, lmx2820_solver_test12_instcal);
-*/
     tcase_add_test(tc_core, lmx2820_solver_test13_pesync);
 
     suite_add_tcase(s, tc_core);
