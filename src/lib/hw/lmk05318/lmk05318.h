@@ -166,9 +166,11 @@ int lmk05318_reset_los_flags(lmk05318_state_t* d);
 int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent);
 int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeout);
 int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout);
+int lmk05318_softreset(lmk05318_state_t* out);
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out);
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);
+int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run);
 
 int lmk05318_set_xo_fref(lmk05318_state_t* d);
 int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode);

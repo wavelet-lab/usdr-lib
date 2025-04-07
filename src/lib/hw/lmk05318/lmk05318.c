@@ -123,7 +123,7 @@ static int lmk05318_add_reg_to_map(lmk05318_state_t* d, const uint32_t* regs, un
     return 0;
 }
 
-static int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run)
+int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run)
 {
     for(unsigned j = 0; j < SIZEOF_ARRAY(registers_map); ++j)
     {
@@ -147,7 +147,7 @@ static int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run)
 
 
 
-static int lmk05318_softreset(lmk05318_state_t* out)
+int lmk05318_softreset(lmk05318_state_t* out)
 {
     uint8_t reg_ctrl;
     const uint8_t mask = ((uint8_t)1 << RESET_SW_OFF);

@@ -97,7 +97,12 @@ int board_ext_simplesync_init(lldev_t dev,
     lmk05318_set_port_affinity(cfg, 6, AFF_APLL1);
     lmk05318_set_port_affinity(cfg, 7, AFF_APLL1);
 
-    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, false, cfg, 4, &ob->lmk, false /*dry_run*/);
+    const bool dpll_mode = false;
+
+    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, dpll_mode, cfg, 4, &ob->lmk, false /*dry_run*/);
+    res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
+    res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, dpll_mode, 10000);
+    res = res ? res : lmk05318_sync(&ob->lmk);
 #endif
 
     if (res)
@@ -131,7 +136,12 @@ int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
     lmk05318_set_port_affinity(cfg, 2, AFF_APLL2);
     lmk05318_set_port_affinity(cfg, 3, AFF_APLL2);
 
-    int res = lmk05318_solver(&ob->lmk, cfg, 4, false);
+    int res = lmk05318_solver(&ob->lmk, cfg, 4, false /*dry_run*/);
+    res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
+    res = res ? res : lmk05318_softreset(&ob->lmk);
+    res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
+    res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
+    res = res ? res : lmk05318_sync(&ob->lmk);
 #endif
     return res;
 }
