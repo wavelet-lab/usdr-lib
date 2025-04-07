@@ -349,8 +349,12 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
     res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], MASH_ORDER_INTEGER_MODE, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
-    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 outputs locked & synced");
+    if(!res)
+        USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 outputs locked & synced");
 
+    lmx2820_stats_t lmxstatus;
+    lmx2820_read_status(&d->lmx1, &lmxstatus); //just for logging
+    //
 
     return res;
 }
