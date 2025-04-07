@@ -95,7 +95,7 @@ static int lmx2820_spi_post(lmx2820_state_t* obj, uint32_t* regs, unsigned count
     {
         uint8_t  rn = regs[i] >> 16;
         uint16_t rv = (uint16_t)regs[i];
-        USDR_LOG("2820", USDR_LOG_DEBUG, "WRITE#%u: R%03u (0x%x02) -> %0x04 [0x%x06]", i, rn, rn, rv, regs[i]);
+        USDR_LOG("2820", USDR_LOG_DEBUG, "WRITE#%u: R%03u (0x%02x) -> 0x%04x [0x%06x]", i, rn, rn, rv, regs[i]);
     }
 
     for (unsigned i = 0; i < count; i++) {
