@@ -34,10 +34,11 @@ int main(int argc, char** argv)
     srunner_add_suite(sr, lmk05318_solver_suite());
     srunner_add_suite(sr, lmx2820_solver_suite());
 #else
-    sr = srunner_create(lmk05318_solver_suite());
+    sr = srunner_create(lmx2820_solver_suite());
 #endif
 
     srunner_set_fork_status (sr, CK_NOFORK);
+
     srunner_run_all(sr, (argc > 1) ? CK_VERBOSE : CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);
     srunner_free(sr);

@@ -41,6 +41,7 @@ struct lmk05318_state {
 
     // VCO2 freq
     uint64_t vco2_freq;
+    unsigned vco2_n, vco2_num, vco2_den;
     unsigned pd1, pd2;
 
     struct {
@@ -103,10 +104,11 @@ struct lmk05318_out_config
 };
 typedef struct lmk05318_out_config lmk05318_out_config_t;
 
+#define LMK05318_FREQ_DELTA 2
+
 static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
                                         unsigned port,
                                         uint32_t freq,
-                                        unsigned freq_delta_plus, unsigned freq_delta_minus,
                                         bool revert_phase,
                                         lmk05318_type_t type)
 {
@@ -117,8 +119,8 @@ static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
     memset(p, 0, sizeof(*p));
     p->port = port;
     p->wanted.freq = freq;
-    p->wanted.freq_delta_plus = freq_delta_plus;
-    p->wanted.freq_delta_minus = freq_delta_minus;
+    p->wanted.freq_delta_plus = LMK05318_FREQ_DELTA;
+    p->wanted.freq_delta_minus = LMK05318_FREQ_DELTA;
     p->wanted.revert_phase = revert_phase;
     p->wanted.type = type;
     p->wanted.pll_affinity = AFF_ANY;
@@ -137,9 +139,13 @@ static inline int lmk05318_set_port_affinity(lmk05318_out_config_t* cfg, unsigne
     return 0;
 }
 
+/*
+ * Legacy functions, remove them later
+ */
 int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned flags, lmk05318_state_t* out);
-
 int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div);
+/**/
+
 int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t div);
 int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype);
 
@@ -151,13 +157,20 @@ enum lock_msk {
 
     LMK05318_LOPL_DPLL = 16,
     LMK05318_LOFL_DPLL = 32,
-
+    LMK05318_BAW_LOCK = 64,
 };
 
-int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk);
+int lmk05318_sync(lmk05318_state_t* out);
+int lmk05318_mute(lmk05318_state_t* out, uint8_t chmask);
+int lmk05318_reset_los_flags(lmk05318_state_t* d);
+int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent);
+int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeout);
+int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout);
+int lmk05318_softreset(lmk05318_state_t* out);
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out);
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);
+int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run);
 
 int lmk05318_set_xo_fref(lmk05318_state_t* d);
 int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode);
@@ -167,6 +180,6 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
                        const lmk05318_xo_settings_t* xo, bool dpll_mode,
                        lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
-                       lmk05318_state_t* out);
+                       lmk05318_state_t* out, bool dry_run);
 
 #endif

@@ -1425,7 +1425,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     usleep(1000);
 
-    res = res ? res : lmk05318_check_lock(&d->lmk, &los);
+    res = res ? res : lmk05318_check_lock(&d->lmk, &los, false /*silent*/);
 
     for (int i = 0; i < 5; i++) {
         uint32_t clk = 0;
@@ -1435,7 +1435,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         usleep(0.5 * 1e6);
     }
 
-    res = res ? res : lmk05318_check_lock(&d->lmk, &los);
+    res = res ? res : lmk05318_check_lock(&d->lmk, &los, false /*silent*/);
     // res = res ? res : lmk05318_set_out_mux(&d->lmk, LMK_FPGA_SYSREF, false, LVDS);
 
     usleep(1000);

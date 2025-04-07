@@ -41,10 +41,6 @@ enum {
     I2C_ADDR_LMK = 0x65,
 };
 
-enum {
-    FREQ_DELTA_HZ = 2,
-};
-
 int board_ext_simplesync_init(lldev_t dev,
                               unsigned subdev,
                               unsigned gpio_base,
@@ -92,16 +88,21 @@ int board_ext_simplesync_init(lldev_t dev,
     xo.type = XO_CMOS;
 
     lmk05318_out_config_t cfg[4];
-    lmk05318_port_request(cfg, 4, 25000000, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, LVCMOS);
-    lmk05318_port_request(cfg, 5, 25000000, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, LVCMOS);
-    lmk05318_port_request(cfg, 6, 25000000, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, LVCMOS);
-    lmk05318_port_request(cfg, 7, 25000000, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, LVCMOS);
+    lmk05318_port_request(cfg, 4, 25000000, false, LVCMOS);
+    lmk05318_port_request(cfg, 5, 25000000, false, LVCMOS);
+    lmk05318_port_request(cfg, 6, 25000000, false, LVCMOS);
+    lmk05318_port_request(cfg, 7, 25000000, false, LVCMOS);
     lmk05318_set_port_affinity(cfg, 4, AFF_APLL1);
     lmk05318_set_port_affinity(cfg, 5, AFF_APLL1);
     lmk05318_set_port_affinity(cfg, 6, AFF_APLL1);
     lmk05318_set_port_affinity(cfg, 7, AFF_APLL1);
 
-    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, false, cfg, 4, &ob->lmk);
+    const bool dpll_mode = false;
+
+    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, dpll_mode, cfg, 4, &ob->lmk, false /*dry_run*/);
+    res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
+    res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, dpll_mode, 10000);
+    res = res ? res : lmk05318_sync(&ob->lmk);
 #endif
 
     if (res)
@@ -126,16 +127,21 @@ int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
     }
 #else
     lmk05318_out_config_t cfg[4];
-    lmk05318_port_request(cfg, 0, meas_lo, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    lmk05318_port_request(cfg, 1, meas_lo, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    lmk05318_port_request(cfg, 2, meas_lo, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    lmk05318_port_request(cfg, 3, meas_lo, FREQ_DELTA_HZ, FREQ_DELTA_HZ, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
+    lmk05318_port_request(cfg, 0, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
+    lmk05318_port_request(cfg, 1, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
+    lmk05318_port_request(cfg, 2, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
+    lmk05318_port_request(cfg, 3, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
     lmk05318_set_port_affinity(cfg, 0, AFF_APLL2);
     lmk05318_set_port_affinity(cfg, 1, AFF_APLL2);
     lmk05318_set_port_affinity(cfg, 2, AFF_APLL2);
     lmk05318_set_port_affinity(cfg, 3, AFF_APLL2);
 
-    int res = lmk05318_solver(&ob->lmk, cfg, 4, false);
+    int res = lmk05318_solver(&ob->lmk, cfg, 4, false /*dry_run*/);
+    res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
+    res = res ? res : lmk05318_softreset(&ob->lmk);
+    res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
+    res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
+    res = res ? res : lmk05318_sync(&ob->lmk);
 #endif
     return res;
 }
