@@ -2,8 +2,6 @@
 #include "lmk05318/lmk05318.h"
 
 #define OUTS_LEN LMK05318_MAX_OUT_PORTS
-#define DELTA_PLUS 2
-#define DELTA_MINUS 2
 
 static lmk05318_out_config_t cfg[OUTS_LEN];
 static lmk05318_state_t dev;
@@ -17,14 +15,14 @@ static void setup()
     dev.fref_pll2_div_rs = 6;
 
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, 100000000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 1, 100000000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 2, 122880000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 3, 122880000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 4,  31250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5,   3840000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6, 491520000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 7,         1, DELTA_PLUS, DELTA_MINUS,  true, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 0, 100000000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 1, 100000000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 2, 122880000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 3, 122880000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 4,  31250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5,   3840000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6, 491520000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 7,         1,  true, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -43,10 +41,10 @@ START_TEST(lmk05318_solver_test2)
     int res = 0;
     const uint64_t f = 5650000000ull;
 
-    res = res ? res : lmk05318_port_request(cfg, 2, f/7/256, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 3, f/7/256, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5,   f/2/4, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6,  f/7/17, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 2, f/7/256, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 3, f/7/256, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5,   f/2/4, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6,  f/7/17, false, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 
     res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
@@ -61,14 +59,14 @@ START_TEST(lmk05318_solver_test3)
     uint64_t f4_7 = 12500000; //3840000;
 
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 1, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 2, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 3, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 4, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 7, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 0, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 1, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 2, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 3, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 4, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 7, f4_7, false, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 
     res = res ? res : lmk05318_set_port_affinity(cfg, 0, AFF_APLL1);
@@ -94,14 +92,14 @@ START_TEST(lmk05318_solver_test4)
     memset(cfg, 0, sizeof(cfg));
 
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 1, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    //res = res ? res : lmk05318_port_request(cfg, 2, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 3, f0_3, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 4, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    //res = res ? res : lmk05318_port_request(cfg, 6, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 7, f4_7, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 0, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 1, f0_3, false, OUT_OFF);
+    //res = res ? res : lmk05318_port_request(cfg, 2, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 3, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 4, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5, f4_7, false, OUT_OFF);
+    //res = res ? res : lmk05318_port_request(cfg, 6, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 7, f4_7, false, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 
     res = res ? res : lmk05318_set_port_affinity(cfg, 0, AFF_APLL1);
@@ -138,14 +136,14 @@ START_TEST(lmk05318_solver_test5)
  */
 
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, 125000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 1, 125000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 2, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 3, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 4, 156250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, 156250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6,  10000000, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(cfg, 7,         1, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(cfg, 0, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 1, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 2, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 3, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 4, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6,  10000000, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(cfg, 7,         1, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
 
     res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
@@ -170,14 +168,14 @@ START_TEST(lmk05318_solver_test6)
  */
 
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, 125000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 1, 125000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 2, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 3, 250000000, DELTA_PLUS, DELTA_MINUS, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 4, 156250000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5,  26000000, DELTA_PLUS, DELTA_MINUS, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6,  13000000, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(cfg, 7,         1, DELTA_PLUS, DELTA_MINUS, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(cfg, 0, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 1, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 2, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 3, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 4, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5,  26000000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6,  13000000, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(cfg, 7,         1, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_xo_settings_t xo;

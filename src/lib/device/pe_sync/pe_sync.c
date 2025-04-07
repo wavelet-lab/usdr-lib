@@ -273,16 +273,15 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     const bool use_dpll = false;
 
-    const int out_accuracy = 2;
     lmk05318_out_config_t lmk05318_outs_cfg[8];
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 0, 125000000, out_accuracy, out_accuracy, false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 1, 125000000, out_accuracy, out_accuracy, false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 2, 250000000, out_accuracy, out_accuracy, false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 3, 250000000, out_accuracy, out_accuracy, false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 4, 156250000, out_accuracy, out_accuracy, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 5, 156250000, out_accuracy, out_accuracy, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6,  10000000, out_accuracy, out_accuracy, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7,         1, out_accuracy, out_accuracy, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 0, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 1, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 2, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 3, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 4, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 5, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6,  10000000, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7,         1, false, LVCMOS);
 
     res = res ? res : lmk05318_create_ex(dev, 0, I2C_BUS_LMK05318B, &xo, use_dpll, lmk05318_outs_cfg, 8, &d->gen, false /*dry_run*/);
     if(res)

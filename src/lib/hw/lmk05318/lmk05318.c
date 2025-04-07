@@ -16,6 +16,8 @@
 #include <usdr_logging.h>
 #include "../../xdsp/attribute_switch.h"
 
+//#define LMK05318_SOLVER_DEBUG
+
 enum {
     VCO_APLL1 = 2500000000ull,
     VCO_APLL1_MIN = 2499750000ull,
@@ -342,7 +344,9 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     return 0;
 }
 
-
+/*
+ * Legacy function, remove it later
+ */
 int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int flags, lmk05318_state_t* out)
 {
     int res;
@@ -400,8 +404,11 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int 
     USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 initialized\n");
     return 0;
 }
+/**/
 
-
+/*
+ * Legacy function, remove it later
+ */
 int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div)
 {
     const unsigned apll2_post_div = 2;
@@ -446,6 +453,7 @@ int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div)
     *last_div = div;
     return 0;
 }
+/**/
 
 VWLT_ATTRIBUTE(optimize("-Ofast"))
 static inline double lmk05318_calc_vco2_div(lmk05318_state_t* d, uint64_t fvco2, unsigned* pn, unsigned* pnum, unsigned* pden)
@@ -459,7 +467,9 @@ static inline double lmk05318_calc_vco2_div(lmk05318_state_t* d, uint64_t fvco2,
 
     const double fvco2_fact = (double)VCO_APLL1 * (n + (double)num / den) / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
 
-    //USDR_LOG("5318", USDR_LOG_ERROR, "WANTED_VCO2:%" PRIu64 "  N:%u NUM:%u DEN:%u VCO2:%.8f", fvco2, n, num, den, fvco2_fact);
+#ifdef LMK05318_SOLVER_DEBUG
+    USDR_LOG("5318", USDR_LOG_ERROR, "WANTED_VCO2:%" PRIu64 "  N:%u NUM:%u DEN:%u VCO2:%.8f", fvco2, n, num, den, fvco2_fact);
+#endif
 
     if(pn)
         *pn = n;
@@ -473,10 +483,10 @@ static inline double lmk05318_calc_vco2_div(lmk05318_state_t* d, uint64_t fvco2,
 
 static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
 {
-    double fref = (double)VCO_APLL1 / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
-    if (fref < APLL2_PD_MIN || fref > APLL2_PD_MAX) {
+    double fpd2 = (double)VCO_APLL1 / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
+    if (fpd2 < APLL2_PD_MIN || fpd2 > APLL2_PD_MAX) {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 PFD should be in range [%" PRIu64 ";%" PRIu64 "] but got %.8f!\n",
-                 (uint64_t)APLL2_PD_MIN, (uint64_t)APLL2_PD_MAX, fref);
+                 (uint64_t)APLL2_PD_MIN, (uint64_t)APLL2_PD_MAX, fpd2);
         return -EINVAL;
     }
 
@@ -499,7 +509,7 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
     int res;
 
     USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL2 RS=%u RP=%u FPD2=%.8f FVCO2=%" PRIu64 " N=%d NUM=%d DEN=%d PD1=%d PD2=%d\n",
-             d->fref_pll2_div_rs, d->fref_pll2_div_rp, fref, d->vco2_freq, n, num, den, d->pd1, d->pd2);
+             d->fref_pll2_div_rs, d->fref_pll2_div_rp, fpd2, d->vco2_freq, n, num, den, d->pd1, d->pd2);
 
     // one of PDs may be unused (==0) -> we should fix it before registers set
     if(d->pd1 < APLL2_PDIV_MIN || d->pd1 > APLL2_PDIV_MAX)
@@ -580,14 +590,14 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
 
 int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
 {
-    unsigned fref = (d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2 : 1);
+    unsigned fpd1 = (d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2 : 1);
     uint64_t fvco = VCO_APLL1;
-    unsigned n = fvco / fref;
+    unsigned n = fvco / fpd1;
 
     //in DPLL mode we use FIXED 40-bit APLL1 denominator and programmed 40-bit numerator
     if(dpll_mode)
     {
-        uint64_t num = (fvco - n * (uint64_t)fref) * (1ull << 40) / fref;
+        uint64_t num = (fvco - n * (uint64_t)fpd1) * (1ull << 40) / fpd1;
 
         USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 " DEN=FIXED\n", fvco, n, num);
 
@@ -610,7 +620,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
     // without DPLL we use programmed 24-bit numerator & programmed 24-bit denominator
     else
     {
-        double frac = (double)fvco / fref - n;
+        double frac = (double)fvco / fpd1 - n;
         const uint32_t den = ((uint32_t)1 << 24) - 1; //max 24-bit
         const uint32_t num = (frac * den + 0.5);
 
@@ -744,16 +754,6 @@ static range_t lmk05318_get_freq_range(const lmk05318_out_config_t* cfg)
     return r;
 }
 
-//#define LMK05318_SOLVER_DEBUG
-
-/*
-enum {
-    freq_too_low = -1,
-    freq_too_high = 1,
-    freq_ok = 0,
-    freq_invalid = 42,
-};
-*/
 VWLT_ATTRIBUTE(optimize("-Ofast"))
 static inline int lmk05318_get_output_divider(const lmk05318_out_config_t* cfg, double ifreq, uint64_t* div)
 {
@@ -763,29 +763,7 @@ static inline int lmk05318_get_output_divider(const lmk05318_out_config_t* cfg, 
         return 1;
 
     double factf = ifreq / (*div);
-
     return (factf == cfg->wanted.freq) ? 0 : 1;
-/*
-    if(*div > cfg->max_odiv)
-        return freq_too_high;
-
-    if(*div < 1)
-        return freq_too_low;
-
-    double f = (double)ifreq / *div;
-
-    if(f <= cfg->freq_max && f >= cfg->freq_min)
-        return freq_ok;
-
-    if(*div <= cfg->max_odiv - 1)
-    {
-        f = (double)ifreq / ++(*div);
-        if(f <= cfg->freq_max && f >= cfg->freq_min)
-            return freq_ok;
-    }
-
-    return freq_invalid;
-*/
 }
 
 VWLT_ATTRIBUTE(optimize("-Ofast"))
@@ -1247,56 +1225,6 @@ static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned c
                 return 0;
             }
         }
-
-#if 0
-        *res_fvco2 = (sol->fvco2.min + sol->fvco2.max) >> 1;
-        *res_pd1 = pd1;
-        *res_pd2 = pd2;
-
-        bool ok_flag = true;
-
-        for(int ii = 0; ii < pd_binds_count; ++ii)
-        {
-            const pd_bind_t* b = &pd_binds[ii];
-            char tmp[1024];
-            int tmp_len = sprintf(tmp, "\tPD%d=%d ports[", (ii+1), b->pd);
-
-            for(int j = 0; j < b->ports_count; ++j)
-            {
-                tmp_len += sprintf(tmp + tmp_len, "%d(OD:%" PRIu64 ")),", outs[b->ports[j]].port, b->odivs[j]);
-            }
-
-            tmp_len += sprintf(tmp + tmp_len, "]");
-            USDR_LOG("5318", USDR_LOG_DEBUG, "%s", tmp);
-
-            //set results
-            for(int j = 0; j < b->ports_count; ++j)
-            {
-                lmk05318_out_config_t* out = &outs[b->ports[j]];
-
-                uint64_t div;
-                const uint64_t fdiv_in = (uint64_t)((double)(*res_fvco2) / b->pd + 0.5);
-                int res = lmk05318_get_output_divider(out, fdiv_in, &div);
-                if(res)
-                {
-                    ok_flag = false;
-                    break;
-                }
-
-                out->result.out_div = div; //b->odivs[j];
-                out->result.freq = (double)(*res_fvco2) / b->pd / div; //b->odivs[j];
-                out->result.mux = (b->pd == pd1) ? OUT_PLL_SEL_APLL2_P1 : OUT_PLL_SEL_APLL2_P2;
-                out->solved = true;
-            }
-
-            if(!ok_flag)
-                break;
-        }
-
-        if(ok_flag)
-            return 0;
-#endif
-
     }
 
 #ifdef LMK05318_SOLVER_DEBUG
@@ -1494,45 +1422,9 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     }
 
     const uint64_t f_mid = (VCO_APLL2_MAX + VCO_APLL2_MIN) / 2;
-    //const uint64_t half_band = (VCO_APLL2_MAX - VCO_APLL2_MIN) / 2;
-
-    //first try the center
     int res = lmk05318_solver_helper(outs, cnt_to_solve, f_mid, d);
-/*
-    //if not - do circular search
-    if(res)
-    {
-        uint64_t step = half_band;
-
-        //max search granularity hardcoded here
-        while(step > 10000)
-        {
-            uint64_t n = half_band / step;
-
-            for(uint64_t i = 1; i <= n; ++i)
-            {
-                res = lmk05318_solver_helper(outs, cnt_to_solve, f_mid + i * step, &fvco2, &pd1, &pd2, d);
-                if(!res)
-                {
-                    step = 0;
-                    break;
-                }
-
-                res = lmk05318_solver_helper(outs, cnt_to_solve, f_mid - i * step, &fvco2, &pd1, &pd2, d);
-                if(!res)
-                {
-                    step = 0;
-                    break;
-                }
-            }
-
-            step /= 2;
-        }
-    }
-*/
     if(res)
         return res;
-
 
 have_complete_solution:
 

@@ -104,10 +104,11 @@ struct lmk05318_out_config
 };
 typedef struct lmk05318_out_config lmk05318_out_config_t;
 
+#define LMK05318_FREQ_DELTA 2
+
 static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
                                         unsigned port,
                                         uint32_t freq,
-                                        unsigned freq_delta_plus, unsigned freq_delta_minus,
                                         bool revert_phase,
                                         lmk05318_type_t type)
 {
@@ -118,8 +119,8 @@ static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
     memset(p, 0, sizeof(*p));
     p->port = port;
     p->wanted.freq = freq;
-    p->wanted.freq_delta_plus = freq_delta_plus;
-    p->wanted.freq_delta_minus = freq_delta_minus;
+    p->wanted.freq_delta_plus = LMK05318_FREQ_DELTA;
+    p->wanted.freq_delta_minus = LMK05318_FREQ_DELTA;
     p->wanted.revert_phase = revert_phase;
     p->wanted.type = type;
     p->wanted.pll_affinity = AFF_ANY;
@@ -138,9 +139,13 @@ static inline int lmk05318_set_port_affinity(lmk05318_out_config_t* cfg, unsigne
     return 0;
 }
 
+/*
+ * Legacy functions, remove them later
+ */
 int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned flags, lmk05318_state_t* out);
-
 int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div);
+/**/
+
 int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t div);
 int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype);
 
