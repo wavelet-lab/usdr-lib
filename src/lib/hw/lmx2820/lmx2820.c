@@ -44,8 +44,7 @@ enum {
     OUT_DIV_LOG2_MAX = 7,
 };
 
-#define VCO_ACCURACY 0.1f
-#define RF_ACCURACY 1.0f
+#define RF_ACCURACY 0.0f
 #define OUT_DIV_DIAP_MAX (OUT_DIV_LOG2_MAX - OUT_DIV_LOG2_MIN + 1 + 1)
 
 //Pin3 bias capacitor, uF
@@ -334,14 +333,21 @@ static int lmx2820_tune_vco(lmx2820_state_t* st, uint64_t vco)
     double pll_frac = n_total - pll_n;
     USDR_LOG("2820", USDR_LOG_DEBUG, "PLL_N:%u PLL_FRAC:%.8f", pll_n, pll_frac);
 
-    uint32_t pll_den = UINT32_MAX;
-    uint32_t pll_num = pll_frac * pll_den;
-    double vco_fact = (double)settings->fpd * (pll_n + (double)pll_num / pll_den);
+    const unsigned pll_r_div = settings->pll_r * settings->pll_r_pre;
+    if(settings->fpd * pll_r_div > UINT32_MAX)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "PLL_DEN overflow, cannot solve in integer values. Try lower OSC_IN.");
+        return -EINVAL;
+    }
 
-    double delta = fabs(vco_fact - vco);
-    USDR_LOG("2820", USDR_LOG_DEBUG, "PLL_N:%u PLL_NUM:%u PLL_DEN:%u VCO:%.2f Deviation:%.8fHz", pll_n, pll_num, pll_den, vco_fact, delta);
+    uint32_t pll_den =  settings->fpd * pll_r_div;
+    uint32_t pll_num = (uint32_t)(pll_frac * pll_den + 0.5);
+    const double ff = (double)settings->fosc_in * (settings->osc_2x ? 2 : 1) * settings->mult;
+    double vco_fact = ff * pll_n / pll_r_div + ff * pll_num / pll_r_div / pll_den;
 
-    if(delta > VCO_ACCURACY)
+    USDR_LOG("2820", USDR_LOG_DEBUG, "PLL_N:%u PLL_NUM:%u PLL_DEN:%u VCO:%.8f", pll_n, pll_num, pll_den, vco_fact);
+
+    if(vco_fact != vco)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "VCO tuning too rough");
         return -EINVAL;
@@ -383,27 +389,25 @@ static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, 
 
     if((osc_in < fpd_min) || force_mult)
     {
+        //need mult
+
         if(force_mult)
             USDR_LOG("2820", USDR_LOG_DEBUG, "Mult:%d forced by user", force_mult);
         else
             USDR_LOG("2820", USDR_LOG_DEBUG, "Need mult");
 
-        //need mult
-        mult = MAX(force_mult ? force_mult : (unsigned)ceil((double)fpd_min / osc_in), MULT_MIN);
-        if(mult > MULT_MAX)
+        if(osc_in < MULT_IN_FREQ_MIN)
         {
-            USDR_LOG("2820", USDR_LOG_ERROR, "Mult:%d out of range", mult);
+            USDR_LOG("2820", USDR_LOG_ERROR, "OSC_IN:%" PRIu64" too low for mult, set %" PRIu64 " at least", fosc_in, (uint64_t)MULT_IN_FREQ_MIN);
             return -EINVAL;
         }
+
+        mult = force_mult ? force_mult : (unsigned)floor((double)fpd_max / osc_in);
+        mult = MIN(MAX(mult, MULT_MIN), MULT_MAX);
+        USDR_LOG("2820", USDR_LOG_DEBUG, "Calculated mult:%u", mult);
 
         pll_r_pre = 1;
         pll_r = 1;
-
-        if(osc_in < MULT_IN_FREQ_MIN)
-        {
-            USDR_LOG("2820", USDR_LOG_ERROR, "OSC_IN:%" PRIu64" too low for mult, set %" PRIu64 " at least", fosc_in, (uint64_t)MULT_IN_FREQ_MIN/2);
-            return -EINVAL;
-        }
 
         if(osc_in > MULT_IN_FREQ_MAX)
         {
@@ -482,12 +486,12 @@ static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, 
         return -EINVAL;
     }
 
-    uint64_t fpd = (uint64_t)((double)osc_in * mult / (pll_r_pre * pll_r) + 0.5);
-    USDR_LOG("2820", USDR_LOG_DEBUG, "For VCO:%" PRIu64 " -> FPD:%" PRIu64, vco, fpd);
+    double fpd = (double)osc_in * mult / (pll_r_pre * pll_r);
+    USDR_LOG("2820", USDR_LOG_DEBUG, "For VCO:%" PRIu64 " -> FPD:%.8f", vco, fpd);
 
     if(fpd < fpd_min || fpd > fpd_max)
     {
-        USDR_LOG("2820", USDR_LOG_ERROR, "FPD:%" PRIu64 " out of range: should never be happen!", fpd);
+        USDR_LOG("2820", USDR_LOG_ERROR, "FPD:%.8f out of range: should never be happen!", fpd);
         return -EINVAL;
     }
 
@@ -680,8 +684,8 @@ static int lmx2820_solver_validate_and_save(lmx2820_state_t* st, uint64_t rfouta
     double rfa_delta = fabs(rfouta - rfa);
     double rfb_delta = fabs(rfoutb - rfb);
 
-    USDR_LOG("2820", USDR_LOG_DEBUG, "RF_A:%" PRIu64 "->%.6f Deviation:%.8fHz", rfouta, rfa, rfa_delta);
-    USDR_LOG("2820", USDR_LOG_DEBUG, "RF_B:%" PRIu64 "->%.6f Deviation:%.8fHz", rfoutb, rfb, rfb_delta);
+    USDR_LOG("2820", USDR_LOG_DEBUG, "RF_A:%" PRIu64 "->%.6f (DIV:%u) Deviation:%.8fHz", rfouta, rfa, ((unsigned)1 << diva), rfa_delta);
+    USDR_LOG("2820", USDR_LOG_DEBUG, "RF_B:%" PRIu64 "->%.6f (DIV:%u) Deviation:%.8fHz", rfoutb, rfb, ((unsigned)1 << divb), rfb_delta);
 
     if(rfa_delta > RF_ACCURACY || rfb_delta > RF_ACCURACY)
     {

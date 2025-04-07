@@ -92,7 +92,7 @@ START_TEST(lmx2820_solver_test8)
 {
     const uint64_t osc_in = 250000000ull;
     const int mash_order = 0;
-    uint64_t out_freq1 = 20000987000ull;
+    uint64_t out_freq1 = 2000098000ull;
     uint64_t out_freq2 = out_freq1 >> 4;
 
     int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
@@ -103,7 +103,7 @@ START_TEST(lmx2820_solver_test9_force_mult)
 {
     const uint64_t osc_in = 250000000ull;
     const int mash_order = 0;
-    uint64_t out_freq1 = 20000987000ull;
+    uint64_t out_freq1 = 20000988000ull;
     uint64_t out_freq2 = out_freq1 >> 4;
 
     int res = lmx2820_solver(&st, osc_in, mash_order, _i, out_freq1, out_freq2);
@@ -158,6 +158,7 @@ Suite * lmx2820_solver_suite(void)
     tc_core = tcase_create("HW");
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
+
     tcase_add_test(tc_core, lmx2820_solver_test1);
     tcase_add_test(tc_core, lmx2820_solver_test2);
     tcase_add_test(tc_core, lmx2820_solver_test3);
