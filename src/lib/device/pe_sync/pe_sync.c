@@ -326,7 +326,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     if(res)
     {
-        USDR_LOG("SYNC", USDR_LOG_WARNING, "LMK03518 PLLs not locked during specified timeout");
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK03518 PLLs not locked during specified timeout");
         return res;
     }
 
@@ -343,15 +343,13 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     const uint64_t lmx1_freq[] =
     {
-        580000000,
-        145000000
+        60000000,
+        60000000
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
 #if 1
     res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], MASH_ORDER_SECOND_ORDER, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
-    if(!res)
-        USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 outputs locked & synced");
 #else
     res = res ? res : lmx2820_loaddump(&d->lmx1);
     usleep(1000);
@@ -371,6 +369,14 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 #endif
     lmx2820_stats_t lmxstatus;
     lmx2820_read_status(&d->lmx1, &lmxstatus); //just for logging
+
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX2820 PLL not locked during specified timeout");
+        return res;
+    }
+
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 outputs locked & synced");
     //
 
     return res;

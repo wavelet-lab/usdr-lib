@@ -174,11 +174,13 @@ int lmx2820_reset(lmx2820_state_t* st)
     if(res)
         return res;
 
-    r0 |= (uint16_t)1 << RESET_OFF;
+    uint32_t regs[] =
+    {
+        MAKE_LMX2820_REG_WR(R0, r0 |  RESET_MSK),
+        MAKE_LMX2820_REG_WR(R0, r0 & ~RESET_MSK)
+    };
 
-    uint32_t reg = MAKE_LMX2820_REG_WR(R0, r0);
-
-    res = lmx2820_spi_post(st, &reg, 1);
+    res = lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
         return res;
 
@@ -195,9 +197,9 @@ static int lmx2820_calibrate(lmx2820_state_t* st, bool set_flag)
         return res;
 
     if(set_flag)
-        r0 |= (uint16_t)1 << FCAL_EN_OFF;
+        r0 |=  FCAL_EN_MSK;
     else
-        r0 &= ~((uint16_t)1 << FCAL_EN_OFF);
+        r0 &= ~FCAL_EN_MSK;
 
     uint32_t reg = MAKE_LMX2820_REG_WR(R0, r0);
 
@@ -310,11 +312,11 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
 
     int res;
 
-#if 0
     res = lmx2820_reset(st);
     if(res)
         return res;
-#endif
+
+    usleep(2); //reset takes less 1 us.
 
     //this list is incompleted
     uint32_t regs[] =
