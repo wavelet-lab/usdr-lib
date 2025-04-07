@@ -61,5 +61,9 @@ int lmx2820_read_status(lmx2820_state_t* st, lmx2820_stats_t* status);
 int lmx2820_tune(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb);
 int lmx2820_instant_calibration_init(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult);
 int lmx2820_tune_instcal(lmx2820_state_t* st, uint64_t rfouta, uint64_t rfoutb);
+int lmx2820_sync(lmx2820_state_t* st);
+int lmx2820_reset(lmx2820_state_t* st);
+int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout);
+
 
 #endif // LMX2820_H

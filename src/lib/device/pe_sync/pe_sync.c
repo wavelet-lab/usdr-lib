@@ -18,6 +18,8 @@
 
 #include "sync_const.h"
 #include "../hw/lmk05318/lmk05318.h"
+#include "../hw/lmx2820/lmx2820.h"
+#include "../hw/def_lmx2820.h"
 
 // [0] 24bit 20Mhz AD5662  InRef::DAC_REF
 // [1] 24bit 20Mhz AD5662  ClockGen::GEN_DC
@@ -122,6 +124,7 @@ struct dev_pe_sync {
     device_t base;
 
     lmk05318_state_t gen;
+    lmx2820_state_t lmx0, lmx1;
 };
 
 enum dev_gpi {
@@ -273,15 +276,27 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     const bool use_dpll = false;
 
+    const uint64_t lmk_freq[8] =
+    {
+        125000000,
+        125000000,
+        250000000,
+        250000000,
+        156250000,
+        156250000,
+        10000000,
+        1
+    };
+
     lmk05318_out_config_t lmk05318_outs_cfg[8];
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 0, 125000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 1, 125000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 2, 250000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 3, 250000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 4, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 5, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6,  10000000, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7,         1, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 0, lmk_freq[0], false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 1, lmk_freq[1], false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 2, lmk_freq[2], false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 3, lmk_freq[3], false, LVDS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 4, lmk_freq[4], false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 5, lmk_freq[5], false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6, lmk_freq[6], false, LVCMOS);
+    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7, lmk_freq[7], false, LVCMOS);
 
     res = res ? res : lmk05318_create_ex(dev, 0, I2C_BUS_LMK05318B, &xo, use_dpll, lmk05318_outs_cfg, 8, &d->gen, false /*dry_run*/);
     if(res)
@@ -321,6 +336,21 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return res;
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMK03518 outputs synced");
+
+    //
+    //LMX2820 #1 setup
+    //
+
+    const uint64_t lmx1_freq[] =
+    {
+        580000000,
+        145000000
+    };
+
+    res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
+    res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], MASH_ORDER_INTEGER_MODE, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 outputs locked & synced");
+
 
     return res;
 }

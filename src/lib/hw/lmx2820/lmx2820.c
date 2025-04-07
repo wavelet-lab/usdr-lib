@@ -49,7 +49,7 @@ enum {
 #define OUT_DIV_DIAP_MAX (OUT_DIV_LOG2_MAX - OUT_DIV_LOG2_MIN + 1 + 1)
 
 //Pin3 bias capacitor, uF
-#define C_BIAS 4.7f
+#define C_BIAS 1.0f
 
 enum {
     PLL_N_MIN = 12,
@@ -138,8 +138,25 @@ static int lmx2820_get_worst_vco_core(uint64_t vco_freq, unsigned mash_order, un
     return -EINVAL;
 }
 
+int lmx2820_sync(lmx2820_state_t* st)
+{
+    uint16_t r1;
 
-static int lmx2820_reset(lmx2820_state_t* st)
+    int res = lmx2820_spi_get(st, R1, &r1);
+    if(res)
+        return res;
+
+    uint32_t regs[] =
+        {
+            MAKE_LMX2820_REG_WR(R1, (r1 & ~PHASE_SYNC_EN_MSK)),
+            MAKE_LMX2820_REG_WR(R1, (r1 |  PHASE_SYNC_EN_MSK)),
+            MAKE_LMX2820_REG_WR(R1, (r1 & ~PHASE_SYNC_EN_MSK)),
+        };
+
+    return lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
+}
+
+int lmx2820_reset(lmx2820_state_t* st)
 {
     memset(st, 0, sizeof(*st));
 
@@ -179,7 +196,7 @@ static int lmx2820_calibrate(lmx2820_state_t* st, bool set_flag)
     return lmx2820_spi_post(st, &reg, 1);
 }
 
-static int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout)
+int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout)
 {
     int res = 0;
     unsigned elapsed = 0;
@@ -277,7 +294,7 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
         MAKE_LMX2820_R19(0x109, TEMPSENSE_EN_ENABLED, 0x0), //enable temperature sensor
     };
 
-    res = lmx2820_spi_post(st, regs, sizeof(regs));
+    res = lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
@@ -914,7 +931,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R0 (1, 1, 0, HP_fd_adj, LP_fd_adj, DBLR_CAL_EN_ENABLED, 1, FCAL_EN_DISABLED, 0, RESET_NORMAL_OPERATION, POWERDOWN_NORMAL_OPERATION)
     };
 
-    res = lmx2820_spi_post(st, regs, sizeof(regs));
+    res = lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
@@ -931,6 +948,20 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         return res;
     }
 
+    res = lmx2820_wait_pll_lock(st, 10000);
+    if(res)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_wait_pll_lock() failed, err:%d", res);
+        return res;
+    }
+
+    res = lmx2820_sync(st);
+    if(res)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_sync() failed, err:%d", res);
+        return res;
+    }
+
     if(use_instcal)
     {
         res = lmx2820_calibrate(st, false);
@@ -939,13 +970,6 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
             USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_calibrate(0) failed, err:%d", res);
             return res;
         }
-    }
-
-    res = lmx2820_wait_pll_lock(st, 10000);
-    if(res)
-    {
-        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_wait_pll_lock() failed, err:%d", res);
-        return res;
     }
 
     return 0;
@@ -1008,7 +1032,7 @@ int lmx2820_tune_instcal(lmx2820_state_t* st, uint64_t rfouta, uint64_t rfoutb)
             MAKE_LMX2820_REG_WR(R0, r0)
         };
 
-    res = lmx2820_spi_post(st, regs, sizeof(regs));
+    res = lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
