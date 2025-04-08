@@ -166,7 +166,14 @@ int lmx2820_sync(lmx2820_state_t* st)
     return lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
 }
 
+#define LMX2820_RESET_SKIP
+
 int lmx2820_reset(lmx2820_state_t* st)
+#ifdef LMX2820_RESET_SKIP
+{
+    return 0;
+}
+#else
 {
     uint16_t r0;
 
@@ -187,6 +194,7 @@ int lmx2820_reset(lmx2820_state_t* st)
     usleep(5); //reset takes <1us
     return 0;
 }
+#endif
 
 static int lmx2820_calibrate(lmx2820_state_t* st, bool set_flag)
 {
