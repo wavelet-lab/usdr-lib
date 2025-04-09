@@ -48,5 +48,6 @@ int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_
 int lmx1214_destroy(lmx1214_state_t* st);
 int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en, lmx1214_auxclkout_cfg_t* aux, bool dry_run);
 int lmx1214_get_temperature(lmx1214_state_t* st, float* value);
+int lmx1214_sync_clr(lmx1214_state_t* st);
 
 #endif // LMX1214_H

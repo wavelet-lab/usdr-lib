@@ -386,15 +386,16 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //
 
     const uint64_t ld_clkout = 160000000;
-    bool ld_en[LMX1214_OUT_CNT] = {1,0,1,0};
+    bool ld_en[LMX1214_OUT_CNT] = {1,0,1,1};
     lmx1214_auxclkout_cfg_t ld_aux;
     ld_aux.enable = 1;
     ld_aux.fmt = LMX2124_FMT_LVDS;
     ld_aux.freq = 8000000;
 
     res = lmx1214_create(dev, 0, SPI_LMX1214, &d->lodistr);
+#if 0
     res = res ? res : lmx1214_solver(&d->lodistr, lmx1_freq[0], ld_clkout, ld_en, &ld_aux, false /*dry run*/);
-
+#endif
     float lmx1214_tempval;
     lmx1214_get_temperature(&d->lodistr, &lmx1214_tempval); //just for logging
 

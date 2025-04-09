@@ -8,6 +8,8 @@
 #include "lmx1214.h"
 #include "usdr_logging.h"
 
+#include "lmx1214_dump.h"
+
 enum
 {
     CLKIN_MIN     = 300000000ull,
@@ -75,6 +77,38 @@ static int lmx1214_spi_get(lmx1214_state_t* obj, uint16_t addr, uint16_t* out)
     return 0;
 }
 
+static int lmx1214_loaddump(lmx1214_state_t* st)
+{
+    int res = lmx1214_spi_post(st, lmx1214_rom_test, SIZEOF_ARRAY(lmx1214_rom_test));
+    if(res)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "lmx1214_loaddump() err:%d", res);
+    }
+    else
+    {
+        USDR_LOG("2820", USDR_LOG_DEBUG, "lmx1214_loaddump() OK");
+    }
+    return res;
+}
+
+int lmx1214_sync_clr(lmx1214_state_t* st)
+{
+    uint16_t r15;
+
+    int res = lmx1214_spi_get(st, R15, &r15);
+    if(res)
+        return res;
+
+    uint32_t regs[] =
+    {
+        MAKE_LMX1214_REG_WR(R15, r15 & ~SYNC_CLR_MSK),
+        MAKE_LMX1214_REG_WR(R15, r15 |  SYNC_CLR_MSK),
+        MAKE_LMX1214_REG_WR(R15, r15 & ~SYNC_CLR_MSK),
+    };
+
+    return lmx1214_spi_post(st, regs, SIZEOF_ARRAY(regs));;
+}
+
 int lmx1214_get_temperature(lmx1214_state_t* st, float* value)
 {
     if(!value)
@@ -89,6 +123,7 @@ int lmx1214_get_temperature(lmx1214_state_t* st, float* value)
     int16_t code = (r24 & RB_TS_MSK) >> RB_TS_OFF;
     *value = 0.65f * code - 351.0f;
 
+    USDR_LOG("1214", USDR_LOG_DEBUG, "LMX1214 temperature sensor:%.2fC", *value);
     return 0;
 }
 
@@ -107,12 +142,18 @@ static int lmx1214_reset_main_divider(lmx1214_state_t* st, bool set_flag)
 int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_t* st)
 {
     memset(st, 0, sizeof(*st));
+    int res;
 
     st->dev = dev;
     st->subdev = subdev;
     st->lsaddr = lsaddr;
 
-    int res;
+#if 1
+    res = lmx1214_loaddump(st);
+    if(res)
+        return res;
+#else
+
     uint32_t regs[] =
     {
         MAKE_LMX1214_R79(0, 0x5),      //magic R79->0x5 (see manual)
@@ -126,8 +167,8 @@ int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_
         USDR_LOG("1214", USDR_LOG_ERROR, "Registers set lmx1214_spi_post() failed, err:%d", res);
         return res;
     }
-
-    usleep(10);
+#endif
+    usleep(100);
 
     float tempval;
     res = lmx1214_get_temperature(st, &tempval);
@@ -341,11 +382,22 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
         return res;
     }
 
+    uint8_t sync_dly_step = 0;
+    if(in >= 4500000000)
+        sync_dly_step = 3;
+    else if(in > 3100000000 && in <= 5700000000)
+        sync_dly_step = 2;
+    else if(in > 2400000000 && in <= 4700000000)
+        sync_dly_step = 1;
+
+    USDR_LOG("1214", USDR_LOG_DEBUG, "CLKIN:%" PRIu64 " -> SYNC_DLY_STEP:%u", in, sync_dly_step);
+
     uint32_t regs[] =
     {
         MAKE_LMX1214_R90(0, 0, (st->auxclk_div_byp ? 1 : 0), (st->auxclk_div_byp ? 1 : 0), 0),
         MAKE_LMX1214_R79(0, 0x5),
         MAKE_LMX1214_R25(0x4, 0, st->clk_div - 1, st->clk_mux),
+        MAKE_LMX1214_R14(0, 1, 1, 0), //set CLKPOS_CAPTURE_EN
         MAKE_LMX1214_R9 (0, 1, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
         MAKE_LMX1214_R8 (0, st->auxclk_div_pre, 0, (st->auxclkout.enable ? 1 : 0), 0, st->auxclkout.fmt),
         MAKE_LMX1214_R3 (st->clkout_enabled[3] ? 1 : 0,
@@ -369,6 +421,23 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
         USDR_LOG("1214", USDR_LOG_ERROR, "lmx1214_reset_main_divider(0) err:%d", res);
         return res;
     }
+
+    return 0;
+}
+
+int lmx1214_windowing(lmx1214_state_t* st)
+{
+    int res;
+    uint16_t r11, r12;
+
+    res = lmx1214_spi_get(st, R11, &r11);
+    res = res ? 0 : lmx1214_spi_get(st, R12, &r12);
+    if(res)
+        return res;
+
+    uint32_t clkpos = ((uint32_t)r12 << 16) | r11;
+    //USDR_LOG(USDR_LOG_DEBUG, "CLKPOS:0b%b", clkpos);
+
 
     return 0;
 }
