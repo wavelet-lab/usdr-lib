@@ -3,10 +3,11 @@ revision: 0.0.1
 processors: [ c ]
 bus:
     type: SPI
-    wr_mask: 0x80000000
+    rd_mask: 0x800000
     usdr_path: /debug/hw/lmx1214/*/reg
-addr_width: 16
+addr_width: 8
 data_width: 16
+
 
 pages:
 - name: Main
@@ -185,16 +186,21 @@ pages:
       opts:
         0x0: LVDS
         0x2: CML
-    - bits: '4:2'
+    - bits: '3:2'
       name: R8_UNDISCLOSED_0
       mode: RW
       dflt: 0x0
       desc: Program this field to 0x0.
-    - bits: 5
+    - bits: 4
       name: AUXCLKOUT_EN
       mode: RW
       dflt: 0x1
       desc: Enables AUXCLK subsystem.
+    - bits: 5
+      name: R8_UNDISCLOSED_5
+      mode: RW
+      dflt: 0x0
+      desc: Program this field to 0x0.
     - bits: '8:6'
       name: AUXCLK_DIV_PRE
       mode: RW

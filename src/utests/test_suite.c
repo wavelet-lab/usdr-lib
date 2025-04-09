@@ -13,6 +13,7 @@ Suite * trig_suite(void);
 Suite * clockgen_suite(void);
 Suite * lmk05318_solver_suite(void);
 Suite * lmx2820_solver_suite(void);
+Suite * lmx1214_solver_suite(void);
 
 int main(int argc, char** argv)
 {
@@ -33,8 +34,9 @@ int main(int argc, char** argv)
     srunner_add_suite(sr, clockgen_suite());
     srunner_add_suite(sr, lmk05318_solver_suite());
     srunner_add_suite(sr, lmx2820_solver_suite());
+    srunner_add_suite(sr, lmx1214_solver_suite());
 #else
-    sr = srunner_create(lmx2820_solver_suite());
+    sr = srunner_create(lmx1214_solver_suite());
 #endif
 
     srunner_set_fork_status (sr, CK_NOFORK);

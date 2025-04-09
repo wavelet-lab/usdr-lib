@@ -19,7 +19,7 @@
 #include "sync_const.h"
 #include "../hw/lmk05318/lmk05318.h"
 #include "../hw/lmx2820/lmx2820.h"
-#include "../hw/def_lmx2820.h"
+#include "../hw/lmx1214/lmx1214.h"
 
 // [0] 24bit 20Mhz AD5662  InRef::DAC_REF
 // [1] 24bit 20Mhz AD5662  ClockGen::GEN_DC
@@ -125,6 +125,8 @@ struct dev_pe_sync {
 
     lmk05318_state_t gen;
     lmx2820_state_t lmx0, lmx1;
+    lmx1214_state_t lodistr;
+
 };
 
 enum dev_gpi {
@@ -343,13 +345,13 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     const uint64_t lmx1_freq[] =
     {
-        60000000,
-        60000000
+        320000000,
+        160000000
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
 #if 1
-    res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], MASH_ORDER_SECOND_ORDER, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
+    res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], 2 /*mash order 2*/, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
 #else
     res = res ? res : lmx2820_loaddump(&d->lmx1);
     usleep(1000);
@@ -377,6 +379,32 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     }
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 outputs locked & synced");
+    //
+
+    //
+    //LMX1214 setup
+    //
+
+    const uint64_t ld_clkout = 160000000;
+    bool ld_en[LMX1214_OUT_CNT] = {1,0,1,0};
+    lmx1214_auxclkout_cfg_t ld_aux;
+    ld_aux.enable = 1;
+    ld_aux.fmt = LMX2124_FMT_LVDS;
+    ld_aux.freq = 8000000;
+
+    res = lmx1214_create(dev, 0, SPI_LMX1214, &d->lodistr);
+    res = res ? res : lmx1214_solver(&d->lodistr, lmx1_freq[0], ld_clkout, ld_en, &ld_aux, false /*dry run*/);
+
+    float lmx1214_tempval;
+    lmx1214_get_temperature(&d->lodistr, &lmx1214_tempval); //just for logging
+
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX1214 failed to initialize, res:%d", res);
+        return res;
+    }
+
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1214 initialized");
     //
 
     return res;

@@ -14,6 +14,7 @@ set(TEST_SUIT_SRCS
     clockgen_test.c
     lmk05318_solver_test.c
     lmx2820_solver_test.c
+    lmx1214_solver_test.c
 )
 
 include_directories(../lib/xdsp)

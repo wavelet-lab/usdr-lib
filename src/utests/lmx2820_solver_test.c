@@ -150,8 +150,8 @@ START_TEST(lmx2820_solver_test13_pesync)
 {
     const uint64_t osc_in = 250000000ull;
     const int mash_order = 2;
-    uint64_t out_freq1 = 580000000ull;
-    uint64_t out_freq2 = out_freq1 >> 2;
+    uint64_t out_freq1 = 320000000ull;
+    uint64_t out_freq2 = 160000000ull;
 
     int res = lmx2820_solver(&st, osc_in, mash_order, 0, out_freq1, out_freq2);
     ck_assert_int_eq( res, 0 );
