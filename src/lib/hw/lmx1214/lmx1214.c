@@ -322,6 +322,8 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
     USDR_LOG("1214", USDR_LOG_INFO, "LMX1214 SOLUTION FOUND:");
     USDR_LOG("1214", USDR_LOG_INFO, "CLKIN:%" PRIu64 " CLK_DIV:%u CLKMUX:%s(%u) CLKOUT:%" PRIu64,
              st->clkin, st->clk_div, lmx1214_decode_mux(st->clk_mux), st->clk_mux, st->clkout);
+    USDR_LOG("1214", USDR_LOG_INFO, "CLKOUT enabled - OUT0:%u OUT1:%u OUT2:%u OUT3:%u",
+             st->clkout_enabled[0], st->clkout_enabled[1], st->clkout_enabled[2], st->clkout_enabled[3]);
 
     if(st->auxclkout.enable)
         USDR_LOG("1214", USDR_LOG_INFO, "AUXCLC_DIV_PRE:%u AUXCLK_DIV_BYP:%u AUXCLK_DIV:%u AUXCLKOUT:%" PRIu64 " AUXCLKOUT_FMT:%s(%u)",
