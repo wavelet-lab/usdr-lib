@@ -20,6 +20,7 @@
 #include "../hw/lmk05318/lmk05318.h"
 #include "../hw/lmx2820/lmx2820.h"
 #include "../hw/lmx1214/lmx1214.h"
+#include "../hw/lmx1204/lmx1204.h"
 
 // [0] 24bit 20Mhz AD5662  InRef::DAC_REF
 // [1] 24bit 20Mhz AD5662  ClockGen::GEN_DC
@@ -126,7 +127,7 @@ struct dev_pe_sync {
     lmk05318_state_t gen;
     lmx2820_state_t lmx0, lmx1;
     lmx1214_state_t lodistr;
-
+    lmx1204_state_t cldistr;
 };
 
 enum dev_gpi {
@@ -345,8 +346,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     const uint64_t lmx1_freq[] =
     {
-        320000000,
-        160000000
+        840000000,
+        840000000
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
@@ -385,12 +386,12 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //LMX1214 setup
     //
 
-    const uint64_t ld_clkout = 160000000;
+    const uint64_t ld_clkout = 840000000/3;
     bool ld_en[LMX1214_OUT_CNT] = {1,0,1,1};
     lmx1214_auxclkout_cfg_t ld_aux;
     ld_aux.enable = 1;
     ld_aux.fmt = LMX2124_FMT_LVDS;
-    ld_aux.freq = 8000000;
+    ld_aux.freq = 840000000/4;
 
     res = lmx1214_create(dev, 0, SPI_LMX1214, &d->lodistr);
 #if 0
@@ -406,6 +407,20 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     }
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1214 initialized");
+    //
+
+    //
+    //LMX1204 setup
+    //
+
+    res = lmx1204_create(dev, 0, SPI_LMX1204, &d->cldistr);
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX1204 failed to initialize, res:%d", res);
+        return res;
+    }
+
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1204 initialized");
     //
 
     return res;

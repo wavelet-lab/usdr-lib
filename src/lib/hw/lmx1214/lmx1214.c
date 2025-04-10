@@ -109,7 +109,7 @@ static int lmx1214_read_all_regs(lmx1214_state_t* st)
         int res = lmx1214_spi_get(st, regs[i], &regval);
         if(res)
             return res;
-        USDR_LOG("2820", USDR_LOG_DEBUG, "READ R%02u = 0x%04x", i, regval);
+        USDR_LOG("1214", USDR_LOG_DEBUG, "READ R%02u = 0x%04x", i, regval);
     }
 
     return 0;

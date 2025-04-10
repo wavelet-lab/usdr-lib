@@ -3,9 +3,9 @@ revision: 0.0.1
 processors: [ c ]
 bus:
     type: SPI
-    wr_mask: 0x80000000
+    rd_mask: 0x800000
     usdr_path: /debug/hw/lmx1204/*/reg
-addr_width: 16
+addr_width: 8
 data_width: 16
 
 pages:
