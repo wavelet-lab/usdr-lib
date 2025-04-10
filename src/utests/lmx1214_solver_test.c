@@ -58,14 +58,14 @@ START_TEST(lmx1214_solver_test3)
 
 START_TEST(lmx1214_solver_test4_pesync)
 {
-    const uint64_t osc_in = 320000000;
-    uint64_t out_freq = osc_in / 2;
+    const uint64_t osc_in = 640000000;
+    uint64_t out_freq = osc_in;
     bool en[4] = {1,1,1,1};
 
     lmx1214_auxclkout_cfg_t aux;
     aux.enable = 1;
     aux.fmt = LMX2124_FMT_LVDS; //LVDS
-    aux.freq = osc_in / 40;
+    aux.freq = osc_in;
 
     int res = lmx1214_solver(&st, osc_in, out_freq, en, &aux, true);
     ck_assert_int_eq( res, 0 );
