@@ -200,12 +200,12 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : dev_gpo_set(dev, IGPO_SY0_CTRL, 3); // Enable LMX2820 0
     res = res ? res : dev_gpo_set(dev, IGPO_SY1_CTRL, 3); // Enable LMX2820 1
 
-    // gpo_gen_ctrl[0] -- En LDO for LMK05318B
-    // gpo_gen_ctrl[1] -- PDN for LMK05318B
-    // gpo_gen_ctrl[2] -- En LDO for OCXO and OCXO DAC
-    // gpo_gen_ctrl[3] -- En distribution buffer REFCLK
-    // gpo_gen_ctrl[4] -- En distribution buffer 1PPS
-    // gpo_gen_ctrl[5] -- clk_gpio[0]
+    //* gpo_gen_ctrl[0] -- En LDO for LMK05318B
+    //* gpo_gen_ctrl[1] -- PDN for LMK05318B
+    //* gpo_gen_ctrl[2] -- En LDO for OCXO and OCXO DAC
+    //* gpo_gen_ctrl[3] -- En distribution buffer REFCLK
+    //* gpo_gen_ctrl[4] -- En distribution buffer 1PPS
+    //* gpo_gen_ctrl[5] -- clk_gpio[0]
     // gpo_gen_ctrl[6] -- clk_gpio[1]
     // gpo_gen_ctrl[7] -- clk_gpio[2]
     // res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (0 << 0) | (0 << 1) | (1 << 2) | (0 << 5));
@@ -219,7 +219,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     // gpo_distrib_ctrl[3]   -- 0 - buffers LMK1D1208I disable, 1 - en
     // gpo_distrib_ctrl[4]   -- En LDO FCLK4..0 CMOS buffers
     // gpo_distrib_ctrl[5]   -- 0 - internal path, 1 - external LO/REFCLK/SYSREF
-    res = res ? res : dev_gpo_set(dev, IGPO_DISTRIB_CTRL, (1 << 0) /* | (15 << 1) */ );
+    res = res ? res : dev_gpo_set(dev, IGPO_DISTRIB_CTRL, (1 << 0) | (15 << 1));
 
     // Wait for all LDOs to settle
     usleep(200000);
@@ -390,11 +390,11 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     bool ld_en[LMX1214_OUT_CNT] = {1,0,1,1};
     lmx1214_auxclkout_cfg_t ld_aux;
     ld_aux.enable = 1;
-    ld_aux.fmt = LMX2124_FMT_LVDS;
+    ld_aux.fmt = LMX1214_FMT_LVDS;
     ld_aux.freq = 840000000/4;
 
     res = lmx1214_create(dev, 0, SPI_LMX1214, &d->lodistr);
-#if 0
+#if 1
     res = res ? res : lmx1214_solver(&d->lodistr, lmx1_freq[0], ld_clkout, ld_en, &ld_aux, false /*dry run*/);
 #endif
     float lmx1214_tempval;

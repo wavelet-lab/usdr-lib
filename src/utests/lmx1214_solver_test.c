@@ -19,7 +19,7 @@ START_TEST(lmx1214_solver_test1)
 
     lmx1214_auxclkout_cfg_t aux;
     aux.enable = 1;
-    aux.fmt = LMX2124_FMT_LVDS; //LVDS
+    aux.fmt = LMX1214_FMT_LVDS; //LVDS
     aux.freq = osc_in / 16;
 
     int res = lmx1214_solver(&st, osc_in, out_freq, en, &aux, true);
@@ -34,7 +34,7 @@ START_TEST(lmx1214_solver_test2)
 
     lmx1214_auxclkout_cfg_t aux;
     aux.enable = 1;
-    aux.fmt = LMX2124_FMT_LVDS; //LVDS
+    aux.fmt = LMX1214_FMT_LVDS; //LVDS
     aux.freq = osc_in / 160;
 
     int res = lmx1214_solver(&st, osc_in, out_freq, en, &aux, true);
@@ -49,7 +49,7 @@ START_TEST(lmx1214_solver_test3)
 
     lmx1214_auxclkout_cfg_t aux;
     aux.enable = 1;
-    aux.fmt = LMX2124_FMT_LVDS; //LVDS
+    aux.fmt = LMX1214_FMT_LVDS; //LVDS
     aux.freq = osc_in;
 
     int res = lmx1214_solver(&st, osc_in, out_freq, en, &aux, true);
@@ -64,7 +64,7 @@ START_TEST(lmx1214_solver_test4_pesync)
 
     lmx1214_auxclkout_cfg_t aux;
     aux.enable = 1;
-    aux.fmt = LMX2124_FMT_LVDS; //LVDS
+    aux.fmt = LMX1214_FMT_LVDS; //LVDS
     aux.freq = osc_in;
 
     int res = lmx1214_solver(&st, osc_in, out_freq, en, &aux, true);

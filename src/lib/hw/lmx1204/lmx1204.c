@@ -93,7 +93,7 @@ static int lmx1204_read_all_regs(lmx1204_state_t* st)
         int res = lmx1204_spi_get(st, regs[i], &regval);
         if(res)
             return res;
-        USDR_LOG("1204", USDR_LOG_DEBUG, "READ R%02u = 0x%04x", i, regval);
+        USDR_LOG("1204", USDR_LOG_DEBUG, "READ R%02u = 0x%04x", regs[i], regval);
     }
 
     return 0;
@@ -113,7 +113,7 @@ int lmx1204_get_temperature(lmx1204_state_t* st, float* value)
     int16_t code = (r24 & RB_TEMPSENSE_MSK) >> RB_TEMPSENSE_OFF;
     *value = 0.65f * code - 351.0f;
 
-    USDR_LOG("1214", USDR_LOG_DEBUG, "LMX1204 temperature sensor:%.2fC", *value);
+    USDR_LOG("1204", USDR_LOG_DEBUG, "LMX1204 temperature sensor:%.2fC", *value);
     return 0;
 }
 
@@ -131,7 +131,7 @@ int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_
     uint32_t regs[] =
     {
         MAKE_LMX1204_R24(0,0,0,1),          //enable temp sensor
-        MAKE_LMX1204_R23(1,1,0,0,0,0,0,0),  //enable temp sensor
+        MAKE_LMX1204_R23(1,1,1,0,1,0,0,0),  //enable temp sensor + MUXOUT_EN=1(push-pull) MUXOUT=1(SDO)
     };
     res = lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)

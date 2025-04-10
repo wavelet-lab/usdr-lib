@@ -109,7 +109,7 @@ static int lmx1214_read_all_regs(lmx1214_state_t* st)
         int res = lmx1214_spi_get(st, regs[i], &regval);
         if(res)
             return res;
-        USDR_LOG("1214", USDR_LOG_DEBUG, "READ R%02u = 0x%04x", i, regval);
+        USDR_LOG("1214", USDR_LOG_DEBUG, "READ R%02u = 0x%04x", regs[i], regval);
     }
 
     return 0;
@@ -186,7 +186,7 @@ int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_
     st->subdev = subdev;
     st->lsaddr = lsaddr;
 
-#if 1
+#if 0
     res = lmx1214_loaddump(st);
     if(res)
         return res;
@@ -194,9 +194,10 @@ int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_
 
     uint32_t regs[] =
     {
-        MAKE_LMX1214_R79(0, 0x5),      //magic R79->0x5 (see manual)
-        MAKE_LMX1214_R24(0, 0, 0, 1),  //temp sensor
-        MAKE_LMX1214_R23(1, 1, 0, 0),  //temp sensor
+        MAKE_LMX1214_R86(0, 0, 0),           //MUXOUT_EN_OVRD=0
+        MAKE_LMX1214_R79(0, 0x5),            //magic R79->0x5 (see manual)
+        MAKE_LMX1214_R24(0, 0, 0, 1),        //temp sensor
+        MAKE_LMX1214_R23(1, 1, 1, 1 << 6),   //temp sensor + MUXOUT_EN=1(push-pull) MUXOUT=1(SDO)
     };
 
     res = lmx1214_spi_post(st, regs, SIZEOF_ARRAY(regs));
@@ -268,8 +269,8 @@ static int lmx1214_solver_prevalidate(uint64_t in, uint64_t out, bool* out_en, l
 
     switch(aux->fmt)
     {
-    case LMX2124_FMT_LVDS: aux->fmt = AUXCLKOUT_FMT_LVDS; break;
-    case LMX2124_FMT_CML : aux->fmt = AUXCLKOUT_FMT_CML; break;
+    case LMX1214_FMT_LVDS: aux->fmt = AUXCLKOUT_FMT_LVDS; break;
+    case LMX1214_FMT_CML : aux->fmt = AUXCLKOUT_FMT_CML; break;
     default:
     {
         USDR_LOG("1214", USDR_LOG_ERROR, "AUXCLKOUT_FMT:%u is invalid", aux->fmt);

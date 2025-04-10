@@ -10,8 +10,8 @@
 
 enum
 {
-    LMX2124_FMT_LVDS = 0,
-    LMX2124_FMT_CML = 2,
+    LMX1214_FMT_LVDS = 0,
+    LMX1214_FMT_CML = 2,
 };
 
 struct lmx1214_auxclkout_cfg
