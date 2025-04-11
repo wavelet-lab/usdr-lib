@@ -65,7 +65,4 @@ int lmx2820_sync(lmx2820_state_t* st);
 int lmx2820_reset(lmx2820_state_t* st);
 int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout);
 
-int lmx2820_loaddump(lmx2820_state_t* st);
-
-
 #endif // LMX2820_H

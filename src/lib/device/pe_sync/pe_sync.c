@@ -200,12 +200,12 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : dev_gpo_set(dev, IGPO_SY0_CTRL, 3); // Enable LMX2820 0
     res = res ? res : dev_gpo_set(dev, IGPO_SY1_CTRL, 3); // Enable LMX2820 1
 
-    //* gpo_gen_ctrl[0] -- En LDO for LMK05318B
-    //* gpo_gen_ctrl[1] -- PDN for LMK05318B
-    //* gpo_gen_ctrl[2] -- En LDO for OCXO and OCXO DAC
-    //* gpo_gen_ctrl[3] -- En distribution buffer REFCLK
-    //* gpo_gen_ctrl[4] -- En distribution buffer 1PPS
-    //* gpo_gen_ctrl[5] -- clk_gpio[0]
+    // gpo_gen_ctrl[0] -- En LDO for LMK05318B
+    // gpo_gen_ctrl[1] -- PDN for LMK05318B
+    // gpo_gen_ctrl[2] -- En LDO for OCXO and OCXO DAC
+    // gpo_gen_ctrl[3] -- En distribution buffer REFCLK
+    // gpo_gen_ctrl[4] -- En distribution buffer 1PPS
+    // gpo_gen_ctrl[5] -- clk_gpio[0]
     // gpo_gen_ctrl[6] -- clk_gpio[1]
     // gpo_gen_ctrl[7] -- clk_gpio[2]
     // res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (0 << 0) | (0 << 1) | (1 << 2) | (0 << 5));
@@ -243,9 +243,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1204, 0x176040, NULL); //Enable MUXOUT as SPI readback
     res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1204, 0xA10000, &s2);
 
-    // TODO check LMX1214 readback settings
-    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1214, 0x560004, NULL); //Enable MUXOUT_EN_OVRD
-    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1214, 0x176000, NULL); //Enable MUXOUT
+    res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1214, 0x176040, NULL); //Enable MUXOUT
     res = res ? res : lowlevel_spi_tr32(dev, 0, SPI_LMX1214, 0xCF0000, &s3);
 
     res = res ? res : i2c_reg_rd8(dev, I2C_BUS_LMK1D1208I_LCK, 0x05, &r4);
@@ -254,7 +252,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     USDR_LOG("SYNC", USDR_LOG_WARNING, "STAT=%08x LP87524_OTP=%02x LMS2820[0/1]=%04x/%04x LMX1204/LMX1214=%04x/%04x LMK1D1208I_LCK/LRF=%02x/%02x\n",
              v, r, s0, s1, s2, s3, r4, r5);
 
-    // TODO: Initialize LMK05318B
+    // Initialize LMK05318B
     // XO: 25Mhz
     //
     // OUT0: LVDS       125.000 Mhz
@@ -339,6 +337,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return res;
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMK03518 outputs synced");
+    //
 
     //
     //LMX2820 #1 setup
@@ -346,57 +345,39 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     const uint64_t lmx1_freq[] =
     {
-        840000000,
-        840000000
+        1600000000,
+        1600000000
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
-#if 1
     res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], 2 /*mash order 2*/, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
-#else
-    res = res ? res : lmx2820_loaddump(&d->lmx1);
-    usleep(1000);
 
-    res = res ? res : lmx2820_wait_pll_lock(&d->lmx1, 10000);
-    if(res)
-        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX2820 not locked!");
-    else
-        USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 locked OK");
-
-    res = res ? res : lmx2820_sync(&d->lmx1);
-    if(res)
-        USDR_LOG("SYNC", USDR_LOG_ERROR, "lmx2820_sync() failed, err:%d", res);
-    else
-        USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 synced OK");
-
-#endif
     lmx2820_stats_t lmxstatus;
     lmx2820_read_status(&d->lmx1, &lmxstatus); //just for logging
 
     if(res)
     {
-        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX2820 PLL not locked during specified timeout");
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX2820[1] PLL not locked during specified timeout");
         return res;
     }
 
-    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820 outputs locked & synced");
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820[1] outputs locked & synced");
     //
 
     //
     //LMX1214 setup
     //
 
-    const uint64_t ld_clkout = 840000000/3;
-    bool ld_en[LMX1214_OUT_CNT] = {1,0,1,1};
+    const uint64_t ld_clkout = 1600000000/2;
+    bool ld_en[LMX1214_OUT_CNT] = {1,1,1,1};
     lmx1214_auxclkout_cfg_t ld_aux;
     ld_aux.enable = 1;
     ld_aux.fmt = LMX1214_FMT_LVDS;
-    ld_aux.freq = 840000000/4;
+    ld_aux.freq = 800000000/4;
 
     res = lmx1214_create(dev, 0, SPI_LMX1214, &d->lodistr);
-#if 1
     res = res ? res : lmx1214_solver(&d->lodistr, lmx1_freq[0], ld_clkout, ld_en, &ld_aux, false /*dry run*/);
-#endif
+
     float lmx1214_tempval;
     lmx1214_get_temperature(&d->lodistr, &lmx1214_tempval); //just for logging
 

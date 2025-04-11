@@ -77,7 +77,7 @@ static int lmx1214_spi_get(lmx1214_state_t* obj, uint16_t addr, uint16_t* out)
     return 0;
 }
 
-static int lmx1214_read_all_regs(lmx1214_state_t* st)
+UNUSED static int lmx1214_read_all_regs(lmx1214_state_t* st)
 {
     uint8_t regs[] =
     {
@@ -115,7 +115,7 @@ static int lmx1214_read_all_regs(lmx1214_state_t* st)
     return 0;
 }
 
-static int lmx1214_loaddump(lmx1214_state_t* st)
+UNUSED static int lmx1214_loaddump(lmx1214_state_t* st)
 {
     int res = lmx1214_spi_post(st, lmx1214_rom_test, SIZEOF_ARRAY(lmx1214_rom_test));
     if(res)
@@ -186,12 +186,6 @@ int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_
     st->subdev = subdev;
     st->lsaddr = lsaddr;
 
-#if 0
-    res = lmx1214_loaddump(st);
-    if(res)
-        return res;
-#else
-
     uint32_t regs[] =
     {
         MAKE_LMX1214_R86(0, 0, 0),           //MUXOUT_EN_OVRD=0
@@ -206,8 +200,8 @@ int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_
         USDR_LOG("1214", USDR_LOG_ERROR, "Registers set lmx1214_spi_post() failed, err:%d", res);
         return res;
     }
-#endif
-    usleep(100000);
+
+    usleep(10);
 
     float tempval;
     res = lmx1214_get_temperature(st, &tempval);
@@ -216,16 +210,6 @@ int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_
         USDR_LOG("1214", USDR_LOG_ERROR, "lmx1214_get_temperature() failed, err:%d", res);
         return res;
     }
-
-    uint16_t r75;
-    res = lmx1214_spi_get(st, R75, &r75);
-    if(res)
-        return res;
-    USDR_LOG("1214", USDR_LOG_DEBUG, "R75 status byte:0x%04x", r75);
-
-    res = lmx1214_read_all_regs(st);
-    if(res)
-        return res;
 
     USDR_LOG("1214", USDR_LOG_DEBUG, "Create OK");
     return 0;
@@ -486,6 +470,7 @@ int lmx1214_windowing(lmx1214_state_t* st)
 
     uint32_t clkpos = ((uint32_t)r12 << 16) | r11;
     //USDR_LOG(USDR_LOG_DEBUG, "CLKPOS:0b%b", clkpos);
+    //TODO
 
 
     return 0;

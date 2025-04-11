@@ -46,7 +46,7 @@ static int lmx1204_spi_get(lmx1204_state_t* obj, uint16_t addr, uint16_t* out)
     return 0;
 }
 
-static int lmx1204_read_all_regs(lmx1204_state_t* st)
+UNUSED static int lmx1204_read_all_regs(lmx1204_state_t* st)
 {
     uint8_t regs[] =
     {
@@ -126,10 +126,9 @@ int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_
     st->subdev = subdev;
     st->lsaddr = lsaddr;
 
-    usleep(100000);
-
     uint32_t regs[] =
     {
+        MAKE_LMX1204_R86(0),                //MUXOUT_EN_OVRD=0
         MAKE_LMX1204_R24(0,0,0,1),          //enable temp sensor
         MAKE_LMX1204_R23(1,1,1,0,1,0,0,0),  //enable temp sensor + MUXOUT_EN=1(push-pull) MUXOUT=1(SDO)
     };
@@ -137,14 +136,10 @@ int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_
     if(res)
         return res;
 
-    usleep(100000);
+    usleep(10);
 
     float tval;
     res = lmx1204_get_temperature(st, &tval);
-    if(res)
-        return res;
-
-    res = lmx1204_read_all_regs(st);
     if(res)
         return res;
 

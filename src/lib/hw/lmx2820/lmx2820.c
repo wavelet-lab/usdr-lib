@@ -296,7 +296,7 @@ int lmx2820_read_status(lmx2820_state_t* st, lmx2820_stats_t* status)
     return 0;
 }
 
-int lmx2820_loaddump(lmx2820_state_t* st)
+UNUSED static int lmx2820_loaddump(lmx2820_state_t* st)
 {
     int res = lmx2820_spi_post(st, lmx2820_rom_test, SIZEOF_ARRAY(lmx2820_rom_test));
     if(res)
