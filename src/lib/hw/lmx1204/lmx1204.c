@@ -1,10 +1,54 @@
 // Copyright (c) 2025 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
+#include <stdint.h>
+#include <inttypes.h>
+#include <math.h>
+
 #include "def_lmx1204.h"
 #include "lmx1204.h"
 #include "usdr_logging.h"
+#include "../cal/opt_func.h"
 
+#define FREQ_EPS 1.0f
+
+enum
+{
+    SYSREFOUT_MIN = 0,
+    SYSREFOUT_MAX_GENMODE = 200000000ull,
+    SYSREFOUT_MAX_RPTMODE = 100000000ull,
+
+    CLKIN_MIN =   300000000ull,
+    CLKIN_MAX = 12800000000ull,
+
+    CLKOUT_MIN_DIV =  150000000ull,
+    CLKOUT_MAX_DIV = 6400000000ull,
+
+    CLKOUT_MIN_BUF = CLKIN_MIN,
+    CLKOUT_MAX_BUF = CLKIN_MAX,
+
+    CLKOUT_MIN_MUL = 3200000000ull,
+    CLKOUT_MAX_MUL = 6400000000ull,
+
+    LOGICLKOUT_MIN =   1000000ull,
+    LOGICLKOUT_MAX = 800000000ull,
+
+    SMCLK_DIV_PRE_OUT_MAX = 1600000000ull,
+    SMCLK_DIV_OUT_MAX =       30000000ull,
+
+    LOGICLK_DIV_PRE_OUT_MAX = 3200000000ull,
+
+    SYSREF_DIV_PRE_OUT_MAX = 3200000000ull,
+
+    CLK_DIV_MIN = 2,
+    CLK_DIV_MAX = 8,
+    CLK_MULT_MIN = 1,
+    CLK_MULT_MAX = 4,
+    LOGICLK_DIV_MIN = 2,
+    LOGICLK_DIV_MAX = 1023,
+    SYSREF_DIV_MIN = 2,
+    SYSREF_DIV_MAX = 4095,
+};
 
 static int lmx1204_print_registers(uint32_t* regs, unsigned count)
 {
@@ -151,3 +195,344 @@ int lmx1204_destroy(lmx1204_state_t* st)
     USDR_LOG("1204", USDR_LOG_DEBUG, "Destroy OK");
     return 0;
 }
+
+static int lmx1204_solver_prevalidate(lmx1204_state_t* st)
+{
+    if(st->clkin < CLKIN_MIN || st->clkin > CLKIN_MAX)
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "CLKIN:%" PRIu64 " out of range [%" PRIu64 "; %" PRIu64 "]",
+                 st->clkin, (uint64_t)CLKIN_MIN, (uint64_t)CLKIN_MAX);
+        return -EINVAL;
+    }
+
+    if(st->logic_en && st->logiclkout_en && (st->logiclkout < LOGICLKOUT_MIN || st->logiclkout > LOGICLKOUT_MAX))
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "LOGICLKOUT:%.4f out of range [%" PRIu64 "; %" PRIu64 "]",
+                 st->logiclkout, (uint64_t)LOGICLKOUT_MIN, (uint64_t)LOGICLKOUT_MAX);
+        return -EINVAL;
+    }
+
+    double fmin, fmax;
+
+    switch(st->clk_mux)
+    {
+    case CLK_MUX_DIVIDER_MODE:    fmin = CLKOUT_MIN_DIV; fmax = CLKOUT_MAX_DIV; break;
+    case CLK_MUX_MULTIPLIER_MODE: fmin = CLKOUT_MIN_MUL; fmax = CLKOUT_MAX_MUL; break;
+    case CLK_MUX_BUFFER_MODE:     fmin = CLKOUT_MIN_BUF; fmax = CLKOUT_MIN_BUF; break;
+    default:
+        USDR_LOG("1204", USDR_LOG_ERROR, "CLK_MUX:%u unknown", st->clk_mux);
+        return -EINVAL;
+    }
+
+    if(st->clkout < fmin || st->clkout > fmax)
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "CLKOUT:%.4f out of range [%.0f; %.0f]", st->clkout, fmin, fmax);
+        return -EINVAL;
+    }
+
+    if(st->sysref_en)
+    {
+        fmin = SYSREFOUT_MIN;
+        switch(st->sysref_mode)
+        {
+        case SYSREF_MODE_CONTINUOUS_GENERATOR_MODE: fmax = SYSREFOUT_MAX_GENMODE; break;
+        case SYSREF_MODE_REPEATER_REPEATER_MODE:    fmax = SYSREFOUT_MAX_RPTMODE; break;
+        case SYSREF_MODE_PULSER_GENERATOR_MODE:     fmax = 0.0f; break;
+        default:
+            USDR_LOG("1204", USDR_LOG_ERROR, "SYSREF_MODE:%u unknown", st->sysref_mode);
+            return -EINVAL;
+        }
+
+        if(fmax != 0.0f && (st->sysrefout < fmin || st->sysrefout > fmax))
+        {
+            USDR_LOG("1204", USDR_LOG_ERROR, "SYSREFOUT:%.4f out of range [%.0f; %.0f]", st->sysrefout, fmin, fmax);
+            return -EINVAL;
+        }
+    }
+
+    if(st->logic_en)
+    {
+        if(st->logiclkout_en)
+        {
+            switch(st->logiclkout_fmt)
+            {
+            case LMX1204_FMT_LVDS:   st->logiclkout_fmt = LOGICLKOUT_FMT_LVDS; break;
+            case LMX1204_FMT_LVPECL: st->logiclkout_fmt = LOGICLKOUT_FMT_LVPECL; break;
+            case LMX1204_FMT_CML:    st->logiclkout_fmt = LOGICLKOUT_FMT_CML; break;
+            default:
+                USDR_LOG("1204", USDR_LOG_ERROR, "LOGICLKOUT_FMT:%u unknown", st->logiclkout_fmt);
+                return -EINVAL;
+            }
+        }
+
+        if(st->sysref_en && st->logisysrefout_en)
+        {
+            switch(st->logisysrefout_fmt)
+            {
+            case LMX1204_FMT_LVDS:   st->logisysrefout_fmt = LOGISYSREFOUT_FMT_LVDS; break;
+            case LMX1204_FMT_LVPECL: st->logisysrefout_fmt = LOGISYSREFOUT_FMT_LVPECL; break;
+            case LMX1204_FMT_CML:    st->logisysrefout_fmt = LOGISYSREFOUT_FMT_CML; break;
+            default:
+                USDR_LOG("1204", USDR_LOG_ERROR, "LOGISYSREFOUT_FMT:%u unknown", st->logisysrefout_fmt);
+                return -EINVAL;
+            }
+        }
+    }
+
+    return 0;
+}
+
+static const char* lmx1204_decode_clkmux(enum clk_mux_options mux)
+{
+    switch(mux)
+    {
+    case CLK_MUX_BUFFER_MODE:     return "CLK_MUX_BUFFER_MODE";
+    case CLK_MUX_MULTIPLIER_MODE: return "CLK_MUX_MULTIPLIER_MODE";
+    case CLK_MUX_DIVIDER_MODE:    return "CLK_MUX_DIVIDER_MODE";
+    }
+    return "UNKNOWN";
+}
+
+// all params are in lmx1204_state_t struct
+int lmx1204_solver(lmx1204_state_t* st, bool prec_mode)
+{
+    int res;
+    enum clk_mux_options clk_mux;
+    unsigned mult_div;
+
+    if(st->clkin > st->clkout)
+        clk_mux = CLK_MUX_DIVIDER_MODE;
+    else if(st->clkin < st->clkout)
+        clk_mux = CLK_MUX_MULTIPLIER_MODE;
+    else
+        clk_mux = st->filter_mode ? CLK_MUX_MULTIPLIER_MODE : CLK_MUX_BUFFER_MODE;
+
+    st->clk_mux = clk_mux;
+
+    res = lmx1204_solver_prevalidate(st);
+    if(res)
+        return res;
+
+    double outclk_fact;
+
+    switch(clk_mux)
+    {
+    case CLK_MUX_BUFFER_MODE:
+    {
+        mult_div = 1;
+        outclk_fact = st->clkin;
+        break;
+    }
+    case CLK_MUX_DIVIDER_MODE:
+    {
+        mult_div = (unsigned)((double)st->clkin / st->clkout + 0.5);
+        if(mult_div < CLK_DIV_MIN || mult_div > CLK_DIV_MAX)
+        {
+            USDR_LOG("1204", USDR_LOG_ERROR, "CLC_DIV:%u out of range", mult_div);
+            return -EINVAL;
+        }
+
+        outclk_fact = (double)st->clkin / mult_div;
+        break;
+    }
+    case CLK_MUX_MULTIPLIER_MODE:
+    {
+        mult_div = (unsigned)(st->clkout / st->clkin + 0.5);
+        if(mult_div < CLK_MULT_MIN || mult_div > CLK_MULT_MAX)
+        {
+            USDR_LOG("1204", USDR_LOG_ERROR, "CLC_MULT:%u out of range", mult_div);
+            return -EINVAL;
+        }
+
+        outclk_fact = (double)st->clkin * mult_div;
+        break;
+    }
+    }
+
+    if(fabs(outclk_fact - st->clkout) > FREQ_EPS)
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "Calculated CLKOUT:%.4f too rough", outclk_fact);
+        return -EINVAL;
+    }
+
+    if(prec_mode && st->clkin != st->clkout * mult_div)
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "Cannot solve CLKOUT:%.4f by int divider/multiplier", st->clkout);
+        return -EINVAL;
+    }
+
+    st->clkout = outclk_fact;
+    st->clk_mult_div = mult_div;
+
+    USDR_LOG("1204", USDR_LOG_DEBUG, "CLKIN:%" PRIu64 " CLK_MUX:%s CLK_MULT_DIV:%u CLKOUT:%.4f [FILTER_MODE:%u] [PREC_MODE:%u]",
+             st->clkin, lmx1204_decode_clkmux(clk_mux), mult_div, st->clkout, st->filter_mode, prec_mode);
+
+    // need to setup VCO for mult
+    if(clk_mux == CLK_MUX_MULTIPLIER_MODE)
+    {
+        unsigned div_pre = MAX(ceil((double)st->clkin / SMCLK_DIV_PRE_OUT_MAX), SMCLK_DIV_PRE_PL2);
+        if(div_pre > SMCLK_DIV_PRE_PL2 && div_pre <= SMCLK_DIV_PRE_PL4)
+            div_pre = SMCLK_DIV_PRE_PL4;
+        else if(div_pre > SMCLK_DIV_PRE_PL4 && div_pre <= SMCLK_DIV_PRE_PL8)
+            div_pre = SMCLK_DIV_PRE_PL8;
+        else
+            return -EINVAL; //impossible
+
+        double fdiv = (double)st->clkin / div_pre / SMCLK_DIV_OUT_MAX;
+        unsigned n = MAX(ceil(log2(fdiv)), SMCLK_DIV_PL1);
+        if(n > SMCLK_DIV_PL128)
+        {
+            return -EINVAL; //impossible
+        }
+
+        const unsigned div = 1u << n;
+
+        USDR_LOG("1204", USDR_LOG_DEBUG, "[MULT VCO SMCLK] SMCLK_DIV_PRE:%u SMCLK_DIV:%u(%u) F_SM_CLK:%.4f",
+                 div_pre, n, div, (double)st->clkin / div_pre / div);
+
+        st->smclk_div_pre = div_pre;
+        st->smclk_div = n;
+    }
+
+    //need to setup LOGICLKOUT
+    if(st->logic_en && st->logiclkout_en)
+    {
+        unsigned div_pre, div;
+        double logiclkout_fact;
+
+        if(st->logiclkout == st->clkin)
+        {
+            div_pre = LOGICLK_DIV_PRE_PL1;
+            div = 0; // bypassed
+            logiclkout_fact = st->clkin;
+        }
+        else
+        {
+            unsigned div_pre_min = MAX(ceil((double)st->clkin / LOGICLK_DIV_PRE_OUT_MAX), LOGICLK_DIV_PRE_PL2);
+
+            bool found = false;
+            for(div_pre = div_pre_min; div_pre <= LOGICLK_DIV_PRE_PL4; ++div_pre)
+            {
+                if(div_pre == LOGICLK_DIV_PRE_PL4 - 1)
+                    continue;
+
+                div = (unsigned)((double)st->clkin / div_pre / st->logiclkout + 0.5);
+                if(div < LOGICLK_DIV_MIN)
+                {
+                    USDR_LOG("1204", USDR_LOG_ERROR, "LOGICLKOUT:%.4f too high", st->logiclkout);
+                    return -EINVAL;
+                }
+                if(div > LOGICLK_DIV_MAX)
+                    continue;
+
+                logiclkout_fact = (double)st->clkin / div_pre / div;
+                if(fabs(st->logiclkout - logiclkout_fact) > FREQ_EPS)
+                    continue;
+                if(prec_mode && st->clkin != st->logiclkout * div_pre * div)
+                    continue;
+            }
+            if(!found)
+            {
+                USDR_LOG("1204", USDR_LOG_ERROR, "Cannot solve LOGICLKOUT:%.4f", st->logiclkout);
+                return -EINVAL;
+            }
+        }
+
+        st->logiclkout = logiclkout_fact;
+        st->logiclk_div_pre = div_pre;
+        st->logiclk_div = div;
+
+        USDR_LOG("1204", USDR_LOG_DEBUG, "[LOGICLKOUT] LOGICLK_DIV_PRE:%u LOGICLK_DIV:%u%s LOGICLKOUT:%.4f",
+                 div_pre, div, div ? "" : "(BYPASSED)", logiclkout_fact);
+    }
+    else
+    {
+        USDR_LOG("1204", USDR_LOG_DEBUG, "[LOGICLKOUT]:disabled");
+    }
+
+    //sysref
+    if(st->sysref_en)
+    {
+        uint64_t f_interpol;
+
+        if(st->clkin <= 1600000000ull)
+        {
+            st->sysref_delay_div = SYSREF_DELAY_DIV_PL2_LE_1_6_GHZ;
+            f_interpol = st->clkin >> 1;
+        }
+        else if(st->clkin <= 3200000000ull)
+        {
+            st->sysref_delay_div = SYSREF_DELAY_DIV_PL4_1_6_GHZ_TO_3_2_GHZ;
+            f_interpol = st->clkin >> 2;
+        }
+        else if(st->clkin <= 6400000000ull)
+        {
+            st->sysref_delay_div = SYSREF_DELAY_DIV_PL8_3_2_GHZ_TO_6_4_GHZ;
+            f_interpol = st->clkin >> 3;
+        }
+        else
+        {
+            st->sysref_delay_div = SYSREF_DELAY_DIV_PL16_6_4_GHZ_TO_12_8_GHZ;
+            f_interpol = st->clkin >> 4;
+        }
+
+        if(st->sysref_mode == SYSREF_MODE_REPEATER_REPEATER_MODE)
+        {
+            if(st->sysrefout != st->sysrefreq)
+            {
+                USDR_LOG("1204", USDR_LOG_ERROR, "[SYSREF] SYSREFREQ must be equal to SYSREFOUT for repeater mode");
+                return -EINVAL;
+            }
+        }
+        else
+        {
+            if(f_interpol % (uint64_t)st->sysrefout)
+            {
+                USDR_LOG("1204", USDR_LOG_ERROR, "[SYSREF] F_INTERPOL:%" PRIu64 " %% SYSREFOUTCLK:%.0f != 0", f_interpol, st->sysrefout);
+                return -EINVAL;
+            }
+
+            unsigned div_pre, div;
+            unsigned min_div_pre = MAX(log2f(ceil((double)st->clkin / SYSREF_DIV_PRE_OUT_MAX)), SYSREF_DIV_PRE_PL1);
+
+            bool found = true;
+
+            for(div_pre = min_div_pre; div_pre <= SYSREF_DIV_PRE_PL4; ++div_pre)
+            {
+                div = (unsigned)((st->clkin >> div_pre) / st->sysrefout + 0.5);
+                if(div < SYSREF_DIV_MIN)
+                {
+                    USDR_LOG("1204", USDR_LOG_ERROR, "SYSREFOUT:%.4f too high", st->sysrefout);
+                    return -EINVAL;
+                }
+                if(div > SYSREF_DIV_MAX)
+                    continue;
+
+                if(st->clkin != (((uint64_t)st->sysrefout * div) << div_pre))
+                {
+                    USDR_LOG("1204", USDR_LOG_ERROR, "SYSREFOUT:%.4f cannot be solved in integers", st->sysrefout);
+                    return -EINVAL;
+                }
+                break;
+            }
+
+            if(!found)
+            {
+                USDR_LOG("1204", USDR_LOG_ERROR, "Cannot solve SYSREFOUT:%.4f", st->sysrefout);
+                return -EINVAL;
+            }
+        }
+
+        //SUCCESS LOG
+    }
+    else
+    {
+        USDR_LOG("1204", USDR_LOG_DEBUG, "[SYSREFCLK]:disabled");
+    }
+
+
+    return 0;
+}
+
+
+

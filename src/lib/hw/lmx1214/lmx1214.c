@@ -3,12 +3,15 @@
 
 #include <stdint.h>
 #include <inttypes.h>
+#include <math.h>
 
 #include "def_lmx1214.h"
 #include "lmx1214.h"
 #include "usdr_logging.h"
 
 #include "lmx1214_dump.h"
+
+#define FREQ_EPS 1.0f
 
 enum
 {
@@ -324,7 +327,12 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
             USDR_LOG("1214", USDR_LOG_ERROR, "CLK_DIV:%u out of range", clk_div);
             return -EINVAL;
         }
-
+        double f = (double)in / clk_div;
+        if(fabs(f - out) > FREQ_EPS)
+        {
+            USDR_LOG("1214", USDR_LOG_ERROR, "Calculated CLKOUT:%.4f too rough", f);
+            return -EINVAL;
+        }
         if(prec_mode && in != out * clk_div)
         {
             USDR_LOG("1214", USDR_LOG_ERROR, "Cannot solve CLKOUT:%" PRIu64 " by int divider", out);
@@ -372,9 +380,15 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
                 continue;
 
             unsigned div = (unsigned)(fmid / aux->freq + 0.5);
-            if(prec_mode && fmid != aux->freq * div)
-                continue;
+
             if(div < AUXCLK_DIV_MIN || div > AUXCLK_DIV_MAX)
+                continue;
+
+            double f = fmid / div;
+            if(fabs(f - aux->freq) > FREQ_EPS)
+                continue;
+
+            if(prec_mode && fmid != aux->freq * div)
                 continue;
 
             found = true;
