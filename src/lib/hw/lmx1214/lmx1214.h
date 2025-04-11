@@ -16,7 +16,7 @@ enum
 
 struct lmx1214_auxclkout_cfg
 {
-    uint64_t freq;
+    double freq;
     bool enable;
     uint8_t fmt;
 };
@@ -37,7 +37,7 @@ struct lmx1214_state
     uint16_t auxclk_div;
     bool auxclk_div_byp;
 
-    uint64_t clkout;
+    double clkout;
     bool clkout_enabled[LMX1214_OUT_CNT];
     lmx1214_auxclkout_cfg_t auxclkout;
 };
@@ -46,7 +46,7 @@ typedef struct lmx1214_state lmx1214_state_t;
 
 int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_t* st);
 int lmx1214_destroy(lmx1214_state_t* st);
-int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en, lmx1214_auxclkout_cfg_t* aux, bool dry_run);
+int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en, lmx1214_auxclkout_cfg_t* aux, bool prec_mode, bool dry_run);
 int lmx1214_get_temperature(lmx1214_state_t* st, float* value);
 int lmx1214_sync_clr(lmx1214_state_t* st);
 

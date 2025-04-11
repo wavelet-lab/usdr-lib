@@ -201,7 +201,7 @@ int lmx1214_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1214_state_
         return res;
     }
 
-    usleep(10);
+    usleep(1000);
 
     float tempval;
     res = lmx1214_get_temperature(st, &tempval);
@@ -245,9 +245,9 @@ static int lmx1214_solver_prevalidate(uint64_t in, uint64_t out, bool* out_en, l
         return -EINVAL;
     }
 
-    if(aux->freq < AUXCLKOUT_MIN || aux->freq > AUXCLKOUT_MAX)
+    if(aux->enable && (aux->freq < AUXCLKOUT_MIN || aux->freq > AUXCLKOUT_MAX))
     {
-        USDR_LOG("1214", USDR_LOG_ERROR, "AUXCLKOUT:%" PRIu64 " out of range [%" PRIu64 ";%" PRIu64 "]", aux->freq, (uint64_t)AUXCLKOUT_MIN, (uint64_t)AUXCLKOUT_MAX);
+        USDR_LOG("1214", USDR_LOG_ERROR, "AUXCLKOUT:%.4f out of range [%" PRIu64 ";%" PRIu64 "]", aux->freq, (uint64_t)AUXCLKOUT_MIN, (uint64_t)AUXCLKOUT_MAX);
         return -EINVAL;
     }
 
@@ -257,8 +257,15 @@ static int lmx1214_solver_prevalidate(uint64_t in, uint64_t out, bool* out_en, l
     case LMX1214_FMT_CML : aux->fmt = AUXCLKOUT_FMT_CML; break;
     default:
     {
-        USDR_LOG("1214", USDR_LOG_ERROR, "AUXCLKOUT_FMT:%u is invalid", aux->fmt);
-        return -EINVAL;
+        if(!aux->enable)
+        {
+            aux->fmt = AUXCLKOUT_FMT_LVDS;
+        }
+        else
+        {
+            USDR_LOG("1214", USDR_LOG_ERROR, "AUXCLKOUT_FMT:%u is invalid", aux->fmt);
+            return -EINVAL;
+        }
     }
     }
 
@@ -291,7 +298,7 @@ static const char* lmx1214_decode_auxfmt(uint8_t fmt)
     return "UNKNOWN";
 }
 
-int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en, lmx1214_auxclkout_cfg_t* aux, bool dry_run)
+int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en, lmx1214_auxclkout_cfg_t* aux, bool prec_mode, bool dry_run)
 {
     int res = lmx1214_solver_prevalidate(in, out, out_en, aux);
     if(res)
@@ -310,7 +317,7 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
     else
     {
         clk_mux = CLK_MUX_DIVIDER;
-        clk_div = in / out;
+        clk_div = (unsigned)((double)in / out + 0.5);
 
         if(clk_div < CLK_DIV_MIN || clk_div > CLK_DIV_MAX)
         {
@@ -318,15 +325,15 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
             return -EINVAL;
         }
 
-        if(in != out * clk_div)
+        if(prec_mode && in != out * clk_div)
         {
             USDR_LOG("1214", USDR_LOG_ERROR, "Cannot solve CLKOUT:%" PRIu64 " by int divider", out);
             return -EINVAL;
         }
     }
 
-    USDR_LOG("1214", USDR_LOG_DEBUG, "CLKIN:%" PRIu64 " CLKOUT:%" PRIu64 " CLK_DIV:%u MUX:%u [BUFFER_MODE:%u]",
-             in, out, clk_div, clk_mux, buffer_mode);
+    USDR_LOG("1214", USDR_LOG_DEBUG, "CLKIN:%" PRIu64 " CLKOUT:%.4f CLK_DIV:%u MUX:%u [BUFFER_MODE:%u] [PREC_MODE:%u]",
+             in, (double)in / clk_div, clk_div, clk_mux, buffer_mode, prec_mode);
 
 
     uint8_t auxclk_div_pre = AUXCLK_DIV_PRE_DIV4;
@@ -350,8 +357,8 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
             if(auxclk_div_pre == AUXCLK_DIV_PRE_DIV4 - 1)
                 continue;
 
-            uint64_t fmid = in / auxclk_div_pre;
-            if(in != fmid * auxclk_div_pre)
+            double fmid = (double)in / auxclk_div_pre;
+            if(prec_mode && in != (uint64_t)(fmid + 0.5) * auxclk_div_pre)
                 continue;
 
             if(fmid == aux->freq && auxclk_div_pre == AUXCLK_DIV_PRE_DIV1)
@@ -364,8 +371,8 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
             if(auxclk_div_pre == AUXCLK_DIV_PRE_DIV1) //cannot use pre_div==1 without bypassing div
                 continue;
 
-            unsigned div = fmid / aux->freq;
-            if(fmid != aux->freq * div)
+            unsigned div = (unsigned)(fmid / aux->freq + 0.5);
+            if(prec_mode && fmid != aux->freq * div)
                 continue;
             if(div < AUXCLK_DIV_MIN || div > AUXCLK_DIV_MAX)
                 continue;
@@ -377,7 +384,7 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
 
         if(!found)
         {
-            USDR_LOG("1214", USDR_LOG_ERROR, "AUXCLKOUT:%" PRIu64 " cannot be solved with LMX1214 divs", aux->freq);
+            USDR_LOG("1214", USDR_LOG_ERROR, "AUXCLKOUT:%.4f cannot be solved with LMX1214 divs", aux->freq);
             return -EINVAL;
         }
     }
@@ -386,21 +393,23 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
     st->clkin = in;
     st->clk_mux = clk_mux;
     st->clk_div = clk_div;
-    st->clkout = out;
+    st->clkout = (double)in / clk_div;
     for(unsigned i = 0; i < LMX1214_OUT_CNT; ++i) st->clkout_enabled[i] = out_en[i];
     st->auxclk_div_pre = auxclk_div_pre;
     st->auxclk_div_byp = auxclk_div_byp;
     st->auxclk_div = auxclk_div;
     st->auxclkout = *aux;
+    if(st->auxclkout.enable)
+        st->auxclkout.freq = auxclk_div_byp ? (double)in / auxclk_div_pre : (double)in / auxclk_div_pre / auxclk_div;
 
     USDR_LOG("1214", USDR_LOG_INFO, "LMX1214 SOLUTION FOUND:");
-    USDR_LOG("1214", USDR_LOG_INFO, "CLKIN:%" PRIu64 " CLK_DIV:%u CLKMUX:%s(%u) CLKOUT:%" PRIu64,
+    USDR_LOG("1214", USDR_LOG_INFO, "CLKIN:%" PRIu64 " CLK_DIV:%u CLKMUX:%s(%u) CLKOUT:%.4f",
              st->clkin, st->clk_div, lmx1214_decode_mux(st->clk_mux), st->clk_mux, st->clkout);
     USDR_LOG("1214", USDR_LOG_INFO, "CLKOUT enabled - OUT0:%u OUT1:%u OUT2:%u OUT3:%u",
              st->clkout_enabled[0], st->clkout_enabled[1], st->clkout_enabled[2], st->clkout_enabled[3]);
 
     if(st->auxclkout.enable)
-        USDR_LOG("1214", USDR_LOG_INFO, "AUXCLC_DIV_PRE:%u AUXCLK_DIV_BYP:%u AUXCLK_DIV:%u AUXCLKOUT:%" PRIu64 " AUXCLKOUT_FMT:%s(%u)",
+        USDR_LOG("1214", USDR_LOG_INFO, "AUXCLC_DIV_PRE:%u AUXCLK_DIV_BYP:%u AUXCLK_DIV:%u AUXCLKOUT:%.4f AUXCLKOUT_FMT:%s(%u)",
                  st->auxclk_div_pre, st->auxclk_div_byp, st->auxclk_div, st->auxclkout.freq,
                  lmx1214_decode_auxfmt(st->auxclkout.fmt), st->auxclkout.fmt);
     else

@@ -136,7 +136,7 @@ int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_
     if(res)
         return res;
 
-    usleep(10);
+    usleep(1000);
 
     float tval;
     res = lmx1204_get_temperature(st, &tval);

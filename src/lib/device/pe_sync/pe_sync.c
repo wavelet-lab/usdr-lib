@@ -376,7 +376,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     ld_aux.freq = 800000000/4;
 
     res = lmx1214_create(dev, 0, SPI_LMX1214, &d->lodistr);
-    res = res ? res : lmx1214_solver(&d->lodistr, lmx1_freq[0], ld_clkout, ld_en, &ld_aux, false /*dry run*/);
+    res = res ? res : lmx1214_solver(&d->lodistr, lmx1_freq[0], ld_clkout, ld_en, &ld_aux, false /*prec_mode*/, false /*dry run*/);
 
     float lmx1214_tempval;
     lmx1214_get_temperature(&d->lodistr, &lmx1214_tempval); //just for logging
