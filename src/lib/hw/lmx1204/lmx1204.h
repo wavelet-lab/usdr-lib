@@ -50,6 +50,7 @@ struct lmx1204_state
     uint8_t sysref_delay_div;
     uint8_t sysref_div_pre;
     uint16_t sysref_div;
+    uint8_t sysref_delay_scale;
 };
 typedef struct lmx1204_state lmx1204_state_t;
 
@@ -60,7 +61,14 @@ enum
     LMX1204_FMT_CML = 2,
 };
 
+enum
+{
+    LMX1204_CONTINUOUS = 0,
+    LMX1204_PULSER = 1,
+    LMX1204_REPEATER = 2,
+};
 
+int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run);
 int lmx1204_get_temperature(lmx1204_state_t* st, float* value);
 int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_t* st);
 int lmx1204_destroy(lmx1204_state_t* st);

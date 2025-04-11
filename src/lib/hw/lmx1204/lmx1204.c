@@ -218,7 +218,7 @@ static int lmx1204_solver_prevalidate(lmx1204_state_t* st)
     {
     case CLK_MUX_DIVIDER_MODE:    fmin = CLKOUT_MIN_DIV; fmax = CLKOUT_MAX_DIV; break;
     case CLK_MUX_MULTIPLIER_MODE: fmin = CLKOUT_MIN_MUL; fmax = CLKOUT_MAX_MUL; break;
-    case CLK_MUX_BUFFER_MODE:     fmin = CLKOUT_MIN_BUF; fmax = CLKOUT_MIN_BUF; break;
+    case CLK_MUX_BUFFER_MODE:     fmin = CLKOUT_MIN_BUF; fmax = CLKOUT_MAX_BUF; break;
     default:
         USDR_LOG("1204", USDR_LOG_ERROR, "CLK_MUX:%u unknown", st->clk_mux);
         return -EINVAL;
@@ -235,9 +235,9 @@ static int lmx1204_solver_prevalidate(lmx1204_state_t* st)
         fmin = SYSREFOUT_MIN;
         switch(st->sysref_mode)
         {
-        case SYSREF_MODE_CONTINUOUS_GENERATOR_MODE: fmax = SYSREFOUT_MAX_GENMODE; break;
-        case SYSREF_MODE_REPEATER_REPEATER_MODE:    fmax = SYSREFOUT_MAX_RPTMODE; break;
-        case SYSREF_MODE_PULSER_GENERATOR_MODE:     fmax = 0.0f; break;
+        case LMX1204_CONTINUOUS: st->sysref_mode = SYSREF_MODE_CONTINUOUS_GENERATOR_MODE; fmax = SYSREFOUT_MAX_GENMODE; break;
+        case LMX1204_REPEATER:   st->sysref_mode = SYSREF_MODE_REPEATER_REPEATER_MODE;    fmax = SYSREFOUT_MAX_RPTMODE; break;
+        case LMX1204_PULSER:     st->sysref_mode = SYSREF_MODE_PULSER_GENERATOR_MODE;     fmax = 0.0f; break;
         default:
             USDR_LOG("1204", USDR_LOG_ERROR, "SYSREF_MODE:%u unknown", st->sysref_mode);
             return -EINVAL;
@@ -293,8 +293,30 @@ static const char* lmx1204_decode_clkmux(enum clk_mux_options mux)
     return "UNKNOWN";
 }
 
+static const char* lmx1204_decode_sysref_mode(enum sysref_mode_options sm)
+{
+    switch(sm)
+    {
+    case SYSREF_MODE_CONTINUOUS_GENERATOR_MODE: return "CONTINUOUS_GENERATOR";
+    case SYSREF_MODE_PULSER_GENERATOR_MODE:     return "PULSER_GENERATOR";
+    case SYSREF_MODE_REPEATER_REPEATER_MODE:    return "REPEATER";
+    }
+    return "UNKNOWN";
+}
+
+static const char* lmx1204_decode_fmt(enum logiclkout_fmt_options fmt)
+{
+    switch(fmt)
+    {
+    case LOGICLKOUT_FMT_LVDS :  return "LVDS";
+    case LOGICLKOUT_FMT_LVPECL: return "LVPECL";
+    case LOGICLKOUT_FMT_CML:    return "CML";
+    }
+    return "UNKNOWN";
+}
+
 // all params are in lmx1204_state_t struct
-int lmx1204_solver(lmx1204_state_t* st, bool prec_mode)
+int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
 {
     int res;
     enum clk_mux_options clk_mux;
@@ -376,7 +398,7 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode)
         else if(div_pre > SMCLK_DIV_PRE_PL4 && div_pre <= SMCLK_DIV_PRE_PL8)
             div_pre = SMCLK_DIV_PRE_PL8;
         else
-            return -EINVAL; //impossible
+            div_pre = SMCLK_DIV_PRE_PL2;
 
         double fdiv = (double)st->clkin / div_pre / SMCLK_DIV_OUT_MAX;
         unsigned n = MAX(ceil(log2(fdiv)), SMCLK_DIV_PL1);
@@ -430,6 +452,9 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode)
                     continue;
                 if(prec_mode && st->clkin != st->logiclkout * div_pre * div)
                     continue;
+
+                found = true;
+                break;
             }
             if(!found)
             {
@@ -476,6 +501,15 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode)
             f_interpol = st->clkin >> 4;
         }
 
+        if(f_interpol <= 200000000ull)
+            st->sysref_delay_scale = SYSREFOUT0_DELAY_SCALE_150_MHZ_TO_200_MHZ;
+        else if(f_interpol <= 400000000ull)
+            st->sysref_delay_scale = SYSREFOUT0_DELAY_SCALE_200_MHZ_TO_400_MHZ;
+        else
+            st->sysref_delay_scale = SYSREFOUT0_DELAY_SCALE_400_MHZ_TO_800_MHZ;
+
+        unsigned div_pre = SYSREF_DIV_PRE_PL4, div = 0x3; //defaults
+
         if(st->sysref_mode == SYSREF_MODE_REPEATER_REPEATER_MODE)
         {
             if(st->sysrefout != st->sysrefreq)
@@ -492,7 +526,6 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode)
                 return -EINVAL;
             }
 
-            unsigned div_pre, div;
             unsigned min_div_pre = MAX(log2f(ceil((double)st->clkin / SYSREF_DIV_PRE_OUT_MAX)), SYSREF_DIV_PRE_PL1);
 
             bool found = true;
@@ -513,6 +546,8 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode)
                     USDR_LOG("1204", USDR_LOG_ERROR, "SYSREFOUT:%.4f cannot be solved in integers", st->sysrefout);
                     return -EINVAL;
                 }
+
+                found = true;
                 break;
             }
 
@@ -523,13 +558,36 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode)
             }
         }
 
-        //SUCCESS LOG
+        st->sysref_div_pre = div_pre;
+        st->sysref_div     = div;
+
+        USDR_LOG("1204", USDR_LOG_DEBUG, "[SYSREFCLK] SYSREFREQ:%" PRIu64 " SYSREF_MODE:%s(%u) SYSREFOUT:%.4f",
+                 st->sysrefreq, lmx1204_decode_sysref_mode(st->sysref_mode), st->sysref_mode, st->sysrefout);
+
+        if(st->sysref_mode != SYSREF_MODE_REPEATER_REPEATER_MODE)
+        {
+            USDR_LOG("1204", USDR_LOG_DEBUG, "[SYSREFCLK] SYSREF_DELAY_DIV:%u F_INTERPOL:%" PRIu64 " DELAY_SCALE:%u SYSREF_DIV_PRE:%u(%u) SYSREF_DIV:%u",
+                     st->sysref_delay_div, f_interpol, st->sysref_delay_scale, (1 << st->sysref_div_pre), st->sysref_div_pre, st->sysref_div);
+        }
     }
     else
     {
         USDR_LOG("1204", USDR_LOG_DEBUG, "[SYSREFCLK]:disabled");
     }
 
+    // succesfull solution
+    USDR_LOG("1204", USDR_LOG_INFO, "LMX1204 SOLUTION FOUND:");
+    USDR_LOG("1204", USDR_LOG_INFO, "CLKIN:%" PRIu64 " SYSREFREQ:%" PRIu64, st->clkin, st->sysrefreq);
+    for(unsigned i = 0; i < LMX1204_OUT_CNT; ++i)
+    {
+        USDR_LOG("1204", USDR_LOG_INFO, "CLKOUT%u   :%.4f EN:%u", i, st->clkout, st->ch_en[0] && st->clkout_en[0]);
+        USDR_LOG("1204", USDR_LOG_INFO, "SYSREFOUT%u:%.4f EN:%u", i, st->sysrefout, st->sysref_en && st->ch_en[0] && st->sysrefout_en[0]);
+    }
+    USDR_LOG("1204", USDR_LOG_INFO, "LOGICLKOUT    :%.4f EN:%u FMT:%s",
+             st->logiclkout, st->logic_en && st->logiclkout_en, lmx1204_decode_fmt(st->logiclkout_fmt));
+    USDR_LOG("1204", USDR_LOG_INFO, "LOGICSYSREFOUT:%.4f EN:%u FMT:%s",
+             st->sysrefout, st->sysref_en && st->logic_en && st->logisysrefout_en, lmx1204_decode_fmt(st->logisysrefout_fmt));
+    USDR_LOG("1204", USDR_LOG_INFO, "--------------");
 
     return 0;
 }

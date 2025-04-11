@@ -15,6 +15,7 @@ set(TEST_SUIT_SRCS
     lmk05318_solver_test.c
     lmx2820_solver_test.c
     lmx1214_solver_test.c
+    lmx1204_solver_test.c
 )
 
 include_directories(../lib/xdsp)
