@@ -45,6 +45,7 @@ struct lmx1204_state
     uint8_t smclk_div;
 
     uint8_t logiclk_div_pre;
+    bool logiclk_div_bypass;
     uint16_t logiclk_div;
 
     uint8_t sysref_delay_div;
@@ -53,6 +54,14 @@ struct lmx1204_state
     uint8_t sysref_delay_scale;
 };
 typedef struct lmx1204_state lmx1204_state_t;
+
+struct lmx1204_stats
+{
+    float temperature;
+    uint8_t vco_sel;
+    uint8_t lock_detect_status;
+};
+typedef struct lmx1204_stats lmx1204_stats_t;
 
 enum
 {
@@ -68,6 +77,9 @@ enum
     LMX1204_REPEATER = 2,
 };
 
+int lmx1204_read_status(lmx1204_state_t* st, lmx1204_stats_t* status);
+int lmx1204_calibrate(lmx1204_state_t* st);
+int lmx1204_wait_pll_lock(lmx1204_state_t* st, unsigned timeout);
 int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run);
 int lmx1204_get_temperature(lmx1204_state_t* st, float* value);
 int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_t* st);

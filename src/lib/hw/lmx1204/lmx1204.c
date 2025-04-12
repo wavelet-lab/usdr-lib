@@ -161,6 +161,54 @@ int lmx1204_get_temperature(lmx1204_state_t* st, float* value)
     return 0;
 }
 
+static inline const char* lmx1204_decode_lock_status(enum rb_ld_options ld)
+{
+    switch(ld)
+    {
+    case RB_LD_UNLOCKED_VTUNE_LOW:  return "UNLOCKED (VTUNE low)";
+    case RB_LD_UNLOCKED_VTUNE_HIGH: return "UNLOCKED (VTUNE high)";
+    case RB_LD_LOCKED:              return "LOCKED";
+    }
+    return "UNKNOWN";
+}
+
+static inline const char* lmx1204_decode_vco_core(enum rb_vco_sel_options c)
+{
+    switch(c)
+    {
+    case RB_VCO_SEL_VCO5: return "VCO5";
+    case RB_VCO_SEL_VCO4: return "VCO4";
+    case RB_VCO_SEL_VCO3: return "VCO3";
+    case RB_VCO_SEL_VCO2: return "VCO2";
+    case RB_VCO_SEL_VCO1: return "VCO1";
+    }
+    return "UNKNOWN";
+}
+
+int lmx1204_read_status(lmx1204_state_t* st, lmx1204_stats_t* status)
+{
+    if(!status)
+        return -EINVAL;
+
+    uint16_t r75, r65;
+
+    int res = lmx1204_get_temperature(st, &status->temperature);
+    res = res ? res : lmx1204_spi_get(st, R75, &r75);
+    res = res ? res : lmx1204_spi_get(st, R65, &r65);
+    if(res)
+        return res;
+
+    status->vco_sel = (r65 & RB_VCO_SEL_MSK) >> RB_VCO_SEL_OFF;
+    status->lock_detect_status = (r75 & RB_LD_MSK) >> RB_LD_OFF;
+
+    USDR_LOG("1204", USDR_LOG_DEBUG, "STATUS> Temp:%.2fC LOCK:%u(%s) VCO_SEL:%u(%s)",
+             status->temperature,
+             status->lock_detect_status, lmx1204_decode_lock_status(status->lock_detect_status),
+             status->vco_sel, lmx1204_decode_vco_core(status->vco_sel));
+
+    return 0;
+}
+
 int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_t* st)
 {
     memset(st, 0, sizeof(*st));
@@ -465,6 +513,7 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
 
         st->logiclkout = logiclkout_fact;
         st->logiclk_div_pre = div_pre;
+        st->logiclk_div_bypass = (div == 0);
         st->logiclk_div = div;
 
         USDR_LOG("1204", USDR_LOG_DEBUG, "[LOGICLKOUT] LOGICLK_DIV_PRE:%u LOGICLK_DIV:%u%s LOGICLKOUT:%.4f",
@@ -589,8 +638,106 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
              st->sysrefout, st->sysref_en && st->logic_en && st->logisysrefout_en, lmx1204_decode_fmt(st->logisysrefout_fmt));
     USDR_LOG("1204", USDR_LOG_INFO, "--------------");
 
+    //registers
+    uint32_t regs[] =
+    {
+        MAKE_LMX1204_R0(0, 0, 0, 1),    //set RESET bit first
+        //
+        MAKE_LMX1204_R86(0),                //MUXOUT_EN_OVRD=0
+        MAKE_LMX1204_R72(0, 0, 0, 0, SYSREF_DELAY_BYPASS_ENGAGE_IN_GENERATOR_MODE__BYPASS_IN_REPEATER_MODE),
+
+        // need for MULT VCO calibration
+        MAKE_LMX1204_R67(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x51cb : 0x50c8),
+        MAKE_LMX1204_R34(0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x04c5 : 0),
+        MAKE_LMX1204_R33(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x5666 : 0x7777),
+        //
+
+        MAKE_LMX1204_R25(0x4, 0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? st->clk_mult_div : st->clk_mult_div - 1, st->clk_mux),
+        MAKE_LMX1204_R23(1, 1, 1, 0, 1, st->sysref_delay_scale, st->sysref_delay_scale, st->sysref_delay_scale),
+        MAKE_LMX1204_R22(st->sysref_delay_scale, st->sysref_delay_scale, st->sysref_delay_div, 0, 0),
+
+        MAKE_LMX1204_R17(0, 0x7f, 0, st->sysref_mode),
+        MAKE_LMX1204_R16(0x1, st->sysref_div),
+        MAKE_LMX1204_R15(0, st->sysref_div_pre, 0x3, st->sysref_en ? 1 : 0, 0, 0),
+
+        //according do doc: program R79 and R90 before setting logiclk_div_bypass
+        //desc order is broken here!
+        MAKE_LMX1204_R8(0, st->logiclk_div_pre, 1, st->logic_en ? 1 : 0, st->logisysrefout_fmt, st->logiclkout_fmt),
+        MAKE_LMX1204_R79(0, st->logiclk_div_bypass ? 0x5 : 0x104),
+        MAKE_LMX1204_REG_WR(R90, st->logiclk_div_bypass ? 0x60 : 0x00),
+        MAKE_LMX1204_R9(0, 0, 0, st->logiclk_div_bypass ? 1 : 0, 0, st->logiclk_div),
+        //
+
+        MAKE_LMX1204_R7(0, 0, 0, 0, 0, 0, 0, st->logisysrefout_en ? 1 : 0),
+        MAKE_LMX1204_R6(st->logiclkout_en, 0x3, 0x3, 0x3, 0x3, 0x4),
+        MAKE_LMX1204_R4(0, 0x6, 0x6,
+                        st->sysrefout_en[3], st->sysrefout_en[2], st->sysrefout_en[1], st->sysrefout_en[0],
+                        st->clkout_en[3], st->clkout_en[2], st->clkout_en[1], st->clkout_en[0]),
+        MAKE_LMX1204_R3(st->ch_en[3], st->ch_en[2], st->ch_en[1], st->ch_en[0], 1, 1, 1, 1, 1, 0, st->smclk_div),
+        MAKE_LMX1204_R2(0,0,st->smclk_div_pre, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 1 : 0, 0x3),
+        //
+        MAKE_LMX1204_R0(0, 0, 0, 0),
+    };
+
+    res = dry_run ? lmx1204_print_registers(regs, SIZEOF_ARRAY(regs)) : lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
+    if(res)
+        return res;
+
     return 0;
 }
 
+int lmx1204_calibrate(lmx1204_state_t* st)
+{
+    if(st->clk_mux != CLK_MUX_MULTIPLIER_MODE)
+    {
+        USDR_LOG("1204", USDR_LOG_DEBUG, "VCO calibration not needed for BUFFER & DIV modes");
+        return 0;
+    }
+
+    uint32_t regs[] =
+    {
+        MAKE_LMX1204_R67(0x51cb),
+        MAKE_LMX1204_R34(0, 0x04c5),
+        MAKE_LMX1204_R33(0x5666),
+        MAKE_LMX1204_R0(0, 0, 0, 0),
+    };
+
+    int res = lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
+    if(res)
+        return res;
+
+    return 0;
+}
+
+int lmx1204_wait_pll_lock(lmx1204_state_t* st, unsigned timeout)
+{
+    int res = 0;
+    unsigned elapsed = 0;
+
+    if(st->clk_mux != CLK_MUX_MULTIPLIER_MODE)
+    {
+        USDR_LOG("1204", USDR_LOG_DEBUG, "VCO lock not needed for BUFFER & DIV modes");
+        return 0;
+    }
+
+    uint16_t r75;
+    while(timeout == 0 || elapsed < timeout)
+    {
+        res = lmx1204_spi_get(st, R75, &r75);
+        if(res)
+            return res;
+
+        const uint16_t lock_detect_status = (r75 & RB_LD_MSK) >> RB_LD_OFF;
+        switch(lock_detect_status)
+        {
+        case RB_LD_LOCKED: return 0;
+        default:
+            usleep(100);
+            elapsed += 100;
+        }
+    }
+
+    return -ETIMEDOUT;
+}
 
 
