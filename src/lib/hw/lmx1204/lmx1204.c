@@ -683,6 +683,8 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
     if(res)
         return res;
 
+    usleep(10000);
+
     return 0;
 }
 

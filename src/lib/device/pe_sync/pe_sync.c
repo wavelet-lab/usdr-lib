@@ -166,6 +166,14 @@ static void usdr_device_pe_sync_destroy(pdevice_t udev)
     // struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
     // lldev_t dev = d->base.dev;
     // TODO: power off
+
+    struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
+    lldev_t dev = d->base.dev;
+
+    dev_gpo_set(dev, IGPO_DISTRIB_CTRL, 0);
+    dev_gpo_set(dev, IGPO_SY0_CTRL, 0);
+    dev_gpo_set(dev, IGPO_SY1_CTRL, 0);
+
     usdr_device_base_destroy(udev);
 }
 
@@ -344,10 +352,10 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //
 
     const uint64_t lmx0_freq[] =
-        {
-            1400000000,
-             175000000
-        };
+    {
+        1400000000,
+        1400000000
+    };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_0, &d->lmx0);
     res = res ? res : lmx2820_tune(&d->lmx0, lmk_freq[2], 2 /*mash order 2*/, 0 /*force_mult*/, lmx0_freq[0], lmx0_freq[1]);

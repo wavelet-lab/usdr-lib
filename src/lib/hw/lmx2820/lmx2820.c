@@ -166,7 +166,7 @@ int lmx2820_sync(lmx2820_state_t* st)
     return lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
 }
 
-#define LMX2820_RESET_SKIP
+//#define LMX2820_RESET_SKIP
 
 int lmx2820_reset(lmx2820_state_t* st)
 #ifdef LMX2820_RESET_SKIP
@@ -191,7 +191,7 @@ int lmx2820_reset(lmx2820_state_t* st)
     if(res)
         return res;
 
-    usleep(5); //reset takes <1us
+    usleep(10000); //reset takes <1us
     return 0;
 }
 #endif
@@ -229,7 +229,7 @@ int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout)
         const uint16_t lock_detect_status = (r74 & RB_LD_MSK) >> RB_LD_OFF;
         switch(lock_detect_status)
         {
-        case RB_LD_INVALID: return -EINVAL;
+        //case RB_LD_INVALID: return -EINVAL;
         case RB_LD_LOCKED: return 0;
         default:
             usleep(100);
@@ -324,8 +324,6 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
     if(res)
         return res;
 
-    usleep(2); //reset takes less 1 us.
-
     //this list is incompleted
     uint32_t regs[] =
     {
@@ -338,6 +336,8 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
         USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
         return res;
     }
+
+    usleep(10000);
 
     lmx2820_stats_t status;
     res = lmx2820_read_status(st, &status);
