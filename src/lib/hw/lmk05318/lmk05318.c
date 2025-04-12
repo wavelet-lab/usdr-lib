@@ -733,6 +733,18 @@ int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
     return lmk05318_add_reg_to_map(d, &reg, 1);
 }
 
+static inline const char* lmk05318_decode_fmt(unsigned f)
+{
+    switch (f) {
+    case LVDS: return "OUT_OPTS_AC_LVDS";
+    case CML: return "OUT_OPTS_AC_CML";
+    case LVPECL: return "OUT_OPTS_AC_LVPECL";
+    case LVCMOS: return "OUT_OPTS_LVCMOS_P_N";
+    default: return "OUT_OPTS_Disabled";
+    }
+    return "UNKNOWN";
+}
+
 static int lmk05318_set_out_mux_ex(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
 {
     unsigned ot;
@@ -1483,9 +1495,9 @@ have_complete_solution:
         if(!is_freq_ok)
             complete_solution_check = false;
 
-        USDR_LOG("5318", is_freq_ok ? USDR_LOG_DEBUG : USDR_LOG_ERROR, "port:%d solved [OD:%" PRIu64 " freq:%.8f mux:%d(%s)] %s",
+        USDR_LOG("5318", is_freq_ok ? USDR_LOG_DEBUG : USDR_LOG_ERROR, "port:%d solved [OD:%" PRIu64 " freq:%.8f mux:%d(%s) fmt:%u(%s)] %s",
                  out_dst->port, out_dst->result.out_div, out_dst->result.freq, out_dst->result.mux,
-                 lmk05318_decode_mux(out_dst->result.mux),
+                 lmk05318_decode_mux(out_dst->result.mux), out_dst->wanted.type, lmk05318_decode_fmt(out_dst->wanted.type),
                  is_freq_ok ? "**OK**" : "**BAD**");
     }
 
@@ -1521,6 +1533,9 @@ have_complete_solution:
 
             if(out->wanted.freq == 0)
                 continue;
+
+            USDR_LOG("5318", USDR_LOG_DEBUG, "OUT%u port:%u div:%" PRIu64 " fmt:%u(%s)",
+                     i, out->port, out->result.out_div, out->wanted.type, lmk05318_decode_fmt(out->wanted.type));
 
             res =             lmk05318_set_out_mux_ex(d, out->port, out->result.mux, out->wanted.type);
             res = res ? res : lmk05318_set_out_div(d, out->port, out->result.out_div);
