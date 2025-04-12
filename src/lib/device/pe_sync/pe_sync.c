@@ -346,7 +346,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     const uint64_t lmx0_freq[] =
         {
             1400000000,
-            1400000000
+             175000000
         };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_0, &d->lmx0);
