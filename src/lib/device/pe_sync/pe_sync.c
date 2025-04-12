@@ -340,6 +340,31 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //
 
     //
+    //LMX2820 #0 setup
+    //
+
+    const uint64_t lmx0_freq[] =
+        {
+            1400000000,
+            1400000000
+        };
+
+    res = lmx2820_create(dev, 0, SPI_LMX2820_0, &d->lmx0);
+    res = res ? res : lmx2820_tune(&d->lmx0, lmk_freq[2], 2 /*mash order 2*/, 0 /*force_mult*/, lmx0_freq[0], lmx0_freq[1]);
+
+    lmx2820_stats_t lmxstatus0;
+    lmx2820_read_status(&d->lmx0, &lmxstatus0); //just for logging
+
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX2820[0] PLL not locked during specified timeout");
+        return res;
+    }
+
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820[0] outputs locked & synced");
+    //
+
+    //
     //LMX2820 #1 setup
     //
 
@@ -352,8 +377,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
     res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], 2 /*mash order 2*/, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
 
-    lmx2820_stats_t lmxstatus;
-    lmx2820_read_status(&d->lmx1, &lmxstatus); //just for logging
+    lmx2820_stats_t lmxstatus1;
+    lmx2820_read_status(&d->lmx1, &lmxstatus1); //just for logging
 
     if(res)
     {
@@ -400,6 +425,52 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX1204 failed to initialize, res:%d", res);
         return res;
     }
+
+    //set 1204 params
+    d->cldistr.clkin     = lmx0_freq[0];
+    d->cldistr.sysrefreq = lmx0_freq[1];
+    d->cldistr.clkout    = d->cldistr.clkin * 4;
+    d->cldistr.sysrefout = 4375000;
+    d->cldistr.sysref_mode = LMX1204_CONTINUOUS;
+    d->cldistr.logiclkout = 1400000;
+
+    d->cldistr.ch_en[0] = 1;
+    d->cldistr.ch_en[1] = 1;
+    d->cldistr.ch_en[2] = 1;
+    d->cldistr.ch_en[3] = 1;
+
+    d->cldistr.clkout_en[0] = 1;
+    d->cldistr.clkout_en[1] = 1;
+    d->cldistr.clkout_en[2] = 1;
+    d->cldistr.clkout_en[3] = 1;
+
+    d->cldistr.sysref_en = 1;
+    d->cldistr.sysrefout_en[0] = 1;
+    d->cldistr.sysrefout_en[1] = 1;
+    d->cldistr.sysrefout_en[2] = 1;
+    d->cldistr.sysrefout_en[3] = 1;
+
+    d->cldistr.logic_en = 1;
+    d->cldistr.logiclkout_en = 1;
+    d->cldistr.logisysrefout_en = 1;
+    d->cldistr.logiclkout_fmt    = LMX1204_FMT_LVDS;
+    d->cldistr.logisysrefout_fmt = LMX1204_FMT_LVDS;
+    //
+    res = lmx1204_solver(&d->cldistr, false/*prec_mode*/, false/*dry_run*/);
+    if(res)
+        return res;
+
+    res = lmx1204_wait_pll_lock(&d->cldistr, 10000);
+
+    lmx1204_stats_t lmx1204status;
+    lmx1204_read_status(&d->cldistr, &lmx1204status); //just for log
+
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX1204 not locked, err:%d", res);
+        return res;
+    }
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1204 locked");
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1204 initialized");
     //
