@@ -218,6 +218,16 @@ int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_
     st->subdev = subdev;
     st->lsaddr = lsaddr;
 
+    //SYSREF individual channel delays defaults (according to TICS Pro)
+    //Could be overriden before solver call (lmx1204_set_sysrefout_ch_delay())
+    for(unsigned i = 0; i < SIZEOF_ARRAY(st->sysref_indiv_ch_delay); ++i)
+    {
+        lmx1204_sysrefout_channel_delay_t* d = &st->sysref_indiv_ch_delay[i];
+        d->phase = SYSREFOUT0_DELAY_PHASE_QCLK0;
+        d->i = 7;
+        d->q = 0x7f - d->i;
+    }
+
     uint32_t regs[] =
     {
         MAKE_LMX1204_R86(0),                //MUXOUT_EN_OVRD=0
@@ -253,7 +263,7 @@ static int lmx1204_solver_prevalidate(lmx1204_state_t* st)
         return -EINVAL;
     }
 
-    if(st->logic_en && st->logiclkout_en && (st->logiclkout < LOGICLKOUT_MIN || st->logiclkout > LOGICLKOUT_MAX))
+    if(st->ch_en[LMX1204_CH_LOGIC] && st->clkout_en[LMX1204_CH_LOGIC] && (st->logiclkout < LOGICLKOUT_MIN || st->logiclkout > LOGICLKOUT_MAX))
     {
         USDR_LOG("1204", USDR_LOG_ERROR, "LOGICLKOUT:%.4f out of range [%" PRIu64 "; %" PRIu64 "]",
                  st->logiclkout, (uint64_t)LOGICLKOUT_MIN, (uint64_t)LOGICLKOUT_MAX);
@@ -296,11 +306,36 @@ static int lmx1204_solver_prevalidate(lmx1204_state_t* st)
             USDR_LOG("1204", USDR_LOG_ERROR, "SYSREFOUT:%.4f out of range [%.0f; %.0f]", st->sysrefout, fmin, fmax);
             return -EINVAL;
         }
+
+        for(unsigned i = 0; i < SIZEOF_ARRAY(st->sysref_indiv_ch_delay); ++i)
+        {
+            if(!st->ch_en[i])
+                continue; //do not check if channel is disabled
+
+            lmx1204_sysrefout_channel_delay_t* d = &st->sysref_indiv_ch_delay[i];
+
+            switch(d->phase)
+            {
+            case SYSREFOUT0_DELAY_PHASE_ICLK0:
+            case SYSREFOUT0_DELAY_PHASE_QCLK0:
+            case SYSREFOUT0_DELAY_PHASE_QCLK1:
+            case SYSREFOUT0_DELAY_PHASE_ICLK1: break;
+            default:
+                USDR_LOG("1204", USDR_LOG_ERROR, "SYSREFOUT[%u] delay phase:%u is invalid", i, d->phase);
+                return -EINVAL;
+            }
+
+            if(d->i + d->q != 0x7f)
+            {
+                USDR_LOG("1204", USDR_LOG_ERROR, "SYSREFOUT[%u] delay I:%u + Q:%u != 127", i, d->i, d->q);
+                return -EINVAL;
+            }
+        }
     }
 
-    if(st->logic_en)
+    if(st->ch_en[LMX1204_CH_LOGIC])
     {
-        if(st->logiclkout_en)
+        if(st->clkout_en[LMX1204_CH_LOGIC])
         {
             switch(st->logiclkout_fmt)
             {
@@ -313,7 +348,7 @@ static int lmx1204_solver_prevalidate(lmx1204_state_t* st)
             }
         }
 
-        if(st->sysref_en && st->logisysrefout_en)
+        if(st->sysref_en && st->sysrefout_en[LMX1204_CH_LOGIC])
         {
             switch(st->logisysrefout_fmt)
             {
@@ -465,7 +500,7 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
     }
 
     //need to setup LOGICLKOUT
-    if(st->logic_en && st->logiclkout_en)
+    if(st->ch_en[LMX1204_CH_LOGIC] && st->clkout_en[LMX1204_CH_LOGIC])
     {
         unsigned div_pre, div;
         double logiclkout_fact;
@@ -633,9 +668,9 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         USDR_LOG("1204", USDR_LOG_INFO, "SYSREFOUT%u:%.4f EN:%u", i, st->sysrefout, st->sysref_en && st->ch_en[0] && st->sysrefout_en[0]);
     }
     USDR_LOG("1204", USDR_LOG_INFO, "LOGICLKOUT    :%.4f EN:%u FMT:%s",
-             st->logiclkout, st->logic_en && st->logiclkout_en, lmx1204_decode_fmt(st->logiclkout_fmt));
+             st->logiclkout, st->ch_en[LMX1204_CH_LOGIC] && st->clkout_en[LMX1204_CH_LOGIC], lmx1204_decode_fmt(st->logiclkout_fmt));
     USDR_LOG("1204", USDR_LOG_INFO, "LOGICSYSREFOUT:%.4f EN:%u FMT:%s",
-             st->sysrefout, st->sysref_en && st->logic_en && st->logisysrefout_en, lmx1204_decode_fmt(st->logisysrefout_fmt));
+             st->sysrefout, st->sysref_en && st->ch_en[LMX1204_CH_LOGIC] && st->sysrefout_en[LMX1204_CH_LOGIC], lmx1204_decode_fmt(st->logisysrefout_fmt));
     USDR_LOG("1204", USDR_LOG_INFO, "--------------");
 
     //registers
@@ -654,29 +689,32 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
 
         MAKE_LMX1204_R25(0x4, 0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? st->clk_mult_div : st->clk_mult_div - 1, st->clk_mux),
         MAKE_LMX1204_R23(1, 1, 1, 0, 1, st->sysref_delay_scale, st->sysref_delay_scale, st->sysref_delay_scale),
-        MAKE_LMX1204_R22(st->sysref_delay_scale, st->sysref_delay_scale, st->sysref_delay_div, 0, 0),
-
-        MAKE_LMX1204_R17(0, 0x7f, 0, st->sysref_mode),
-        MAKE_LMX1204_R16(0x1, st->sysref_div),
+        MAKE_LMX1204_R22(st->sysref_delay_scale, st->sysref_delay_scale, st->sysref_delay_div, 0, st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].q),
+        MAKE_LMX1204_R21(st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].i, st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].phase, st->sysref_indiv_ch_delay[LMX1204_CH3].q),
+        MAKE_LMX1204_R20(st->sysref_indiv_ch_delay[LMX1204_CH3].i, st->sysref_indiv_ch_delay[LMX1204_CH3].phase, st->sysref_indiv_ch_delay[LMX1204_CH2].q),
+        MAKE_LMX1204_R19(st->sysref_indiv_ch_delay[LMX1204_CH2].i, st->sysref_indiv_ch_delay[LMX1204_CH2].phase, st->sysref_indiv_ch_delay[LMX1204_CH1].q),
+        MAKE_LMX1204_R18(st->sysref_indiv_ch_delay[LMX1204_CH1].i, st->sysref_indiv_ch_delay[LMX1204_CH1].phase, st->sysref_indiv_ch_delay[LMX1204_CH0].q),
+        MAKE_LMX1204_R17(0, st->sysref_indiv_ch_delay[LMX1204_CH0].i, st->sysref_indiv_ch_delay[LMX1204_CH0].phase, st->sysref_mode),
+        MAKE_LMX1204_R16(0x1, st->sysref_div), //0x1 == sysref pulse count
         MAKE_LMX1204_R15(0, st->sysref_div_pre, 0x3, st->sysref_en ? 1 : 0, 0, 0),
 
         //according do doc: program R79 and R90 before setting logiclk_div_bypass
         //desc order is broken here!
-        MAKE_LMX1204_R8(0, st->logiclk_div_pre, 1, st->logic_en ? 1 : 0, st->logisysrefout_fmt, st->logiclkout_fmt),
+        MAKE_LMX1204_R8(0, st->logiclk_div_pre, 1, st->ch_en[LMX1204_CH_LOGIC] ? 1 : 0, st->logisysrefout_fmt, st->logiclkout_fmt),
         MAKE_LMX1204_R79(0, st->logiclk_div_bypass ? 0x5 : 0x104),
         MAKE_LMX1204_REG_WR(R90, st->logiclk_div_bypass ? 0x60 : 0x00),
         MAKE_LMX1204_R9(0, 0, 0, st->logiclk_div_bypass ? 1 : 0, 0, st->logiclk_div),
         //
 
-        MAKE_LMX1204_R7(0, 0, 0, 0, 0, 0, 0, st->logisysrefout_en ? 1 : 0),
-        MAKE_LMX1204_R6(st->logiclkout_en, 0x3, 0x3, 0x3, 0x3, 0x4),
+        MAKE_LMX1204_R7(0, 0, 0, 0, 0, 0, 0, st->sysrefout_en[LMX1204_CH_LOGIC] ? 1 : 0),
+        MAKE_LMX1204_R6(st->clkout_en[LMX1204_CH_LOGIC], 0x3, 0x3, 0x3, 0x3, 0x4),
         MAKE_LMX1204_R4(0, 0x6, 0x6,
-                        st->sysrefout_en[3], st->sysrefout_en[2], st->sysrefout_en[1], st->sysrefout_en[0],
-                        st->clkout_en[3], st->clkout_en[2], st->clkout_en[1], st->clkout_en[0]),
-        MAKE_LMX1204_R3(st->ch_en[3], st->ch_en[2], st->ch_en[1], st->ch_en[0], 1, 1, 1, 1, 1, 0, st->smclk_div),
+                        st->sysrefout_en[LMX1204_CH3], st->sysrefout_en[LMX1204_CH2], st->sysrefout_en[LMX1204_CH1], st->sysrefout_en[LMX1204_CH0],
+                        st->clkout_en[LMX1204_CH3], st->clkout_en[LMX1204_CH2], st->clkout_en[LMX1204_CH1], st->clkout_en[LMX1204_CH0]),
+        MAKE_LMX1204_R3(st->ch_en[LMX1204_CH3], st->ch_en[LMX1204_CH2], st->ch_en[LMX1204_CH1], st->ch_en[LMX1204_CH0], 1, 1, 1, 1, 1, 0, st->smclk_div),
         MAKE_LMX1204_R2(0,0,st->smclk_div_pre, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 1 : 0, 0x3),
         //
-        MAKE_LMX1204_R0(0, 0, 0, 0),
+        MAKE_LMX1204_R0(0, 0, 0, 0),    //reset RESET bit last
     };
 
     res = dry_run ? lmx1204_print_registers(regs, SIZEOF_ARRAY(regs)) : lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
@@ -742,4 +780,17 @@ int lmx1204_wait_pll_lock(lmx1204_state_t* st, unsigned timeout)
     return -ETIMEDOUT;
 }
 
+int lmx1204_reload_sysrefout_ch_delay(lmx1204_state_t* st)
+{
+    uint32_t regs[] =
+    {
+        MAKE_LMX1204_R22(st->sysref_delay_scale, st->sysref_delay_scale, st->sysref_delay_div, 0, st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].q),
+        MAKE_LMX1204_R21(st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].i, st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].phase, st->sysref_indiv_ch_delay[LMX1204_CH3].q),
+        MAKE_LMX1204_R20(st->sysref_indiv_ch_delay[LMX1204_CH3].i, st->sysref_indiv_ch_delay[LMX1204_CH3].phase, st->sysref_indiv_ch_delay[LMX1204_CH2].q),
+        MAKE_LMX1204_R19(st->sysref_indiv_ch_delay[LMX1204_CH2].i, st->sysref_indiv_ch_delay[LMX1204_CH2].phase, st->sysref_indiv_ch_delay[LMX1204_CH1].q),
+        MAKE_LMX1204_R18(st->sysref_indiv_ch_delay[LMX1204_CH1].i, st->sysref_indiv_ch_delay[LMX1204_CH1].phase, st->sysref_indiv_ch_delay[LMX1204_CH0].q),
+        MAKE_LMX1204_R17(0, st->sysref_indiv_ch_delay[LMX1204_CH0].i, st->sysref_indiv_ch_delay[LMX1204_CH0].phase, st->sysref_mode),
+    };
 
+    return lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
+}

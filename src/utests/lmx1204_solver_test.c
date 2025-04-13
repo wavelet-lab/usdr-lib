@@ -8,28 +8,33 @@ static void setup()
 {
     memset(&st, 0, sizeof(st));
 
-    st.ch_en[0] = 1;
-    st.ch_en[1] = 1;
-    st.ch_en[2] = 1;
-    st.ch_en[3] = 1;
+    st.ch_en[LMX1204_CH0] = 1;
+    st.ch_en[LMX1204_CH1] = 1;
+    st.ch_en[LMX1204_CH2] = 1;
+    st.ch_en[LMX1204_CH3] = 1;
+    st.ch_en[LMX1204_CH_LOGIC] = 1;
 
-    st.clkout_en[0] = 1;
-    st.clkout_en[1] = 1;
-    st.clkout_en[2] = 1;
-    st.clkout_en[3] = 1;
+    st.clkout_en[LMX1204_CH0] = 1;
+    st.clkout_en[LMX1204_CH1] = 1;
+    st.clkout_en[LMX1204_CH2] = 1;
+    st.clkout_en[LMX1204_CH3] = 1;
+    st.clkout_en[LMX1204_CH_LOGIC] = 1;
 
     st.sysref_en = 1;
-    st.sysrefout_en[0] = 1;
-    st.sysrefout_en[1] = 1;
-    st.sysrefout_en[2] = 1;
-    st.sysrefout_en[3] = 1;
-
-    st.logic_en = 1;
-    st.logiclkout_en = 1;
-    st.logisysrefout_en = 1;
+    st.sysrefout_en[LMX1204_CH0] = 1;
+    st.sysrefout_en[LMX1204_CH1] = 1;
+    st.sysrefout_en[LMX1204_CH2] = 1;
+    st.sysrefout_en[LMX1204_CH3] = 1;
+    st.sysrefout_en[LMX1204_CH_LOGIC] = 1;
 
     st.logiclkout_fmt = LMX1204_FMT_LVDS;
     st.logisysrefout_fmt = LMX1204_FMT_LVDS;
+
+    lmx1204_init_sysrefout_ch_delay(&st, LMX1204_CH0,      1/*SYSREFOUT0_DELAY_PHASE_QCLK0*/, 7, 120);
+    lmx1204_init_sysrefout_ch_delay(&st, LMX1204_CH1,      1/*SYSREFOUT0_DELAY_PHASE_QCLK0*/, 7, 120);
+    lmx1204_init_sysrefout_ch_delay(&st, LMX1204_CH2,      1/*SYSREFOUT0_DELAY_PHASE_QCLK0*/, 7, 120);
+    lmx1204_init_sysrefout_ch_delay(&st, LMX1204_CH3,      1/*SYSREFOUT0_DELAY_PHASE_QCLK0*/, 7, 120);
+    lmx1204_init_sysrefout_ch_delay(&st, LMX1204_CH_LOGIC, 1/*SYSREFOUT0_DELAY_PHASE_QCLK0*/, 7, 120);
 }
 
 static void teardown() {}

@@ -8,6 +8,23 @@
 
 #define LMX1204_OUT_CNT 4
 
+enum
+{
+    LMX1204_CH0 = 0,
+    LMX1204_CH1 = 1,
+    LMX1204_CH2 = 2,
+    LMX1204_CH3 = 3,
+    LMX1204_CH_LOGIC = 4,
+};
+
+struct lmx1204_sysrefout_channel_delay
+{
+    uint8_t phase;
+    uint8_t q;
+    uint8_t i;
+};
+typedef struct lmx1204_sysrefout_channel_delay lmx1204_sysrefout_channel_delay_t;
+
 struct lmx1204_state
 {
     lldev_t  dev;
@@ -21,13 +38,9 @@ struct lmx1204_state
 
     bool sysref_en;
 
-    bool ch_en[LMX1204_OUT_CNT];
-    bool clkout_en[LMX1204_OUT_CNT];
-    bool sysrefout_en[LMX1204_OUT_CNT];
-
-    bool logic_en;
-    bool logiclkout_en;
-    bool logisysrefout_en;
+    bool ch_en[LMX1204_OUT_CNT + 1];        // 4 + logic ch
+    bool clkout_en[LMX1204_OUT_CNT + 1];
+    bool sysrefout_en[LMX1204_OUT_CNT + 1];
 
     double   clkout;
     double   sysrefout;
@@ -52,8 +65,19 @@ struct lmx1204_state
     uint8_t sysref_div_pre;
     uint16_t sysref_div;
     uint8_t sysref_delay_scale;
+    lmx1204_sysrefout_channel_delay_t sysref_indiv_ch_delay[LMX1204_OUT_CNT + 1]; // 4 + logic ch
 };
 typedef struct lmx1204_state lmx1204_state_t;
+
+static inline void lmx1204_init_sysrefout_ch_delay(lmx1204_state_t* st, unsigned ch, uint8_t phase, uint8_t i, uint8_t q)
+{
+    if(ch > LMX1204_CH_LOGIC)
+        return;
+
+    st->sysref_indiv_ch_delay[ch].phase = phase;
+    st->sysref_indiv_ch_delay[ch].i = i;
+    st->sysref_indiv_ch_delay[ch].q = q;
+}
 
 struct lmx1204_stats
 {
@@ -82,6 +106,7 @@ int lmx1204_calibrate(lmx1204_state_t* st);
 int lmx1204_wait_pll_lock(lmx1204_state_t* st, unsigned timeout);
 int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run);
 int lmx1204_get_temperature(lmx1204_state_t* st, float* value);
+int lmx1204_reload_sysrefout_ch_delay(lmx1204_state_t* st);
 int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_t* st);
 int lmx1204_destroy(lmx1204_state_t* st);
 

@@ -435,34 +435,35 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     }
 
     //set 1204 params
-    d->cldistr.clkin     = lmx0_freq[0];
-    d->cldistr.sysrefreq = lmx0_freq[1];
-    d->cldistr.clkout    = d->cldistr.clkin * 4;
-    d->cldistr.sysrefout = 4375000;
-    d->cldistr.sysref_mode = LMX1204_CONTINUOUS;
-    d->cldistr.logiclkout = 1400000;
+    lmx1204_state_t* lmx1204 = &d->cldistr;
+    lmx1204->clkin     = lmx0_freq[0];
+    lmx1204->sysrefreq = lmx0_freq[1];
+    lmx1204->clkout    = d->cldistr.clkin * 4;
+    lmx1204->sysrefout = 4375000;
+    lmx1204->sysref_mode = LMX1204_CONTINUOUS;
+    lmx1204->logiclkout = 1400000;
 
-    d->cldistr.ch_en[0] = 1;
-    d->cldistr.ch_en[1] = 1;
-    d->cldistr.ch_en[2] = 1;
-    d->cldistr.ch_en[3] = 1;
+    lmx1204->ch_en[LMX1204_CH0] = 1;
+    lmx1204->ch_en[LMX1204_CH1] = 1;
+    lmx1204->ch_en[LMX1204_CH2] = 1;
+    lmx1204->ch_en[LMX1204_CH3] = 1;
+    lmx1204->ch_en[LMX1204_CH_LOGIC] = 1;
 
-    d->cldistr.clkout_en[0] = 1;
-    d->cldistr.clkout_en[1] = 1;
-    d->cldistr.clkout_en[2] = 1;
-    d->cldistr.clkout_en[3] = 1;
+    lmx1204->clkout_en[LMX1204_CH0] = 1;
+    lmx1204->clkout_en[LMX1204_CH1] = 1;
+    lmx1204->clkout_en[LMX1204_CH2] = 1;
+    lmx1204->clkout_en[LMX1204_CH3] = 1;
+    lmx1204->clkout_en[LMX1204_CH_LOGIC] = 1;
 
-    d->cldistr.sysref_en = 1;
-    d->cldistr.sysrefout_en[0] = 1;
-    d->cldistr.sysrefout_en[1] = 1;
-    d->cldistr.sysrefout_en[2] = 1;
-    d->cldistr.sysrefout_en[3] = 1;
+    lmx1204->sysref_en = 1;
+    lmx1204->sysrefout_en[LMX1204_CH0] = 1;
+    lmx1204->sysrefout_en[LMX1204_CH1] = 1;
+    lmx1204->sysrefout_en[LMX1204_CH2] = 1;
+    lmx1204->sysrefout_en[LMX1204_CH3] = 1;
+    lmx1204->sysrefout_en[LMX1204_CH_LOGIC] = 1;
 
-    d->cldistr.logic_en = 1;
-    d->cldistr.logiclkout_en = 1;
-    d->cldistr.logisysrefout_en = 1;
-    d->cldistr.logiclkout_fmt    = LMX1204_FMT_LVDS;
-    d->cldistr.logisysrefout_fmt = LMX1204_FMT_LVDS;
+    lmx1204->logiclkout_fmt    = LMX1204_FMT_LVDS;
+    lmx1204->logisysrefout_fmt = LMX1204_FMT_LVDS;
     //
     res = lmx1204_solver(&d->cldistr, false/*prec_mode*/, false/*dry_run*/);
     if(res)
