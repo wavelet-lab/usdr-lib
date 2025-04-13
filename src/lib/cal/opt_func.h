@@ -57,5 +57,6 @@ int find_best_2d(struct opt_iteration2d *ops, unsigned max_count, void* param, i
                  int *px, int *py, int *pfxy);
 
 uint64_t find_gcd(uint64_t a, uint64_t b);
+void binary_print_u32_reverse(uint32_t x, char* s);
 
 #endif

@@ -110,5 +110,8 @@ int lmx1204_reload_sysrefout_ch_delay(lmx1204_state_t* st);
 int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_t* st);
 int lmx1204_destroy(lmx1204_state_t* st);
 
+int lmx1204_sysref_windowing_beforesync(lmx1204_state_t* st);
+int lmx1204_sysref_windowing_capture(lmx1204_state_t* st);
+int lmx1204_sysref_windowing_aftersync(lmx1204_state_t* st);
 
 #endif // LMX1204_H

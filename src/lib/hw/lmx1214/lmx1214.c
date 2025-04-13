@@ -8,6 +8,7 @@
 #include "def_lmx1214.h"
 #include "lmx1214.h"
 #include "usdr_logging.h"
+#include "../common/common.h"
 
 #include "lmx1214_dump.h"
 
@@ -130,24 +131,6 @@ UNUSED static int lmx1214_loaddump(lmx1214_state_t* st)
         USDR_LOG("2820", USDR_LOG_DEBUG, "lmx1214_loaddump() OK");
     }
     return res;
-}
-
-int lmx1214_sync_clr(lmx1214_state_t* st)
-{
-    uint16_t r15;
-
-    int res = lmx1214_spi_get(st, R15, &r15);
-    if(res)
-        return res;
-
-    uint32_t regs[] =
-    {
-        MAKE_LMX1214_REG_WR(R15, r15 & ~SYNC_CLR_MSK),
-        MAKE_LMX1214_REG_WR(R15, r15 |  SYNC_CLR_MSK),
-        MAKE_LMX1214_REG_WR(R15, r15 & ~SYNC_CLR_MSK),
-    };
-
-    return lmx1214_spi_post(st, regs, SIZEOF_ARRAY(regs));;
 }
 
 int lmx1214_get_temperature(lmx1214_state_t* st, float* value)
@@ -438,24 +421,18 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
         return res;
     }
 
-    uint8_t sync_dly_step = 0;
-    if(in >= 4500000000)
-        sync_dly_step = 3;
-    else if(in > 3100000000 && in <= 5700000000)
-        sync_dly_step = 2;
-    else if(in > 2400000000 && in <= 4700000000)
-        sync_dly_step = 1;
-
-    USDR_LOG("1214", USDR_LOG_DEBUG, "CLKIN:%" PRIu64 " -> SYNC_DLY_STEP:%u", in, sync_dly_step);
-
     uint32_t regs[] =
     {
-        MAKE_LMX1214_R90(0, 0, (st->auxclk_div_byp ? 1 : 0), (st->auxclk_div_byp ? 1 : 0), 0),
-        MAKE_LMX1214_R79(0, 0x5),
         MAKE_LMX1214_R25(0x4, 0, st->clk_div - 1, st->clk_mux),
-        MAKE_LMX1214_R14(0, 1, 1, 0), //set CLKPOS_CAPTURE_EN
-        MAKE_LMX1214_R9 (0, 1, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
+        MAKE_LMX1214_R14(0, 0, 1, 0),
+
+        //according do doc: program R79 and R90 before setting logiclk_div_bypass
+        //desc order is broken here!
         MAKE_LMX1214_R8 (0, st->auxclk_div_pre, 0, (st->auxclkout.enable ? 1 : 0), 0, st->auxclkout.fmt),
+        MAKE_LMX1214_R79(0, st->auxclk_div_byp ? 0x5 : 0x104 /*0x205*/),
+        MAKE_LMX1214_R90(0, 0, (st->auxclk_div_byp ? 1 : 0), (st->auxclk_div_byp ? 1 : 0), 0),
+
+        MAKE_LMX1214_R9 (0, 0, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
         MAKE_LMX1214_R3 (st->clkout_enabled[3] ? 1 : 0,
                          st->clkout_enabled[2] ? 1 : 0,
                          st->clkout_enabled[1] ? 1 : 0,
@@ -471,6 +448,8 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
         return res;
     }
 
+    usleep(10000);
+
     res = dry_run ? 0 : lmx1214_reset_main_divider(st, false);
     if(res)
     {
@@ -481,20 +460,82 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
     return 0;
 }
 
-int lmx1214_windowing(lmx1214_state_t* st)
+int lmx1214_sysref_windowing_beforesync(lmx1214_state_t* st)
+{
+    int res;
+
+    uint8_t delay_step_size = SYNC_DLY_STEP_28_PS_1_4GHZ_TO_2_7GHZ;
+    if(st->clkin > 2400000000 && st->clkin <= 4700000000)
+        delay_step_size = SYNC_DLY_STEP_15_PS__2_4GHZ_TO_4_7GHZ;
+    if(st->clkin > 3100000000 && st->clkin <= 5700000000)
+        delay_step_size = SYNC_DLY_STEP_11_PS_3_1GHZ_TO_5_7GHZ;
+    if(st->clkin > 4500000000 && st->clkin <= 12800000000)
+        delay_step_size = SYNC_DLY_STEP_8_PS_4_5GHZ_TO_12_8GHZ;
+
+    USDR_LOG("1214", USDR_LOG_DEBUG, "DELAY_STEPSIZE:%u", delay_step_size);
+
+    {
+        uint32_t regs[] =
+            {
+                MAKE_LMX1214_R9 (0, 1/*SYNC_EN*/, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
+                MAKE_LMX1214_R14(0, 1/*CLKPOS_CAPTURE_EN*/, 1, 0),
+                MAKE_LMX1214_R13(0, delay_step_size),
+            };
+
+        res = lmx1214_spi_post(st, regs, SIZEOF_ARRAY(regs));
+        if(res)
+            return res;
+    }
+
+    {
+        uint16_t r15;
+        res = lmx1214_spi_get(st, R15, &r15);
+        if(res)
+            return res;
+
+        uint32_t regval_set = MAKE_LMX1214_REG_WR(R15, r15 |  SYNC_CLR_MSK);
+        uint32_t regval_rst = MAKE_LMX1214_REG_WR(R15, r15 & ~SYNC_CLR_MSK);
+
+        res = lmx1214_spi_post(st, &regval_set, 1);
+        res = res ? res : lmx1214_spi_post(st, &regval_rst, 1);
+    }
+
+    return res;
+}
+
+int lmx1214_sysref_windowing_aftersync(lmx1214_state_t* st)
+{
+    uint32_t regs[] =
+        {
+            MAKE_LMX1214_R9 (0, 0/*SYNC_EN*/, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
+            MAKE_LMX1214_R14(0, 0/*CLKPOS_CAPTURE_EN*/, 1, 0),
+        };
+    return lmx1214_spi_post(st, regs, SIZEOF_ARRAY(regs));
+}
+
+int lmx1214_sysref_windowing_capture(lmx1214_state_t* st)
 {
     int res;
     uint16_t r11, r12;
 
     res = lmx1214_spi_get(st, R11, &r11);
-    res = res ? 0 : lmx1214_spi_get(st, R12, &r12);
+    res = res ? res : lmx1214_spi_get(st, R12, &r12);
     if(res)
         return res;
 
     uint32_t clkpos = ((uint32_t)r12 << 16) | r11;
-    //USDR_LOG(USDR_LOG_DEBUG, "CLKPOS:0b%b", clkpos);
-    //TODO
 
+    unsigned delay;
+    res = common_ti_calc_sync_delay(clkpos, &delay);
+    if(res)
+        return res;
+
+    {
+        uint32_t reg = MAKE_LMX1214_R15(0, 0x16, delay, 0);
+        res = lmx1214_spi_post(st, &reg, 1);
+        if(res)
+            return res;
+    }
 
     return 0;
 }

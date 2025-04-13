@@ -10,6 +10,8 @@
 #include "usdr_logging.h"
 #include "../cal/opt_func.h"
 
+#include "../common/common.h"
+
 #define FREQ_EPS 1.0f
 
 enum
@@ -141,6 +143,18 @@ UNUSED static int lmx1204_read_all_regs(lmx1204_state_t* st)
     }
 
     return 0;
+}
+
+static int lmx1204_reset_main_divider(lmx1204_state_t* st, bool set_flag)
+{
+    uint16_t r25;
+
+    int res = lmx1204_spi_get(st, R25, &r25);
+    if(res)
+        return res;
+
+    uint32_t reg = MAKE_LMX1204_REG_WR(R25, set_flag ? (r25 | CLK_DIV_RST_MSK) : (r25 & ~CLK_DIV_RST_MSK));
+    return lmx1204_spi_post(st, &reg, 1);
 }
 
 int lmx1204_get_temperature(lmx1204_state_t* st, float* value)
@@ -674,6 +688,14 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
     USDR_LOG("1204", USDR_LOG_INFO, "--------------");
 
     //registers
+
+    res = dry_run ? 0 : lmx1204_reset_main_divider(st, true);
+    if(res)
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "lmx1204_reset_main_divider(1) err:%d", res);
+        return res;
+    }
+
     uint32_t regs[] =
     {
         MAKE_LMX1204_R0(0, 0, 0, 1),    //set RESET bit first
@@ -722,6 +744,13 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         return res;
 
     usleep(10000);
+
+    res = dry_run ? 0 : lmx1204_reset_main_divider(st, false);
+    if(res)
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "lmx1204_reset_main_divider(0) err:%d", res);
+        return res;
+    }
 
     return 0;
 }
@@ -793,4 +822,84 @@ int lmx1204_reload_sysrefout_ch_delay(lmx1204_state_t* st)
     };
 
     return lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
+}
+
+int lmx1204_sysref_windowing_beforesync(lmx1204_state_t* st)
+{
+    int res;
+
+    uint8_t delay_step_size = SYSREFREQ_DELAY_STEPSIZE_28_PS_1_4_GHZ_TO_2_7_GHZ;
+    if(st->clkin > 2400000000 && st->clkin <= 4700000000)
+        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_15_PS_2_4_GHZ_TO_4_7_GHZ;
+    if(st->clkin > 3100000000 && st->clkin <= 5700000000)
+        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_11_PS_3_1_GHZ_TO_5_7_GHZ;
+    if(st->clkin > 4500000000 && st->clkin <= 12800000000)
+        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_8_PS_4_5_GHZ_TO_12_8_GHZ;
+
+    USDR_LOG("1204", USDR_LOG_DEBUG, "DELAY_STEPSIZE:%u", delay_step_size);
+
+    {
+        uint32_t regs[] =
+        {
+            MAKE_LMX1204_R9(0, 1/*SYNC_EN*/, 0, st->logiclk_div_bypass ? 1 : 0, 0, st->logiclk_div),
+            MAKE_LMX1204_R14(0, 0, 0, 1/*CLKPOS_CAPTURE_EN*/, 1, 0),
+            MAKE_LMX1204_R13(0, delay_step_size),
+        };
+
+        res = lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
+        if(res)
+            return res;
+    }
+
+    {
+        uint16_t r15;
+        res = lmx1204_spi_get(st, R15, &r15);
+        if(res)
+            return res;
+
+        uint32_t regval_set = MAKE_LMX1204_REG_WR(R15, r15 |  SYSREFREQ_CLR_MSK);
+        uint32_t regval_rst = MAKE_LMX1204_REG_WR(R15, r15 & ~SYSREFREQ_CLR_MSK);
+
+        res = lmx1204_spi_post(st, &regval_set, 1);
+        res = res ? res : lmx1204_spi_post(st, &regval_rst, 1);
+    }
+
+    return res;
+}
+
+int lmx1204_sysref_windowing_aftersync(lmx1204_state_t* st)
+{
+    uint32_t regs[] =
+    {
+        MAKE_LMX1204_R9(0, 0/*SYNC_EN*/, 0, st->logiclk_div_bypass ? 1 : 0, 0, st->logiclk_div),
+        MAKE_LMX1204_R14(0, 0, 0, 0/*CLKPOS_CAPTURE_EN*/, 1, 0),
+    };
+    return lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
+}
+
+int lmx1204_sysref_windowing_capture(lmx1204_state_t* st)
+{
+    int res;
+    uint16_t r11, r12;
+
+    res = lmx1204_spi_get(st, R11, &r11);
+    res = res ? res : lmx1204_spi_get(st, R12, &r12);
+    if(res)
+        return res;
+
+    uint32_t clkpos = ((uint32_t)r12 << 16) | r11;
+
+    unsigned delay;
+    res = common_ti_calc_sync_delay(clkpos, &delay);
+    if(res)
+        return res;
+
+    {
+        uint32_t reg = MAKE_LMX1204_R15(0, st->sysref_div_pre, 0x3, st->sysref_en ? 1 : 0, delay, 0);
+        res = lmx1204_spi_post(st, &reg, 1);
+        if(res)
+            return res;
+    }
+
+    return 0;
 }
