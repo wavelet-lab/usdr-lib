@@ -12,6 +12,7 @@
 #include "../cal/opt_func.h"
 
 #include "lmx2820_dump.h"
+#include "../common/common.h"
 
 enum {
 
@@ -89,38 +90,16 @@ static uint64_t FPD_MAX[MASH_ORDER_THIRD_ORDER + 1] =
 
 static int lmx2820_spi_post(lmx2820_state_t* obj, uint32_t* regs, unsigned count)
 {
-    int res;
-
-    for (unsigned i = 0; i < count; i++)
-    {
-        uint8_t  rn = regs[i] >> 16;
-        uint16_t rv = (uint16_t)regs[i];
-        USDR_LOG("2820", USDR_LOG_DEBUG, "WRITE#%u: R%03u (0x%02x) -> 0x%04x [0x%06x]", i, rn, rn, rv, regs[i]);
-    }
-
-    for (unsigned i = 0; i < count; i++) {
-        res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, regs[i], NULL);
-        if (res)
-            return res;
-
-        USDR_LOG("2820", USDR_LOG_NOTE, "[%d/%d] reg wr %08x\n", i, count, regs[i]);
-    }
-
-    return 0;
+    return
+        common_print_registers_a8d16(regs, count, USDR_LOG_DEBUG)
+        ||
+        common_spi_post(obj, regs, count);
 }
 
 static int lmx2820_spi_get(lmx2820_state_t* obj, uint16_t addr, uint16_t* out)
 {
-    uint32_t v;
-    int res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, MAKE_LMX2820_REG_RD((uint32_t)addr), &v);
-    if (res)
-        return res;
-
-    USDR_LOG("2820", USDR_LOG_NOTE, " reg rd %04x => %08x\n", addr, v);
-    *out = v;
-    return 0;
+    return common_spi_get(obj, MAKE_LMX2820_REG_RD((uint32_t)addr), out);
 }
-
 
 static int lmx2820_get_worst_vco_core(uint64_t vco_freq, unsigned mash_order, unsigned* vco_core, uint16_t* min_pll_n)
 {

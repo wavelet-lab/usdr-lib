@@ -79,3 +79,45 @@ int common_ti_calc_sync_delay(uint32_t clkpos, unsigned* calced_delay)
     *calced_delay = delay;
     return 0;
 }
+
+int common_print_registers_a8d16(uint32_t* regs, unsigned count, int loglevel)
+{
+    for (unsigned i = 0; i < count; i++)
+    {
+        uint8_t  ra = regs[i] >> 16;
+        uint16_t rv = (uint16_t)regs[i];
+        USDR_LOG("COMN", loglevel, "WRITE#%u: R%03u (0x%02x) -> 0x%04x [0x%06x]", i, ra, ra, rv, regs[i]);
+    }
+
+    return 0;
+}
+
+int common_spi_post(void* o, uint32_t* regs, unsigned count)
+{
+    int res;
+    const common_hw_state_struct_t* obj = (common_hw_state_struct_t*)o;
+
+    for (unsigned i = 0; i < count; i++) {
+        res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, regs[i], NULL);
+        if (res)
+            return res;
+
+        USDR_LOG("COMN", USDR_LOG_NOTE, "[%d/%d] reg wr %08x\n", i, count, regs[i]);
+    }
+
+    return 0;
+}
+
+int common_spi_get(void* o, uint16_t addr, uint16_t* out)
+{
+    uint32_t v;
+    const common_hw_state_struct_t* obj = (common_hw_state_struct_t*)o;
+
+    int res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, addr, &v);
+    if (res)
+        return res;
+
+    USDR_LOG("COMN", USDR_LOG_NOTE, " reg rd %04x => %08x\n", addr, v);
+    *out = v;
+    return 0;
+}

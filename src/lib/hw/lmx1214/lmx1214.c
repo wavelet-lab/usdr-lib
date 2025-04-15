@@ -41,44 +41,17 @@ enum
     AUXCLK_DIV_MAX = 1023,
 };
 
-static int lmx1214_print_registers(uint32_t* regs, unsigned count)
-{
-    for (unsigned i = 0; i < count; i++)
-    {
-        uint8_t  rn = regs[i] >> 16;
-        uint16_t rv = (uint16_t)regs[i];
-        USDR_LOG("1214", USDR_LOG_DEBUG, "WRITE#%u: R%03u (0x%02x) -> 0x%04x [0x%06x]", i, rn, rn, rv, regs[i]);
-    }
-
-    return 0;
-}
-
 static int lmx1214_spi_post(lmx1214_state_t* obj, uint32_t* regs, unsigned count)
 {
-    int res;
-    lmx1214_print_registers(regs, count);
-
-    for (unsigned i = 0; i < count; i++) {
-        res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, regs[i], NULL);
-        if (res)
-            return res;
-
-        USDR_LOG("1214", USDR_LOG_NOTE, "[%d/%d] reg wr %08x\n", i, count, regs[i]);
-    }
-
-    return 0;
+    return
+        common_print_registers_a8d16(regs, count, USDR_LOG_DEBUG)
+        ||
+        common_spi_post(obj, regs, count);
 }
 
 static int lmx1214_spi_get(lmx1214_state_t* obj, uint16_t addr, uint16_t* out)
 {
-    uint32_t v;
-    int res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, MAKE_LMX1214_REG_RD((uint32_t)addr), &v);
-    if (res)
-        return res;
-
-    USDR_LOG("1214", USDR_LOG_NOTE, " reg rd %04x => %08x\n", addr, v);
-    *out = v;
-    return 0;
+    return common_spi_get(obj, MAKE_LMX1214_REG_RD((uint32_t)addr), out);
 }
 
 UNUSED static int lmx1214_read_all_regs(lmx1214_state_t* st)
@@ -431,8 +404,8 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
         MAKE_LMX1214_R8 (0, st->auxclk_div_pre, 0, (st->auxclkout.enable ? 1 : 0), 0, st->auxclkout.fmt),
         MAKE_LMX1214_R79(0, st->auxclk_div_byp ? 0x5 : 0x104 /*0x205*/),
         MAKE_LMX1214_R90(0, 0, (st->auxclk_div_byp ? 1 : 0), (st->auxclk_div_byp ? 1 : 0), 0),
-
         MAKE_LMX1214_R9 (0, 0, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
+
         MAKE_LMX1214_R3 (st->clkout_enabled[3] ? 1 : 0,
                          st->clkout_enabled[2] ? 1 : 0,
                          st->clkout_enabled[1] ? 1 : 0,
@@ -441,7 +414,7 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
                         ),
     };
 
-    res = dry_run ? lmx1214_print_registers(regs, SIZEOF_ARRAY(regs)) : lmx1214_spi_post(st, regs, SIZEOF_ARRAY(regs));
+    res = dry_run ? common_print_registers_a8d16(regs, SIZEOF_ARRAY(regs), USDR_LOG_DEBUG) : lmx1214_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
     {
         USDR_LOG("1214", USDR_LOG_ERROR, "Registers set lmx1214_spi_post() failed, err:%d", res);

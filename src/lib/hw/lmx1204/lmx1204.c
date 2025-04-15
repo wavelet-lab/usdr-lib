@@ -52,44 +52,17 @@ enum
     SYSREF_DIV_MAX = 4095,
 };
 
-static int lmx1204_print_registers(uint32_t* regs, unsigned count)
-{
-    for (unsigned i = 0; i < count; i++)
-    {
-        uint8_t  rn = regs[i] >> 16;
-        uint16_t rv = (uint16_t)regs[i];
-        USDR_LOG("1204", USDR_LOG_DEBUG, "WRITE#%u: R%03u (0x%02x) -> 0x%04x [0x%06x]", i, rn, rn, rv, regs[i]);
-    }
-
-    return 0;
-}
-
 static int lmx1204_spi_post(lmx1204_state_t* obj, uint32_t* regs, unsigned count)
 {
-    int res;
-    lmx1204_print_registers(regs, count);
-
-    for (unsigned i = 0; i < count; i++) {
-        res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, regs[i], NULL);
-        if (res)
-            return res;
-
-        USDR_LOG("1204", USDR_LOG_NOTE, "[%d/%d] reg wr %08x\n", i, count, regs[i]);
-    }
-
-    return 0;
+    return
+        common_print_registers_a8d16(regs, count, USDR_LOG_DEBUG)
+        ||
+        common_spi_post(obj, regs, count);
 }
 
 static int lmx1204_spi_get(lmx1204_state_t* obj, uint16_t addr, uint16_t* out)
 {
-    uint32_t v;
-    int res = lowlevel_spi_tr32(obj->dev, obj->subdev, obj->lsaddr, MAKE_LMX1204_REG_RD((uint32_t)addr), &v);
-    if (res)
-        return res;
-
-    USDR_LOG("1204", USDR_LOG_NOTE, " reg rd %04x => %08x\n", addr, v);
-    *out = v;
-    return 0;
+    return common_spi_get(obj, MAKE_LMX1204_REG_RD((uint32_t)addr), out);
 }
 
 UNUSED static int lmx1204_read_all_regs(lmx1204_state_t* st)
@@ -739,7 +712,7 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         MAKE_LMX1204_R0(0, 0, 0, 0),    //reset RESET bit last
     };
 
-    res = dry_run ? lmx1204_print_registers(regs, SIZEOF_ARRAY(regs)) : lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
+    res = dry_run ? common_print_registers_a8d16(regs, SIZEOF_ARRAY(regs), USDR_LOG_DEBUG) : lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
         return res;
 
