@@ -10,6 +10,14 @@
 
 enum
 {
+    LMX1214_CH0 = 0,
+    LMX1214_CH1 = 1,
+    LMX1214_CH2 = 2,
+    LMX1214_CH3 = 3,
+};
+
+enum
+{
     LMX1214_FMT_LVDS = 0,
     LMX1214_FMT_CML = 2,
 };

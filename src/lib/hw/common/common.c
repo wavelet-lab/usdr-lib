@@ -108,7 +108,7 @@ int common_spi_post(void* o, uint32_t* regs, unsigned count)
     return 0;
 }
 
-int common_spi_get(void* o, uint16_t addr, uint16_t* out)
+int common_spi_get(void* o, uint32_t addr, uint16_t* out)
 {
     uint32_t v;
     const common_hw_state_struct_t* obj = (common_hw_state_struct_t*)o;

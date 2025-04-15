@@ -145,7 +145,7 @@ int lmx2820_sync(lmx2820_state_t* st)
     return lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
 }
 
-//#define LMX2820_RESET_SKIP
+#define LMX2820_RESET_SKIP
 
 int lmx2820_reset(lmx2820_state_t* st)
 #ifdef LMX2820_RESET_SKIP

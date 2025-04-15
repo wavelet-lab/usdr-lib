@@ -406,10 +406,10 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
         MAKE_LMX1214_R90(0, 0, (st->auxclk_div_byp ? 1 : 0), (st->auxclk_div_byp ? 1 : 0), 0),
         MAKE_LMX1214_R9 (0, 0, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
 
-        MAKE_LMX1214_R3 (st->clkout_enabled[3] ? 1 : 0,
-                         st->clkout_enabled[2] ? 1 : 0,
-                         st->clkout_enabled[1] ? 1 : 0,
-                         st->clkout_enabled[0] ? 1 : 0,
+        MAKE_LMX1214_R3 (st->clkout_enabled[LMX1214_CH3] ? 1 : 0,
+                         st->clkout_enabled[LMX1214_CH2] ? 1 : 0,
+                         st->clkout_enabled[LMX1214_CH1] ? 1 : 0,
+                         st->clkout_enabled[LMX1214_CH0] ? 1 : 0,
                          0xF86//0xFE
                         ),
     };
