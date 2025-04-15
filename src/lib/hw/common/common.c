@@ -11,7 +11,7 @@ int common_ti_calc_sync_delay(uint32_t clkpos, unsigned* calced_delay)
 
     char tmps[WBSIZE + 1];
 
-    binary_print_u32_reverse(clkpos, tmps);
+    binary_print_u32(clkpos, tmps, true /*reverse*/);
     USDR_LOG("COMN", USDR_LOG_DEBUG, "WINDOW DATA:0b%s", tmps);
 
     //MSB & LSB should be 1

@@ -9,6 +9,7 @@
 #define OPT_FUNC_H
 
 #include "stdint.h"
+#include "stdbool.h"
 
 #define MAX(a, b) \
   ({ __typeof__ (a) _a = (a); \
@@ -57,6 +58,6 @@ int find_best_2d(struct opt_iteration2d *ops, unsigned max_count, void* param, i
                  int *px, int *py, int *pfxy);
 
 uint64_t find_gcd(uint64_t a, uint64_t b);
-void binary_print_u32_reverse(uint32_t x, char* s);
+void binary_print_u32(uint32_t x, char* s, bool reverse);
 
 #endif

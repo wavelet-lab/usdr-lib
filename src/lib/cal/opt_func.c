@@ -205,40 +205,11 @@ uint64_t find_gcd(uint64_t a, uint64_t b)
     return find_gcd((b - a) >> 1, a);
 }
 
-void binary_print_u32_reverse(uint32_t x, char* s)
+void binary_print_u32(uint32_t x, char* s, bool reverse)
 {
-    sprintf(s, "%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u%1u",
-           (x >>  0) & 0x1,
-           (x >>  1) & 0x1,
-           (x >>  2) & 0x1,
-           (x >>  3) & 0x1,
-           (x >>  4) & 0x1,
-           (x >>  5) & 0x1,
-           (x >>  6) & 0x1,
-           (x >>  7) & 0x1,
-           (x >>  8) & 0x1,
-           (x >>  9) & 0x1,
-           (x >> 10) & 0x1,
-           (x >> 11) & 0x1,
-           (x >> 12) & 0x1,
-           (x >> 13) & 0x1,
-           (x >> 14) & 0x1,
-           (x >> 15) & 0x1,
-           (x >> 16) & 0x1,
-           (x >> 17) & 0x1,
-           (x >> 18) & 0x1,
-           (x >> 19) & 0x1,
-           (x >> 20) & 0x1,
-           (x >> 21) & 0x1,
-           (x >> 22) & 0x1,
-           (x >> 23) & 0x1,
-           (x >> 24) & 0x1,
-           (x >> 25) & 0x1,
-           (x >> 26) & 0x1,
-           (x >> 27) & 0x1,
-           (x >> 28) & 0x1,
-           (x >> 29) & 0x1,
-           (x >> 30) & 0x1,
-           (x >> 31) & 0x1
-    );
+    unsigned len = 0;
+    for(unsigned i = 0; i < sizeof(x) * 8; ++i)
+    {
+        len += sprintf(s + len, "%1u", reverse ? (x >> i) & 0x1 : (int32_t)(x << i) < 0);
+    }
 }
