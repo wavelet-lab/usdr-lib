@@ -57,6 +57,14 @@ x-mute-lvl: &mute-lvl
     0x2: DIFF_HIGH_P_LOW_N_BY
     0x3: DIFF_LOW_P_LOW_N_LOW
 
+x-ref-dc-mode: &ref-dc-mode
+    0x0: AC_COUPLED_INT
+    0x1: DC_COUPLED_INT
+
+x-ref-buf-mode: &ref-buf-mode
+    0x0: AC_HYST50_DC_EN
+    0x1: AC_HYST200_DC_DIS
+
 pages:
   - name: Top
     regs:
@@ -376,9 +384,11 @@ pages:
           - bits: "3"
             name: SECREF_DC_MODE
             desc: SECREF DC buffer mode; 0x0 = SECREF is AC coupled internally; 0x1 = SECREF is DC coupled internally
+            opts: *ref-dc-mode
           - bits: "2"
             name: PRIREF_DC_MODE
             desc: PRIREF DC buffer mode; 0x0 = PRIREF is AC coupled internally; 0x1 = PRIREF is DC coupled internally
+            opts: *ref-dc-mode
           - bits: "0"
             name: APLL2_DEN_MODE
             desc: Programmable APLL2 denominator mode; 0x0 = APLL2 uses fixed 24-bit denominator; 0x1 = APLL2 uses programmable 24-bit denominator (R333, R334, R335)
@@ -428,9 +438,11 @@ pages:
           - bits: "1"
             name: SECREF_BUF_MODE
             desc: SECREF buffer mode. 0x0 - Set AC buffer hysteresis to 50mV or enable DC buffer hysteresis; 0x1 = Set AC buffer hysteresis to 200mV or disable DC buffer hysteresis
+            opts: *ref-buf-mode
           - bits: "0"
             name: PRIREF_BUF_MODE
             desc: PRIREF buffer mode. 0x0 - Set AC buffer hysteresis to 50mV or enable DC buffer hysteresis; 0x1 = Set AC buffer hysteresis to 200mV or disable DC buffer hysteresis
+            opts: *ref-buf-mode
       - addr: 0x2E
         name: REF_CLKCTL2
         fields:
@@ -1046,6 +1058,9 @@ pages:
           - bits: "4"
             name: DPLL_FASTLOCK_ALWAYS
             desc: Enable DPLL fast lock 
+          - bits: "3"
+            name: DPLL_LOCKDET_PPM_EN
+            desc: Enable DPLL Frequency Lock Detect
           - bits: "2"
             name: DPLL_HLDOVR_MODE
             desc: DPLL Holdover mode when tuning word history unavailable; 0x0 = Enter free-run mode; 0x1 = Hold last control value prior to holdover 

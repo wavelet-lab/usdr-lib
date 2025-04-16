@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 #include "def_lmk05318.h"
 #include "lmk05318.h"
@@ -44,8 +45,193 @@ enum {
     APLL2_PDIV_MIN = 2,
     APLL2_PDIV_MAX = 7,
     APLL2_PDIV_COUNT = 2, //PD1 & PD2
+
+    F_TDC_MIN = 1,
+    F_TDC_MAX = 26000000,
+
+    DPLL_REF_R_DIV_MIN = 1,
+    DPLL_REF_R_DIV_MAX = UINT16_MAX - 1,
+
+    DPLL_PRE_DIV_MIN = 2,
+    DPLL_PRE_DIV_MAX = 17,
 };
 
+int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
+{
+    if(!dpll->enabled)
+    {
+        d->dpll.enabled = false;
+        USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] DPLL disabled");
+        return 0;
+    }
+
+    //Validate REF inputs
+    for(unsigned i = LMK05318_PRIREF; i <= LMK05318_SECREF; ++i)
+    {
+        if(!dpll->en[i])
+            continue;
+
+        switch(dpll->dc_mode[i])
+        {
+        case DPLL_REF_AC_COUPLED_INT: dpll->dc_mode[i] = REF_DC_MODE_AC_COUPLED_INT; break;
+        case DPLL_REF_DC_COUPLED_INT: dpll->dc_mode[i] = REF_DC_MODE_DC_COUPLED_INT; break;
+        default:
+            USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] %sREF DC_MODE:%u unsupported",
+                     (i == LMK05318_PRIREF) ? "PRI" : "SEC", dpll->dc_mode[i]);
+            return -EINVAL;
+        }
+
+        switch(dpll->buf_mode[i])
+        {
+        case DPLL_REF_AC_BUF_HYST50_DC_EN: dpll->buf_mode[i] = REF_BUF_MODE_AC_HYST50_DC_EN; break;
+        case DPLL_REF_AC_BUF_HYST200_DC_DIS: dpll->buf_mode[i] = REF_BUF_MODE_AC_HYST200_DC_DIS; break;
+        default:
+            USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] %sREF BUF_MODE:%u unsupported",
+                     (i == LMK05318_PRIREF) ? "PRI" : "SEC", dpll->buf_mode[i]);
+            return -EINVAL;
+        }
+
+        switch(dpll->type[i])
+        {
+        case XO_DC_DIFF_EXT:        dpll->type[i] = IN_OPTS_DC_DIFF_EXT; break;
+        case XO_AC_DIFF_EXT:        dpll->type[i] = IN_OPTS_AC_DIFF_EXT; break;
+        case XO_AC_DIFF_INT_100:    dpll->type[i] = IN_OPTS_AC_DIFF_INT_100; break;
+        case XO_HCSL_INT_50:        dpll->type[i] = IN_OPTS_HCSL_INT_50; break;
+        case XO_CMOS:               dpll->type[i] = IN_OPTS_CMOS; break;
+        case XO_SE_INT_50:          dpll->type[i] = IN_OPTS_SE_INT_50; break;
+        default:
+            USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] %sREF TYPE:%u unsupported",
+                     (i == LMK05318_PRIREF) ? "PRI" : "SEC", dpll->type[i]);
+            return -EINVAL;
+        }
+    }
+
+    d->dpll.enabled = true;
+
+    if(dpll->en[LMK05318_PRIREF] && dpll->en[LMK05318_SECREF])
+    {
+        unsigned max_ref_id, min_ref_id;
+        if(dpll->fref[LMK05318_PRIREF] > dpll->fref[LMK05318_SECREF])
+        {
+            max_ref_id = LMK05318_PRIREF; min_ref_id = LMK05318_SECREF;
+        } else
+        {
+            max_ref_id = LMK05318_SECREF; min_ref_id = LMK05318_PRIREF;
+        }
+
+        uint64_t max_div = dpll->fref[max_ref_id];
+        uint64_t min_div = dpll->fref[min_ref_id];
+        uint64_t gcd = find_gcd(min_div, max_div);
+        if(gcd > 1)
+        {
+            min_div /= gcd;
+            max_div /= gcd;
+        }
+
+        const unsigned min_div_required = ceil((double)dpll->fref[max_ref_id] / F_TDC_MAX);
+
+        if(max_div > DPLL_REF_R_DIV_MAX || min_div < min_div_required)
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] incorrect PRIREF/SECREF ratio (%.2f)", (double)min_div / max_div);
+            return -EINVAL;
+        }
+
+        d->dpll.ref_en[LMK05318_PRIREF] = d->dpll.ref_en[LMK05318_SECREF] = true;
+        d->dpll.rdiv[min_ref_id] = min_div;
+        d->dpll.rdiv[max_ref_id] = max_div;
+        d->dpll.ftdc = (double)dpll->fref[min_ref_id] / d->dpll.rdiv[min_ref_id];
+
+        const double ftdc2 = (double)dpll->fref[max_ref_id] / d->dpll.rdiv[max_ref_id];
+        if(fabs(ftdc2 - d->dpll.ftdc) > 1E-6)
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] PRIREF/SECREF cannot be resolved to one TDC (%.6f != %.6f)", d->dpll.ftdc, ftdc2);
+        }
+    }
+    else if(dpll->en[LMK05318_PRIREF] || dpll->en[LMK05318_SECREF])
+    {
+        uint8_t id = dpll->en[LMK05318_PRIREF] ? LMK05318_PRIREF : LMK05318_SECREF;
+        uint64_t div = ceil((double)dpll->fref[id] / F_TDC_MAX);
+        if(div > DPLL_REF_R_DIV_MAX)
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] PRIREF or SECREF value too high");
+            return -EINVAL;
+        }
+
+        d->dpll.ref_en[id] = true;
+        d->dpll.rdiv[id] = div;
+        d->dpll.ftdc = (double)dpll->fref[id] / div;
+    }
+    else
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] PRIREF and SECREF are disabled, cannot configure DPLL");
+        return -EINVAL;
+    }
+
+    USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] PRIREF:%" PRIu64 " EN:%u RDIV:%u",
+             dpll->fref[LMK05318_PRIREF], d->dpll.ref_en[LMK05318_PRIREF], d->dpll.rdiv[LMK05318_PRIREF]);
+    USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] SECREF:%" PRIu64 " EN:%u RDIV:%u",
+             dpll->fref[LMK05318_SECREF], d->dpll.ref_en[LMK05318_SECREF], d->dpll.rdiv[LMK05318_SECREF]);
+    USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] FTDC:%.8f", d->dpll.ftdc);
+
+
+    const uint64_t max_fbdiv = ((uint64_t)1 << 30) - 1;
+    const uint64_t min_fbdiv = 1;
+
+    unsigned max_pre_div = MIN(VCO_APLL1 / d->dpll.ftdc / 2 / min_fbdiv, DPLL_PRE_DIV_MAX);
+    unsigned min_pre_div = MAX(VCO_APLL1 / d->dpll.ftdc / 2 / max_fbdiv, DPLL_PRE_DIV_MIN);
+    if(max_pre_div < min_pre_div)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] cannot calculate PRE_DIV");
+        return -EINVAL;
+    }
+
+    const unsigned pre_div = min_pre_div;
+    double fbdiv = (double)VCO_APLL1 / d->dpll.ftdc / 2.0 / pre_div;
+    USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] PRE_DIV:%u FB_DIV:%.8f", pre_div, fbdiv);
+    if(fbdiv < min_fbdiv || fbdiv > max_fbdiv)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] FB_DIV:%.8f out of range", fbdiv);
+        return -EINVAL;
+    }
+
+    uint32_t fb_int = (uint32_t)fbdiv;
+    double fb_frac = fbdiv - fb_int;
+    uint64_t fb_den = VCO_APLL1 * 2 * pre_div; //(uint64_t)1 << 40;
+    uint64_t fb_num = (uint64_t)(fb_frac * fb_den + 0.5);
+    uint64_t gcd = find_gcd(fb_num, fb_den);
+    if(gcd > 1)
+    {
+        fb_num /= gcd;
+        fb_den /= gcd;
+    }
+
+    //check
+    const double vco1_fact = d->dpll.ftdc * 2.0 * pre_div * (fb_int + (double)fb_num / fb_den);
+    const double delta = fabs((double)VCO_APLL1 - vco1_fact);
+    USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] N:%u NUM:%" PRIu64 " DEN:%" PRIu64 " VCO1_FACT:%.8f DELTA:%.8fHz",
+             fb_int, fb_num, fb_den, vco1_fact, delta);
+    if(delta > 1E-6)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] VCO1_FACT too rough");
+        return -EINVAL;
+    }
+
+    d->dpll.n = fb_int;
+    d->dpll.num = fb_num;
+    d->dpll.den = fb_den;
+
+    //DPLL BW
+    if((dpll->en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] == 1) || (dpll->en[LMK05318_SECREF] && dpll->fref[LMK05318_SECREF] == 1))
+    {
+        d->dpll.lbw = 0.01;
+    }
+    else
+        d->dpll.lbw = 100;
+
+    USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] LBW:%.2fHz", d->dpll.lbw);
+
+    return 0;
+}
 
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out)
@@ -210,17 +396,120 @@ int lmk05318_reset_los_flags(lmk05318_state_t* d)
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
-static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
+static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bool zdm)
 {
+    int res = lmk05318_dpll_config(d, dpll);
+    if(res)
+        return res;
+
+    if(d->dpll.enabled == false)
+    {
+        uint32_t dpll_regs[] =
+        {
+            MAKE_LMK05318_DEV_CTL(0, 0, 1, 1, 1, 1, 1),    //R12   set APLL1 mode - DPLL
+            MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, 1),        //R39   set fixed APLL1 denumerator for DPLL en, programmed den otherwise
+            MAKE_LMK05318_SPARE_NVMBASE2_BY1(0, 0, 1),     //R40   set programmed APPL2 denumerator always
+            MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, 0, 0, 0),  //R252   disable DPLL
+            MAKE_LMK05318_PLL1_CALCTRL0(1, 0, 1),          //R79 BAW_LOCKDET_EN=1 PLL1_VCOWAIT=1
+        };
+        res = lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
+    }
+    else
+    {
+        const bool one_pps[] =
+        {
+            (dpll->en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] == 1),
+            (dpll->en[LMK05318_SECREF] && dpll->fref[LMK05318_SECREF] == 1),
+        };
+
+        const bool lt2k[] =
+        {
+            !one_pps[LMK05318_PRIREF] && (dpll->en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] < 2000),
+            !one_pps[LMK05318_SECREF] && (dpll->en[LMK05318_SECREF] && dpll->fref[LMK05318_SECREF] < 2000),
+        };
+
+        const bool ge2k[] =
+        {
+            !one_pps[LMK05318_PRIREF] && !lt2k[LMK05318_PRIREF],
+            !one_pps[LMK05318_SECREF] && !lt2k[LMK05318_SECREF],
+        };
+
+        unsigned meas_time[] =
+        {
+            (unsigned)(log2f(10000.f / dpll->fref[LMK05318_PRIREF]) + 2.5),
+            (unsigned)(log2f(10000.f / dpll->fref[LMK05318_SECREF]) + 2.5),
+        };
+
+        uint32_t dpll_regs[] =
+        {
+            MAKE_LMK05318_DEV_CTL(0, 0, 0, 1, 1, 1, 1),   //R12   set APLL1 mode - Free-run
+            MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, 0),       //R39   set fixed APLL1 denumerator for DPLL en, programmed den otherwise
+            MAKE_LMK05318_SPARE_NVMBASE2_BY1(dpll->dc_mode[LMK05318_SECREF], dpll->dc_mode[LMK05318_PRIREF], 1), //R40   set programmed APPL2 denumerator always
+            MAKE_LMK05318_REF_CLKCTL1(dpll->fref[LMK05318_SECREF] >= 5000000 && dpll->type[LMK05318_SECREF] != IN_OPTS_CMOS && dpll->type[LMK05318_SECREF] != IN_OPTS_SE_INT_50,
+                                      dpll->fref[LMK05318_PRIREF] >= 5000000 && dpll->type[LMK05318_PRIREF] != IN_OPTS_CMOS && dpll->type[LMK05318_PRIREF] != IN_OPTS_SE_INT_50,
+                                      dpll->buf_mode[LMK05318_SECREF],
+                                      dpll->buf_mode[LMK05318_PRIREF]),   //R45
+            MAKE_LMK05318_REF_CLKCTL2(dpll->type[LMK05318_SECREF], dpll->type[LMK05318_PRIREF]),                 //R46
+
+            MAKE_LMK05318_PLL1_CALCTRL0(0, 0, 1),                        //R79 BAW_LOCKDET_EN=0 PLL1_VCOWAIT=1
+
+            MAKE_LMK05318_REF0_DETEN(ge2k[LMK05318_PRIREF],
+                                     lt2k[LMK05318_PRIREF] || one_pps[LMK05318_PRIREF],
+                                     dpll->en[LMK05318_PRIREF],
+                                     ge2k[LMK05318_PRIREF],
+                                     ge2k[LMK05318_PRIREF],
+                                     ge2k[LMK05318_PRIREF]), //R193
+
+            MAKE_LMK05318_REF0_DETEN(ge2k[LMK05318_SECREF],
+                                     lt2k[LMK05318_SECREF] || one_pps[LMK05318_SECREF],
+                                     dpll->en[LMK05318_SECREF],
+                                     ge2k[LMK05318_SECREF],
+                                     ge2k[LMK05318_SECREF],
+                                     ge2k[LMK05318_SECREF]), //R194
+
+            MAKE_LMK05318_REG_WR(REF0_VLDTMR, meas_time[LMK05318_PRIREF] & 0b00011111), //R233
+            MAKE_LMK05318_REG_WR(REF1_VLDTMR, meas_time[LMK05318_SECREF] & 0b00011111), //R234
+
+            MAKE_LMK05318_REF0_PH_VALID_THR(lt2k[LMK05318_PRIREF] || one_pps[LMK05318_PRIREF] ? 63 : 0), //R243 *********TODO
+            MAKE_LMK05318_REF1_PH_VALID_THR(lt2k[LMK05318_SECREF] || one_pps[LMK05318_SECREF] ? 63 : 0), //R244 *********TODO
+
+            MAKE_LMK05318_DPLL_REF01_PRTY(2, 1),                    //R249 set PRIREF 1st, SECREF 2nd priority
+            MAKE_LMK05318_DPLL_REF_SWMODE(0,
+                                          (d->dpll.ref_en[LMK05318_PRIREF] ? LMK05318_PRIREF : LMK05318_SECREF),
+                                          (d->dpll.ref_en[LMK05318_PRIREF] && d->dpll.ref_en[LMK05318_SECREF]) ? 0x0 : 0x3), //R251
+            MAKE_LMK05318_DPLL_GEN_CTL(zdm ? 1 : 0, 0, 0, !one_pps[LMK05318_PRIREF] && !one_pps[LMK05318_SECREF], 1, 0, 1), //R252  enable ZDM & enable DPLL
+            MAKE_LMK05318_DPLL_REF0_RDIV_BY0(d->dpll.rdiv[LMK05318_PRIREF]), //R256
+            MAKE_LMK05318_DPLL_REF0_RDIV_BY1(d->dpll.rdiv[LMK05318_PRIREF]),
+            MAKE_LMK05318_DPLL_REF1_RDIV_BY0(d->dpll.rdiv[LMK05318_SECREF]),
+            MAKE_LMK05318_DPLL_REF1_RDIV_BY1(d->dpll.rdiv[LMK05318_SECREF]), //R259
+            MAKE_LMK05318_DPLL_REF_FB_PREDIV(d->dpll.pre_div - 2), //R304
+            MAKE_LMK05318_DPLL_REF_FB_DIV_BY0(d->dpll.n), //R305
+            MAKE_LMK05318_DPLL_REF_FB_DIV_BY1(d->dpll.n),
+            MAKE_LMK05318_DPLL_REF_FB_DIV_BY2(d->dpll.n),
+            MAKE_LMK05318_DPLL_REF_FB_DIV_BY3(d->dpll.n), //R308
+            MAKE_LMK05318_DPLL_REF_NUM_BY0(d->dpll.num),  //R309
+            MAKE_LMK05318_DPLL_REF_NUM_BY1(d->dpll.num),
+            MAKE_LMK05318_DPLL_REF_NUM_BY2(d->dpll.num),
+            MAKE_LMK05318_DPLL_REF_NUM_BY3(d->dpll.num),
+            MAKE_LMK05318_DPLL_REF_NUM_BY4(d->dpll.num),  //R313
+            MAKE_LMK05318_DPLL_REF_DEN_BY0(d->dpll.den),  //R314
+            MAKE_LMK05318_DPLL_REF_DEN_BY1(d->dpll.den),
+            MAKE_LMK05318_DPLL_REF_DEN_BY2(d->dpll.den),
+            MAKE_LMK05318_DPLL_REF_DEN_BY3(d->dpll.den),
+            MAKE_LMK05318_DPLL_REF_DEN_BY4(d->dpll.den),  //R318
+        };
+        res = lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
+    }
+
+    if(res)
+        return res;
+
     uint32_t regs[] =
     {
-        MAKE_LMK05318_DEV_CTL(0, 0, dpllmode ? 1 : 0, 1, 1, 1, 1),   //R12   set APLL1 mode - DPLL | Free-run
-        MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, 0, dpllmode ? 1 : 0), //R252  enable/disable DPLL
-        MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, dpllmode ? 0 : 1),       //R39 ***  set fixed APLL1 denumerator for DPLL en, programmed den otherwise
-        MAKE_LMK05318_SPARE_NVMBASE2_BY1(0, 0, 1),                   //R40 ***  set programmed APPL2 denumerator always
-        MAKE_LMK05318_PLL_CLK_CFG(0, 0b111),                         //R47   set PLL clock cfg
+        MAKE_LMK05318_PLL_CLK_CFG(0, 0b111),                         //R47   APLL cascade mode + set PLL clock cfg
         MAKE_LMK05318_OUTSYNCCTL(1, 1, 1),                           //R70   enable APLL1/APLL2 channel sync
         MAKE_LMK05318_OUTSYNCEN(1, 1, 1, 1, 1, 1),                   //R71   enable ch0..ch7 out sync
+
         MAKE_LMK05318_MUTELVL1(CH3_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH2_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH1_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
@@ -233,7 +522,6 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
         MAKE_LMK05318_INT_FLAG0(0,0,0,0),                            //R19   |
         MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),                    //R20   | reset interrupt LOS flags
 
-        MAKE_LMK05318_PLL1_CALCTRL0(1, 0, 1),                        //R79 BAW_LOCKDET_EN=1 PLL1_VCOWAIT=1
         MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(1, 0),                 //R80 BAW_LOCK=1
 
         0x00510A,   //R81
@@ -262,7 +550,7 @@ static int lmk05318_init(lmk05318_state_t* d, bool dpllmode)
 
 
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
-                       const lmk05318_xo_settings_t* xo, bool dpll_mode,
+                       const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
                        lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
                        lmk05318_state_t* out, bool dry_run)
 {
@@ -298,7 +586,25 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
 #endif
 
 #if 1
-    res = lmk05318_init(out, dpll_mode);
+
+    //detect ZDM mode -> if 1)OUT7 = 1Hz 2) DPLL input ref = 1Hz
+    bool zdm = false;
+    for(unsigned i = 0; i < out_ports_len; ++i)
+    {
+        lmk05318_out_config_t* p = out_ports_cfg + i;
+        if(p->port == 7 && p->wanted.freq == 1)
+        {
+            zdm = true;
+            break;
+        }
+    }
+    zdm &= (dpll->enabled && ((dpll->en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] == 1)
+                           || (dpll->en[LMK05318_SECREF] && dpll->fref[LMK05318_SECREF] == 1)));
+    if(zdm)
+        USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] ZDM enabled");
+    //
+
+    res = lmk05318_init(out, dpll, zdm);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d on init()", res);
@@ -312,7 +618,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return res;
     }
 
-    res = lmk05318_tune_apll1(out, dpll_mode);
+    res = lmk05318_tune_apll1(out);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d tuning APLL1", res);
@@ -612,14 +918,14 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
     return 0;
 }
 
-int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode)
+int lmk05318_tune_apll1(lmk05318_state_t* d)
 {
     unsigned fpd1 = (d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2 : 1);
     uint64_t fvco = VCO_APLL1;
     unsigned n = fvco / fpd1;
 
     //in DPLL mode we use FIXED 40-bit APLL1 denominator and programmed 40-bit numerator
-    if(dpll_mode)
+    if(d->dpll.enabled)
     {
         uint64_t num = (fvco - n * (uint64_t)fpd1) * (1ull << 40) / fpd1;
 
@@ -1606,7 +1912,7 @@ int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent)
     return 0;
 }
 
-int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeout)
+int lmk05318_wait_apll1_lock(lmk05318_state_t* d, unsigned timeout)
 {
     int res = 0;
     unsigned elapsed = 0;
@@ -1632,7 +1938,7 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeo
             return res;
         }
 
-        if(dpll_mode)
+        if(d->dpll.enabled)
         {
             locked = pll1_vm_inside && !(los_msk & LMK05318_LOPL_DPLL) && !(los_msk & LMK05318_LOFL_DPLL);
         }
@@ -1703,5 +2009,49 @@ int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
     }
 
     USDR_LOG("5318", USDR_LOG_INFO, "APLL2 locked OK");
+    return 0;
+}
+
+int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout)
+{
+    if(!d->dpll.enabled)
+    {
+        USDR_LOG("5318", USDR_LOG_DEBUG, "DPLL disabled, validating ref ignored");
+        return 0;
+    }
+
+    int res = 0;
+    unsigned elapsed = 0;
+    bool valid = false;
+    uint8_t reg;
+
+    while(timeout == 0 || elapsed < timeout)
+    {
+        res = lmk05318_reg_rd(d, REFVALSTAT, &reg);
+        if(res)
+        {
+            USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 read(REFVALSTAT) error:%d", res);
+            return res;
+        }
+
+        bool pri_valid = d->dpll.ref_en[LMK05318_PRIREF] ? (reg & PRIREF_VALSTAT_MSK) : true;
+        bool sec_valid = d->dpll.ref_en[LMK05318_SECREF] ? (reg & SECREF_VALSTAT_MSK) : true;
+        valid = pri_valid && sec_valid;
+
+        if(valid)
+            break;
+
+        usleep(100);
+        elapsed += 100;
+    }
+
+    if(!valid)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "DPLL input reference NOT VALID! PRIREF_VALSTAT:%u SECREF_VALSTAT:%u",
+                    reg & PRIREF_VALSTAT_MSK, reg & SECREF_VALSTAT_MSK);
+        return -ETIMEDOUT;
+    }
+
+    USDR_LOG("5318", USDR_LOG_INFO, "DPLL input reference is valid");
     return 0;
 }

@@ -20,6 +20,18 @@ enum xo_input_type
 };
 typedef enum xo_input_type xo_input_type_t;
 
+enum
+{
+    DPLL_REF_AC_COUPLED_INT = 0,
+    DPLL_REF_DC_COUPLED_INT = 1,
+};
+
+enum
+{
+    DPLL_REF_AC_BUF_HYST50_DC_EN = 0,
+    DPLL_REF_AC_BUF_HYST200_DC_DIS = 1,
+};
+
 struct lmk05318_xo_settings
 {
     unsigned pll1_fref_rdiv;
@@ -29,6 +41,23 @@ struct lmk05318_xo_settings
     bool fdet_bypass;
 };
 typedef struct lmk05318_xo_settings lmk05318_xo_settings_t;
+
+enum
+{
+    LMK05318_PRIREF = 0,
+    LMK05318_SECREF = 1,
+};
+
+struct lmk05318_dpll_settings
+{
+    bool enabled;
+    bool en[2];
+    uint64_t fref[2];
+    uint8_t dc_mode[2];
+    uint8_t buf_mode[2];
+    uint8_t type[2];
+};
+typedef struct lmk05318_dpll_settings lmk05318_dpll_settings_t;
 
 struct lmk05318_state {
     lldev_t dev;
@@ -49,6 +78,16 @@ struct lmk05318_state {
         uint64_t odiv;
         int mux;
     } outputs[LMK05318_MAX_OUT_PORTS];
+
+    struct {
+        bool enabled;
+        bool ref_en[2];
+        uint16_t rdiv[2];
+        double ftdc;
+        double lbw;
+        uint8_t pre_div;
+        uint64_t n, num, den;
+    } dpll;
 
     lmk05318_xo_settings_t xo;
 };
@@ -164,7 +203,7 @@ int lmk05318_sync(lmk05318_state_t* out);
 int lmk05318_mute(lmk05318_state_t* out, uint8_t chmask);
 int lmk05318_reset_los_flags(lmk05318_state_t* d);
 int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent);
-int lmk05318_wait_apll1_lock(lmk05318_state_t* d, bool dpll_mode, unsigned timeout);
+int lmk05318_wait_apll1_lock(lmk05318_state_t* d, unsigned timeout);
 int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout);
 int lmk05318_softreset(lmk05318_state_t* out);
 
@@ -173,13 +212,16 @@ int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);
 int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run);
 
 int lmk05318_set_xo_fref(lmk05318_state_t* d);
-int lmk05318_tune_apll1(lmk05318_state_t* d, bool dpll_mode);
+int lmk05318_tune_apll1(lmk05318_state_t* d);
 
 int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs, bool dry_run);
 
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
-                       const lmk05318_xo_settings_t* xo, bool dpll_mode,
+                       const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
                        lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
                        lmk05318_state_t* out, bool dry_run);
+
+int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll);
+int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout);
 
 #endif

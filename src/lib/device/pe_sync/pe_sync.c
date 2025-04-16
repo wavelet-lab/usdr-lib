@@ -283,7 +283,14 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
-    const bool use_dpll = false;
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+    dpll.enabled = true;
+    dpll.en[LMK05318_PRIREF] = true;
+    dpll.fref[LMK05318_PRIREF] = 1;
+    dpll.type[LMK05318_PRIREF] = XO_DC_DIFF_EXT;
+    dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
+    dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
 
     const uint64_t lmk_freq[8] =
     {
@@ -307,7 +314,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6, lmk_freq[6], false, LVCMOS);
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7, lmk_freq[7], false, LVCMOS);
 
-    res = res ? res : lmk05318_create_ex(dev, 0, I2C_BUS_LMK05318B, &xo, use_dpll, lmk05318_outs_cfg, 8, &d->gen, false /*dry_run*/);
+    res = res ? res : lmk05318_create_ex(dev, 0, I2C_BUS_LMK05318B, &xo, &dpll, lmk05318_outs_cfg, 8, &d->gen, false /*dry_run*/);
     if(res)
         return res;
 
@@ -318,9 +325,17 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
+    //wait for PRIREF/SECREF validation
+    res = lmk05318_wait_dpll_ref_stat(&d->gen, 5000000);
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK03518 DPLL input reference freqs are not validated during specified timeout");
+        return res;
+    }
+
     //wait for lock
     //APLL1/DPLL
-    res = lmk05318_wait_apll1_lock(&d->gen, use_dpll, 10000);
+    res = lmk05318_wait_apll1_lock(&d->gen, 10000);
 
     //APLL2 (if needed)
     if(res == 0 && d->gen.vco2_freq)
@@ -350,7 +365,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //
     //LMX2820 #0 setup
     //
-
+#if 0
     const uint64_t lmx0_freq[] =
     {
         1400000000,
@@ -371,7 +386,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820[0] outputs locked & synced");
     //
-
+#endif
     //
     //LMX2820 #1 setup
     //
@@ -426,7 +441,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //
     //LMX1204 setup
     //
-
+#if 0
     res = lmx1204_create(dev, 0, SPI_LMX1204, &d->cldistr);
     if(res)
     {
@@ -483,7 +498,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1204 initialized");
     //
-
+#endif
     return res;
 }
 

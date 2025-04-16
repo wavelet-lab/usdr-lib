@@ -38,7 +38,7 @@ int main(int argc, char** argv)
     srunner_add_suite(sr, lmx1214_solver_suite());
     srunner_add_suite(sr, lmx1204_solver_suite());
 #else
-    sr = srunner_create(lmx1204_solver_suite());
+    sr = srunner_create(lmk05318_solver_suite());
 #endif
 
     srunner_set_fork_status (sr, CK_NOFORK);

@@ -97,11 +97,12 @@ int board_ext_simplesync_init(lldev_t dev,
     lmk05318_set_port_affinity(cfg, 6, AFF_APLL1);
     lmk05318_set_port_affinity(cfg, 7, AFF_APLL1);
 
-    const bool dpll_mode = false;
+    lmk05318_dpll_settings_t dpll;
+    dpll.enabled = false;
 
-    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, dpll_mode, cfg, 4, &ob->lmk, false /*dry_run*/);
+    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, &dpll, cfg, 4, &ob->lmk, false /*dry_run*/);
     res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
-    res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, dpll_mode, 10000);
+    res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
 #endif
 
