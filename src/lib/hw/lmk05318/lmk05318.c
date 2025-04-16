@@ -580,13 +580,13 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return -ENODEV;
     }
 
-#if 0
-    res = lmk05318_reg_wr_n(out, lmk05318_rom_test, SIZEOF_ARRAY(lmk05318_rom_test));
+#if 1
+    res = lmk05318_reg_wr_n(out, lmk05318_rom_dpll, SIZEOF_ARRAY(lmk05318_rom_dpll));
     if (res)
         return res;
 #endif
 
-#if 1
+#if 0
 
     //detect ZDM mode -> if 1)OUT7 = 1Hz 2) DPLL input ref = 1Hz
     bool zdm = false;
