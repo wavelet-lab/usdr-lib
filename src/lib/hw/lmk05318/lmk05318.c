@@ -556,6 +556,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
 {
     int res;
     uint8_t dummy[4] = {0,0,0,0};
+    memset(out, 0, sizeof(lmk05318_state_t));
 
     lmk05318_registers_map_reset();
 
@@ -2023,11 +2024,12 @@ int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout)
     int res = 0;
     unsigned elapsed = 0;
     bool valid = false;
-    uint8_t reg;
+    uint8_t reg, reg2;
 
     while(timeout == 0 || elapsed < timeout)
     {
         res = lmk05318_reg_rd(d, REFVALSTAT, &reg);
+        res = res ? res : lmk05318_reg_rd(d, 0xa7, &reg2);
         if(res)
         {
             USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK05318 read(REFVALSTAT) error:%d", res);
@@ -2047,8 +2049,8 @@ int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout)
 
     if(!valid)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "DPLL input reference NOT VALID! PRIREF_VALSTAT:%u SECREF_VALSTAT:%u",
-                    reg & PRIREF_VALSTAT_MSK, reg & SECREF_VALSTAT_MSK);
+        USDR_LOG("5318", USDR_LOG_ERROR, "DPLL input reference NOT VALID! PRIREF_VALSTAT:%u SECREF_VALSTAT:%u R167:0x%02x",
+                    reg & PRIREF_VALSTAT_MSK, reg & SECREF_VALSTAT_MSK, reg2);
         return -ETIMEDOUT;
     }
 
