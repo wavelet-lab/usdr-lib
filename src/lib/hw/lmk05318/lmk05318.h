@@ -22,6 +22,15 @@ typedef enum xo_input_type xo_input_type_t;
 
 enum
 {
+    DPLL_REF_TYPE_DIFF_NOTERM = 1,
+    DPLL_REF_TYPE_DIFF_100 = 3,
+    DPLL_REF_TYPE_DIFF_50 = 5,
+    DPLL_REF_TYPE_SE_NOTERM = 8,
+    DPLL_REF_TYPE_SE_50 = 0xC,
+};
+
+enum
+{
     DPLL_REF_AC_COUPLED_INT = 0,
     DPLL_REF_DC_COUPLED_INT = 1,
 };

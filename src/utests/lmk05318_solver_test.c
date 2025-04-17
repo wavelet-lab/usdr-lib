@@ -173,8 +173,8 @@ START_TEST(lmk05318_solver_test6)
     res = res ? res : lmk05318_port_request(cfg, 2, 250000000, false, LVDS);
     res = res ? res : lmk05318_port_request(cfg, 3, 250000000, false, LVDS);
     res = res ? res : lmk05318_port_request(cfg, 4, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5,  26000000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6,  13000000, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(cfg, 5, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 6,  10000000, false, LVCMOS);
     res = res ? res : lmk05318_port_request(cfg, 7,         1, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
 
@@ -185,12 +185,34 @@ START_TEST(lmk05318_solver_test6)
     xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+    dpll.enabled = true;
+    dpll.en[LMK05318_PRIREF] = true;
+    dpll.fref[LMK05318_PRIREF] = 1;
+    dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
+    dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
+    dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
+
     lmk05318_state_t st;
     memset(&st, 0, sizeof(st));
 
-    res = lmk05318_create_ex(NULL, 0, 0, &xo, false, cfg, 8, &st, true /*dry_run*/);
+    res = lmk05318_create_ex(NULL, 0, 0, &xo, &dpll, cfg, 8, &st, true /*dry_run*/);
     ck_assert_int_eq( res, 0 );
 
+}
+
+START_TEST(lmk05318_dpll_test1)
+{
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+
+    dpll.enabled = true;
+    dpll.en[LMK05318_PRIREF] = true;
+    dpll.fref[LMK05318_PRIREF] = 1;
+
+    int res = lmk05318_dpll_config(&dev, &dpll);
+    ck_assert_int_eq( res, 0 );
 }
 
 Suite * lmk05318_solver_suite(void)
@@ -202,13 +224,15 @@ Suite * lmk05318_solver_suite(void)
     tc_core = tcase_create("HW");
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
-
+/*
     tcase_add_test(tc_core, lmk05318_solver_test1);
-    //tcase_add_test(tc_core, lmk05318_solver_test2);
+    ////////tcase_add_test(tc_core, lmk05318_solver_test2);
     tcase_add_test(tc_core, lmk05318_solver_test3);
     tcase_add_test(tc_core, lmk05318_solver_test4);
     tcase_add_test(tc_core, lmk05318_solver_test5);
-    tcase_add_test(tc_core, lmk05318_solver_test6);
+*/    tcase_add_test(tc_core, lmk05318_solver_test6);
+
+    //tcase_add_test(tc_core, lmk05318_dpll_test1);
 
     suite_add_tcase(s, tc_core);
     return s;

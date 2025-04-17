@@ -65,6 +65,13 @@ x-ref-buf-mode: &ref-buf-mode
     0x0: AC_HYST50_DC_EN
     0x1: AC_HYST200_DC_DIS
 
+x-ref-input-type: &ref-input-type
+    0x1: DIFF_NOTERM
+    0x3: DIFF_100
+    0x5: DIFF_50
+    0x8: SE_NOTERM
+    0xC: SE_50
+
 pages:
   - name: Top
     regs:
@@ -449,11 +456,11 @@ pages:
           - bits: "7-4"
             name: SECREF_TYPE
             desc: SECREF Input Type See PRIREF_TYPE for input type bit settings.
-            opts: *in-opts
+            opts: *ref-input-type
           - bits: "3-0"
             name: PRIREF_TYPE
-            desc: PRIREF Input Type; 0x0 = DC-Differential (external termination); 0x1 = AC-Differential (external termination); 0x3 = AC-Differential (internal termination 100-Ω); 0x4 = HCSL (internal termination 50-Ω); 0x8 = CMOS; 0xC = Single-ended (internal termination 50-Ω)
-            opts: *in-opts
+            desc: PRIREF Input Type
+            opts: *ref-input-type
       - addr: 0x2F
         name: PLL_CLK_CFG
         fields:

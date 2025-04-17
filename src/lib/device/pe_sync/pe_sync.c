@@ -288,7 +288,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     dpll.enabled = true;
     dpll.en[LMK05318_PRIREF] = true;
     dpll.fref[LMK05318_PRIREF] = 1;
-    dpll.type[LMK05318_PRIREF] = XO_DC_DIFF_EXT;
+    dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
     dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
     dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
 
