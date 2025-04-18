@@ -2128,7 +2128,7 @@ int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout)
         elapsed += (clock_get_time() - tk);
     }
 
-    USDR_LOG("5318", USDR_LOG_INFO, "ELAPSED:%.4f PRIREF_VALSTAT:%u SECREF_VALSTAT:%u DPLL_REFSEL_STAT:0x%02x(%s)",
+    USDR_LOG("5318", USDR_LOG_INFO, "ELAPSED:%.4fs PRIREF_VALSTAT:%u SECREF_VALSTAT:%u DPLL_REFSEL_STAT:0x%02x(%s)",
              (double)elapsed / 1000000.f,
              (reg & PRIREF_VALSTAT_MSK) >> PRIREF_VALSTAT_OFF,
              (reg & SECREF_VALSTAT_MSK) >> SECREF_VALSTAT_OFF,

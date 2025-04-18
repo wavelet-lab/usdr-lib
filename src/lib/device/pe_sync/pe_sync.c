@@ -326,7 +326,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return res;
 
     //wait for PRIREF/SECREF validation
-    res = lmk05318_wait_dpll_ref_stat(&d->gen, 10000000); //10s
+    res = lmk05318_wait_dpll_ref_stat(&d->gen, 60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
     if(res)
     {
         USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK03518 DPLL input reference freqs are not validated during specified timeout");
