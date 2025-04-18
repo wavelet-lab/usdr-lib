@@ -505,46 +505,65 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_REF_DEN_BY2(d->dpll.den),
             MAKE_LMK05318_DPLL_REF_DEN_BY3(d->dpll.den),
             MAKE_LMK05318_DPLL_REF_DEN_BY4(d->dpll.den),  //R318
-
-            0x00C300, // PRIREF Missing Clock Detection
-            0x00C400, // PRIREF Missing Clock Detection
-            0x00C51D, // PRIREF Missing Clock Detection
-            // 0x00C600, // SECREF Missing Clock Detection
-            // 0x00C700, // SECREF Missing Clock Detection
-            // 0x00C800, // SECREF Missing Clock Detection
-            0x00C900, // PRI/SECREF Window Detection
-            0x00CA00, // PRIREF Early Clock Detection
-            0x00CB00, // PRIREF Early Clock Detection
-            0x00CC15, // PRIREF Early Clock Detection
-            // 0x00CD00, // SECREF Early Clock Detection
-            // 0x00CE00, // SECREF Early Clock Detection
-            // 0x00CF00, // SECREF Early Clock Detection
-            0x00D000, // PRIREF Frequency Detection
-            0x00D100, // PRIREF Frequency Detection
-            0x00D200, // PRIREF Frequency Detection
-            0x00D300, // PRIREF Frequency Detection
-            // 0x00D400, // SECREF Frequency Detection
-            // 0x00D500, // SECREF Frequency Detection
-            // 0x00D600, // SECREF Frequency Detection
-            // 0x00D700, // SECREF Frequency Detection
-            0x00D900, // PRIREF Frequency Detection
-            0x00DA00, // PRIREF Frequency Detection
-            0x00DB00, // PRIREF Frequency Detection
-            0x00DC00, // PRIREF Frequency Detection
-            0x00DD00, // PRIREF Frequency Detection
-            0x00DE00, // PRIREF Frequency Detection
-            0x00DF00, // PRIREF Frequency Detection
-            0x00E000, // PRIREF Frequency Detection
-            // 0x00E100, // SECREF Frequency Detection
-            // 0x00E200, // SECREF Frequency Detection
-            // 0x00E300, // SECREF Frequency Detection
-            // 0x00E400, // SECREF Frequency Detection
-            // 0x00E500, // SECREF Frequency Detection
-            // 0x00E600, // SECREF Frequency Detection
-            // 0x00E700, // SECREF Frequency Detection
-            // 0x00E800, // SECREF Frequency Detection
         };
+
+        uint32_t pri_miss_clock_det = d->dpll.ref_en[LMK05318_PRIREF] ? 0x1D : 0x0;
+        uint32_t sec_miss_clock_det = d->dpll.ref_en[LMK05318_SECREF] ? 0x1D : 0x0;
+
+        uint32_t pri_early_clk_det = d->dpll.ref_en[LMK05318_PRIREF] ? 0x15 : 0x0;
+        uint32_t sec_early_clk_det = d->dpll.ref_en[LMK05318_SECREF] ? 0x15 : 0x0;
+
+        uint32_t dpll_regs_clk_detections[] =
+        {
+            MAKE_LMK05318_REF0_MISSCLK_DIV_BY0(pri_miss_clock_det),
+            MAKE_LMK05318_REF0_MISSCLK_DIV_BY1(pri_miss_clock_det),
+            MAKE_LMK05318_REF0_MISSCLK_DIV_BY2(pri_miss_clock_det), // R195:197 PRIREF Missing Clock Detection
+            //
+            MAKE_LMK05318_REF1_MISSCLK_DIV_BY0(sec_miss_clock_det),
+            MAKE_LMK05318_REF1_MISSCLK_DIV_BY1(sec_miss_clock_det),
+            MAKE_LMK05318_REF1_MISSCLK_DIV_BY2(sec_miss_clock_det), // R198:200 SECREF Missing Clock Detection
+
+            MAKE_LMK05318_REF_MISSCLK_CTL(d->dpll.ref_en[LMK05318_SECREF] ? 0 : 0, d->dpll.ref_en[LMK05318_PRIREF] ? 0 : 0), // R201 PRI/SECREF Window Detection
+
+            MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY0(pri_early_clk_det),
+            MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY1(pri_early_clk_det),
+            MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY2(pri_early_clk_det), // R202:204 PRIREF Early Clock Detection
+            //
+            MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY0(sec_early_clk_det),
+            MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY1(sec_early_clk_det),
+            MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY2(sec_early_clk_det), // R205:207 SECREF Early Clock Detection
+
+            MAKE_LMK05318_REF0_PPM_MIN_BY0(0),
+            MAKE_LMK05318_REF0_PPM_MIN_BY1(0),
+            MAKE_LMK05318_REF0_PPM_MAX_BY0(0),
+            MAKE_LMK05318_REF0_PPM_MAX_BY1(0), // R208:211 PRIREF Frequency Detection
+            //
+            MAKE_LMK05318_REF1_PPM_MIN_BY0(0),
+            MAKE_LMK05318_REF1_PPM_MIN_BY1(0),
+            MAKE_LMK05318_REF1_PPM_MAX_BY0(0),
+            MAKE_LMK05318_REF1_PPM_MAX_BY1(0), // R212:215 SECREF Frequency Detection
+
+            MAKE_LMK05318_REF0_CNTSTRT_BY0(0),
+            MAKE_LMK05318_REF0_CNTSTRT_BY1(0),
+            MAKE_LMK05318_REF0_CNTSTRT_BY2(0),
+            MAKE_LMK05318_REF0_CNTSTRT_BY3(0),
+            MAKE_LMK05318_REF0_HOLD_CNTSTRT_BY0(0),
+            MAKE_LMK05318_REF0_HOLD_CNTSTRT_BY1(0),
+            MAKE_LMK05318_REF0_HOLD_CNTSTRT_BY2(0),
+            MAKE_LMK05318_REF0_HOLD_CNTSTRT_BY3(0), // R217:224 PRIREF Frequency Detection
+            //
+            MAKE_LMK05318_REF1_CNTSTRT_BY0(0),
+            MAKE_LMK05318_REF1_CNTSTRT_BY1(0),
+            MAKE_LMK05318_REF1_CNTSTRT_BY2(0),
+            MAKE_LMK05318_REF1_CNTSTRT_BY3(0),
+            MAKE_LMK05318_REF1_HOLD_CNTSTRT_BY0(0),
+            MAKE_LMK05318_REF1_HOLD_CNTSTRT_BY1(0),
+            MAKE_LMK05318_REF1_HOLD_CNTSTRT_BY2(0),
+            MAKE_LMK05318_REF1_HOLD_CNTSTRT_BY3(0), // R225:232 SECREF Frequency Detection
+        };
+
         res = lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
+        res = res ? res : lmk05318_add_reg_to_map(d, dpll_regs_clk_detections, SIZEOF_ARRAY(dpll_regs_clk_detections));
     }
 
     if(res)
@@ -2060,6 +2079,19 @@ int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
     return 0;
 }
 
+static const char* lmk05318_decode_dpll_refsel_stat(uint8_t stat)
+{
+    switch(stat)
+    {
+    case 0: return "HOLDOVER";
+    case 1: return "PRIREF";
+    case 2: return "SECREF";
+    case 3: return "RESERVED";
+    }
+
+    return "UNKNOWN";
+}
+
 int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout)
 {
     if(!d->dpll.enabled)
@@ -2075,6 +2107,8 @@ int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout)
 
     while(timeout == 0 || elapsed < timeout)
     {
+        uint64_t tk = clock_get_time();
+
         res = lmk05318_reg_rd(d, REFVALSTAT, &reg);
         res = res ? res : lmk05318_reg_rd(d, 0xa7, &reg2);
         if(res)
@@ -2090,14 +2124,16 @@ int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout)
         if(valid)
             break;
 
-        usleep(100);
-        elapsed += 100;
+        usleep(100000);
+        elapsed += (clock_get_time() - tk);
     }
+
+    USDR_LOG("5318", USDR_LOG_INFO, "PRIREF_VALSTAT:%u SECREF_VALSTAT:%u DPLL_REFSEL_STAT:0x%02x(%s)",
+             reg & PRIREF_VALSTAT_MSK, reg & SECREF_VALSTAT_MSK, reg2, lmk05318_decode_dpll_refsel_stat(reg2 & 0b11));
 
     if(!valid)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "DPLL input reference NOT VALID! PRIREF_VALSTAT:%u SECREF_VALSTAT:%u R167:0x%02x",
-                    reg & PRIREF_VALSTAT_MSK, reg & SECREF_VALSTAT_MSK, reg2);
+        USDR_LOG("5318", USDR_LOG_ERROR, "DPLL input reference NOT VALID!");
         return -ETIMEDOUT;
     }
 

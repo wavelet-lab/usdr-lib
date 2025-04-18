@@ -10,6 +10,7 @@
 
 #include "stdint.h"
 #include "stdbool.h"
+#include "time.h"
 
 #define MAX(a, b) \
   ({ __typeof__ (a) _a = (a); \
@@ -59,5 +60,12 @@ int find_best_2d(struct opt_iteration2d *ops, unsigned max_count, void* param, i
 
 uint64_t find_gcd(uint64_t a, uint64_t b);
 void binary_print_u32(uint32_t x, char* s, bool reverse);
+
+static inline uint64_t clock_get_time()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000LL + (uint64_t)ts.tv_nsec/1000LL;
+}
 
 #endif
