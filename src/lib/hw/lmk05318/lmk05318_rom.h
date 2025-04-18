@@ -3,6 +3,359 @@
 
 static const uint32_t lmk05318_rom_dpll[] =
 {
+    //0x000000,
+    //0x000100,
+    //0x000200,
+    //0x000300,
+    //0x000400,
+    //0x000500,  R
+    //0x000600,
+    //0x000700,
+    //0x000800,
+    //0x000A00,
+    //0x000B00,
+
+    0x000C1B, //ok
+    //0x000D00, R
+    //0x000E00, R
+    //0x000F00, // ok default
+    //0x001000, // ok default
+    //0x001100, // ok default
+    //0x001200, // ok default
+    0x001300, // ok
+    0x001400, // ok
+    //0x001500, // ok default
+    //0x001600, // ok default
+    0x001700,   // ok, 0xff - mute specifics
+    0x001800,   // ok, 0xff - mute specifics
+    0x001900,   // ok
+    0x001A00, // XO hyst timer
+    0x001B00, // XO SE energy det mode
+    0x001C00, // XO DIFF energy det mode
+    0x001D17, // ************************? DPLL mute on ph lock
+    0x001E00, // *********? LDO timer scale
+    0x002000, // *********? PLL1/2 MASH LDO trim
+    //0x002300, // ok default
+    //0x002400, // ok default
+    //0x002500, //default STATUS0 open Drain mode
+    //0x002600,//default
+    0x002700,  // ok
+    0x002806,  // ok (?)
+    //0x002900, // default SPARE_NVMBASE2
+    0x002A10,   // ok (? XO inp buffer=0)
+    0x002B40,   // ok (default bits?)
+    0x002C00,   //ok
+    0x002D07,   //ok (default bits)
+    0x002E01,   //ok
+    0x002F00,   //ok (counters differ)
+    //0x003000,   // ok stats
+    //0x003100,   // ok stats
+    //0x003200,   //default
+    0x003310, //ok
+    0x003410, //ok
+    0x003513, //ok
+    0x003610, //ok
+    0x003710, //ok
+    0x003809, //ok
+    0x003900, //ok
+    0x003A0F, //ok
+    0x003B00, //ok
+    0x003C0F, //ok
+    0x003D3E, //ok
+    0x003EF9, //ok
+    0x003F3E, //ok
+    0x004095, //ok
+    0x004102, //ok
+    0x0042F8, //ok
+    0x0043FF, //ok
+    0x004400, // ????? APLL1 BAW drain != default TODO
+    //0x004500, //default
+    0x004607, //ok
+    0x00473F, //ok
+    //0x004800, R
+    //0x004900, //default
+    0x004A00, //ok
+    0x004B00, //???? !=default
+    0x004C00, //APLL1 Post div1???? todo
+    0x004D00, //PLL1 loop filter?.. todo
+    //0x004E00, ??? unknown
+    0x004F00, //ok (default bit)
+    0x005000, //ok
+    0x00510A, //ok
+    0x005200, //ok
+    0x00530E, //ok
+    0x0054A6, //ok
+    0x005500, //ok
+    0x005600, //ok
+    0x00571E, //ok
+    0x005884, //ok
+    0x005980, //ok
+    0x005A00, //ok
+    0x005B14, //ok
+    0x005C00, //ok
+    0x005D0E, //ok
+    0x005EA6, //ok
+    0x005F00, //ok
+    0x006000, //ok
+    0x00611E, //ok
+    0x006284, //ok
+    0x006380, //ok
+    0x006429, //ok
+    //0x006500, // != default, PLL2 charge pump
+    //0x006633, //PLL2 (off)
+    //0x006700, //PLL2 Loop filter sett
+    //0x006800, //PLL2 (off) default
+    //0x006900, //PLL2
+    0x006A00, // PLL1 N Delay div (!=default)
+    0x006B00, // PLL1 N Delay div (!=default)
+    0x006C00, //ok
+    0x006D32, //ok
+    0x006E00, //ok
+    0x006F00, //ok
+    0x007000, //ok
+    0x007100, //ok
+    0x007200, //ok
+    0x007303, //ok
+    0x007401, //ok
+
+    //0x007500, //PLL1_FDEV ==default
+    //0x007600, //PLL1_FDEV ==default
+    //0x007700, //PLL1_FDEV ==default
+    //0x007800, //PLL1_FDEV ==default
+    //0x007900, //PLL1_FDEV ==default
+    //0x007A00, //PLL1_FDEV ==default
+    //0x007B00, // PLL1_NUM_STAT_39:32
+    //0x007C00, // PLL1_NUM_STAT_31:24
+    //0x007D00, // PLL1_NUM_STAT_23:16
+    //0x007E00, // PLL1_NUM_STAT_15:8
+    //0x007F00, // PLL1_NUM_STAT
+    //0x008000, //PLL1 NUM saturation(default)
+    0x008100, // PLL1 Loop Filter R2 ??? !=default
+    //0x008200, // PLL1 loop filter C1 ==default
+    0x008300, // PLL1 Loop Filter R3 ??? != default
+    0x008400, // PLL1 Loop Filter R4 ??? != default
+    //0x008500, // PLL1 Loop Filter C4 ==default
+    //0x008600, // Bit 8 of PLL2_NDIV
+    //0x00872C, // Bits 7:0 of PLL2 N Divider
+    //0x00887C, // Bits 23:16 of PLL2_NUM
+    //0x0089E0, // Bits 15:8 of PLL2_NUM
+    //0x008ABF, // PLL2 Fractional Divider Numerator
+    //0x008B00, // SDM Dither Mode + APLL2 SDM Order
+    //0x008C00, // PLL2 Loop Filter R2
+    //0x008D00, // PLL2 Loop Filter C1 == default
+    //0x008E00, // PLL2 Loop Filter R3
+    //0x008F00, // PLL2 Loop Filter R4
+    //0x009000, // PLL2 Loop Filter C4/C3
+    0x009100, // XO Input Wait Timer ??? != default
+    0x009200, // ??? unknown !=default 0x84
+    //0x009300, // ??? unknown ==default
+    //0x009500, // ??? unknown ==default
+    //0x009600, //APPL1 Amp Cal up/low threhold ==default
+    //0x009700, // ??? unknown ==default
+    //0x009800, // ??? unknown ==default
+    //0x009900, //APPL2 Amp Cal up/low threhold ==default
+    0x009A00, // LDO trim bits ??? != default
+    //0x009B00, // NVM Stored CRC RO
+    //0x009C00, // NVM Program Count RO
+    //0x009D00, // NVM misc
+    //0x009E00, //MUMLCRC RO
+    //0x009F00, // Bits 12:8 of MEMADR ==default
+    //0x00A000, // Memory Address ==default
+    //0x00A100, // EEPROM Read Data RO
+    //0x00A200, // RAM Read/Write Data ==default
+    //0x00A400, // NVM Program Unlock
+    //0x00A500, // NVM BASE unlock ==default
+    //0x00A700, // unknown ==default
+    //0x00B200, // unknown ==default
+    //0x00B400, // Bits 37:32 of DPLL_TUNING_FREE_RUN ==default
+    //0x00B500, // Bits 31:24 of DPLL_TUNING_FREE_RUN ==default
+    //0x00B600, // Bits 23:16 of DPLL_TUNING_FREE_RUN ==default
+    //0x00B700, // Bits 15:8 of DPLL_TUNING_FREE_RUN ==default
+    //0x00B800, // DPLL Free-run tuning word ==default
+    0x00B9F1, // DPLL_REF_HIST_EN=enabled !=default ?????
+    0x00BA01, // DPLL REF Tuning History Timer !=default ???
+    //0x00BB00, //DPLL_REF_HISTDLY ==default
+    //0x00BC00, //DPLL_REF_HISTDLY ==default
+    //0x00BD00, //DPLL_REF_HISTDLY ==default
+    //0x00BE00, //DPLL_REF_HISTDLY ==default
+    //0x00BF00, //unknown ==default
+    0x00C000,  // PRI/SECREF detectors settings !=default ???
+
+    0x00C119, //ok
+    0x00C200, //ok
+    0x00C300, //ok
+    0x00C400, //ok
+    0x00C51D, //ok
+    0x00C600, //ok
+    0x00C700, //ok
+    0x00C800, //ok
+    0x00C900, //ok
+    0x00CA00, //ok
+    0x00CB00, //ok
+    0x00CC15, //ok
+    0x00CD00, //ok
+    0x00CE00, //ok
+    0x00CF00, //ok
+    0x00D000, //ok
+    0x00D100, //ok
+    0x00D200, //ok
+    0x00D300, //ok
+    0x00D400, //ok
+    0x00D500, //ok
+    0x00D600, //ok
+    0x00D700, //ok
+    //0x00D800, //unknown
+    0x00D900, //ok
+    0x00DA00, //ok
+    0x00DB00, //ok
+    0x00DC00, //ok
+    0x00DD00, //ok
+    0x00DE00, //ok
+    0x00DF00, //ok
+    0x00E000, //ok
+    0x00E100, //ok
+    0x00E200, //ok
+    0x00E300, //ok
+    0x00E400, //ok
+    0x00E500, //ok
+    0x00E600, //ok
+    0x00E700, //ok
+    0x00E800, //ok
+    0x00E90F, //ok
+    0x00EA00, //ok
+
+    0x00EB02, //PRIREF_PH_VALID_DET1 !=default
+    0x00ECFA,
+    0x00EDF0,
+    0x00EE80, //
+    0x00EF00,
+    0x00F000,
+    0x00F100,
+    0x00F200, //SECREF_PH_VALID_DET4 !=default
+
+    0x00F33F, //ok
+    0x00F400, //ok
+    0x00F921, //ok
+    //0x00FA00, //default
+    0x00FB03, //ok
+    0x00FC29, //ok +++ZDM
+    //0x00FD00, default
+    //0x00FE00, default
+    //0x00FF00, default
+
+    0x010000, //ok
+    0x010101, //ok
+    0x010200, //ok
+    0x010300, //ok
+
+    0x010402, // DPLL_REF_AVOID_SLIP !=default
+    0x010580, // DPLL Reference Control
+    0x010601, // DPLL Reference Control
+    0x01072A, // DPLL Reference Control
+    0x010805, // DPLL Reference Control
+    0x0109F2, // DPLL Reference Control
+    0x010A00, // DPLL Reference Control
+    0x010BA0, // DPLL Reference Control + DPLL Loop Filter
+    0x010C00, // DPLL Reference Control
+    0x010D00, // DPLL Reference Control
+    0x010E02, // DPLL Loop Filter
+    0x010FA6, // DPLL Loop Filter
+    0x011000, // DPLL Loop Filter
+    0x011100, // DPLL Loop Filter
+    0x011200, // DPLL Loop Filter
+    0x011316, // DPLL Loop Filter
+    0x011416, // DPLL Loop Filter
+    0x011516, // DPLL Loop Filter
+    0x011600, // DPLL Loop Filter
+    0x011700, // DPLL Loop Filter
+    0x011800, // DPLL Loop Filter
+    0x011900, // DPLL Loop Filter
+    0x011A00, // DPLL Loop Filter
+    0x011B00, // DPLL Loop Filter
+    0x011C1E, // DPLL Loop Filter
+    0x011D1E, // DPLL Loop Filter
+    0x011E00, // DPLL Loop Filter
+    0x011F00, // DPLL Loop Filter
+    0x012000, // DPLL Loop Filter
+    0x012100, // DPLL Loop Filter
+    0x012203, // DPLL Phase Lock Detection
+    0x012322, // DPLL Phase Lock Detection
+    0x012400, // Phase Cancellation for Hitless Switching
+    0x012500, // Phase Cancellation for Hitless Switching
+    0x012600, // Phase Cancellation for Hitless Switching
+    0x012700, // Phase Cancellation for Hitless Switching
+    0x01280A, // DPLL Loop Filter
+    0x01290A, // DPLL Loop Filter
+    0x012A0A, // DPLL Loop Filter
+    //0x012B00, // unknown
+    0x012C00, // DPLL Phase Lock Detection
+    0x012D1C, // Phase lock declaration threshold
+    0x012E1E, // Phase un-lock declaration threshold
+    //0x012F01, // unknown?????????????
+
+    0x01300F, //ok
+    0x013104, //ok
+    0x013261, //ok
+    0x0133F8, //ok
+    0x013443, //ok
+    0x0135C3, ///////
+    0x0136C3, ///////
+    0x0137C3, ///////
+    0x0138C3, ///////
+    0x0139C3, ///////
+    0x013AFF, /////// DPLL NUM/DEN (may differ)
+    0x013BFF, ///////
+    0x013CFF, ///////
+    0x013DFF, ///////
+    0x013EFF, ///////
+
+    0x013F03, // DPLL Reference Control != default
+    0x014000, // DPLL DCO Lock Detection
+    0x01410A, // DPLL DCO Lock Detection
+    0x014200, // DPLL DCO Lock Detection
+    0x014300, // DPLL DCO Lock Detection
+    0x014400, // DPLL DCO Lock Detection
+    0x014501, // DPLL DCO Lock Detection
+    0x014606, // DPLL DCO Lock Detection
+    0x014735, // DPLL DCO Lock Detection
+    0x014875, // DPLL DCO Lock Detection
+    0x01490B, // DPLL DCO Lock Detection
+    0x014A00, // DPLL DCO Unlock Detection
+    0x014B64, // DPLL DCO Unlock Detection
+    0x014C00, // DPLL DCO Unlock Detection
+
+    //0x014D00,
+    //0x014E61, /* PLL2 den */
+    //0x014FA8,
+
+    0x015006, // DPLL DCO Unlock Detection != default
+    0x015135, // DPLL DCO Unlock Detection
+    0x015275, // DPLL DCO Unlock Detection
+
+    0x01530B, /* Ok PLL1 num*/
+
+    //0x015400, // DPLL_REF_SYNC_PH_OFFSET ==default
+    //0x015500, // DPLL_REF_SYNC_PH_OFFSET ==default
+    //0x015600, // DPLL_REF_SYNC_PH_OFFSET ==default
+    //0x015700, // DPLL_REF_SYNC_PH_OFFSET ==default
+    //0x015800, // DPLL_REF_SYNC_PH_OFFSET ==default
+    //0x015900, // DPLL REF Zero Delay Mode Phase Offset ==default
+    //0x015A00, // DPLL Freq Incr/Decr enable via pin or reg control ==default
+    //0x015B00, // DPLL_FDEV ==default
+    //0x015C00, // DPLL_FDEV ==default
+    //0x015D00, // DPLL_FDEV ==default
+    //0x015E00, // DPLL_FDEV ==default
+    //0x015F00, // DPLL Freq Incr/Decr Numerator Step Word ==default
+    //0x016000, // DPLL Freq Incr/Decr register control ==default
+
+    //0x016500,
+    //0x016F00,  R
+    //0x019B00,
+};
+
+
+static const uint32_t lmk05318_rom_dpll____[] =
+{
 /*
         0x000000,
         0x000100,
