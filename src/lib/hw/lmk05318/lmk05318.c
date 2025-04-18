@@ -589,6 +589,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     }
 
 #if 0
+    out->dpll.enabled = true;
     res = lmk05318_reg_wr_n(out, lmk05318_rom_dpll, SIZEOF_ARRAY(lmk05318_rom_dpll));
     if (res)
         return res;

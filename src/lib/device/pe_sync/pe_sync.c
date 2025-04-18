@@ -200,7 +200,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     // gpo_in_ctrl[1] --  0 - external SMA, 1 - feedback from LCK_FB
     // gpo_in_ctrl[2] --  0 - external SMA, 1 - 1PPS from GPS
     // gpo_in_ctrl[3] --  En GPS LDO
-    res = res ? res : dev_gpo_set(dev, IGPO_IN_CTRL, 0); // Disable GPS
+    res = res ? res : dev_gpo_set(dev, IGPO_IN_CTRL, 0b1101); // Enable GPS
 
     // gpo_sy_ctrl*[0] -- LMX2820 LDO Pwr EN
     // gpo_sy_ctrl*[1] -- LMX2820 CE pin
