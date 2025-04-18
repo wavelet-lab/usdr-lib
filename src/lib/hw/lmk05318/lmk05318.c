@@ -505,6 +505,44 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_REF_DEN_BY2(d->dpll.den),
             MAKE_LMK05318_DPLL_REF_DEN_BY3(d->dpll.den),
             MAKE_LMK05318_DPLL_REF_DEN_BY4(d->dpll.den),  //R318
+
+            0x00C300, // PRIREF Missing Clock Detection
+            0x00C400, // PRIREF Missing Clock Detection
+            0x00C51D, // PRIREF Missing Clock Detection
+            // 0x00C600, // SECREF Missing Clock Detection
+            // 0x00C700, // SECREF Missing Clock Detection
+            // 0x00C800, // SECREF Missing Clock Detection
+            0x00C900, // PRI/SECREF Window Detection
+            0x00CA00, // PRIREF Early Clock Detection
+            0x00CB00, // PRIREF Early Clock Detection
+            0x00CC15, // PRIREF Early Clock Detection
+            // 0x00CD00, // SECREF Early Clock Detection
+            // 0x00CE00, // SECREF Early Clock Detection
+            // 0x00CF00, // SECREF Early Clock Detection
+            0x00D000, // PRIREF Frequency Detection
+            0x00D100, // PRIREF Frequency Detection
+            0x00D200, // PRIREF Frequency Detection
+            0x00D300, // PRIREF Frequency Detection
+            // 0x00D400, // SECREF Frequency Detection
+            // 0x00D500, // SECREF Frequency Detection
+            // 0x00D600, // SECREF Frequency Detection
+            // 0x00D700, // SECREF Frequency Detection
+            0x00D900, // PRIREF Frequency Detection
+            0x00DA00, // PRIREF Frequency Detection
+            0x00DB00, // PRIREF Frequency Detection
+            0x00DC00, // PRIREF Frequency Detection
+            0x00DD00, // PRIREF Frequency Detection
+            0x00DE00, // PRIREF Frequency Detection
+            0x00DF00, // PRIREF Frequency Detection
+            0x00E000, // PRIREF Frequency Detection
+            // 0x00E100, // SECREF Frequency Detection
+            // 0x00E200, // SECREF Frequency Detection
+            // 0x00E300, // SECREF Frequency Detection
+            // 0x00E400, // SECREF Frequency Detection
+            // 0x00E500, // SECREF Frequency Detection
+            // 0x00E600, // SECREF Frequency Detection
+            // 0x00E700, // SECREF Frequency Detection
+            // 0x00E800, // SECREF Frequency Detection
         };
         res = lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
     }

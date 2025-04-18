@@ -215,7 +215,7 @@ static const uint32_t lmk05318_rom_dpll[] =
         0x00D500, // SECREF Frequency Detection
         0x00D600, // SECREF Frequency Detection
         0x00D700, // SECREF Frequency Detection
-        0x00D800, // PRIREF Frequency Detection
+        0x00D800, // ?
         0x00D900, // PRIREF Frequency Detection
         0x00DA00, // PRIREF Frequency Detection
         0x00DB00, // PRIREF Frequency Detection
