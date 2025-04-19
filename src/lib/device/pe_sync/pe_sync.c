@@ -491,7 +491,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     if(res)
     {
-        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX1204 not locked, err:%d", res);
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMX1204 not locked, err:%d [%s]",
+                 res, (res == -ETIMEDOUT ? "TIMEOUT" : "ERROR"));
         return res;
     }
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1204 locked");

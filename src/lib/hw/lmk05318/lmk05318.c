@@ -1969,6 +1969,8 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, unsigned timeout)
 
     while(timeout == 0 || elapsed < timeout)
     {
+        uint64_t tk = clock_get_time();
+
         res = lmk05318_reg_rd(d, PLL1_CALSTAT1, &reg);
         if(res)
         {
@@ -1997,14 +1999,15 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, unsigned timeout)
             break;
 
         usleep(100);
-        elapsed += 100;
+        elapsed += (clock_get_time() - tk);
     }
+
+    USDR_LOG("5318", USDR_LOG_INFO, "ELAPSED:%.4fs PLL1_CALSTAT1:%u PLL1_VM_INSIDE:0x%02x LOS_MASK:0x%02x LMK05318_BAW_LOCK:%u",
+             (double)elapsed / 1000000.f, reg, pll1_vm_inside ? 1 : 0, los_msk,(los_msk & LMK05318_BAW_LOCK) ? 1 : 0);
 
     if(!locked)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "APLL1 is not locked! [PLL1_CALSTAT1:%u PLL1_VM_INSIDE:0x%02x LOS_MASK:0x%02x LMK05318_BAW_LOCK:%u]",
-                 reg, pll1_vm_inside ? 1 : 0, los_msk,(los_msk & LMK05318_BAW_LOCK) ? 1 : 0);
-
+        USDR_LOG("5318", USDR_LOG_ERROR, "APLL1 is not locked!");
         return -ETIMEDOUT;
     }
 
@@ -2023,6 +2026,8 @@ int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
 
     while(timeout == 0 || elapsed < timeout)
     {
+        uint64_t tk = clock_get_time();
+
         res = lmk05318_reg_rd(d, PLL2_CALSTAT1, &reg);
         if(res)
         {
@@ -2044,13 +2049,16 @@ int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
             break;
 
         usleep(100);
-        elapsed += 100;
+        elapsed += (clock_get_time() - tk);
     }
+
+    USDR_LOG("5318", USDR_LOG_INFO, "ELAPSED:%.4fs PLL2_CALSTAT1:%u PLL2_VM_INSIDE:0x%02x LOS_MASK:0x%02x LMK05318_LOL_PLL2:%u",
+             (double)elapsed / 1000000.f, reg, pll2_vm_inside ? 1 : 0, los_msk,(los_msk & LMK05318_LOL_PLL2) ? 1 : 0);
+
 
     if(!locked)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "APLL2 is not locked! [PLL2_CALSTAT1:%u PLL2_VM_INSIDE:0x%02x LOS_MASK:0x%02x LMK05318_LOL_PLL2:%u]",
-                 reg, pll2_vm_inside ? 1 : 0, los_msk,(los_msk & LMK05318_LOL_PLL2) ? 1 : 0);
+        USDR_LOG("5318", USDR_LOG_ERROR, "APLL2 is not locked!");
         return -ETIMEDOUT;
     }
 
@@ -2103,7 +2111,7 @@ int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout)
         if(valid)
             break;
 
-        usleep(100000);
+        usleep(1000000);
         elapsed += (clock_get_time() - tk);
     }
 

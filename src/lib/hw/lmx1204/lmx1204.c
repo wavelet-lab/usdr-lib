@@ -765,6 +765,8 @@ int lmx1204_wait_pll_lock(lmx1204_state_t* st, unsigned timeout)
     uint16_t r75;
     while(timeout == 0 || elapsed < timeout)
     {
+        uint64_t tk = clock_get_time();
+
         res = lmx1204_spi_get(st, R75, &r75);
         if(res)
             return res;
@@ -775,7 +777,7 @@ int lmx1204_wait_pll_lock(lmx1204_state_t* st, unsigned timeout)
         case RB_LD_LOCKED: return 0;
         default:
             usleep(100);
-            elapsed += 100;
+            elapsed += (clock_get_time() - tk);
         }
     }
 

@@ -201,6 +201,8 @@ int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout)
     uint16_t r74;
     while(timeout == 0 || elapsed < timeout)
     {
+        uint64_t tk = clock_get_time();
+
         res = lmx2820_spi_get(st, R74, &r74);
         if(res)
             return res;
@@ -208,11 +210,11 @@ int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout)
         const uint16_t lock_detect_status = (r74 & RB_LD_MSK) >> RB_LD_OFF;
         switch(lock_detect_status)
         {
-        //case RB_LD_INVALID: return -EINVAL;
+        case RB_LD_INVALID: return -EINVAL;
         case RB_LD_LOCKED: return 0;
         default:
             usleep(100);
-            elapsed += 100;
+            elapsed += (clock_get_time() - tk);
         }
     }
 
@@ -973,7 +975,8 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
     res = lmx2820_wait_pll_lock(st, 10000);
     if(res)
     {
-        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_wait_pll_lock() failed, err:%d", res);
+        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_wait_pll_lock() failed, err:%d [%s]",
+                 res, (res == -ETIMEDOUT ? "TIMEOUT" : "ERROR"));
         return res;
     }
 
