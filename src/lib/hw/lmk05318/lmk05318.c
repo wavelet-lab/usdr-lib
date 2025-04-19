@@ -580,9 +580,6 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
 
         MAKE_LMK05318_INT_FLAG0(0,0,0,0),                            //R19   |
         MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),                    //R20   | reset interrupt LOS flags
-
-        MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0,3),  //R115 PLL1 MASHORD=3
-        MAKE_LMK05318_PLL2_MASHCTRL(0,3),        //R139 PLL2 MASHORD=3
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -894,7 +891,10 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
         d->pd2 = d->pd1;
     }
 
+    const uint8_t apll2_sdm_order = num ? 3 : 0; //override if needed
+
     uint32_t regs[] = {
+        MAKE_LMK05318_PLL2_MASHCTRL(0,apll2_sdm_order),                                 //R139 PLL2 MASHORD=3
         MAKE_LMK05318_PLL2_CTRL2(d->pd2 - 1, d->pd1 - 1),                               //R102
         MAKE_LMK05318_PLL2_NDIV_BY0(n),                                                 //R135
         MAKE_LMK05318_PLL2_NDIV_BY1(n),                                                 //R134
@@ -966,6 +966,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
     unsigned fpd1 = (d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2 : 1);
     uint64_t fvco = VCO_APLL1;
     unsigned n = fvco / fpd1;
+    const uint8_t apll1_sdm_order = 3; //override if needed
 
     //in DPLL mode we use FIXED 40-bit APLL1 denominator and programmed 40-bit numerator
     if(d->dpll.enabled)
@@ -975,15 +976,16 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
         USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 " DEN=FIXED\n", fvco, n, num);
 
         uint32_t regs[] = {
-            MAKE_LMK05318_PLL1_MODE(0, 0, 1),               //R116  DPLL mode
-            MAKE_LMK05318_PLL1_NDIV_BY0(n),                 //R109  NDIV
-            MAKE_LMK05318_PLL1_NDIV_BY1(n),                 //R108  NDIV
-            MAKE_LMK05318_PLL1_NUM_BY0(num),                //R110 |
-            MAKE_LMK05318_PLL1_NUM_BY1(num),                //R111 |
-            MAKE_LMK05318_PLL1_NUM_BY2(num),                //R112 | 40-bit NUM
-            MAKE_LMK05318_PLL1_NUM_BY3(num),                //R113 |
-            MAKE_LMK05318_PLL1_NUM_BY4(num),                //R114 |
-            MAKE_LMK05318_PLL1_CTRL0(0),                    //R74   Activate APLL1
+            MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0,apll1_sdm_order), //R115 PLL1 MASHORD=3 WeakDither
+            MAKE_LMK05318_PLL1_MODE(0, 0, 1),                     //R116  DPLL mode
+            MAKE_LMK05318_PLL1_NDIV_BY0(n),                       //R109  NDIV
+            MAKE_LMK05318_PLL1_NDIV_BY1(n),                       //R108  NDIV
+            MAKE_LMK05318_PLL1_NUM_BY0(num),                      //R110 |
+            MAKE_LMK05318_PLL1_NUM_BY1(num),                      //R111 |
+            MAKE_LMK05318_PLL1_NUM_BY2(num),                      //R112 | 40-bit NUM
+            MAKE_LMK05318_PLL1_NUM_BY3(num),                      //R113 |
+            MAKE_LMK05318_PLL1_NUM_BY4(num),                      //R114 |
+            MAKE_LMK05318_PLL1_CTRL0(0),                          //R74   Activate APLL1
         };
 
         int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
@@ -1000,6 +1002,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
         USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu32 " DEN=%" PRIu32 "\n", fvco, n, num, den);
 
         uint32_t regs[] = {
+            MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0,apll1_sdm_order),     //R115 PLL1 MASHORD=3 WeakDither
             MAKE_LMK05318_PLL1_MODE(0, 0, 0),                         //R116  free-run mode
             MAKE_LMK05318_PLL1_NDIV_BY0(n),                           //R109  NDIV
             MAKE_LMK05318_PLL1_NDIV_BY1(n),                           //R108  NDIV
