@@ -404,19 +404,21 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
 
     if(d->dpll.enabled == false)
     {
-        uint32_t dpll_regs[] =
+        // WITHOUT DPLL
+        uint32_t no_dpll_regs[] =
         {
-            MAKE_LMK05318_DEV_CTL(0, 0, 1, 1, 1, 1, 1),    //R12   set APLL1 mode - DPLL
-            MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, 1),        //R39   set fixed APLL1 denumerator for DPLL en, programmed den otherwise
-            MAKE_LMK05318_SPARE_NVMBASE2_BY1(0, 0, 1),     //R40   set programmed APPL2 denumerator always
-            MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, 0, 0, 0),  //R252   disable DPLL
-            MAKE_LMK05318_PLL1_CALCTRL0(1, 0, 1),          //R79 BAW_LOCKDET_EN=1 PLL1_VCOWAIT=1
-            MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(1, 0),   //R80 BAW_LOCK=1
+            MAKE_LMK05318_DEV_CTL(0, 0, 0/*SYNC_AUTO_DPLL*/, 1, 1, 1, 1),    //R12   set APLL1 mode - NO DPLL
+            MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, 1/*Programmed 24-bit DEN*/), //R39   set fixed APLL1 denumerator for DPLL en, programmed den otherwise
+            MAKE_LMK05318_SPARE_NVMBASE2_BY1(0, 0, 1),                       //R40   set programmed APPL2 denumerator always
+            MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, 0, 0, 0),                 //R252   disable DPLL
+            MAKE_LMK05318_PLL1_CALCTRL0(1, 0, 1),                            //R79 BAW_LOCKDET_EN=1 PLL1_VCOWAIT=1
+            MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(1, 0),                     //R80 BAW_LOCK=1
         };
-        res = lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
+        res = lmk05318_add_reg_to_map(d, no_dpll_regs, SIZEOF_ARRAY(no_dpll_regs));
     }
     else
     {
+        //WITH DPLL
         const bool one_pps[] =
         {
             (dpll->en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] == 1),
@@ -443,8 +445,8 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
 
         uint32_t dpll_regs[] =
         {
-            MAKE_LMK05318_DEV_CTL(0, 0, 0, 1, 1, 1, 1),   //R12   set APLL1 mode - Free-run
-            MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, 0),       //R39   set fixed APLL1 denumerator for DPLL en, programmed den otherwise
+            MAKE_LMK05318_DEV_CTL(0, 0, 1/*SYNC_AUTO_DPLL*/, 1, 1, 1, 1),   //R12   set APLL1 mode - Free-run
+            MAKE_LMK05318_SPARE_NVMBASE2_BY2(0, 0/*Fixed 40-bit DEN*/),       //R39   set fixed APLL1 denumerator for DPLL en, programmed den otherwise
             MAKE_LMK05318_SPARE_NVMBASE2_BY1(dpll->dc_mode[LMK05318_SECREF], dpll->dc_mode[LMK05318_PRIREF], 1), //R40   set programmed APPL2 denumerator always
             MAKE_LMK05318_REF_CLKCTL1(!dpll->en[LMK05318_SECREF] || (dpll->fref[LMK05318_SECREF] >= 5000000 && dpll->type[LMK05318_SECREF] != IN_OPTS_CMOS && dpll->type[LMK05318_SECREF] != IN_OPTS_SE_INT_50) ? 0 : 1,
                                       !dpll->en[LMK05318_PRIREF] || (dpll->fref[LMK05318_PRIREF] >= 5000000 && dpll->type[LMK05318_PRIREF] != IN_OPTS_CMOS && dpll->type[LMK05318_PRIREF] != IN_OPTS_SE_INT_50) ? 0 : 1,
@@ -507,63 +509,8 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_REF_DEN_BY4(d->dpll.den),  //R318
         };
 
-        uint32_t pri_miss_clock_det = d->dpll.ref_en[LMK05318_PRIREF] ? 0x1D : 0x0;
-        uint32_t sec_miss_clock_det = d->dpll.ref_en[LMK05318_SECREF] ? 0x1D : 0x0;
-
-        uint32_t pri_early_clk_det = d->dpll.ref_en[LMK05318_PRIREF] ? 0x15 : 0x0;
-        uint32_t sec_early_clk_det = d->dpll.ref_en[LMK05318_SECREF] ? 0x15 : 0x0;
-
-        uint32_t dpll_regs_clk_detections[] =
-        {
-            MAKE_LMK05318_REF0_MISSCLK_DIV_BY0(pri_miss_clock_det),
-            MAKE_LMK05318_REF0_MISSCLK_DIV_BY1(pri_miss_clock_det),
-            MAKE_LMK05318_REF0_MISSCLK_DIV_BY2(pri_miss_clock_det), // R195:197 PRIREF Missing Clock Detection
-            //
-            MAKE_LMK05318_REF1_MISSCLK_DIV_BY0(sec_miss_clock_det),
-            MAKE_LMK05318_REF1_MISSCLK_DIV_BY1(sec_miss_clock_det),
-            MAKE_LMK05318_REF1_MISSCLK_DIV_BY2(sec_miss_clock_det), // R198:200 SECREF Missing Clock Detection
-
-            MAKE_LMK05318_REF_MISSCLK_CTL(d->dpll.ref_en[LMK05318_SECREF] ? 0 : 0, d->dpll.ref_en[LMK05318_PRIREF] ? 0 : 0), // R201 PRI/SECREF Window Detection
-
-            MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY0(pri_early_clk_det),
-            MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY1(pri_early_clk_det),
-            MAKE_LMK05318_REF0_EARLY_CLK_DIV_BY2(pri_early_clk_det), // R202:204 PRIREF Early Clock Detection
-            //
-            MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY0(sec_early_clk_det),
-            MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY1(sec_early_clk_det),
-            MAKE_LMK05318_REF1_EARLY_CLK_DIV_BY2(sec_early_clk_det), // R205:207 SECREF Early Clock Detection
-
-            MAKE_LMK05318_REF0_PPM_MIN_BY0(0),
-            MAKE_LMK05318_REF0_PPM_MIN_BY1(0),
-            MAKE_LMK05318_REF0_PPM_MAX_BY0(0),
-            MAKE_LMK05318_REF0_PPM_MAX_BY1(0), // R208:211 PRIREF Frequency Detection
-            //
-            MAKE_LMK05318_REF1_PPM_MIN_BY0(0),
-            MAKE_LMK05318_REF1_PPM_MIN_BY1(0),
-            MAKE_LMK05318_REF1_PPM_MAX_BY0(0),
-            MAKE_LMK05318_REF1_PPM_MAX_BY1(0), // R212:215 SECREF Frequency Detection
-
-            MAKE_LMK05318_REF0_CNTSTRT_BY0(0),
-            MAKE_LMK05318_REF0_CNTSTRT_BY1(0),
-            MAKE_LMK05318_REF0_CNTSTRT_BY2(0),
-            MAKE_LMK05318_REF0_CNTSTRT_BY3(0),
-            MAKE_LMK05318_REF0_HOLD_CNTSTRT_BY0(0),
-            MAKE_LMK05318_REF0_HOLD_CNTSTRT_BY1(0),
-            MAKE_LMK05318_REF0_HOLD_CNTSTRT_BY2(0),
-            MAKE_LMK05318_REF0_HOLD_CNTSTRT_BY3(0), // R217:224 PRIREF Frequency Detection
-            //
-            MAKE_LMK05318_REF1_CNTSTRT_BY0(0),
-            MAKE_LMK05318_REF1_CNTSTRT_BY1(0),
-            MAKE_LMK05318_REF1_CNTSTRT_BY2(0),
-            MAKE_LMK05318_REF1_CNTSTRT_BY3(0),
-            MAKE_LMK05318_REF1_HOLD_CNTSTRT_BY0(0),
-            MAKE_LMK05318_REF1_HOLD_CNTSTRT_BY1(0),
-            MAKE_LMK05318_REF1_HOLD_CNTSTRT_BY2(0),
-            MAKE_LMK05318_REF1_HOLD_CNTSTRT_BY3(0), // R225:232 SECREF Frequency Detection
-        };
-
-        res = lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
-        res = res ? res : lmk05318_add_reg_to_map(d, dpll_regs_clk_detections, SIZEOF_ARRAY(dpll_regs_clk_detections));
+        res = lmk05318_add_reg_to_map(d, lmk05318_rom_dpll_empiric, SIZEOF_ARRAY(lmk05318_rom_dpll_empiric));
+        res = res ? res : lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
     }
 
     if(res)
@@ -607,7 +554,9 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
         0x006284,   //      |
         0x006380,   //R99
 
-        MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0,3), //R115 PLL1 MASHORD=3
+        MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0,3),  //R115 PLL1 MASHORD=3
+        MAKE_LMK05318_OUT_MUTE(0,0,0,0,0,0,0,0), //R25 unmute all chans
+
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
