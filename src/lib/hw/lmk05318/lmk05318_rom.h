@@ -1,197 +1,222 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
-static const uint32_t lmk05318_rom_dpll_empiric[] =
+#include <stdint.h>
+#include <stdbool.h>
+
+enum empiric_type
 {
-    0x000d00, // [RO]
-    0x000e00, // [RO]
-    0x000f00, // [DEF] INT_MASK
-    0x001000, // [DEF] INT_MASK
-    0x001100, // [DEF] XO/APLL LOL Polarity
-    0x001200, // [DEF] DPLL LOL Polarity
-    0x001500, // [DEF] INT_AND_OR
-    0x001600, // [DEF] STATUS0/1 Polarity
-    0x001900, // OUT MUTE ctrls
-    0x001a00, // [DEF] XO hyst timer
-    0x001b00, // XO SE energy det mode
-    0x001c00, // XO DIFF energy det mode
-    0x001d00, // mute during LOCK ?? 0x17
-    0x001e00, // LDO timer scale
-    0x002000, // APLL MASD + LDO trim
-    0x002300, // [DEF] VCO1/2 LSO settings
-    0x002400, // [DEF] STAT0/1 Driver Type Output
-    0x002500, // STATUS0 open Drain mode
-    0x002600, // STATUS1 open Drain mode
-    0x002900, // [DEF] SPARE_NVMBASE2
-    0x003000, // STAT0_SEL
-    0x003100, // STAT1_SEL
-    0x003200, // [DEF] DCO freq + CH6/7 PD
-    0x004400, // APLL1 BAW drain
-    0x004500, // unknown
-    0x004800, // [RO] RO OUTCH active flags
-    0x004900, // [DEF] REF_BYPASS (route REF to OUTs instead of VCO1)
-    0x004b00, // PLL1 Vtune Monitor bypass + charge pump gain
-    0x004c00, // PLL1 post-div 1
-    0x004d00, // PLL1 loop filter
-    0x004e00, // [DEF] PLL1 bleed resistor
-    0x006500, // PLL2 charge pump
-    0x006633, // PLL2 post-div2 post-div1
-    0x006700, // PLL2 Loop filter
-    0x006800, // [DEF] PLL2 bleed resistor
-    0x006900, // [DEF] PLL2 closed loop wait + VCO wait
-    0x006a00, // PLL1 N Delay div (MSB)
-    0x006b00, // PLL1 N Delay div
-    0x007500, // [DEF] PLL1_FDEV (MSB)
-    0x007600, // [DEF] PLL1_FDEV def
-    0x007700, // [DEF] PLL1_FDEV def
-    0x007800, // [DEF] PLL1_FDEV def
-    0x007900, // [DEF] PLL1_FDEV def
-    0x007a00, // [DEF] PLL1 inc/dec ctrl
-    0x007b00, // [DEF] PLL1_NUM_STAT (MSB)
-    0x007c00, // [DEF] PLL1_NUM_STAT
-    0x007d00, // [DEF] PLL1_NUM_STAT
-    0x007e00, // [DEF] PLL1_NUM_STAT
-    0x007f00, // [DEF] PLL1_NUM_STAT
-    0x008000, // [DEF] PLL1 NUM saturation
-    0x008100, // PLL1 Loop Filter R2
-    0x008200, // [DEF] PLL1 loop filter C1
-    0x008300, // PLL1 Loop Filter R3
-    0x008400, // PLL1 Loop Filter R4
-    0x008500, // [DEF] PLL1 Loop Filter C4
-    0x008600, // Bit 8 of PLL2_NDIV
-    0x00872c, // Bits 7:0 of PLL2 NDIV
-    0x00887c, // PLL2_NUM (MSB)
-    0x0089e0, // PLL2_NUM
-    0x008abf, // PLL2_NUM
-    0x008b00, // [DEF] SDM Dither Mode + APLL2 SDM Order
-    0x008c00, // PLL2 Loop Filter R2
-    0x008d00, // [DEF] PLL2 Loop Filter C1
-    0x008e00, // PLL2 Loop Filter R3
-    0x008f00, // PLL2 Loop Filter R4
-    0x009000, // [DEF] PLL2 Loop Filter C4/C3
-    0x009100, // XO Input Wait Timer
-    0x009200, // unknown
-    0x009300, // unknown
-    0x009500, // unknown
-    0x009600, // [DEF] PLL1 Amp Cal up/low threhold def
-    0x009700, // unknown
-    0x009800, // unknown
-    0x009900, // PLL1 Amp Cal up/low threhold
-    0x009a00, // LDO trim bits
-    0x009b00, // [RO] NVM Stored CRC
-    0x009c00, // [RO] NVM Program Count
-    0x009e00, // [RO] MUMLCRC
-    0x009f00, // [DEF] Bits 12:8 of MEMADR
-    0x00a000, // [DEF] Memory Address
-    0x00a100, // [RO]EEPROM Read Data
-    0x00a200, // [DEF] RAM Read/Write Data
-    0x00a500, // [DEF] NVM BASE unlock
-    0x00a700, // unknown
-    0x00b200, // unknown
-    0x00b400, // [DEF] DPLL_TUNING_FREE_RUN (MSB)
-    0x00b500, // [DEF] DPLL_TUNING_FREE_RUN
-    0x00b600, // [DEF] DPLL_TUNING_FREE_RUN
-    0x00b700, // [DEF] DPLL_TUNING_FREE_RUN
-    0x00b800, // [DEF] DPLL_TUNING_FREE_RUN
-    0x00b9f1, // DPLL_REF_HIST_EN=enabled
-    0x00ba01, // DPLL REF Tuning History Timer
-    0x00bb00, // [DEF] DPLL_REF_HISTDLY (MSB)
-    0x00bc00, // [DEF] DPLL_REF_HISTDLY
-    0x00bd00, // [DEF] DPLL_REF_HISTDLY
-    0x00be00, // [DEF] DPLL_REF_HISTDLY
-    0x00bf00, // unknown
-    0x00c000, // PRI/SECREF detectors settings
-    0x00d800, // unknown
-    0x00eb02, // PRIREF_PH_VALID_DET (MSB)
-    0x00ecfa, // PRIREF_PH_VALID_DET
-    0x00edf0, // PRIREF_PH_VALID_DET
-    0x00ee80, // PRIREF_PH_VALID_DET
-    0x00ef00, // SECREF_PH_VALID_DET (MSB)
-    0x00f000, // SECREF_PH_VALID_DET
-    0x00f100, // SECREF_PH_VALID_DET
-    0x00f200, // SECREF_PH_VALID_DET
-    0x00fa00, // [DEF] DPLL_VAL_FL(PL)_EN
-    0x00fd00, // [DEF] DPLL switchover timer
-    0x00fe00, // [DEF] DPLL switchover timer
-    0x00ff00, // [DEF] DPLL switchover timer
-    0x010402, // DPLL_REF_AVOID_SLIP(en) + TDC software ctrl(dis)
-    0x010580, // DPLL Reference Control
-    0x010601, // DPLL Reference Control
-    0x01072a, // DPLL Reference Control
-    0x010805, // DPLL Reference Control
-    0x0109f2, // DPLL Reference Control
-    0x010a00, // DPLL Reference Control
-    0x010ba0, // DPLL Reference Control + DPLL loop filter
-    0x010c00, // DPLL Loop Filter
-    0x010d00, // DPLL Loop Filter
-    0x010e02, // DPLL Loop Filter
-    0x010fa6, // DPLL Loop Filter
-    0x011000, // DPLL Loop Filter
-    0x011100, // DPLL Loop Filter
-    0x011200, // DPLL Loop Filter
-    0x011316, // DPLL Loop Filter
-    0x011416, // DPLL Loop Filter
-    0x011516, // DPLL Loop Filter
-    0x011600, // DPLL Loop Filter
-    0x011700, // DPLL Loop Filter
-    0x011800, // DPLL Loop Filter
-    0x011900, // DPLL Loop Filter
-    0x011a00, // DPLL Loop Filter
-    0x011b00, // DPLL Loop Filter
-    0x011c1e, // DPLL Loop Filter
-    0x011d1e, // DPLL Loop Filter
-    0x011e00, // DPLL Loop Filter
-    0x011f00, // DPLL Loop Filter
-    0x012000, // DPLL Loop Filter
-    0x012100, // DPLL Loop Filter
-    0x012203, // DPLL Phase Lock Detection
-    0x012322, // DPLL Phase Lock Detection
-    0x012400, // Phase Cancellation for Hitless Switching
-    0x012500, // Phase Cancellation for Hitless Switching
-    0x012600, // Phase Cancellation for Hitless Switching
-    0x012700, // Phase Cancellation for Hitless Switching
-    0x01280a, // DPLL Loop Filter
-    0x01290a, // DPLL Loop Filter
-    0x012a0a, // DPLL Loop Filter
-    0x012b00, // unknown
-    0x012c00, // [DEF] DPLL Phase Lock Detection
-    0x012d1c, // Phase lock declaration threshold
-    0x012e1e, // Phase un-lock declaration threshold
-    0x012f01, // unknown
-    0x013f03, // DPLL Reference Control
-    0x014000, // DPLL DCO Lock Detection
-    0x01410a, // DPLL DCO Lock Detection
-    0x014200, // DPLL DCO Lock Detection
-    0x014300, // DPLL DCO Lock Detection
-    0x014400, // DPLL DCO Lock Detection
-    0x014501, // DPLL DCO Lock Detection
-    0x014606, // DPLL DCO Lock Detection
-    0x014735, // DPLL DCO Lock Detection
-    0x014875, // DPLL DCO Lock Detection
-    0x01490b, // DPLL DCO Lock Detection
-    0x014a00, // DPLL DCO Unlock Detection
-    0x014b64, // DPLL DCO Unlock Detection
-    0x014c00, // DPLL DCO Unlock Detection
-    0x014d00, // PLL2 DEN (MSB)
-    0x014e61, // PLL2 DEN
-    0x014fa8, // PLL2 DEN
-    0x015006, // DPLL DCO Unlock Detection
-    0x015135, // DPLL DCO Unlock Detection
-    0x015275, // DPLL DCO Unlock Detection
-    0x01530b, // PLL1 24-b NUM MSB (not used in DPLL mode)
-    0x015400, // [DEF] DPLL_REF_SYNC_PH_OFFSET
-    0x015500, // [DEF] DPLL_REF_SYNC_PH_OFFSET
-    0x015600, // [DEF] DPLL_REF_SYNC_PH_OFFSET
-    0x015700, // [DEF] DPLL_REF_SYNC_PH_OFFSET
-    0x015800, // [DEF] DPLL_REF_SYNC_PH_OFFSET
-    0x015900, // [DEF] DPLL REF Zero Delay Mode Phase Offset
-    0x015a00, // [DEF] DPLL Freq Incr/Decr enable via pin/reg
-    0x015b00, // [DEF] DPLL_FDEV
-    0x015c00, // [DEF] DPLL_FDEV
-    0x015d00, // [DEF] DPLL_FDEV
-    0x015e00, // [DEF] DPLL_FDEV
-    0x015f00, // [DEF] DPLL Freq Incr/Decr Numerator Step Word (MSB)
-    0x016000, // [DEF] DPLL Freq Incr/Decr Numerator Step Word
+    REG_READONLY = 1,
+    REG_DEFAULTS = 2,
+    REG_OVERRIDE = 4,
+    REG_PLL1     = 8,
+    REG_PLL2     = 16,
+    REG_DPLL     = 32,
+    REG_XO       = 64,
+    REG_LDO      = 128,
+    REG_NVM      = 256,
+    REG_UNKNOWN  = 512,
+};
+typedef enum empiric_type empiric_type_t;
+
+struct empiric
+{
+    uint32_t reg;
+    empiric_type_t type;
+};
+typedef struct empiric empiric_t;
+
+static const empiric_t lmk05318_rom_dpll_empiric[] =
+{
+    {0x000d00, REG_READONLY | REG_XO | REG_PLL1 | REG_PLL2}, // [RO] APLL&XO LOSSes
+    {0x000e00, REG_READONLY | REG_DPLL},                     // [RO] DPLL LOSSes
+    {0x000f00, REG_DEFAULTS},                                // [DEF] INT_MASK
+    {0x001000, REG_DEFAULTS},                                // [DEF] INT_MASK
+    {0x001100, REG_DEFAULTS | REG_XO | REG_PLL1 | REG_PLL2}, // [DEF] XO/APLL LOL Polarity
+    {0x001200, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL LOL Polarity
+    {0x001500, REG_DEFAULTS},                                // [DEF] INT_AND_OR
+    {0x001600, REG_DEFAULTS},                                // [DEF] STATUS0/1 Polarity
+    //{0x001900, REG_OVERRIDE},                                // OUT MUTE ctrls (unmute)
+    {0x001a00, REG_DEFAULTS | REG_XO},                       // [DEF] XO hyst timer
+    {0x001b00, REG_OVERRIDE | REG_XO},                       // XO SE energy det mode
+    {0x001c00, REG_OVERRIDE | REG_XO},                       // XO DIFF energy det mode
+    //{0x001d00, REG_OVERRIDE},                                // mute during LOCK ?? 0x17
+    {0x001e00, REG_OVERRIDE | REG_LDO},                      // LDO timer scale
+    {0x002000, REG_OVERRIDE | REG_LDO | REG_PLL1 | REG_PLL2},// APLL MASH LDO trim
+    {0x002300, REG_DEFAULTS | REG_LDO | REG_PLL1 | REG_PLL2},// [DEF] VCO1/2 LDO settings
+    {0x002400, REG_DEFAULTS},                                // [DEF] STAT0/1 Driver Type Output
+    {0x002500, REG_OVERRIDE},                                // STATUS0 open Drain mode
+    {0x002600, REG_OVERRIDE},                                // STATUS1 open Drain mode
+    {0x002900, REG_DEFAULTS | REG_NVM},                      // [DEF] SPARE_NVMBASE2
+    {0x003000, REG_OVERRIDE},                                // STAT0_SEL
+    {0x003100, REG_OVERRIDE},                                // STAT1_SEL
+    {0x003200, REG_DEFAULTS},                                // [DEF] DCO freq + CH6/7 PD
+    {0x004400, REG_OVERRIDE | REG_PLL1},                     // APLL1 BAW drain
+    {0x004500, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x004800, REG_READONLY},                                // [RO] RO OUTCH active flags
+    {0x004900, REG_DEFAULTS},                                // [DEF] REF_BYPASS (route REF to OUTs instead of VCO1)
+    {0x004b00, REG_OVERRIDE | REG_PLL1},                     // PLL1 Vtune Monitor bypass + charge pump gain
+    {0x004c00, REG_OVERRIDE | REG_PLL1},                     // PLL1 post-div 1
+    {0x004d00, REG_OVERRIDE | REG_PLL1},                     // PLL1 loop filter
+    {0x004e00, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1 bleed resistor
+    {0x006500, REG_OVERRIDE | REG_PLL2},                     // PLL2 charge pump
+    {0x006633, REG_OVERRIDE | REG_PLL2},                     // PLL2 post-div2 post-div1
+    {0x006700, REG_OVERRIDE | REG_PLL2},                     // PLL2 Loop filter
+    {0x006800, REG_DEFAULTS | REG_PLL2},                     // [DEF] PLL2 bleed resistor
+    {0x006900, REG_DEFAULTS | REG_PLL2},                     // [DEF] PLL2 closed loop wait + VCO wait
+    {0x006a00, REG_OVERRIDE | REG_PLL1},                     // PLL1 N Delay div (MSB)
+    {0x006b00, REG_OVERRIDE | REG_PLL1},                     // PLL1 N Delay div
+    {0x007500, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_FDEV (MSB)
+    {0x007600, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_FDEV def
+    {0x007700, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_FDEV def
+    {0x007800, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_FDEV def
+    {0x007900, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_FDEV def
+    {0x007a00, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1 inc/dec ctrl
+    {0x007b00, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_NUM_STAT (MSB)
+    {0x007c00, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_NUM_STAT
+    {0x007d00, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_NUM_STAT
+    {0x007e00, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_NUM_STAT
+    {0x007f00, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1_NUM_STAT
+    {0x008000, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1 NUM saturation
+    {0x008100, REG_OVERRIDE | REG_PLL1},                     // PLL1 Loop Filter R2
+    {0x008200, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1 loop filter C1
+    {0x008300, REG_OVERRIDE | REG_PLL1},                     // PLL1 Loop Filter R3
+    {0x008400, REG_OVERRIDE | REG_PLL1},                     // PLL1 Loop Filter R4
+    {0x008500, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1 Loop Filter C4
+    {0x008600, REG_OVERRIDE | REG_PLL2},                     // Bit 8 of PLL2_NDIV
+    {0x00872c, REG_OVERRIDE | REG_PLL2},                     // Bits 7:0 of PLL2 NDIV
+    {0x00887c, REG_OVERRIDE | REG_PLL2},                     // PLL2_NUM (MSB)
+    {0x0089e0, REG_OVERRIDE | REG_PLL2},                     // PLL2_NUM
+    {0x008abf, REG_OVERRIDE | REG_PLL2},                     // PLL2_NUM
+    //{0x008b00, REG_DEFAULTS | REG_PLL2},                     // [DEF] SDM Dither Mode + APLL2 SDM Order
+    {0x008c00, REG_OVERRIDE | REG_PLL2},                     // PLL2 Loop Filter R2
+    {0x008d00, REG_DEFAULTS | REG_PLL2},                     // [DEF] PLL2 Loop Filter C1
+    {0x008e00, REG_OVERRIDE | REG_PLL2},                     // PLL2 Loop Filter R3
+    {0x008f00, REG_OVERRIDE | REG_PLL2},                     // PLL2 Loop Filter R4
+    {0x009000, REG_DEFAULTS | REG_PLL2},                     // [DEF] PLL2 Loop Filter C4/C3
+    {0x009100, REG_OVERRIDE | REG_XO},                       // XO Input Wait Timer
+    {0x009200, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x009300, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x009500, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x009600, REG_DEFAULTS | REG_PLL1},                     // [DEF] PLL1 Amp Cal up/low threhold def
+    {0x009700, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x009800, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x009900, REG_OVERRIDE | REG_PLL1},                     // PLL1 Amp Cal up/low threhold
+    {0x009a00, REG_OVERRIDE | REG_LDO},                      // LDO trim bits
+    {0x009b00, REG_READONLY | REG_NVM},                      // [RO] NVM Stored CRC
+    {0x009c00, REG_READONLY | REG_NVM},                      // [RO] NVM Program Count
+    {0x009e00, REG_READONLY | REG_NVM},                      // [RO] MUMLCRC
+    {0x009f00, REG_DEFAULTS | REG_NVM},                      // [DEF] Bits 12:8 of MEMADR
+    {0x00a000, REG_DEFAULTS | REG_NVM},                      // [DEF] Memory Address
+    {0x00a100, REG_READONLY | REG_NVM},                      // [RO]EEPROM Read Data
+    {0x00a200, REG_DEFAULTS | REG_NVM},                      // [DEF] RAM Read/Write Data
+    {0x00a500, REG_DEFAULTS | REG_NVM},                      // [DEF] NVM BASE unlock
+    {0x00a700, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x00b200, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x00b400, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_TUNING_FREE_RUN (MSB)
+    {0x00b500, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_TUNING_FREE_RUN
+    {0x00b600, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_TUNING_FREE_RUN
+    {0x00b700, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_TUNING_FREE_RUN
+    {0x00b800, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_TUNING_FREE_RUN
+    {0x00b9f1, REG_OVERRIDE | REG_DPLL},                     // DPLL_REF_HIST_EN=enabled
+    {0x00ba01, REG_OVERRIDE | REG_DPLL},                     // DPLL REF Tuning History Timer
+    {0x00bb00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_HISTDLY (MSB)
+    {0x00bc00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_HISTDLY
+    {0x00bd00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_HISTDLY
+    {0x00be00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_HISTDLY
+    {0x00bf00, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x00c000, REG_OVERRIDE | REG_DPLL},                     // PRI/SECREF detectors settings
+    {0x00d800, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x00eb02, REG_OVERRIDE | REG_DPLL},                     // PRIREF_PH_VALID_DET (MSB)
+    {0x00ecfa, REG_OVERRIDE | REG_DPLL},                     // PRIREF_PH_VALID_DET
+    {0x00edf0, REG_OVERRIDE | REG_DPLL},                     // PRIREF_PH_VALID_DET
+    {0x00ee80, REG_OVERRIDE | REG_DPLL},                     // PRIREF_PH_VALID_DET
+    {0x00ef00, REG_OVERRIDE | REG_DPLL},                     // SECREF_PH_VALID_DET (MSB)
+    {0x00f000, REG_OVERRIDE | REG_DPLL},                     // SECREF_PH_VALID_DET
+    {0x00f100, REG_OVERRIDE | REG_DPLL},                     // SECREF_PH_VALID_DET
+    {0x00f200, REG_OVERRIDE | REG_DPLL},                     // SECREF_PH_VALID_DET
+    {0x00fa00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_VAL_FL(PL)_EN
+    {0x00fd00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL switchover timer
+    {0x00fe00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL switchover timer
+    {0x00ff00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL switchover timer
+    {0x010402, REG_OVERRIDE | REG_DPLL},                     // DPLL_REF_AVOID_SLIP(en) + TDC software ctrl(dis)
+    {0x010580, REG_OVERRIDE | REG_DPLL},                     // DPLL Reference Control
+    {0x010601, REG_OVERRIDE | REG_DPLL},                     // DPLL Reference Control
+    {0x01072a, REG_OVERRIDE | REG_DPLL},                     // DPLL Reference Control
+    {0x010805, REG_OVERRIDE | REG_DPLL},                     // DPLL Reference Control
+    {0x0109f2, REG_OVERRIDE | REG_DPLL},                     // DPLL Reference Control
+    {0x010a00, REG_OVERRIDE | REG_DPLL},                     // DPLL Reference Control
+    {0x010ba0, REG_OVERRIDE | REG_DPLL},                     // DPLL Reference Control + DPLL loop filter
+    {0x010c00, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x010d00, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x010e02, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x010fa6, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011000, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011100, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011200, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011316, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011416, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011516, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011600, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011700, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011800, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011900, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011a00, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011b00, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011c1e, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011d1e, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011e00, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x011f00, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x012000, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x012100, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x012203, REG_OVERRIDE | REG_DPLL},                     // DPLL Phase Lock Detection
+    {0x012322, REG_OVERRIDE | REG_DPLL},                     // DPLL Phase Lock Detection
+    {0x012400, REG_OVERRIDE | REG_DPLL},                     // Phase Cancellation for Hitless Switching
+    {0x012500, REG_OVERRIDE | REG_DPLL},                     // Phase Cancellation for Hitless Switching
+    {0x012600, REG_OVERRIDE | REG_DPLL},                     // Phase Cancellation for Hitless Switching
+    {0x012700, REG_OVERRIDE | REG_DPLL},                     // Phase Cancellation for Hitless Switching
+    {0x01280a, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x01290a, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x012a0a, REG_OVERRIDE | REG_DPLL},                     // DPLL Loop Filter
+    {0x012b00, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x012c00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL Phase Lock Detection
+    {0x012d1c, REG_OVERRIDE | REG_DPLL},                     // Phase lock declaration threshold
+    {0x012e1e, REG_OVERRIDE | REG_DPLL},                     // Phase un-lock declaration threshold
+    {0x012f01, REG_OVERRIDE | REG_UNKNOWN},                  // unknown
+    {0x013f03, REG_OVERRIDE | REG_DPLL},                     // DPLL Reference Control
+    {0x014000, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x01410a, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x014200, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x014300, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x014400, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x014501, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x014606, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x014735, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x014875, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x01490b, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Lock Detection
+    {0x014a00, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Unlock Detection
+    {0x014b64, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Unlock Detection
+    {0x014c00, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Unlock Detection
+    {0x014d00, REG_OVERRIDE | REG_PLL2},                     // PLL2 DEN (MSB)
+    {0x014e61, REG_OVERRIDE | REG_PLL2},                     // PLL2 DEN
+    {0x014fa8, REG_OVERRIDE | REG_PLL2},                     // PLL2 DEN
+    {0x015006, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Unlock Detection
+    {0x015135, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Unlock Detection
+    {0x015275, REG_OVERRIDE | REG_DPLL},                     // DPLL DCO Unlock Detection
+    {0x01530b, REG_OVERRIDE | REG_PLL1},                     // PLL1 24-b NUM MSB (not used in DPLL mode)
+    {0x015400, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_SYNC_PH_OFFSET
+    {0x015500, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_SYNC_PH_OFFSET
+    {0x015600, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_SYNC_PH_OFFSET
+    {0x015700, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_SYNC_PH_OFFSET
+    {0x015800, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_REF_SYNC_PH_OFFSET
+    {0x015900, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL REF Zero Delay Mode Phase Offset
+    {0x015a00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL Freq Incr/Decr enable via pin/reg
+    {0x015b00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_FDEV
+    {0x015c00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_FDEV
+    {0x015d00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_FDEV
+    {0x015e00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL_FDEV
+    {0x015f00, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL Freq Incr/Decr Numerator Step Word (MSB)
+    {0x016000, REG_DEFAULTS | REG_DPLL},                     // [DEF] DPLL Freq Incr/Decr Numerator Step Word
 };
 
 static const uint32_t lmk05318_rom_dpll[] =

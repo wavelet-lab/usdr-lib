@@ -396,6 +396,29 @@ int lmk05318_reset_los_flags(lmk05318_state_t* d)
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
+static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* regs, unsigned count, unsigned mask)
+{
+    unsigned n = 0;
+
+    for(unsigned i = 0; i < count; ++i)
+    {
+        const empiric_t v = regs[i];
+        if(v.type & mask)
+        {
+            USDR_LOG("5318", USDR_LOG_DEBUG, "ADD REGISTER from empirical set [0x%06x]", v.reg);
+            ++n;
+
+            int res = lmk05318_add_reg_to_map(d, &v.reg, 1);
+            if(res)
+                return res;
+        }
+    }
+
+    USDR_LOG("5318", USDR_LOG_DEBUG, "%u REGISTERS added from empirical set", n);
+
+    return 0;
+}
+
 static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bool zdm)
 {
     int res = lmk05318_dpll_config(d, dpll);
@@ -413,6 +436,27 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, 0, 0, 0),                 //R252   disable DPLL
             MAKE_LMK05318_PLL1_CALCTRL0(1, 0, 1),                            //R79 BAW_LOCKDET_EN=1 PLL1_VCOWAIT=1
             MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(1, 0),                     //R80 BAW_LOCK=1
+
+            0x00510A,   //R81
+            0x005200,   //      |
+            0x00530E,   //      |
+            0x0054A6,   //      |
+            0x005500,   //      |
+            0x005600,   //      |
+            0x00571E,   //      |
+            0x005884,   //      |
+            0x005980,   //      | BAW lock&unlock detection
+            0x005A00,   //      |
+            0x005B14,   //      |
+            0x005C00,   //      |
+            0x005D0E,   //      |
+            0x005EA6,   //      |
+            0x005F00,   //      |
+            0x006000,   //      |
+            0x00611E,   //      |
+            0x006284,   //      |
+            0x006380,   //R99
+
         };
         res = lmk05318_add_reg_to_map(d, no_dpll_regs, SIZEOF_ARRAY(no_dpll_regs));
     }
@@ -464,8 +508,7 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
                                      ge2k[LMK05318_PRIREF],
                                      ge2k[LMK05318_PRIREF],
                                      1 /* amp_det_en ge2k[LMK05318_PRIREF]*/) :
-            MAKE_LMK05318_REF0_DETEN(0,0,0,0,0,0)
-            , //R193
+            MAKE_LMK05318_REF0_DETEN(0,0,0,0,0,0), //R193
 
             dpll->en[LMK05318_SECREF] ?
             MAKE_LMK05318_REF1_DETEN(ge2k[LMK05318_SECREF],
@@ -474,8 +517,7 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
                                      ge2k[LMK05318_SECREF],
                                      ge2k[LMK05318_SECREF],
                                      1 /* amp_det_en ge2k[LMK05318_SECREF]*/) :
-            MAKE_LMK05318_REF1_DETEN(0,0,0,0,0,0)
-            , //R194
+            MAKE_LMK05318_REF1_DETEN(0,0,0,0,0,0), //R194
 
             MAKE_LMK05318_REG_WR(REF0_VLDTMR, meas_time[LMK05318_PRIREF] & 0b00011111), //R233
             MAKE_LMK05318_REG_WR(REF1_VLDTMR, meas_time[LMK05318_SECREF] & 0b00011111), //R234
@@ -509,18 +551,23 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_REF_DEN_BY4(d->dpll.den),  //R318
         };
 
-        res = lmk05318_add_reg_to_map(d, lmk05318_rom_dpll_empiric, SIZEOF_ARRAY(lmk05318_rom_dpll_empiric));
+        const unsigned mask = (unsigned)-1; //all
+        res = lmk05318_empirics_smartload(d, lmk05318_rom_dpll_empiric, SIZEOF_ARRAY(lmk05318_rom_dpll_empiric), mask);
         res = res ? res : lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
     }
 
     if(res)
         return res;
 
+    //common registers
     uint32_t regs[] =
     {
         MAKE_LMK05318_PLL_CLK_CFG(0, 0b111),                         //R47   APLL cascade mode + set PLL clock cfg
         MAKE_LMK05318_OUTSYNCCTL(1, 1, 1),                           //R70   enable APLL1/APLL2 channel sync
         MAKE_LMK05318_OUTSYNCEN(1, 1, 1, 1, 1, 1),                   //R71   enable ch0..ch7 out sync
+        MAKE_LMK05318_DPLL_MUTE(1,1,1,1),                            //R29   mute during lock
+
+        MAKE_LMK05318_OUT_MUTE(0,0,0,0,0,0,0,0),                     //R25 unmute all chans
 
         MAKE_LMK05318_MUTELVL1(CH3_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
                                CH2_MUTE_LVL_DIFF_LOW_P_LOW_N_LOW,
@@ -534,29 +581,8 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
         MAKE_LMK05318_INT_FLAG0(0,0,0,0),                            //R19   |
         MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),                    //R20   | reset interrupt LOS flags
 
-        0x00510A,   //R81
-        0x005200,   //      |
-        0x00530E,   //      |
-        0x0054A6,   //      |
-        0x005500,   //      |
-        0x005600,   //      |
-        0x00571E,   //      |
-        0x005884,   //      |
-        0x005980,   //      | BAW lock&unlock detection
-        0x005A00,   //      |
-        0x005B14,   //      |
-        0x005C00,   //      |
-        0x005D0E,   //      |
-        0x005EA6,   //      |
-        0x005F00,   //      |
-        0x006000,   //      |
-        0x00611E,   //      |
-        0x006284,   //      |
-        0x006380,   //R99
-
         MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0,3),  //R115 PLL1 MASHORD=3
-        MAKE_LMK05318_OUT_MUTE(0,0,0,0,0,0,0,0), //R25 unmute all chans
-
+        MAKE_LMK05318_PLL2_MASHCTRL(0,3),        //R139 PLL2 MASHORD=3
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
