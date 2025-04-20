@@ -396,7 +396,7 @@ int lmk05318_reset_los_flags(lmk05318_state_t* d)
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
-#if 0
+UNUSED
 static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* regs, unsigned count, unsigned mask_allow, unsigned mask_deny)
 {
     unsigned n = 0;
@@ -419,7 +419,6 @@ static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* reg
 
     return 0;
 }
-#endif
 
 static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bool zdm)
 {
