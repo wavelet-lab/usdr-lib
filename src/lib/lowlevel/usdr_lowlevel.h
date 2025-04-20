@@ -17,6 +17,9 @@ enum lowlevel_ls_ops {
     USDR_LSOP_URAM = 3,  // Read followed by write
     USDR_LSOP_DRP = 4, // Xilinx DRP port
 
+    USDR_LSOP_GPI = 5, //Internal GPI port / Read Only
+    USDR_LSOP_GPO = 6, //Internal GPO port / Write Only
+
     USDR_LSOP_CUSTOM_CMD = 65536, //Custom commands
 };
 
@@ -59,8 +62,10 @@ enum lowlevel_generic_ops {
 enum llstream_flags {
     LLSF_EXACT_VALUES = 1, //Fail if requested values can't be satisfied; otherwise use closest
     LLSF_NEED_FDPOLL = 2,
-    LLSF_EXT_STAT = 4, // Deprectaed, DON'T USE IT
 };
+
+typedef int (*soft_tx_commit_fn_t)(void *param, unsigned sz, const void* oob_ptr, unsigned oob_size);
+typedef int (*soft_rx_release_fn_t)(void *param);
 
 struct lowlevel_stream_params {
     unsigned flags;
@@ -77,7 +82,12 @@ struct lowlevel_stream_params {
     unsigned bits_per_sym;
     int underlying_fd; ///< FD used for select/poll/epoll calls to get rid of blocking dma_wait/dma_get operations. Multiple streams may share same fd
 
-    size_t out_mtu_size; ///< Maximum transfer size for single transfer (return
+    size_t out_mtu_size;     ///< Maximum transfer size for single transfer (burst)
+    unsigned out_max_bursts; ///< Maximum number of bursts in a transaction
+
+    unsigned dma_core_id;
+    void* param;
+    soft_tx_commit_fn_t soft_tx_commit;
 };
 typedef struct lowlevel_stream_params lowlevel_stream_params_t;
 
@@ -176,6 +186,14 @@ static inline int lowlevel_drp_rd16(lldev_t dev, subdev_t subdev, unsigned port,
                                     uint16_t regaddr, uint16_t *pout) {
     return lowlevel_get_ops(dev)->ls_op(dev, subdev, USDR_LSOP_DRP, (port << 16) | regaddr,
                                         2, pout, 0, NULL);
+}
+
+static inline int lowlevel_gpo_wr8(lldev_t dev, subdev_t subdev, unsigned addr, uint8_t out) {
+    return lowlevel_get_ops(dev)->ls_op(dev, subdev, USDR_LSOP_GPO, addr, 0, NULL, 1, &out);
+}
+
+static inline int lowlevel_gpi_rd32(lldev_t dev, subdev_t subdev, unsigned addr, uint32_t *pout) {
+    return lowlevel_get_ops(dev)->ls_op(dev, subdev, USDR_LSOP_GPI, addr, 4, pout, 0, NULL);
 }
 
 static inline int lowlevel_destroy(lldev_t dev) {

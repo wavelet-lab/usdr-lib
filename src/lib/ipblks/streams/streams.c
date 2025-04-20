@@ -12,9 +12,7 @@ struct bitsfmt get_bits_fmt(const char* fmt)
         bmft.complex = true;
     }
 
-    if (strcasecmp(fmt, "i8") == 0)
-        bmft.bits = 8;
-    else if (strcasecmp(fmt, "i12") == 0)
+    if (strcasecmp(fmt, "i12") == 0)
         bmft.bits = 12;
     else if (strcasecmp(fmt, "i16") == 0)
         bmft.bits = 16;

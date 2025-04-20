@@ -32,6 +32,18 @@ enum usdr_core_subtype {
     // internal MCU glue logic
     USDR_CS_MCU = 0x7,
 
+    // Syncronization core (1PPS, Sysref, etc.)
+    USDR_CS_SYNC = 0x8,
+
+    // Int bucket
+    USDR_CS_BUCKET = 0x9,
+
+    // GPI
+    USDR_CS_GPI = 0xA,
+
+    // GPO
+    USDR_CS_GPO = 0XB,
+
     // non-standard user defined
     USDR_CS_USER = 0xff,
 
@@ -48,6 +60,8 @@ enum usdr_bus_cores {
     USDR_BS_GPIO15_SIMPLE = 5,
 
     USDR_BS_QSPIA24_R0 = 6,
+
+    USDR_QSPI_FLASH_24_RW = 7,
 };
 
 enum usd_aux_cores {
@@ -70,6 +84,24 @@ enum usdr_fe_cores {
     USDR_TXSFE = 32,
 };
 
+enum usdr_sync_cores {
+    USDR_SYNC_SIMPLE = 0,
+    USDR_SYNC_PRECISE_SYSREF = 1,
+};
+
+enum usdr_bucket_cores {
+    USDR_BUCKET_16B = 0,
+};
+
+enum usdr_gpo_cores {
+    USDR_GPO_8BIT = 0,
+};
+
+enum usdr_gpi_cores {
+    USDR_GPI_32BIT_12 = 0,
+};
+
+
 #define USDR_MAKE_COREID(family, coreid) \
     (((family) & 0xff) | ((coreid) << 8))
 
@@ -81,6 +113,5 @@ enum usdr_fe_cores {
 #define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
 #define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
 #define SPI_CORE_CFGW_CS8     USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_CFG_CS8)
-
 
 #endif

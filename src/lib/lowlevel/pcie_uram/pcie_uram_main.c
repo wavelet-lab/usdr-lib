@@ -52,12 +52,14 @@ struct stream_cache_data {
     size_t vma_length;
 
     uint64_t seq;
+
+    //
+    void* param;
+    soft_tx_commit_fn_t soft_tx_fn;
 };
 
 struct pcie_uram_dev
 {
-    //struct lowlevel_ops* ops;
-    //pdevice_t udev;
     struct lowlevel_dev ll;
     uint32_t *mmaped_io;
 
@@ -68,12 +70,8 @@ struct pcie_uram_dev
     device_id_t devid;
     device_bus_t db;
 
-    unsigned channels[DBMAX_SRX + DBMAX_STX];
-    unsigned bit_per_all_sym[DBMAX_SRX + DBMAX_STX];
-
     struct stream_cache_data scache[DBMAX_SRX + DBMAX_STX];
 };
-
 typedef struct pcie_uram_dev pcie_uram_dev_t;
 
 
@@ -412,6 +410,12 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
     case USDR_LSOP_DRP: {
         return device_bus_drp_generic_op(dev, subdev, &d->db, ls_op_addr, meminsz, pin, memoutsz, pout);
     }
+    case USDR_LSOP_GPI: {
+        return device_bus_gpi_generic_op(dev, subdev, &d->db, ls_op_addr, meminsz, pin, memoutsz, pout);
+    }
+    case USDR_LSOP_GPO: {
+        return device_bus_gpo_generic_op(dev, subdev, &d->db, ls_op_addr, meminsz, pin, memoutsz, pout);
+    }
     }
     return -EOPNOTSUPP;
 }
@@ -474,9 +478,11 @@ int pcie_uram_stream_initialize(lldev_t dev, subdev_t subdev,
     } else {
         sc->mmaped_area = NULL;
     }
+    sc->param = params->param;
+    sc->soft_tx_fn = params->soft_tx_commit;
 
-    d->channels[pdsc.sno] = params->channels;
-    d->bit_per_all_sym[pdsc.sno] = params->bits_per_sym;
+    //d->channels[pdsc.sno] = params->channels;
+    //d->bit_per_all_sym[pdsc.sno] = params->bits_per_sym;
     params->underlying_fd = d->fd;
     params->out_mtu_size = pdsc.dma_buf_sz;
     USDR_LOG("PCIE", USDR_LOG_INFO, "Configured stream%d: %d X %d (vma_off=%08lx vma_len=%08lx)\n",
@@ -657,20 +663,19 @@ static
 int pcie_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, void* buffer, unsigned sz, const void* oob_ptr, unsigned oob_size)
 {
     struct pcie_uram_dev* d = (struct pcie_uram_dev*)dev;
-    uint32_t samples = sz * 8 / d->bit_per_all_sym[channel];
-    uint64_t timestamp = (oob_ptr) ? (*(uint64_t*)oob_ptr) : ~0ul;
-    unsigned cnf_base = 12; //REG_WR_TXDMA_CNF_L;
+    struct stream_cache_data* sc = &d->scache[channel];
 
-    if (d->scache[channel].cfg_bufsize < sz) {
+    if (channel > DBMAX_SRX + DBMAX_STX)
+        return -EINVAL;
+
+    if (sc->cfg_bufsize < sz) {
         USDR_LOG("PCIE", USDR_LOG_CRITICAL_WARNING, "Stream was configured with %d DMA buffer but tried to write %d!\n",
                  d->scache[channel].cfg_bufsize, sz);
         return -EINVAL;
     }
 
     // TODO: Call to flush DMA buffers on non-coherent systems
-
-    return sfe_tx4_push_ring_buffer(dev, subdev,
-                                    cnf_base, samples, timestamp);
+    return sc->soft_tx_fn(sc->param, sz, oob_ptr, oob_size);
 }
 
 static
@@ -856,9 +861,9 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
                             unsigned vidpid, void* webops, uintptr_t param)
 {
     struct pci_filtering_params pf;
-    int res = pcie_filtering_params_parse(pcount, devparam, devval, &pf);
-    if (res) {
-        return res;
+    int err = pcie_filtering_params_parse(pcount, devparam, devval, &pf);
+    if (err) {
+        return err;
     }
 
     if (pf.dev == NULL) {
@@ -866,7 +871,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     }
 
     // TODO class
-    int fd, err;
+    int fd;
     bool mmapedio = true;
     unsigned iospacesz = 4096;
     char devname[128];
@@ -970,6 +975,11 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
         err = -ENOSPC;
         goto remove_dev;
     }
+    if (dev->db.bucket_count != 1) {
+        USDR_LOG("PCIE", USDR_LOG_ERROR, "Broken device description: no bucket!\n");
+        err = -ENOSPC;
+        goto remove_dev;
+    }
 
     memcpy(dl.idx_regsp_base, dev->db.idxreg_base, sizeof(dl.idx_regsp_base));
     memcpy(dl.idx_regsp_vbase, dev->db.idxreg_virt_base, sizeof(dl.idx_regsp_base));
@@ -1026,11 +1036,11 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
         }
     }
 
-    dl.bucket_base = 8;
-    dl.bucket_core = 0;
-    dl.bucket_count = 1;
+    dl.bucket_base = dev->db.bucket_base[0];
+    dl.bucket_core = dev->db.bucket_core[0];
+    dl.bucket_count = dev->db.bucket_count;
 
-    err = ioctl(fd, PCIE_DRIVER_SET_DEVLAYOUT, &dl);
+    err = err ? err : ioctl(fd, PCIE_DRIVER_SET_DEVLAYOUT, &dl);
     if (err) {
         err = -errno;
         USDR_LOG("PCIE", USDR_LOG_ERROR,
@@ -1047,11 +1057,6 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
             dev->mmaped_io = NULL;
         }
     }
-
-
-    // Set NTFY routing to PCIe ???????
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    err = pcie_reg_write32_ioctl(dev, 0, (15u << 24) | (0x00));
 
     // Device initialization
     err = err ? err : dev->ll.pdev->initialize(dev->ll.pdev, pcount, devparam, devval);

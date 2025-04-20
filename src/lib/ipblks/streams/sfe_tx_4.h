@@ -13,7 +13,7 @@ int sfe_tx4_mtu_get(const struct stream_config* psc);
 
 // TX only supports 16 bit for now
 int sfe_tx4_ctl(sfe_cfg_t *pfe,
-                unsigned cfg_base,
+                unsigned sync_base,
                 unsigned chans,
                 uint8_t swap_ab_flag,
                 uint8_t mute_flag,
@@ -21,7 +21,7 @@ int sfe_tx4_ctl(sfe_cfg_t *pfe,
                 bool start);
 
 int sfe_tx4_upd(sfe_cfg_t *pfe,
-                unsigned cfg_base,
+                unsigned sync_base,
                 unsigned mute_flags,
                 unsigned swap_ab_flag);
 
@@ -35,5 +35,16 @@ int sfe_tx4_push_ring_buffer(lldev_t dev,
                              unsigned cfg_base,
                              unsigned samples,
                              int64_t timestamp);
+
+int sfe_extx4_push_ring_buffer(lldev_t dev,
+                               subdev_t subdev,
+                               unsigned cfg_base,
+                               uint32_t* creg0,
+                               uint32_t* creg1,
+                               uint32_t* creg2,
+                               unsigned bytes,
+                               unsigned samples,
+                               unsigned lgbursts,
+                               int64_t timestamp);
 
 #endif

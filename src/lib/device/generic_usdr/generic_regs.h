@@ -30,13 +30,25 @@ enum REGS_generic_usdr_r000 {
     M2PCI_REG_QSPI_FLASH      = 10,
     M2PCI_REG_QSPI_FLASH_ADDR = 11,
 
+    // TXDMA old core
     M2PCI_REG_WR_TXDMA_CNF_L  = 12, //Burst len
     M2PCI_REG_WR_TXDMA_CNF_T  = 13, //Burst timing
-    M2PCI_REG_WR_TXDMA_COMB   = 14, //Control
+
+    // FE/DMA Sync & control
+    // M2PCI_REG_WR_TXDMA_COMB   = 14, //Control
+    M2PCI_REG_WR_SYNC_CTRL    = 14, //Control
 
     M2PCI_REG_INT = 15,
 
     // Ranges [16-31]
+    M2PCI_REG_RD_GPI0_12        = 16,
+
+    // TXDMA new core
+    M2PCI_REG_WR_TXDMA_CFG0     = 28,
+    M2PCI_REG_WR_TXDMA_CFG1     = 29,
+    M2PCI_REG_WR_TXDMA_TS_H     = 30,
+    M2PCI_REG_WR_TXDMA_TS_L     = 31,
+
     M2PCI_REG_RD_TXDMA_STAT     = 28,
     M2PCI_REG_RD_TXDMA_STATM    = 29,
     M2PCI_REG_RD_TXDMA_STATTS   = 30,

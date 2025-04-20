@@ -734,8 +734,9 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
                           double freq,
                           double *actualfreq)
 {
+    int res;
     if (actualfreq) *actualfreq = freq;
-    bool first_rx = d->tx_lo == 0;
+    bool first_tx = (d->tx_lo == 0);
     if (dir_tx) {
         d->tx_lo = freq;
     } else {
@@ -754,24 +755,23 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
     USDR_LOG("UDEV", USDR_LOG_INFO, "%s: FE_FREQ orig=%u RFIC=%u\n",
              lowlevel_get_devname(d->base.dev), d->rx_lo, d->rfic_rx_lo);
 
-    // Fixup for error when TX PLL doesn't work when RX isn't running
-    int res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
-    if (res == -ENOLCK && !dir_tx && first_rx) {
+    res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
+    if (res == -ENOLCK) {
+        // For unrecognized reason some LMS6002 chips fail to lock TX pll before RX initialization
+        // so we try to lock TX in standalone mode first and if fails try to initialize RX pll
+        // and tune TX again
+        if (dir_tx && first_tx && d->rx_lo == 0) {
+            lms6002d_tune_pll(&d->lms, 0, freq);
+        }
         // LDO may not be ready, check again
-        usleep(100);
-        res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
-    }
-    if (res == -ENOLCK && dir_tx && d->rx_lo == 0) {
-        res = lms6002d_tune_pll(&d->lms, 0, freq);
-        if (res)
-            return res;
-
+        usleep(1000);
         res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
     }
     if (res == -ENOLCK) {
-        USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: %s_LO=%u unable to lock!\n",
+        USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: %s_LO=%u unable to lock (pwr: %d)!\n",
                  lowlevel_get_devname(d->base.dev), dir_tx ? "TX" : "RX",
-                 dir_tx ? d->tx_lo : d->rx_lo);
+                 dir_tx ? d->tx_lo : d->rx_lo,
+                 dir_tx ? d->tx_pwren : d->rx_pwren);
     }
     return res;
 }
