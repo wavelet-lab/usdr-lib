@@ -396,14 +396,14 @@ int lmk05318_reset_los_flags(lmk05318_state_t* d)
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
-static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* regs, unsigned count, unsigned mask)
+static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* regs, unsigned count, unsigned mask_allow, unsigned mask_deny)
 {
     unsigned n = 0;
 
     for(unsigned i = 0; i < count; ++i)
     {
         const empiric_t v = regs[i];
-        if(v.type & mask)
+        if((v.type & mask_allow) && !(v.type & mask_deny))
         {
             USDR_LOG("5318", USDR_LOG_DEBUG, "ADD REGISTER from empirical set [0x%06x]", v.reg);
             ++n;
@@ -551,8 +551,9 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_REF_DEN_BY4(d->dpll.den),  //R318
         };
 
-        const unsigned mask = (unsigned)-1; //all
-        res = lmk05318_empirics_smartload(d, lmk05318_rom_dpll_empiric, SIZEOF_ARRAY(lmk05318_rom_dpll_empiric), mask);
+        const unsigned mask_allow = (unsigned)-1; //all
+        const unsigned mask_deny  = 0; //none
+        res = lmk05318_empirics_smartload(d, lmk05318_rom_dpll_empiric, SIZEOF_ARRAY(lmk05318_rom_dpll_empiric), mask_allow, mask_deny);
         res = res ? res : lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
     }
 
