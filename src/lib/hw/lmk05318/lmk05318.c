@@ -396,6 +396,7 @@ int lmk05318_reset_los_flags(lmk05318_state_t* d)
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
+#if 0
 static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* regs, unsigned count, unsigned mask_allow, unsigned mask_deny)
 {
     unsigned n = 0;
@@ -418,6 +419,7 @@ static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* reg
 
     return 0;
 }
+#endif
 
 static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bool zdm)
 {
@@ -487,6 +489,30 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             (unsigned)(log2f(10000.f / dpll->fref[LMK05318_SECREF]) + 2.5),
         };
 
+        //this value is empirical and should be clarified
+        uint32_t phase_valid_detection[] =
+        {
+            dpll->en[LMK05318_PRIREF] ? 50000000 : 0,
+            dpll->en[LMK05318_SECREF] ? 50000000 : 0,
+        };
+
+        //this value is empirical and should be clarified
+        uint64_t ref_cycslip_offset = 5000000000;
+
+        //this value is empirical and should be clarified
+        uint16_t ref_filter_scalar = 678;
+
+        //this value is empirical and should be clarified
+        uint8_t ref_quant = 10;
+
+        uint8_t dpll_sdm_order = 3;
+
+        //this value is empirical and should be clarified
+        uint64_t dco_lock_det0 = 0x000a000000;
+        uint64_t dco_lock_det1 = 0x010635750b;
+        uint32_t dco_unlock_det0 = 0x006400;
+        uint32_t dco_unlock_det1 = 0x063575;
+
         uint32_t dpll_regs[] =
         {
             MAKE_LMK05318_DEV_CTL(0, 0, 1/*SYNC_AUTO_DPLL*/, 1, 1, 1, 1),   //R12   set APLL1 mode - Free-run
@@ -549,11 +575,104 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_REF_DEN_BY2(d->dpll.den),
             MAKE_LMK05318_DPLL_REF_DEN_BY3(d->dpll.den),
             MAKE_LMK05318_DPLL_REF_DEN_BY4(d->dpll.den),  //R318
-        };
 
-        const unsigned mask_allow = (unsigned)-1; //all
-        const unsigned mask_deny  = 0; //none
+            MAKE_LMK05318_REG_WR(0x00d8, 0x00),           //R216 unknown, undocumented, but critical to start DPLL
+
+            MAKE_LMK05318_REF0_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_PRIREF]), //R235
+            MAKE_LMK05318_REF0_PH_VALID_CNT_BY1(phase_valid_detection[LMK05318_PRIREF]), //R236
+            MAKE_LMK05318_REF0_PH_VALID_CNT_BY2(phase_valid_detection[LMK05318_PRIREF]), //R237
+            MAKE_LMK05318_REF0_PH_VALID_CNT_BY3(phase_valid_detection[LMK05318_PRIREF]), //R238
+
+            MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_SECREF]), //R239
+            MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_SECREF]), //R240
+            MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_SECREF]), //R241
+            MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_SECREF]), //R242
+
+            MAKE_LMK05318_DPLL_REF_TDC_CTL(0, 1),    //R260 DPLL_REF_AVOID_SLIP(en) + TDC software ctrl(dis)
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_DLY_GEN, 0x80),                     //R261 empirical! clarify!
+
+            MAKE_LMK05318_DPLL_REF_CYCSLIP_OFFSET_BY0(ref_cycslip_offset),    //R262
+            MAKE_LMK05318_DPLL_REF_CYCSLIP_OFFSET_BY1(ref_cycslip_offset),    //R263
+            MAKE_LMK05318_DPLL_REF_CYCSLIP_OFFSET_BY2(ref_cycslip_offset),    //R264
+            MAKE_LMK05318_DPLL_REF_CYCSLIP_OFFSET_BY3(ref_cycslip_offset),    //R265
+            MAKE_LMK05318_DPLL_REF_CYCSLIP_OFFSET_BY4(ref_cycslip_offset),    //R266
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_LOOPCTL, 0xa0),                     //R267 empirical! clarify!
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_LOOPCTL_CHG, 0),                    //R268
+            MAKE_LMK05318_REG_WR(DPLL_REF_DECIMATION, 0),                     //R269
+
+            MAKE_LMK05318_DPLL_REF_FILTSCALAR_BY0(ref_filter_scalar),         //R270
+            MAKE_LMK05318_DPLL_REF_FILTSCALAR_BY1(ref_filter_scalar),         //R271
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_FILTGAIN,     0),                   //R272
+            MAKE_LMK05318_REG_WR(DPLL_REF_FILTGAIN_FL1, 0),                   //R273
+            MAKE_LMK05318_REG_WR(DPLL_REF_FILTGAIN_FL2, 0),                   //R274
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_LOOPGAIN,     22),                  //R275 empirical! clarify!
+            MAKE_LMK05318_REG_WR(DPLL_REF_LOOPGAIN_FL1, 22),                  //R276 empirical! clarify!
+            MAKE_LMK05318_REG_WR(DPLL_REF_LOOPGAIN_FL2, 22),                  //R277 empirical! clarify!
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_LPF0GAIN,     0),                   //R278
+            MAKE_LMK05318_REG_WR(DPLL_REF_LPF0GAIN_FL1, 0),                   //R279
+            MAKE_LMK05318_REG_WR(DPLL_REF_LPF0GAIN_FL2, 0),                   //R280
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_LPF1GAIN,     0),                   //R281
+            MAKE_LMK05318_REG_WR(DPLL_REF_LPF1GAIN_FL1, 0),                   //R282
+            MAKE_LMK05318_REG_WR(DPLL_REF_LPF1GAIN_FL2, 0),                   //R283
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_LPF0GAIN2_FL, 30),                  //R284 empirical! clarify!
+            MAKE_LMK05318_REG_WR(DPLL_REF_LPF1GAIN2_FL, 30),                  //R285 empirical! clarify!
+
+            MAKE_LMK05318_DPLL_REF_TMR_FL1_BY0(0),                            //R286
+            MAKE_LMK05318_DPLL_REF_TMR_FL1_BY1(0),                            //R287
+            MAKE_LMK05318_DPLL_REF_TMR_FL2_BY0(0),                            //R288
+            MAKE_LMK05318_DPLL_REF_TMR_FL2_BY1(0),                            //R289
+
+            MAKE_LMK05318_DPLL_REF_TMR_LCK_BY0(0x0322),                       //R290 empirical! clarify!
+            MAKE_LMK05318_DPLL_REF_TMR_LCK_BY0(0x0322),                       //R291 empirical! clarify!
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_PHC_LPF,  0),                       //R292
+            MAKE_LMK05318_REG_WR(DPLL_REF_PHC_CTRL, 0),                       //R293
+            MAKE_LMK05318_DPLL_REF_PHC_TIMER_BY0(0),                          //R294
+            MAKE_LMK05318_DPLL_REF_PHC_TIMER_BY1(0),                          //R295
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_QUANT,     ref_quant),              //R296
+            MAKE_LMK05318_REG_WR(DPLL_REF_QUANT_FL1, ref_quant),              //R297
+            MAKE_LMK05318_REG_WR(DPLL_REF_QUANT_FL2, ref_quant),              //R298
+
+            MAKE_LMK05318_REG_WR(DPLL_PL_LPF_GAIN,       0),                  //R300 empirical! clarify!
+            MAKE_LMK05318_REG_WR(DPLL_PL_THRESH,      0x1c),                  //R301 empirical! clarify!
+            MAKE_LMK05318_REG_WR(DPLL_PL_UNLK_THRESH, 0x1e),                  //R302 empirical! clarify!
+
+            MAKE_LMK05318_REG_WR(DPLL_REF_MASHCTL, dpll_sdm_order),           //R319
+
+            MAKE_LMK05318_DPLL_REF_LOCKDET_1_5_BY0(dco_lock_det0),            //R320
+            MAKE_LMK05318_DPLL_REF_LOCKDET_1_5_BY1(dco_lock_det0),
+            MAKE_LMK05318_DPLL_REF_LOCKDET_1_5_BY2(dco_lock_det0),
+            MAKE_LMK05318_DPLL_REF_LOCKDET_1_5_BY3(dco_lock_det0),
+            MAKE_LMK05318_DPLL_REF_LOCKDET_1_5_BY4(dco_lock_det0),
+
+            MAKE_LMK05318_DPLL_REF_LOCKDET_6_10_BY0(dco_lock_det1),           //R325
+            MAKE_LMK05318_DPLL_REF_LOCKDET_6_10_BY1(dco_lock_det1),
+            MAKE_LMK05318_DPLL_REF_LOCKDET_6_10_BY2(dco_lock_det1),
+            MAKE_LMK05318_DPLL_REF_LOCKDET_6_10_BY3(dco_lock_det1),
+            MAKE_LMK05318_DPLL_REF_LOCKDET_6_10_BY4(dco_lock_det1),
+
+            MAKE_LMK05318_DPLL_REF_UNLOCKDET_1_3_BY0(dco_unlock_det0),        //R330
+            MAKE_LMK05318_DPLL_REF_UNLOCKDET_1_3_BY1(dco_unlock_det0),
+            MAKE_LMK05318_DPLL_REF_UNLOCKDET_1_3_BY2(dco_unlock_det0),
+
+            MAKE_LMK05318_DPLL_REF_UNLOCKDET_VCO_CNTSTRT_BY0(dco_unlock_det1),//R336
+            MAKE_LMK05318_DPLL_REF_UNLOCKDET_VCO_CNTSTRT_BY1(dco_unlock_det1),//R337
+            MAKE_LMK05318_DPLL_REF_UNLOCKDET_VCO_CNTSTRT_BY2(dco_unlock_det1),//R338
+        };
+#if 0
+        const unsigned mask_allow = REG_OVERRIDE;
+        const unsigned mask_deny  = REG_PLL1 | REG_PLL2 | REG_XO | REG_LDO | REG_NVM | REG_UNKNOWN;
         res = lmk05318_empirics_smartload(d, lmk05318_rom_dpll_empiric, SIZEOF_ARRAY(lmk05318_rom_dpll_empiric), mask_allow, mask_deny);
+#endif
         res = res ? res : lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
     }
 
@@ -581,6 +700,7 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
 
         MAKE_LMK05318_INT_FLAG0(0,0,0,0),                            //R19   |
         MAKE_LMK05318_INT_FLAG1(0,0,0,0,0,0,0,0),                    //R20   | reset interrupt LOS flags
+        MAKE_LMK05318_INTCTL(0,0),                                   //R21
     };
 
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));

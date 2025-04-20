@@ -1119,11 +1119,8 @@ pages:
       - addr: 0x10D
         name: DPLL_REF_DECIMATION
 
-      - addr: 0x10E
-        name: DPLL_REF_FILTSCALAR_BY1
-
-      - addr: 0x10F
-        name: DPLL_REF_FILTSCALAR_BY0
+      - addr: "0x10E:0x10F"
+        name: DPLL_REF_FILTSCALAR
 
       - addr: 0x110
         name: DPLL_REF_FILTGAIN
@@ -1167,23 +1164,14 @@ pages:
       - addr: 0x11D
         name: DPLL_REF_LPF1GAIN2_FL
 
-      - addr: 0x11E
-        name: DPLL_REF_TMR_FL1_BY1
+      - addr: "0x11E:0x11F"
+        name: DPLL_REF_TMR_FL1
 
-      - addr: 0x11F
-        name: DPLL_REF_TMR_FL1_BY0
+      - addr: "0x120:0x121"
+        name: DPLL_REF_TMR_FL2
 
-      - addr: 0x120
-        name: DPLL_REF_TMR_FL2_BY1
-
-      - addr: 0x121
-        name: DPLL_REF_TMR_FL2_BY0
-
-      - addr: 0x122
-        name: DPLL_REF_TMR_LCK_BY1
-
-      - addr: 0x123
-        name: DPLL_REF_TMR_LCK_BY0
+      - addr: "0x122:0x123"
+        name: DPLL_REF_TMR_LCK
 
       - addr: 0x124
         name: DPLL_REF_PHC_LPF
@@ -1191,11 +1179,8 @@ pages:
       - addr: 0x125
         name: DPLL_REF_PHC_CTRL
 
-      - addr: 0x126
-        name: DPLL_REF_PHC_TIMER_BY1
-
-      - addr: 0x127
-        name: DPLL_REF_PHC_TIMER_BY0
+      - addr: "0x126:0x127"
+        name: DPLL_REF_PHC_TIMER
 
       - addr: 0x128
         name: DPLL_REF_QUANT
