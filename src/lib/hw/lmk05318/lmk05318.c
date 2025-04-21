@@ -505,6 +505,7 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
         uint8_t ref_quant = 10;
 
         uint8_t dpll_sdm_order = 3;
+        uint8_t dpll_sdm_dither = 0;
 
         //this value is empirical and should be clarified
         uint64_t dco_lock_det0 = 0x000a000000;
@@ -587,7 +588,7 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_REF1_PH_VALID_CNT_BY2(phase_valid_detection[LMK05318_SECREF]), //R241
             MAKE_LMK05318_REF1_PH_VALID_CNT_BY3(phase_valid_detection[LMK05318_SECREF]), //R242
 
-            MAKE_LMK05318_DPLL_REF_TDC_CTL(0, 1),    //R260 DPLL_REF_AVOID_SLIP(en) + TDC software ctrl(dis)
+            MAKE_LMK05318_DPLL_REF_TDC_CTL(0, 1),    //R260 TDC software ctrl(dis) + DPLL_REF_AVOID_SLIP(en)
 
             MAKE_LMK05318_REG_WR(DPLL_REF_DLY_GEN, 0x80),                     //R261 empirical! clarify!
 
@@ -645,7 +646,7 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_REG_WR(DPLL_PL_THRESH,      0x1c),                  //R301 empirical! clarify!
             MAKE_LMK05318_REG_WR(DPLL_PL_UNLK_THRESH, 0x1e),                  //R302 empirical! clarify!
 
-            MAKE_LMK05318_REG_WR(DPLL_REF_MASHCTL, dpll_sdm_order),           //R319
+            MAKE_LMK05318_DPLL_REF_MASHCTL(dpll_sdm_dither, dpll_sdm_order),  //R319
 
             MAKE_LMK05318_DPLL_REF_LOCKDET_1_5_BY0(dco_lock_det0),            //R320
             MAKE_LMK05318_DPLL_REF_LOCKDET_1_5_BY1(dco_lock_det0),

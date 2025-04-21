@@ -1217,6 +1217,11 @@ pages:
 
       - addr: 0x13F
         name: DPLL_REF_MASHCTL
+        fields:
+          - bits: "4-3"
+            name: DPLL_REF_DTHRMODE
+          - bits: "2-0"
+            name: DPLL_REF_ORDER
 
       - addr: "0x140:0x144"
         name: DPLL_REF_LOCKDET_1_5
