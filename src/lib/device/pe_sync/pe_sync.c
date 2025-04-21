@@ -335,14 +335,14 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     //wait for lock
     //APLL1/DPLL
-    res = lmk05318_wait_apll1_lock(&d->gen, 10000);
+    res = lmk05318_wait_apll1_lock(&d->gen, 100000);
 
     //APLL2 (if needed)
     if(res == 0 && d->gen.vco2_freq)
     {
         //reset LOS flags once again because APLL2 LOS is set after APLL1 tuning
         res = lmk05318_reset_los_flags(&d->gen);
-        res = res ? res : lmk05318_wait_apll2_lock(&d->gen, 10000);
+        res = res ? res : lmk05318_wait_apll2_lock(&d->gen, 100000);
     }
 
     unsigned los_msk;
@@ -484,7 +484,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
-    res = lmx1204_wait_pll_lock(&d->cldistr, 10000);
+    res = lmx1204_wait_pll_lock(&d->cldistr, 100000);
 
     lmx1204_stats_t lmx1204status;
     lmx1204_read_status(&d->cldistr, &lmx1204status); //just for log

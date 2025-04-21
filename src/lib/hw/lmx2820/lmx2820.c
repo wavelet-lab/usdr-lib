@@ -972,7 +972,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         return res;
     }
 
-    res = lmx2820_wait_pll_lock(st, 10000);
+    res = lmx2820_wait_pll_lock(st, 100000);
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_wait_pll_lock() failed, err:%d [%s]",
