@@ -583,9 +583,9 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_REF0_PH_VALID_CNT_BY3(phase_valid_detection[LMK05318_PRIREF]), //R238
 
             MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_SECREF]), //R239
-            MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_SECREF]), //R240
-            MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_SECREF]), //R241
-            MAKE_LMK05318_REF1_PH_VALID_CNT_BY0(phase_valid_detection[LMK05318_SECREF]), //R242
+            MAKE_LMK05318_REF1_PH_VALID_CNT_BY1(phase_valid_detection[LMK05318_SECREF]), //R240
+            MAKE_LMK05318_REF1_PH_VALID_CNT_BY2(phase_valid_detection[LMK05318_SECREF]), //R241
+            MAKE_LMK05318_REF1_PH_VALID_CNT_BY3(phase_valid_detection[LMK05318_SECREF]), //R242
 
             MAKE_LMK05318_DPLL_REF_TDC_CTL(0, 1),    //R260 DPLL_REF_AVOID_SLIP(en) + TDC software ctrl(dis)
 
@@ -630,12 +630,12 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_REF_TMR_FL2_BY1(0),                            //R289
 
             MAKE_LMK05318_DPLL_REF_TMR_LCK_BY0(0x0322),                       //R290 empirical! clarify!
-            MAKE_LMK05318_DPLL_REF_TMR_LCK_BY0(0x0322),                       //R291 empirical! clarify!
+            MAKE_LMK05318_DPLL_REF_TMR_LCK_BY1(0x0322),                       //R291 empirical! clarify!
 
-            MAKE_LMK05318_REG_WR(DPLL_REF_PHC_LPF,  0),                       //R292
-            MAKE_LMK05318_REG_WR(DPLL_REF_PHC_CTRL, 0),                       //R293
-            MAKE_LMK05318_DPLL_REF_PHC_TIMER_BY0(0),                          //R294
-            MAKE_LMK05318_DPLL_REF_PHC_TIMER_BY1(0),                          //R295
+            MAKE_LMK05318_REG_WR(DPLL_REF_PHC_LPF,  0),                       //R292 |
+            MAKE_LMK05318_REG_WR(DPLL_REF_PHC_CTRL, 0),                       //R293 |
+            MAKE_LMK05318_DPLL_REF_PHC_TIMER_BY0(0),                          //R294 | Phase Cancellation for Hitless Switching
+            MAKE_LMK05318_DPLL_REF_PHC_TIMER_BY1(0),                          //R295 |
 
             MAKE_LMK05318_REG_WR(DPLL_REF_QUANT,     ref_quant),              //R296
             MAKE_LMK05318_REG_WR(DPLL_REF_QUANT_FL1, ref_quant),              //R297
