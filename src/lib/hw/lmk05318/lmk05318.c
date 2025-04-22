@@ -22,8 +22,9 @@
 
 enum {
     VCO_APLL1 = 2500000000ull,
-    VCO_APLL1_MIN = 2499750000ull,
-    VCO_APLL1_MAX = 2500250000ull,
+    VCO_APLL1_DELTA_MAX = 250000,
+    VCO_APLL1_MIN = VCO_APLL1 - VCO_APLL1_DELTA_MAX,
+    VCO_APLL1_MAX = VCO_APLL1 + VCO_APLL1_DELTA_MAX,
 
     VCO_APLL2_MIN = 5500000000ull,
     VCO_APLL2_MAX = 6250000000ull,
@@ -54,6 +55,23 @@ enum {
 
     DPLL_PRE_DIV_MIN = 2,
     DPLL_PRE_DIV_MAX = 17,
+};
+
+enum
+{
+    SDM_DITHER_MODE_WEAK = 0x0,
+    SDM_DITHER_MODE_MEDIUM = 0x1,
+    SDM_DITHER_MODE_STRONG = 0x2,
+    SDM_DITHER_MODE_DISABLED = 0x3,
+};
+
+enum
+{
+    SDM_ORDER_INT = 0x0,
+    SDM_ORDER_FIRST = 0x1,
+    SDM_ORDER_SECOND = 0x2,
+    SDM_ORDER_THIRD = 0x3,
+    SDM_ORDER_FORTH = 0x4,
 };
 
 int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
@@ -209,7 +227,7 @@ int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
     const double delta = fabs((double)VCO_APLL1 - vco1_fact);
     USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] N:%u NUM:%" PRIu64 " DEN:%" PRIu64 " VCO1_FACT:%.8f DELTA:%.8fHz",
              fb_int, fb_num, fb_den, vco1_fact, delta);
-    if(delta > 1E-6)
+    if(delta > 1E-4)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] VCO1_FACT too rough");
         return -EINVAL;
@@ -504,8 +522,8 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
         //this value is empirical and should be clarified
         uint8_t ref_quant = 10;
 
-        uint8_t dpll_sdm_order = 3;
-        uint8_t dpll_sdm_dither = 0;
+        uint8_t dpll_sdm_order = d->dpll.num ? SDM_ORDER_THIRD : SDM_ORDER_INT;
+        uint8_t dpll_sdm_dither = SDM_DITHER_MODE_WEAK;
 
         //this value is empirical and should be clarified
         uint64_t dco_lock_det0 = 0x000a000000;
@@ -974,9 +992,11 @@ static inline double lmk05318_calc_vco2_div(lmk05318_state_t* d, uint64_t fvco2,
 
 static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
 {
+    int res;
+
     double fpd2 = (double)VCO_APLL1 / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
     if (fpd2 < APLL2_PD_MIN || fpd2 > APLL2_PD_MAX) {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 PFD should be in range [%" PRIu64 ";%" PRIu64 "] but got %.8f!\n",
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 FPD should be in range [%" PRIu64 ";%" PRIu64 "] but got %.8f!\n",
                  (uint64_t)APLL2_PD_MIN, (uint64_t)APLL2_PD_MAX, fpd2);
         return -EINVAL;
     }
@@ -997,10 +1017,12 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
     const unsigned n   = d->vco2_n;
     const unsigned num = d->vco2_num;
     const unsigned den = d->vco2_den;
-    int res;
 
-    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL2 RS=%u RP=%u FPD2=%.8f FVCO2=%" PRIu64 " N=%d NUM=%d DEN=%d PD1=%d PD2=%d\n",
-             d->fref_pll2_div_rs, d->fref_pll2_div_rp, fpd2, d->vco2_freq, n, num, den, d->pd1, d->pd2);
+    const uint8_t apll2_sdm_order = num ? SDM_ORDER_THIRD : SDM_ORDER_INT; //override if needed
+    const uint8_t apll2_sdm_dither = SDM_DITHER_MODE_WEAK;
+
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL2 RS=%u RP=%u FPD2=%.8f FVCO2=%" PRIu64 " N=%d NUM=%d DEN=%d PD1=%d PD2=%d MASH_ORD:%u",
+             d->fref_pll2_div_rs, d->fref_pll2_div_rp, fpd2, d->vco2_freq, n, num, den, d->pd1, d->pd2, apll2_sdm_order);
 
     // one of PDs may be unused (==0) -> we should fix it before registers set
     if(d->pd1 < APLL2_PDIV_MIN || d->pd1 > APLL2_PDIV_MAX)
@@ -1012,10 +1034,8 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
         d->pd2 = d->pd1;
     }
 
-    const uint8_t apll2_sdm_order = num ? 3 : 0; //override if needed
-
     uint32_t regs[] = {
-        MAKE_LMK05318_PLL2_MASHCTRL(0,apll2_sdm_order),                                 //R139 PLL2 MASHORD=3
+        MAKE_LMK05318_PLL2_MASHCTRL(apll2_sdm_dither, apll2_sdm_order),                 //R139 PLL2 MASHORD=3
         MAKE_LMK05318_PLL2_CTRL2(d->pd2 - 1, d->pd1 - 1),                               //R102
         MAKE_LMK05318_PLL2_NDIV_BY0(n),                                                 //R135
         MAKE_LMK05318_PLL2_NDIV_BY1(n),                                                 //R134
@@ -1084,20 +1104,63 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
 
 int lmk05318_tune_apll1(lmk05318_state_t* d)
 {
-    unsigned fpd1 = (d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2 : 1);
-    uint64_t fvco = VCO_APLL1;
-    unsigned n = fvco / fpd1;
-    const uint8_t apll1_sdm_order = 3; //override if needed
+    int res;
+
+    uint8_t apll1_sdm_order;
+    const uint8_t apll1_sdm_dither = SDM_DITHER_MODE_WEAK;
+
+    uint64_t num, den;
+
+    const double fpd1 = ((double)d->xo.fref / d->xo.pll1_fref_rdiv) * (d->xo.doubler_enabled ? 2.0f : 1.0f);
+    if(fpd1 < APLL1_PD_MIN || fpd1 > APLL1_PD_MAX)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL1 FPD should be in range [%" PRIu64 ";%" PRIu64 "] but got %.8f!\n",
+                 (uint64_t)APLL1_PD_MIN, (uint64_t)APLL1_PD_MAX, fpd1);
+        return -EINVAL;
+    }
+
+    const uint64_t fvco = VCO_APLL1;
+    const double r = (double)fvco / fpd1;
+    const unsigned n = (unsigned)r;
+    const double n_frac = r - n;
+
+    if(n > UINT16_MAX)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL1 FDIV.N=%u out of range [1;65535]", n);
+        return -EINVAL;
+    }
 
     //in DPLL mode we use FIXED 40-bit APLL1 denominator and programmed 40-bit numerator
     if(d->dpll.enabled)
     {
-        uint64_t num = (fvco - n * (uint64_t)fpd1) * (1ull << 40) / fpd1;
+        den = (uint64_t)1 << 40; //fixed
+        num = (uint64_t)(n_frac * den + 0.5);
+        apll1_sdm_order = SDM_ORDER_THIRD; //for DPLL correction
+    }
+    // without DPLL we use programmed 24-bit numerator & programmed 24-bit denominator
+    else
+    {
+        den = ((uint64_t)1 << 24) - 1; //max 24-bit
+        num = (uint64_t)(n_frac * den + 0.5);
+        apll1_sdm_order = num ? SDM_ORDER_THIRD : SDM_ORDER_INT;
+    }
 
-        USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu64 " DEN=FIXED\n", fvco, n, num);
+    const double vco1_fact = fpd1 * (n + (double)num / den);
 
+    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FPD=%.8f VCO_FACT=%.8f N=%d NUM=%" PRIu64 " DEN=%" PRIu64 "[%s] MASH_ORD:%u",
+             fpd1, vco1_fact, n, num, den, (d->dpll.enabled ? "FIXED" : "PROGRAMMED"), apll1_sdm_order);
+
+    if(fabs(vco1_fact - fvco) > 1E-4)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL1 VCO too rough");
+        return -EINVAL;
+    }
+
+    if(d->dpll.enabled)
+    {
         uint32_t regs[] = {
-            MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0,apll1_sdm_order), //R115 PLL1 MASHORD=3 WeakDither
+            MAKE_LMK05318_PLL1_MASHCTRL(0, 0, 0,
+                              apll1_sdm_dither, apll1_sdm_order), //R115 PLL1 MASHORD=3 WeakDither
             MAKE_LMK05318_PLL1_MODE(0, 0, 1),                     //R116  DPLL mode
             MAKE_LMK05318_PLL1_NDIV_BY0(n),                       //R109  NDIV
             MAKE_LMK05318_PLL1_NDIV_BY1(n),                       //R108  NDIV
@@ -1109,21 +1172,13 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
             MAKE_LMK05318_PLL1_CTRL0(0),                          //R74   Activate APLL1
         };
 
-        int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
-        if (res)
-            return res;
+        res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
     }
-    // without DPLL we use programmed 24-bit numerator & programmed 24-bit denominator
     else
     {
-        double frac = (double)fvco / fpd1 - n;
-        const uint32_t den = ((uint32_t)1 << 24) - 1; //max 24-bit
-        const uint32_t num = (frac * den + 0.5);
-
-        USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FVCO=%" PRIu64 " N=%d NUM=%" PRIu32 " DEN=%" PRIu32 "\n", fvco, n, num, den);
-
         uint32_t regs[] = {
-            MAKE_LMK05318_PLL1_MASHCTRL(0,0,0,0,apll1_sdm_order),     //R115 PLL1 MASHORD=3 WeakDither
+            MAKE_LMK05318_PLL1_MASHCTRL(0, 0, 0,
+                                  apll1_sdm_dither, apll1_sdm_order), //R115 PLL1 MASHORD=3 WeakDither
             MAKE_LMK05318_PLL1_MODE(0, 0, 0),                         //R116  free-run mode
             MAKE_LMK05318_PLL1_NDIV_BY0(n),                           //R109  NDIV
             MAKE_LMK05318_PLL1_NDIV_BY1(n),                           //R108  NDIV
@@ -1139,12 +1194,10 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
             MAKE_LMK05318_PLL1_CTRL0(0),                              //R74   Activate APLL1
         };
 
-        int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
-        if (res)
-            return res;
+        res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
     }
 
-    return 0;
+    return res;
 }
 
 static inline uint64_t lmk05318_max_odiv(unsigned port)
