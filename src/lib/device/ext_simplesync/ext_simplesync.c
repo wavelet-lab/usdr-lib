@@ -137,7 +137,7 @@ int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
     lmk05318_set_port_affinity(cfg, 2, AFF_APLL2);
     lmk05318_set_port_affinity(cfg, 3, AFF_APLL2);
 
-    int res = lmk05318_solver(&ob->lmk, cfg, 4, false /*dry_run*/);
+    int res = lmk05318_solver(&ob->lmk, cfg, 4);
     res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
     res = res ? res : lmk05318_softreset(&ob->lmk);
     res = res ? res : lmk05318_reset_los_flags(&ob->lmk);

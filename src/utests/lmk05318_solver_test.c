@@ -32,7 +32,7 @@ static void teardown()
 
 START_TEST(lmk05318_solver_test1)
 {
-    int res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
+    int res = lmk05318_solver(&dev, cfg, OUTS_LEN);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -47,7 +47,7 @@ START_TEST(lmk05318_solver_test2)
     res = res ? res : lmk05318_port_request(cfg, 6,  f/7/17, false, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
+    res = lmk05318_solver(&dev, cfg, OUTS_LEN);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -79,7 +79,7 @@ START_TEST(lmk05318_solver_test3)
     res = res ? res : lmk05318_set_port_affinity(cfg, 7, AFF_APLL2);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
+    res = lmk05318_solver(&dev, cfg, OUTS_LEN);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -112,10 +112,10 @@ START_TEST(lmk05318_solver_test4)
     res = res ? res : lmk05318_set_port_affinity(cfg, 7, AFF_APLL2);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(&dev, cfg, 4, true);
+    res = lmk05318_solver(&dev, cfg, 4);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(&dev, cfg + 4, 4, true);
+    res = lmk05318_solver(&dev, cfg + 4, 4);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -146,7 +146,7 @@ START_TEST(lmk05318_solver_test5)
     res = res ? res : lmk05318_port_request(cfg, 7,         1, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
 
-    res = lmk05318_solver(&dev, cfg, OUTS_LEN, true);
+    res = lmk05318_solver(&dev, cfg, OUTS_LEN);
     ck_assert_int_eq( res, 0 );
 
 }

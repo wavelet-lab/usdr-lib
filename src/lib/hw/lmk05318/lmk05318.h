@@ -68,6 +68,14 @@ struct lmk05318_dpll_settings
 };
 typedef struct lmk05318_dpll_settings lmk05318_dpll_settings_t;
 
+struct lmk05318_output
+{
+    double freq;
+    uint64_t odiv;
+    int mux;
+};
+typedef struct lmk05318_output lmk05318_output_t;
+
 struct lmk05318_state {
     lldev_t dev;
     unsigned subdev;
@@ -82,11 +90,7 @@ struct lmk05318_state {
     unsigned vco2_n, vco2_num, vco2_den;
     unsigned pd1, pd2;
 
-    struct {
-        double freq;
-        uint64_t odiv;
-        int mux;
-    } outputs[LMK05318_MAX_OUT_PORTS];
+    lmk05318_output_t outputs[LMK05318_MAX_OUT_PORTS];
 
     struct {
         bool enabled;
@@ -96,6 +100,7 @@ struct lmk05318_state {
         double lbw;
         uint8_t pre_div;
         uint64_t n, num, den;
+        bool zdm;
     } dpll;
 
     lmk05318_xo_settings_t xo;
@@ -223,7 +228,7 @@ int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run);
 int lmk05318_set_xo_fref(lmk05318_state_t* d);
 int lmk05318_tune_apll1(lmk05318_state_t* d);
 
-int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs, bool dry_run);
+int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs);
 
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
                        const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,

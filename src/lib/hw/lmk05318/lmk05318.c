@@ -76,7 +76,7 @@ enum
 
 int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
 {
-    if(!dpll->enabled)
+    if(!dpll || !dpll->enabled)
     {
         d->dpll.enabled = false;
         USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] DPLL disabled");
@@ -248,9 +248,20 @@ int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
 
     USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] LBW:%.2fHz", d->dpll.lbw);
 
+    //detect ZDM mode ->
+    // if 1) OUT7 = 1Hz
+    //    2) DPLL input ref = 1Hz
+    //    3) OUT2 routed via APLL1
+    const lmk05318_output_t* p7 = &d->outputs[LMK05318_MAX_OUT_PORTS - 1];
+    d->dpll.zdm = p7->freq == 1.0 && (p7->mux == OUT_PLL_SEL_APLL1_P1_INV || p7->mux == OUT_PLL_SEL_APLL1_P1);
+    d->dpll.zdm &= (d->dpll.ref_en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] == 1)
+                   ||
+                   (d->dpll.ref_en[LMK05318_SECREF] && dpll->fref[LMK05318_SECREF] == 1);
+
+    USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] ZDM %s", d->dpll.zdm ? "enabled" : "disabled");
+
     return 0;
 }
-
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out)
 {
@@ -438,7 +449,7 @@ static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* reg
     return 0;
 }
 
-static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bool zdm)
+static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
 {
     int res = lmk05318_dpll_config(d, dpll);
     if(res)
@@ -573,7 +584,8 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
             MAKE_LMK05318_DPLL_REF_SWMODE(0,
                                           (d->dpll.ref_en[LMK05318_PRIREF] ? LMK05318_PRIREF : LMK05318_SECREF),
                                           (d->dpll.ref_en[LMK05318_PRIREF] && d->dpll.ref_en[LMK05318_SECREF]) ? 0x0 : 0x3), //R251
-            MAKE_LMK05318_DPLL_GEN_CTL(zdm ? 1 : 0, 0, 1/*DPLL_SWITCHOVER_ALWAYS*/, !one_pps[LMK05318_PRIREF] && !one_pps[LMK05318_SECREF], 1, 0, 1), //R252  enable ZDM & enable DPLL
+            MAKE_LMK05318_DPLL_GEN_CTL(d->dpll.zdm ? 1 : 0, 0, 1/*DPLL_SWITCHOVER_ALWAYS*/,
+                                       !one_pps[LMK05318_PRIREF] && !one_pps[LMK05318_SECREF], 1, 0, 1), //R252  enable ZDM & enable DPLL
             MAKE_LMK05318_DPLL_REF0_RDIV_BY0(d->dpll.rdiv[LMK05318_PRIREF]), //R256
             MAKE_LMK05318_DPLL_REF0_RDIV_BY1(d->dpll.rdiv[LMK05318_PRIREF]),
             MAKE_LMK05318_DPLL_REF1_RDIV_BY0(d->dpll.rdiv[LMK05318_SECREF]),
@@ -724,7 +736,6 @@ static int lmk05318_init(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll, bo
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
 }
 
-
 int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
                        const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
                        lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
@@ -762,34 +773,7 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     res = lmk05318_reg_wr_n(out, lmk05318_rom_dpll, SIZEOF_ARRAY(lmk05318_rom_dpll));
     if (res)
         return res;
-#endif
-
-#if 1
-
-    //detect ZDM mode -> if 1)OUT7 = 1Hz 2) DPLL input ref = 1Hz
-    bool zdm = false;
-    for(unsigned i = 0; i < out_ports_len; ++i)
-    {
-        lmk05318_out_config_t* p = out_ports_cfg + i;
-        if(p->port == 7 && p->wanted.freq == 1)
-        {
-            zdm = true;
-            break;
-        }
-    }
-    zdm &= (dpll->enabled && ((dpll->en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] == 1)
-                           || (dpll->en[LMK05318_SECREF] && dpll->fref[LMK05318_SECREF] == 1)));
-    if(zdm)
-        USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] ZDM enabled");
-    //
-
-    res = lmk05318_init(out, dpll, zdm);
-    if(res)
-    {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d on init()", res);
-        return res;
-    }
-
+#else
     res = lmk05318_set_xo_fref(out);
     if(res)
     {
@@ -804,10 +788,17 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return res;
     }
 
-    res = lmk05318_solver(out, out_ports_cfg, out_ports_len, false /*dry_run*/);
+    res = lmk05318_solver(out, out_ports_cfg, out_ports_len);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d solving output frequencies", res);
+        return res;
+    }
+
+    res = lmk05318_set_common_registers(out, dpll);
+    if(res)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d on init()", res);
         return res;
     }
 
@@ -1820,8 +1811,10 @@ static const char* lmk05318_decode_mux(enum lmk05318_out_pll_sel_t mux)
 }
 
 VWLT_ATTRIBUTE(optimize("-Ofast"))
-int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs, bool dry_run)
+int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs)
 {
+    int res;
+
     if(!_outs || !n_outs || n_outs > LMK05318_MAX_OUT_PORTS)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "input data is incorrect");
@@ -1984,7 +1977,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     }
 
     const uint64_t f_mid = (VCO_APLL2_MAX + VCO_APLL2_MIN) / 2;
-    int res = lmk05318_solver_helper(outs, cnt_to_solve, f_mid, d);
+    res = lmk05318_solver_helper(outs, cnt_to_solve, f_mid, d);
     if(res)
         return res;
 
@@ -2041,35 +2034,31 @@ have_complete_solution:
         }
     }
 
-    //update hw registers
-    if(!dry_run)
+    //tune APLL2
+    res = lmk05318_tune_apll2_ex(d);
+    if(res)
     {
-        //tune APLL2
-        int res = lmk05318_tune_apll2_ex(d);
+        USDR_LOG("5318", USDR_LOG_ERROR, "error %d tuning APLL2", res);
+        return res;
+    }
+
+    //set output ports
+    for(unsigned i = 0; i < n_outs; ++i)
+    {
+        const lmk05318_out_config_t* out = _outs + i;
+
+        if(out->wanted.freq == 0)
+            continue;
+
+        USDR_LOG("5318", USDR_LOG_DEBUG, "OUT%u port:%u div:%" PRIu64 " fmt:%u(%s)",
+                 i, out->port, out->result.out_div, out->wanted.type, lmk05318_decode_fmt(out->wanted.type));
+
+        res =             lmk05318_set_out_mux_ex(d, out->port, out->result.mux, out->wanted.type);
+        res = res ? res : lmk05318_set_out_div(d, out->port, out->result.out_div);
         if(res)
         {
-            USDR_LOG("5318", USDR_LOG_ERROR, "error %d tuning APLL2", res);
+            USDR_LOG("5318", USDR_LOG_ERROR, "error %d setting mux/div for port#%d", res, out->port);
             return res;
-        }
-
-        //set output ports
-        for(unsigned i = 0; i < n_outs; ++i)
-        {
-            const lmk05318_out_config_t* out = _outs + i;
-
-            if(out->wanted.freq == 0)
-                continue;
-
-            USDR_LOG("5318", USDR_LOG_DEBUG, "OUT%u port:%u div:%" PRIu64 " fmt:%u(%s)",
-                     i, out->port, out->result.out_div, out->wanted.type, lmk05318_decode_fmt(out->wanted.type));
-
-            res =             lmk05318_set_out_mux_ex(d, out->port, out->result.mux, out->wanted.type);
-            res = res ? res : lmk05318_set_out_div(d, out->port, out->result.out_div);
-            if(res)
-            {
-                USDR_LOG("5318", USDR_LOG_ERROR, "error %d setting hw parameters for port#%d", res, out->port);
-                return res;
-            }
         }
     }
 
