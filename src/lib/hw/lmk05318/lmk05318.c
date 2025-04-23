@@ -74,6 +74,10 @@ enum
     SDM_ORDER_FORTH = 0x4,
 };
 
+#define DPLL_FDIV_FRAC_MAX 0.9375f
+#define DPLL_FDIV_FRAC_MIN 0.0625f
+
+
 static const char* lmk05318_dpll_decode_ref_dc_mode(enum lmk05318_ref_dc_mode_t m)
 {
     switch(m)
@@ -1208,6 +1212,14 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
         den = (uint64_t)1 << 40; //fixed
         num = (uint64_t)(n_frac * den + 0.5);
         apll1_sdm_order = SDM_ORDER_THIRD; //for DPLL correction
+
+        //additional check for DPLL mode
+        if(num && ((double)num / den <= DPLL_FDIV_FRAC_MIN || (double)num / den >= DPLL_FDIV_FRAC_MAX))
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "[APLL1] NUM/DEN ratio:%.8f out of range (%.4f;%.4f)",
+                     (double)num / den, DPLL_FDIV_FRAC_MIN, DPLL_FDIV_FRAC_MAX);
+            return -EINVAL;
+        }
     }
     // without DPLL we use programmed 24-bit numerator & programmed 24-bit denominator
     else
