@@ -74,6 +74,42 @@ enum
     SDM_ORDER_FORTH = 0x4,
 };
 
+static const char* lmk05318_dpll_decode_ref_dc_mode(enum lmk05318_ref_dc_mode_t m)
+{
+    switch(m)
+    {
+    case REF_DC_MODE_AC_COUPLED_INT: return "AC_COUPLED_INT";
+    case REF_DC_MODE_DC_COUPLED_INT: return "DC_COUPLED_INT";
+    }
+
+    return "UNKNOWN";
+}
+
+static const char* lmk05318_dpll_decode_ref_buf_mode(enum lmk05318_ref_buf_mode_t b)
+{
+    switch(b)
+    {
+    case REF_BUF_MODE_AC_HYST50_DC_EN:   return "AC_HYST50_DC_EN";
+    case REF_BUF_MODE_AC_HYST200_DC_DIS: return "AC_HYST200_DC_DIS";
+    }
+
+    return "UNKNOWN";
+}
+
+static const char* lmk05318_dpll_decode_ref_type(enum lmk05318_ref_input_type_t t)
+{
+    switch(t)
+    {
+    case REF_INPUT_TYPE_DIFF_NOTERM: return "DIFF_NOTERM";
+    case REF_INPUT_TYPE_DIFF_100:    return "DIFF_100";
+    case REF_INPUT_TYPE_DIFF_50:     return "DIFF_50";
+    case REF_INPUT_TYPE_SE_NOTERM:   return "SE_NOTERM";
+    case REF_INPUT_TYPE_SE_50:       return "SE_50";
+    }
+
+    return "UNKNOWN";
+}
+
 int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
 {
     if(!dpll || !dpll->enabled)
@@ -229,7 +265,7 @@ int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
              fb_int, fb_num, fb_den, vco1_fact, delta);
     if(delta > 1E-4)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] VCO1_FACT too rough");
+        USDR_LOG("5318", USDR_LOG_ERROR, "[DPLL] VCO1_FACT:%.8f too rough", vco1_fact);
         return -EINVAL;
     }
 
@@ -248,17 +284,24 @@ int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
 
     USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] LBW:%.2fHz", d->dpll.lbw);
 
-    //detect ZDM mode ->
-    // if 1) OUT7 = 1Hz
-    //    2) DPLL input ref = 1Hz
-    //    3) OUT2 routed via APLL1
-    const lmk05318_output_t* p7 = &d->outputs[LMK05318_MAX_OUT_PORTS - 1];
-    d->dpll.zdm = p7->freq == 1.0 && (p7->mux == OUT_PLL_SEL_APLL1_P1_INV || p7->mux == OUT_PLL_SEL_APLL1_P1);
-    d->dpll.zdm &= (d->dpll.ref_en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] == 1)
-                   ||
-                   (d->dpll.ref_en[LMK05318_SECREF] && dpll->fref[LMK05318_SECREF] == 1);
+    //log
+    for(unsigned i = LMK05318_PRIREF; i <= LMK05318_SECREF; ++i)
+    {
+        const char* nm = i == LMK05318_PRIREF ? "PRIREF" : "SECREF";
+        if(d->dpll.ref_en[i])
+            USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] %s:enabled FREF:%" PRIu64 " DC_MODE:%u(%s) BUF_MODE:%u(%s) TYPE:%u(%s) RDIV:%u",
+                     nm,
+                     dpll->fref[i],
+                     dpll->dc_mode[i], lmk05318_dpll_decode_ref_dc_mode(dpll->dc_mode[i]),
+                     dpll->buf_mode[i], lmk05318_dpll_decode_ref_buf_mode(dpll->buf_mode[i]),
+                     dpll->type[i], lmk05318_dpll_decode_ref_type(dpll->type[i]),
+                     d->dpll.rdiv[i]);
+        else
+            USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] %s:disabled", nm);
+    }
 
-    USDR_LOG("5318", USDR_LOG_DEBUG, "[DPLL] ZDM %s", d->dpll.zdm ? "enabled" : "disabled");
+    USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] FTDC:%.4f N:%" PRIu64" NUM:%" PRIu64" DEN:%" PRIu64 " PRE_DIV:%u LBW:%.2fHz VCO1:%.8f",
+             d->dpll.ftdc, d->dpll.n, d->dpll.num, d->dpll.den, d->dpll.pre_div, d->dpll.lbw, vco1_fact);
 
     return 0;
 }
@@ -451,9 +494,7 @@ static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* reg
 
 static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
 {
-    int res = lmk05318_dpll_config(d, dpll);
-    if(res)
-        return res;
+    int res = 0;
 
     if(d->dpll.enabled == false)
     {
@@ -535,12 +576,25 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
 
         uint8_t dpll_sdm_order = d->dpll.num ? SDM_ORDER_THIRD : SDM_ORDER_INT;
         uint8_t dpll_sdm_dither = SDM_DITHER_MODE_WEAK;
+        USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] MASH_ORD:%u", dpll_sdm_order);
 
         //this value is empirical and should be clarified
         uint64_t dco_lock_det0 = 0x000a000000;
         uint64_t dco_lock_det1 = 0x010635750b;
         uint32_t dco_unlock_det0 = 0x006400;
         uint32_t dco_unlock_det1 = 0x063575;
+
+        //detect ZDM mode ->
+        // if 1) OUT7 = 1Hz
+        //    2) DPLL input ref = 1Hz
+        //    3) OUT2 routed via APLL1
+        const lmk05318_output_t* p7 = &d->outputs[LMK05318_MAX_OUT_PORTS - 1];
+        d->dpll.zdm = p7->freq == 1.0 && (p7->mux == OUT_PLL_SEL_APLL1_P1_INV || p7->mux == OUT_PLL_SEL_APLL1_P1);
+        d->dpll.zdm &= (d->dpll.ref_en[LMK05318_PRIREF] && dpll->fref[LMK05318_PRIREF] == 1)
+                       ||
+                       (d->dpll.ref_en[LMK05318_SECREF] && dpll->fref[LMK05318_SECREF] == 1);
+
+        USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] ZDM %s", d->dpll.zdm ? "enabled" : "disabled");
 
         uint32_t dpll_regs[] =
         {
@@ -781,6 +835,13 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return res;
     }
 
+    res = lmk05318_dpll_config(out, dpll);
+    if(res)
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d configuring DPLL", res);
+        return res;
+    }
+
     res = lmk05318_tune_apll1(out);
     if(res)
     {
@@ -987,7 +1048,7 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
 
     double fpd2 = (double)VCO_APLL1 / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
     if (fpd2 < APLL2_PD_MIN || fpd2 > APLL2_PD_MAX) {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 FPD should be in range [%" PRIu64 ";%" PRIu64 "] but got %.8f!\n",
+        USDR_LOG("5318", USDR_LOG_ERROR, "[APLL2] FPD should be in range [%" PRIu64 ";%" PRIu64 "] but got %.8f!\n",
                  (uint64_t)APLL2_PD_MIN, (uint64_t)APLL2_PD_MAX, fpd2);
         return -EINVAL;
     }
@@ -996,7 +1057,7 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
         ((d->pd1 < APLL2_PDIV_MIN || d->pd1 > APLL2_PDIV_MAX) && (d->pd2 < APLL2_PDIV_MIN || d->pd2 > APLL2_PDIV_MAX))
         )
     {
-        USDR_LOG("5318", USDR_LOG_WARNING, "LMK05318 APLL2: either FVCO2[%" PRIu64"] or (PD1[%d] && PD2[%d]) is out of range, APLL2 will be disabled",
+        USDR_LOG("5318", USDR_LOG_WARNING, "[APLL2] either FVCO2[%" PRIu64"] nor (PD1[%d] && PD2[%d]) is out of range, APLL2 will be disabled",
                  d->vco2_freq, d->pd1, d->pd2);
         // Disable
         uint32_t regs[] = {
@@ -1012,7 +1073,7 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
     const uint8_t apll2_sdm_order = num ? SDM_ORDER_THIRD : SDM_ORDER_INT; //override if needed
     const uint8_t apll2_sdm_dither = SDM_DITHER_MODE_WEAK;
 
-    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL2 RS=%u RP=%u FPD2=%.8f FVCO2=%" PRIu64 " N=%d NUM=%d DEN=%d PD1=%d PD2=%d MASH_ORD:%u",
+    USDR_LOG("5318", USDR_LOG_INFO, "[APLL2] RS=%u RP=%u FPD2=%.8f FVCO2=%" PRIu64 " N=%d NUM=%d DEN=%d PD1=%d PD2=%d MASH_ORD:%u",
              d->fref_pll2_div_rs, d->fref_pll2_div_rp, fpd2, d->vco2_freq, n, num, den, d->pd1, d->pd2, apll2_sdm_order);
 
     // one of PDs may be unused (==0) -> we should fix it before registers set
@@ -1046,6 +1107,21 @@ static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
     return 0;
 }
 
+static const char* lmk05318_decode_xo_type(enum xo_type_options t)
+{
+    switch(t)
+    {
+    case XO_TYPE_DC_DIFF_EXT: return "DC_DIFF_EXT";
+    case XO_TYPE_AC_DIFF_EXT: return "AC_DIFF_EXT";
+    case XO_TYPE_AC_DIFF_INT_100: return "AC_DIFF_INT_100";
+    case XO_TYPE_HCSL_INT_50: return "HCSL_INT_50";
+    case XO_TYPE_CMOS: return "CMOS";
+    case XO_TYPE_SE_INT_50: return "SE_INT_50";
+    }
+
+    return "UNKNOWN";
+}
+
 int lmk05318_set_xo_fref(lmk05318_state_t* d)
 {
     const uint32_t xo_fref = d->xo.fref;
@@ -1055,14 +1131,14 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
 
     if(xo_fref < XO_FREF_MIN || xo_fref > XO_FREF_MAX)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 XO input fref should be in range [%" PRIu64 ";%" PRIu64 "] but got %d!\n",
+        USDR_LOG("5318", USDR_LOG_ERROR, "[XO] input fref should be in range [%" PRIu64 ";%" PRIu64 "] but got %d!\n",
                  (uint64_t)XO_FREF_MIN, (uint64_t)XO_FREF_MAX, xo_fref);
         return -EINVAL;
     }
 
     if(d->xo.pll1_fref_rdiv < APLL1_DIVIDER_MIN || d->xo.pll1_fref_rdiv > APLL1_DIVIDER_MAX)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APPL1_RDIV:%d out of range [%d;%d]", d->xo.pll1_fref_rdiv, (int)APLL1_DIVIDER_MIN, (int)APLL1_DIVIDER_MAX);
+        USDR_LOG("5318", USDR_LOG_ERROR, "[XO] APPL1_RDIV:%d out of range [%d;%d]", d->xo.pll1_fref_rdiv, (int)APLL1_DIVIDER_MIN, (int)APLL1_DIVIDER_MAX);
         return -EINVAL;
     }
 
@@ -1076,9 +1152,14 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
     case XO_CMOS: xo_type_raw = XO_TYPE_CMOS; break;
     case XO_SE_INT_50: xo_type_raw = XO_TYPE_SE_INT_50; break;
     default:
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 XO input type %d is not supported!\n", (int)xo_type);
+        USDR_LOG("5318", USDR_LOG_ERROR, "[XO] input type %d is not supported!\n", (int)xo_type);
         return -EINVAL;
     }
+
+    USDR_LOG("5318", USDR_LOG_INFO, "[XO] FREF:%u TYPE:%u(%s) DOUBLER:%u RDIV:%u FDET_BYPASS:%u",
+             xo_fref,
+             xo_type_raw, lmk05318_decode_xo_type(xo_type_raw),
+             xo_doubler_enabled, d->xo.pll1_fref_rdiv, xo_fdet_bypass);
 
     uint32_t regs[] = {
         MAKE_LMK05318_XO_CLKCTL1(xo_doubler_enabled ? 1 : 0, xo_fdet_bypass ? 1 : 0, 0, 1),   //R42
@@ -1117,7 +1198,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
 
     if(n > UINT16_MAX)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL1 FDIV.N=%u out of range [1;65535]", n);
+        USDR_LOG("5318", USDR_LOG_ERROR, "[APLL1] FDIV.N=%u out of range [1;65535]", n);
         return -EINVAL;
     }
 
@@ -1138,12 +1219,12 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
 
     const double vco1_fact = fpd1 * (n + (double)num / den);
 
-    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 APLL1 FPD=%.8f VCO_FACT=%.8f N=%d NUM=%" PRIu64 " DEN=%" PRIu64 "[%s] MASH_ORD:%u",
+    USDR_LOG("5318", USDR_LOG_INFO, "[APLL1] FPD=%.8f VCO_FACT=%.8f N=%d NUM=%" PRIu64 " DEN=%" PRIu64 "[%s] MASH_ORD:%u",
              fpd1, vco1_fact, n, num, den, (d->dpll.enabled ? "FIXED" : "PROGRAMMED"), apll1_sdm_order);
 
     if(fabs(vco1_fact - fvco) > 1E-4)
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL1 VCO too rough");
+        USDR_LOG("5318", USDR_LOG_ERROR, "[APLL1] VCO too rough");
         return -EINVAL;
     }
 
