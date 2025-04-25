@@ -47,6 +47,10 @@ enum {
     APLL2_PDIV_MAX = 7,
     APLL2_PDIV_COUNT = 2, //PD1 & PD2
 
+    OUTDIV7_STAGE2_MAX = (uint64_t)1 << 24,
+    OUTDIV7_STAGE1_MAX = (uint64_t)1 << 8,
+    OUTDIV7_STAGE1_WITH_ST2_MIN = 6,
+
     F_TDC_MIN = 1,
     F_TDC_MAX = 26000000,
 
@@ -1300,6 +1304,27 @@ static inline uint64_t lmk05318_max_odiv(unsigned port)
     return 1;
 }
 
+VWLT_ATTRIBUTE(optimize("-Ofast"))
+static inline uint16_t lmk05318_factorize_out7div(uint64_t total_div)
+{
+    if(total_div <= OUTDIV7_STAGE1_MAX)
+        return total_div;
+
+    uint16_t div = OUTDIV7_STAGE1_MAX;
+
+    while(div >= OUTDIV7_STAGE1_WITH_ST2_MIN)
+    {
+        if(total_div % div == 0 && total_div / div <= OUTDIV7_STAGE2_MAX)
+        {
+            return div;
+        }
+        --div;
+    }
+
+    return OUTDIV7_STAGE1_MAX; //if total div is not divisible by any of [256..6], let it be 256
+}
+
+
 int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
 {
     if (port > (LMK05318_MAX_OUT_PORTS - 1) || udiv < 1 || udiv > lmk05318_max_odiv(port))
@@ -1308,9 +1333,11 @@ int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
     //out7 is special
     if(port == 7)
     {
-        uint64_t div_stage2 = udiv >> 8;
-        div_stage2 = div_stage2 ? div_stage2 : 1;
-        uint8_t div_stage1 = udiv / div_stage2;
+        uint16_t div_stage1 = lmk05318_factorize_out7div(udiv);
+        uint64_t div_stage2 = (uint64_t)((double)udiv / div_stage1 + 0.5);
+
+        USDR_LOG("5318", USDR_LOG_DEBUG, "[OUT7] TOTAL_DIV:%" PRIu64 " DIV_STAGE1:%u DIV_STAGE2:%" PRIu64 " FACT:%" PRIu64 "",
+                    udiv, div_stage1, div_stage2, div_stage2 * div_stage1);
 
         --div_stage1;
         --div_stage2;
