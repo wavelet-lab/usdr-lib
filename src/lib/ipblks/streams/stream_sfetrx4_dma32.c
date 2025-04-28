@@ -41,7 +41,7 @@ void extxcfg_cache_init(extxcfg_cache_t* c)
 {
     c->reg_0 = 0;
     c->reg_1 = 0;
-    c->reg_2 = ~0u;
+    c->reg_2 = ~1u;
 }
 
 struct stream_sfetrx_dma32 {
