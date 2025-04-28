@@ -12,6 +12,8 @@
 #include "../lib/ipblks/espi_flash.h"
 #include "../lib/ipblks/xlnx_bitstream.h"
 
+#include "../lib/device/device.h"
+
 enum {
     M2PCI_REG_STAT_CTRL = 0,
 };
@@ -48,6 +50,8 @@ int main(int argc, char** argv)
     bool corrupt = false;
     uint32_t curfwid;
     bool no_device = false;
+    uint64_t master_offset = MASTER_IMAGE_OFF;
+    uint64_t qspi_base = 10;
 
     memset(outa, 0xff, SIZEOF_ARRAY(outa));
     memset(outb, 0xff, SIZEOF_ARRAY(outb));
@@ -125,12 +129,17 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    if (!(no_device)) {
+        usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/master_off", &master_offset);
+        usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/base", &qspi_base);
+    }
+
     usleep(1000);
 
     uint32_t fid = 0xdeadbeef;
     char fid_str[64] = {0};
 
-    res = (no_device) ? 0 : espi_flash_get_id(dev, 0, 10, &fid, fid_str, sizeof(fid_str));
+    res = (no_device) ? 0 : espi_flash_get_id(dev, 0, qspi_base, &fid, fid_str, sizeof(fid_str));
     if (res) {
         fprintf(stderr, "Failed to get flash ID (%s)!\n", fid_str);
         return 2;
@@ -140,12 +149,12 @@ int main(int argc, char** argv)
     }
 
     //Check image
-    res = (no_device) ? 0 : espi_flash_read(dev, 0, 10, 512, 0, 256, outb);
+    res = (no_device) ? 0 : espi_flash_read(dev, 0, qspi_base, 512, 0, 256, outb);
     if (res) {
         fprintf(stderr, "Failed to read current golden image header! res=%d\n", res);
         return 4;
     }
-    res = (no_device) ? 0 : espi_flash_read(dev, 0, 10, 512, MASTER_IMAGE_OFF, 256, outb + 256);
+    res = (no_device) ? 0 : espi_flash_read(dev, 0, qspi_base, 512, master_offset, 256, outb + 256);
     if (res) {
         fprintf(stderr, "Failed to read current master image header! res=%d\n", res);
         return 4;
@@ -172,7 +181,7 @@ int main(int argc, char** argv)
                 image_master.devid, image_master.usr_access2, (long long)get_xilinx_rev_h(image_master.usr_access2));
     }
 
-    uint32_t off = (golden) ? 0 : MASTER_IMAGE_OFF;
+    uint32_t off = (golden) ? 0 : master_offset;
     unsigned total_length = SIZEOF_ARRAY(outa);
     if (rdwr == ACTION_WRITE || rdwr == ACTION_INFO) {
         FILE* w = fopen(filename, "rb");
@@ -203,7 +212,7 @@ int main(int argc, char** argv)
             fprintf(stderr, "It looks like the file is corrupted! res=%d\n", res);
             return 4;
         }
-        res = (no_device) ? 0 : xlnx_btstrm_iprgcheck(&image, &file, MASTER_IMAGE_OFF, golden);
+        res = (no_device) ? 0 : xlnx_btstrm_iprgcheck(&image, &file, master_offset, golden);
         if (res) {
             fprintf(stderr, "Image check failed! res=%d, file revision=%12ld\n", res, get_xilinx_rev_h(file.usr_access2));
             return 4;
@@ -237,13 +246,13 @@ int main(int argc, char** argv)
 
         if (golden) {
             fprintf(stderr, "Writing GOLDEN header\n");
-            res = espi_flash_write(dev, 0, 10, 512, outa, 4096, off, 0);
+            res = espi_flash_write(dev, 0, qspi_base, 512, outa, 4096, off, 0);
             if (res) {
                 fprintf(stderr, "Failed to write header! res=%d", res);
                 return 4;
             }
             fprintf(stderr, "Writing GOLDEN body\n");
-            res = espi_flash_write(dev, 0, 10, 512,
+            res = espi_flash_write(dev, 0, qspi_base, 512,
                                              outa + 4096,
                                              total_length - 4096,
                                              off + 4096, 0);
@@ -252,14 +261,14 @@ int main(int argc, char** argv)
                 return 4;
             }
         } else {
-            res = espi_flash_write(dev, 0, 10, 512, outa, total_length, off,
+            res = espi_flash_write(dev, 0, qspi_base, 512, outa, total_length, off,
                                              ESPI_FLASH_DONT_WRITE_HEADER);
             if (res) {
                 fprintf(stderr, "Failed to write! res=%d", res);
                 return 4;
             }
 
-            res = espi_flash_write(dev, 0, 10, 512, outa, 256, off,
+            res = espi_flash_write(dev, 0, qspi_base, 512, outa, 256, off,
                                              ESPI_FLASH_DONT_ERASE);
             if (res) {
                 fprintf(stderr, "Failed to write header! res=%d", res);
@@ -270,7 +279,7 @@ int main(int argc, char** argv)
 
     if (rdwr == ACTION_WRITE || rdwr == ACTION_READBACK) {
         fprintf(stderr, "Reading %d bytes!\n", total_length);
-        res = espi_flash_read(dev, 0, 10, 512, off, total_length, outb);
+        res = espi_flash_read(dev, 0, qspi_base, 512, off, total_length, outb);
         if (res) {
             fprintf(stderr, "Failed to readback! res=%d", res);
             return 4;
