@@ -196,6 +196,16 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return 0;
     }
 
+#if 0
+    {
+        USDR_LOG("SYNC", USDR_LOG_WARNING, "PESync shutdown...");
+        usdr_device_pe_sync_destroy(udev);
+        usleep(30000000);
+        USDR_LOG("SYNC", USDR_LOG_WARNING, "PESync OFF");
+        return 0;
+    }
+#endif
+
     // gpo_in_ctrl[0] --  0 - Disable input 1PPS / 10Mhz buffer and REF ADC for 1PPS
     // gpo_in_ctrl[1] --  0 - external SMA, 1 - feedback from LCK_FB
     // gpo_in_ctrl[2] --  0 - external SMA, 1 - 1PPS from GPS
@@ -326,7 +336,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return res;
 
     //wait for PRIREF/SECREF validation
-    res = lmk05318_wait_dpll_ref_stat(&d->gen, 60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
+    res = lmk05318_wait_dpll_ref_stat(&d->gen, 2*60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
     if(res)
     {
         USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK03518 DPLL input reference freqs are not validated during specified timeout");
@@ -362,10 +372,12 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMK03518 outputs synced");
     //
 
+    //return 0;
+
     //
     //LMX2820 #0 setup
     //
-#if 0
+#if 1
     const uint64_t lmx0_freq[] =
     {
         1400000000,
@@ -387,6 +399,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820[0] outputs locked & synced");
     //
 #endif
+#if 1
     //
     //LMX2820 #1 setup
     //
@@ -437,11 +450,11 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1214 initialized");
     //
-
+#endif
     //
     //LMX1204 setup
     //
-#if 0
+#if 1
     res = lmx1204_create(dev, 0, SPI_LMX1204, &d->cldistr);
     if(res)
     {
@@ -484,9 +497,11 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
+    lmx1204_stats_t lmx1204status;
+    lmx1204_read_status(&d->cldistr, &lmx1204status); //just for log
+
     res = lmx1204_wait_pll_lock(&d->cldistr, 100000);
 
-    lmx1204_stats_t lmx1204status;
     lmx1204_read_status(&d->cldistr, &lmx1204status); //just for log
 
     if(res)

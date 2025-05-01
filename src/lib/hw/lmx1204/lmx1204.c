@@ -232,6 +232,9 @@ int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_
     if(res)
         return res;
 
+    lmx1204_stats_t lmx1204status;
+    lmx1204_read_status(st, &lmx1204status); //just for log
+
     return 0;
 }
 
@@ -383,6 +386,23 @@ static const char* lmx1204_decode_fmt(enum logiclkout_fmt_options fmt)
     case LOGICLKOUT_FMT_CML:    return "CML";
     }
     return "UNKNOWN";
+}
+
+static int lmx1204_reset(lmx1204_state_t* st)
+{
+    uint32_t regs[] =
+    {
+        MAKE_LMX1204_R0(0, 0, 0, 1),    //set RESET bit
+        MAKE_LMX1204_R0(0, 0, 0, 0),    //reset RESET bit
+    };
+
+    int res = lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
+    if(res)
+        return res;
+
+    usleep(10000);
+
+    return 0;
 }
 
 // all params are in lmx1204_state_t struct
@@ -662,6 +682,13 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
 
     //registers
 
+    res = dry_run ? 0 : lmx1204_reset(st);
+    if(res)
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "lmx1204_reset() err:%d", res);
+        return res;
+    }
+
     res = dry_run ? 0 : lmx1204_reset_main_divider(st, true);
     if(res)
     {
@@ -671,8 +698,6 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
 
     uint32_t regs[] =
     {
-        MAKE_LMX1204_R0(0, 0, 0, 1),    //set RESET bit first
-        //
         MAKE_LMX1204_R86(0),                //MUXOUT_EN_OVRD=0
         MAKE_LMX1204_R72(0, 0, 0, 0, SYSREF_DELAY_BYPASS_ENGAGE_IN_GENERATOR_MODE__BYPASS_IN_REPEATER_MODE),
 
@@ -683,6 +708,7 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         //
 
         MAKE_LMX1204_R25(0x4, 0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? st->clk_mult_div : st->clk_mult_div - 1, st->clk_mux),
+        MAKE_LMX1204_R24(0,0,0,1),          //enable temp sensor
         MAKE_LMX1204_R23(1, 1, 1, 0, 1, st->sysref_delay_scale, st->sysref_delay_scale, st->sysref_delay_scale),
         MAKE_LMX1204_R22(st->sysref_delay_scale, st->sysref_delay_scale, st->sysref_delay_div, 0, st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].q),
         MAKE_LMX1204_R21(st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].i, st->sysref_indiv_ch_delay[LMX1204_CH_LOGIC].phase, st->sysref_indiv_ch_delay[LMX1204_CH3].q),

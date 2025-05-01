@@ -210,7 +210,7 @@ int lmx2820_wait_pll_lock(lmx2820_state_t* st, unsigned timeout)
         const uint16_t lock_detect_status = (r74 & RB_LD_MSK) >> RB_LD_OFF;
         switch(lock_detect_status)
         {
-        case RB_LD_INVALID: return -EINVAL;
+        //case RB_LD_INVALID: return -EINVAL;
         case RB_LD_LOCKED: return 0;
         default:
             usleep(100);
