@@ -92,16 +92,16 @@ UNUSED static int lmx1214_read_all_regs(lmx1214_state_t* st)
     return 0;
 }
 
-UNUSED static int lmx1214_loaddump(lmx1214_state_t* st)
+int lmx1214_loaddump(lmx1214_state_t* st)
 {
     int res = lmx1214_spi_post(st, lmx1214_rom_test, SIZEOF_ARRAY(lmx1214_rom_test));
     if(res)
     {
-        USDR_LOG("2820", USDR_LOG_ERROR, "lmx1214_loaddump() err:%d", res);
+        USDR_LOG("1214", USDR_LOG_ERROR, "lmx1214_loaddump() err:%d", res);
     }
     else
     {
-        USDR_LOG("2820", USDR_LOG_DEBUG, "lmx1214_loaddump() OK");
+        USDR_LOG("1214", USDR_LOG_DEBUG, "lmx1214_loaddump() OK");
     }
     return res;
 }
@@ -396,22 +396,30 @@ int lmx1214_solver(lmx1214_state_t* st, uint64_t in, uint64_t out, bool* out_en,
 
     uint32_t regs[] =
     {
-        MAKE_LMX1214_R25(0x4, 0, st->clk_div - 1, st->clk_mux),
+        MAKE_LMX1214_R90(0, 0, (st->auxclk_div_byp ? 1 : 0), (st->auxclk_div_byp ? 1 : 0), 0),
+        MAKE_LMX1214_R79(0, 0x5),
+        MAKE_LMX1214_REG_WR(R75, 0x6),
+        MAKE_LMX1214_R25(0x4, 0/*clk div reset*/, st->clk_div - 1, st->clk_mux),
         MAKE_LMX1214_R14(0, 0, 1, 0),
-
+        MAKE_LMX1214_R9 (0, 0, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
+        MAKE_LMX1214_R8 (0, st->auxclk_div_pre, 0, (st->auxclkout.enable ? 1 : 0), 0, st->auxclkout.fmt),
+        MAKE_LMX1214_R7 (0, 0x2, 0x2, 0x2, 0x0/*prediv-pwr 2 bits*/, 0x3, 0x7/*aux pwr*/, 0x1),
+#if 0
         //according do doc: program R79 and R90 before setting logiclk_div_bypass
         //desc order is broken here!
-        MAKE_LMX1214_R8 (0, st->auxclk_div_pre, 0, (st->auxclkout.enable ? 1 : 0), 0, st->auxclkout.fmt),
-        MAKE_LMX1214_R79(0, st->auxclk_div_byp ? 0x5 : 0x104 /*0x205*/),
+        MAKE_LMX1214_R8 (0, st->auxclk_div_pre, (st->auxclkout.enable ? 1 : 0), 0, st->auxclkout.fmt),
+        //MAKE_LMX1214_R79(0, st->auxclk_div_byp ? 0x5 : 0x104 /*0x205*/),
         MAKE_LMX1214_R90(0, 0, (st->auxclk_div_byp ? 1 : 0), (st->auxclk_div_byp ? 1 : 0), 0),
         MAKE_LMX1214_R9 (0, 0, 0, (st->auxclk_div_byp ? 1 : 0), 0, st->auxclk_div),
-
+#endif
         MAKE_LMX1214_R3 (st->clkout_enabled[LMX1214_CH3] ? 1 : 0,
                          st->clkout_enabled[LMX1214_CH2] ? 1 : 0,
                          st->clkout_enabled[LMX1214_CH1] ? 1 : 0,
                          st->clkout_enabled[LMX1214_CH0] ? 1 : 0,
                          0xF86//0xFE
                         ),
+        MAKE_LMX1214_R2 (0, 0x8, 1/*en state machine*/, 0x3),
+        MAKE_LMX1214_R0 (0, 0/*pwr down*/, 0),
     };
 
     res = dry_run ? common_print_registers_a8d16(regs, SIZEOF_ARRAY(regs), USDR_LOG_DEBUG) : lmx1214_spi_post(st, regs, SIZEOF_ARRAY(regs));

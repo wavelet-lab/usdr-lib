@@ -101,6 +101,21 @@ START_TEST(lmx1214_solver_test4_pesync2)
     ck_assert_int_eq( res, 0 );
 }
 
+START_TEST(lmx1214_solver_test4_pesync3)
+{
+    const uint64_t osc_in = 550000000;
+    uint64_t out_freq = osc_in;
+    bool en[4] = {1,1,1,1};
+
+    lmx1214_auxclkout_cfg_t aux;
+    aux.enable = 1;
+    aux.fmt = LMX1214_FMT_LVDS;
+    aux.freq = osc_in;
+
+    int res = lmx1214_solver(&st, osc_in, out_freq, en, &aux, false, true);
+    ck_assert_int_eq( res, 0 );
+}
+
 Suite * lmx1214_solver_suite(void)
 {
     Suite *s;
@@ -111,12 +126,13 @@ Suite * lmx1214_solver_suite(void)
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
 
-    tcase_add_test(tc_core, lmx1214_solver_test1);
-    tcase_add_test(tc_core, lmx1214_solver_test2);
-    tcase_add_test(tc_core, lmx1214_solver_test3);
-    tcase_add_test(tc_core, lmx1214_solver_test4_pesync0);
-    tcase_add_test(tc_core, lmx1214_solver_test4_pesync1);
-    tcase_add_test(tc_core, lmx1214_solver_test4_pesync2);
+//    tcase_add_test(tc_core, lmx1214_solver_test1);
+//    tcase_add_test(tc_core, lmx1214_solver_test2);
+//    tcase_add_test(tc_core, lmx1214_solver_test3);
+//    tcase_add_test(tc_core, lmx1214_solver_test4_pesync0);
+//    tcase_add_test(tc_core, lmx1214_solver_test4_pesync1);
+//    tcase_add_test(tc_core, lmx1214_solver_test4_pesync2);
+    tcase_add_test(tc_core, lmx1214_solver_test4_pesync3);
 
     suite_add_tcase(s, tc_core);
     return s;

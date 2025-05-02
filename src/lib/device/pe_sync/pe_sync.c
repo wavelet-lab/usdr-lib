@@ -166,7 +166,7 @@ static void usdr_device_pe_sync_destroy(pdevice_t udev)
     // struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
     // lldev_t dev = d->base.dev;
     // TODO: power off
-
+#if 0
     struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
     lldev_t dev = d->base.dev;
 
@@ -175,6 +175,8 @@ static void usdr_device_pe_sync_destroy(pdevice_t udev)
     dev_gpo_set(dev, IGPO_SY1_CTRL, 0);
 
     usdr_device_base_destroy(udev);
+    USDR_LOG("SYNC", USDR_LOG_WARNING, "PESync destroyed");
+#endif
 }
 
 static int i2c_reg_rd8(lldev_t dev, unsigned lsaddr, uint8_t reg, uint8_t* val)
@@ -374,14 +376,16 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     //return 0;
 
+    usleep(2000000);
+
     //
     //LMX2820 #0 setup
     //
 #if 1
     const uint64_t lmx0_freq[] =
     {
-        1400000000,
-        1400000000
+        500000000, //1400000000,
+        500000000, //1400000000
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_0, &d->lmx0);
@@ -406,8 +410,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     const uint64_t lmx1_freq[] =
     {
-        1600000000,
-        1600000000
+        550000000, //1600000000,
+        550000000, //1600000000
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
@@ -429,15 +433,16 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //LMX1214 setup
     //
 
-    const uint64_t ld_clkout = 1600000000/2;
+    const uint64_t ld_clkout = lmx1_freq[0];
     bool ld_en[LMX1214_OUT_CNT] = {1,1,1,1};
     lmx1214_auxclkout_cfg_t ld_aux;
     ld_aux.enable = 1;
     ld_aux.fmt = LMX1214_FMT_LVDS;
-    ld_aux.freq = 800000000/4;
+    ld_aux.freq = ld_clkout;
 
     res = lmx1214_create(dev, 0, SPI_LMX1214, &d->lodistr);
     res = res ? res : lmx1214_solver(&d->lodistr, lmx1_freq[0], ld_clkout, ld_en, &ld_aux, false /*prec_mode*/, false /*dry run*/);
+    //res = res ? res : lmx1214_loaddump(&d->lodistr);
 
     float lmx1214_tempval;
     lmx1214_get_temperature(&d->lodistr, &lmx1214_tempval); //just for logging
@@ -455,6 +460,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //LMX1204 setup
     //
 #if 1
+
     res = lmx1204_create(dev, 0, SPI_LMX1204, &d->cldistr);
     if(res)
     {
@@ -466,10 +472,10 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     lmx1204_state_t* lmx1204 = &d->cldistr;
     lmx1204->clkin     = lmx0_freq[0];
     lmx1204->sysrefreq = lmx0_freq[1];
-    lmx1204->clkout    = d->cldistr.clkin * 4;
-    lmx1204->sysrefout = 4375000;
+    lmx1204->clkout    = d->cldistr.clkin;
+    lmx1204->sysrefout = 3125000;
     lmx1204->sysref_mode = LMX1204_CONTINUOUS;
-    lmx1204->logiclkout = 1400000;
+    lmx1204->logiclkout = 125000000;
 
     lmx1204->ch_en[LMX1204_CH0] = 1;
     lmx1204->ch_en[LMX1204_CH1] = 1;
@@ -494,6 +500,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     lmx1204->logisysrefout_fmt = LMX1204_FMT_LVDS;
     //
     res = lmx1204_solver(&d->cldistr, false/*prec_mode*/, false/*dry_run*/);
+    //res = lmx1204_loaddump(&d->cldistr);
     if(res)
         return res;
 

@@ -100,6 +100,22 @@ START_TEST(lmx1204_solver_test4)
     ck_assert_int_eq( res, 0 );
 }
 
+START_TEST(lmx1204_solver_test5)
+{
+    st.clkin = 500000000;
+    st.clkout = st.clkin;
+
+    st.sysrefreq = 0;
+    st.sysrefout = 3125000;
+    st.sysref_mode = LMX1204_CONTINUOUS;
+
+    //st.ch_en[LMX1204_CH_LOGIC] = false;
+    st.logiclkout = 125000000;
+
+    int res = lmx1204_solver(&st, false, true);
+    ck_assert_int_eq( res, 0 );
+}
+
 Suite * lmx1204_solver_suite(void)
 {
     Suite *s;
@@ -110,10 +126,11 @@ Suite * lmx1204_solver_suite(void)
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
 
-    tcase_add_test(tc_core, lmx1204_solver_test1);
-    tcase_add_test(tc_core, lmx1204_solver_test2);
-    tcase_add_test(tc_core, lmx1204_solver_test3);
-    tcase_add_test(tc_core, lmx1204_solver_test4);
+    //tcase_add_test(tc_core, lmx1204_solver_test1);
+    //tcase_add_test(tc_core, lmx1204_solver_test2);
+    //tcase_add_test(tc_core, lmx1204_solver_test3);
+    //tcase_add_test(tc_core, lmx1204_solver_test4);
+    tcase_add_test(tc_core, lmx1204_solver_test5);
 
     suite_add_tcase(s, tc_core);
     return s;

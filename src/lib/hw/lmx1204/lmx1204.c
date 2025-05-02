@@ -11,6 +11,7 @@
 #include "../cal/opt_func.h"
 
 #include "../common/common.h"
+#include "lmx1204_dump.h"
 
 #define FREQ_EPS 1.0f
 
@@ -63,6 +64,20 @@ static int lmx1204_spi_post(lmx1204_state_t* obj, uint32_t* regs, unsigned count
 static int lmx1204_spi_get(lmx1204_state_t* obj, uint16_t addr, uint16_t* out)
 {
     return common_spi_get(obj, MAKE_LMX1204_REG_RD((uint32_t)addr), out);
+}
+
+int lmx1204_loaddump(lmx1204_state_t* st)
+{
+    int res = lmx1204_spi_post(st, lmx1204_rom_test, SIZEOF_ARRAY(lmx1204_rom_test));
+    if(res)
+    {
+        USDR_LOG("1204", USDR_LOG_ERROR, "lmx1204_loaddump() err:%d", res);
+    }
+    else
+    {
+        USDR_LOG("1204", USDR_LOG_DEBUG, "lmx1204_loaddump() OK");
+    }
+    return res;
 }
 
 UNUSED static int lmx1204_read_all_regs(lmx1204_state_t* st)
@@ -405,6 +420,19 @@ static int lmx1204_reset(lmx1204_state_t* st)
     return 0;
 }
 
+static inline uint8_t lmx1204_get_delay_step_size(lmx1204_state_t* st)
+{
+    uint8_t delay_step_size = SYSREFREQ_DELAY_STEPSIZE_28_PS_1_4_GHZ_TO_2_7_GHZ;
+    if(st->clkin > 2400000000 && st->clkin <= 4700000000)
+        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_15_PS_2_4_GHZ_TO_4_7_GHZ;
+    if(st->clkin > 3100000000 && st->clkin <= 5700000000)
+        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_11_PS_3_1_GHZ_TO_5_7_GHZ;
+    if(st->clkin > 4500000000 && st->clkin <= 12800000000)
+        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_8_PS_4_5_GHZ_TO_12_8_GHZ;
+
+    return delay_step_size;
+}
+
 // all params are in lmx1204_state_t struct
 int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
 {
@@ -698,13 +726,16 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
 
     uint32_t regs[] =
     {
-        MAKE_LMX1204_R86(0),                //MUXOUT_EN_OVRD=0
+        MAKE_LMX1204_REG_WR(R90, st->logiclk_div_bypass ? 0x60 : 0x00),
+        //MAKE_LMX1204_R86(0),                //MUXOUT_EN_OVRD=0
+        MAKE_LMX1204_R79(0, st->logiclk_div_bypass ? 0x104 : 0x5),
+        MAKE_LMX1204_REG_WR(0x4c, 0),
         MAKE_LMX1204_R72(0, 0, 0, 0, SYSREF_DELAY_BYPASS_ENGAGE_IN_GENERATOR_MODE__BYPASS_IN_REPEATER_MODE),
 
         // need for MULT VCO calibration
         MAKE_LMX1204_R67(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x51cb : 0x50c8),
         MAKE_LMX1204_R34(0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x04c5 : 0),
-        MAKE_LMX1204_R33(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x5666 : 0x7777),
+        MAKE_LMX1204_R33(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? /*0x5666*/0x6666 : 0x7777),
         //
 
         MAKE_LMX1204_R25(0x4, 0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? st->clk_mult_div : st->clk_mult_div - 1, st->clk_mux),
@@ -718,7 +749,8 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         MAKE_LMX1204_R17(0, st->sysref_indiv_ch_delay[LMX1204_CH0].i, st->sysref_indiv_ch_delay[LMX1204_CH0].phase, st->sysref_mode),
         MAKE_LMX1204_R16(0x1, st->sysref_div), //0x1 == sysref pulse count
         MAKE_LMX1204_R15(0, st->sysref_div_pre, 0x3, st->sysref_en ? 1 : 0, 0, 0),
-
+        MAKE_LMX1204_R13(0, lmx1204_get_delay_step_size(st)),
+/*
         //according do doc: program R79 and R90 before setting logiclk_div_bypass
         //desc order is broken here!
         MAKE_LMX1204_R8(0, st->logiclk_div_pre, 1, st->ch_en[LMX1204_CH_LOGIC] ? 1 : 0, st->logisysrefout_fmt, st->logiclkout_fmt),
@@ -726,7 +758,9 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         MAKE_LMX1204_REG_WR(R90, st->logiclk_div_bypass ? 0x60 : 0x00),
         MAKE_LMX1204_R9(0, 0, 0, st->logiclk_div_bypass ? 1 : 0, 0, st->logiclk_div),
         //
-
+*/
+        MAKE_LMX1204_R9(0, 0, 0, st->logiclk_div_bypass ? 1 : 0, 0, st->logiclk_div),
+        MAKE_LMX1204_R8(0, st->logiclk_div_pre, 1, st->ch_en[LMX1204_CH_LOGIC] ? 1 : 0, st->logisysrefout_fmt, st->logiclkout_fmt),
         MAKE_LMX1204_R7(0, 0, 0, 0, 0, 0, 0, st->sysrefout_en[LMX1204_CH_LOGIC] ? 1 : 0),
         MAKE_LMX1204_R6(st->clkout_en[LMX1204_CH_LOGIC], 0x3, 0x3, 0x3, 0x3, 0x4),
         MAKE_LMX1204_R4(0, 0x6, 0x6,
@@ -829,14 +863,7 @@ int lmx1204_sysref_windowing_beforesync(lmx1204_state_t* st)
 {
     int res;
 
-    uint8_t delay_step_size = SYSREFREQ_DELAY_STEPSIZE_28_PS_1_4_GHZ_TO_2_7_GHZ;
-    if(st->clkin > 2400000000 && st->clkin <= 4700000000)
-        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_15_PS_2_4_GHZ_TO_4_7_GHZ;
-    if(st->clkin > 3100000000 && st->clkin <= 5700000000)
-        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_11_PS_3_1_GHZ_TO_5_7_GHZ;
-    if(st->clkin > 4500000000 && st->clkin <= 12800000000)
-        delay_step_size = SYSREFREQ_DELAY_STEPSIZE_8_PS_4_5_GHZ_TO_12_8_GHZ;
-
+    uint8_t delay_step_size = lmx1204_get_delay_step_size(st);
     USDR_LOG("1204", USDR_LOG_DEBUG, "DELAY_STEPSIZE:%u", delay_step_size);
 
     {
