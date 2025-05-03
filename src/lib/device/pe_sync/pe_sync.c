@@ -21,6 +21,7 @@
 #include "../hw/lmx2820/lmx2820.h"
 #include "../hw/lmx1214/lmx1214.h"
 #include "../hw/lmx1204/lmx1204.h"
+#include "../hw/lmk1d1208i/lmk1d1208i.h"
 
 // [0] 24bit 20Mhz AD5662  InRef::DAC_REF
 // [1] 24bit 20Mhz AD5662  ClockGen::GEN_DC
@@ -128,6 +129,7 @@ struct dev_pe_sync {
     lmx2820_state_t lmx0, lmx1;
     lmx1214_state_t lodistr;
     lmx1204_state_t cldistr;
+    lmk1d1208i_state_t lmk1d0, lmk1d1;
 };
 
 enum dev_gpi {
@@ -432,7 +434,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //
     //LMX1214 setup
     //
-
+#if 1
     const uint64_t ld_clkout = lmx1_freq[0];
     bool ld_en[LMX1214_OUT_CNT] = {1,1,1,1};
     lmx1214_auxclkout_cfg_t ld_aux;
@@ -454,6 +456,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     }
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1214 initialized");
+#endif
     //
 #endif
     //
@@ -522,6 +525,82 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1204 initialized");
     //
 #endif
+
+    //
+    // LMK1D1208I[0] setup
+    //
+
+    lmk1d1208i_config_t lmk1d_cfg;
+    lmk1d_cfg.in[0].enabled = true;
+    lmk1d_cfg.in[1].enabled = false;
+    lmk1d_cfg.bank[0].mute = false;
+    lmk1d_cfg.bank[1].mute = false;
+    lmk1d_cfg.bank[0].sel = LMK1D1208I_IN0;
+    lmk1d_cfg.bank[1].sel = LMK1D1208I_IN0;
+    lmk1d_cfg.out[0].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[1].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[2].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[3].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[4].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[5].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[6].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[7].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[0].enabled = true;
+    lmk1d_cfg.out[1].enabled = true;
+    lmk1d_cfg.out[2].enabled = true;
+    lmk1d_cfg.out[3].enabled = true;
+    lmk1d_cfg.out[4].enabled = true;
+    lmk1d_cfg.out[5].enabled = true;
+    lmk1d_cfg.out[6].enabled = true;
+    lmk1d_cfg.out[7].enabled = true;
+
+    res = lmk1d1208i_create(dev, 0, I2C_BUS_LMK1D1208I_LCK, &lmk1d_cfg, &d->lmk1d0);
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK1D1208I[0] failed to initialize, res:%d", res);
+        return res;
+    }
+
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMK1D1208I[0] initialized");
+    //
+
+    //
+    // LMK1D1208I[1] setup
+    //
+
+    lmk1d_cfg.in[0].enabled = true;
+    lmk1d_cfg.in[1].enabled = false;
+    lmk1d_cfg.bank[0].mute = false;
+    lmk1d_cfg.bank[1].mute = false;
+    lmk1d_cfg.bank[0].sel = LMK1D1208I_IN0;
+    lmk1d_cfg.bank[1].sel = LMK1D1208I_IN0;
+    lmk1d_cfg.out[0].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[1].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[2].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[3].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[4].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[5].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[6].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[7].amp = LMK1D1208I_STANDARD_LVDS;
+    lmk1d_cfg.out[0].enabled = true;
+    lmk1d_cfg.out[1].enabled = true;
+    lmk1d_cfg.out[2].enabled = true;
+    lmk1d_cfg.out[3].enabled = true;
+    lmk1d_cfg.out[4].enabled = true;
+    lmk1d_cfg.out[5].enabled = true;
+    lmk1d_cfg.out[6].enabled = true;
+    lmk1d_cfg.out[7].enabled = true;
+
+    res = lmk1d1208i_create(dev, 0, I2C_BUS_LMK1D1208I_LRF, &lmk1d_cfg, &d->lmk1d1);
+    if(res)
+    {
+        USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK1D1208I[1] failed to initialize, res:%d", res);
+        return res;
+    }
+
+    USDR_LOG("SYNC", USDR_LOG_INFO, "LMK1D1208I[1] initialized");
+    //
+
     return res;
 }
 
