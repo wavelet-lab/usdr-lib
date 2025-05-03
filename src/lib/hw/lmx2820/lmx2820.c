@@ -560,7 +560,7 @@ static int lmx2820_calculate_input_chain(lmx2820_state_t* st, uint64_t fosc_in, 
     if(res)
         return res;
 
-    USDR_LOG("2820", USDR_LOG_WARNING, "Input circuit res: OSC_IN:%" PRIu64 " OSC_2X:%d PLL_R_PRE:%d MULT:%d PLL_R:%d FPD:%.0f PLL_N:%u PLL_NUM:%u PLL_DEN:%u VCO:%.2f",
+    USDR_LOG("2820", USDR_LOG_INFO, "Input circuit res: OSC_IN:%" PRIu64 " OSC_2X:%d PLL_R_PRE:%d MULT:%d PLL_R:%d FPD:%.0f PLL_N:%u PLL_NUM:%u PLL_DEN:%u VCO:%.2f",
              settings->fosc_in,
              settings->osc_2x,
              settings->pll_r_pre,
@@ -805,11 +805,11 @@ int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, un
 
     lmx2820_output_chain_t * outs = &st->lmx2820_output_chain;
 
-    USDR_LOG("2820", USDR_LOG_WARNING, "***** SOLUTION *****");
-    USDR_LOG("2820", USDR_LOG_WARNING, "VCO:%.2f OSC_IN:%" PRIu64 " MASH_ORDER:%u VCO_CORE%u", st->lmx2820_input_chain.fvco, osc_in, mash_order, st->lmx2820_input_chain.vco_core);
-    USDR_LOG("2820", USDR_LOG_WARNING, "CH_A - RF:%.2f DIV:%u(%u) MUX:%s", outs->rfouta, outs->chdiva - 1, (1 << outs->chdiva),
+    USDR_LOG("2820", USDR_LOG_INFO, "***** SOLUTION *****");
+    USDR_LOG("2820", USDR_LOG_INFO, "VCO:%.2f OSC_IN:%" PRIu64 " MASH_ORDER:%u VCO_CORE%u", st->lmx2820_input_chain.fvco, osc_in, mash_order, st->lmx2820_input_chain.vco_core);
+    USDR_LOG("2820", USDR_LOG_INFO, "CH_A - RF:%.2f DIV:%u(%u) MUX:%s", outs->rfouta, outs->chdiva - 1, (1 << outs->chdiva),
              outs->outa_mux == OUTA_MUX_VCO_DOUBLER ? "OUTA_MUX_VCO_DOUBLER" : (outs->outa_mux == OUTA_MUX_VCO ? "OUTA_MUX_VCO": "OUTA_MUX_CHANNEL_DIVIDER"));
-    USDR_LOG("2820", USDR_LOG_WARNING, "CH_B - RF:%.2f DIV:%u(%u) MUX:%s", outs->rfoutb, outs->chdivb - 1, (1 << outs->chdivb),
+    USDR_LOG("2820", USDR_LOG_INFO, "CH_B - RF:%.2f DIV:%u(%u) MUX:%s", outs->rfoutb, outs->chdivb - 1, (1 << outs->chdivb),
              outs->outb_mux == OUTB_MUX_VCO_DOUBLER ? "OUTB_MUX_VCO_DOUBLER" : (outs->outb_mux == OUTB_MUX_VCO ? "OUTB_MUX_VCO": "OUTB_MUX_CHANNEL_DIVIDER"));
 
     return 0;
@@ -864,11 +864,11 @@ int lmx2820_solver_instcal(lmx2820_state_t* st, uint64_t rfouta, uint64_t rfoutb
 
     lmx2820_output_chain_t * outs = &st->lmx2820_output_chain;
 
-    USDR_LOG("2820", USDR_LOG_WARNING, "***** INSTCAL SOLUTION *****");
-    USDR_LOG("2820", USDR_LOG_WARNING, "VCO:%.2f", st->lmx2820_input_chain.fvco);
-    USDR_LOG("2820", USDR_LOG_WARNING, "CH_A - RF:%.2f DIV:%u(%u) MUX:%s", outs->rfouta, outs->chdiva - 1, (1 << outs->chdiva),
+    USDR_LOG("2820", USDR_LOG_INFO, "***** INSTCAL SOLUTION *****");
+    USDR_LOG("2820", USDR_LOG_INFO, "VCO:%.2f", st->lmx2820_input_chain.fvco);
+    USDR_LOG("2820", USDR_LOG_INFO, "CH_A - RF:%.2f DIV:%u(%u) MUX:%s", outs->rfouta, outs->chdiva - 1, (1 << outs->chdiva),
              outs->outa_mux == OUTA_MUX_VCO_DOUBLER ? "OUTA_MUX_VCO_DOUBLER" : (outs->outa_mux == OUTA_MUX_VCO ? "OUTA_MUX_VCO": "OUTA_MUX_CHANNEL_DIVIDER"));
-    USDR_LOG("2820", USDR_LOG_WARNING, "CH_B - RF:%.2f DIV:%u(%u) MUX:%s", outs->rfoutb, outs->chdivb - 1, (1 << outs->chdivb),
+    USDR_LOG("2820", USDR_LOG_INFO, "CH_B - RF:%.2f DIV:%u(%u) MUX:%s", outs->rfoutb, outs->chdivb - 1, (1 << outs->chdivb),
              outs->outb_mux == OUTB_MUX_VCO_DOUBLER ? "OUTB_MUX_VCO_DOUBLER" : (outs->outb_mux == OUTB_MUX_VCO ? "OUTB_MUX_VCO": "OUTB_MUX_CHANNEL_DIVIDER"));
 
     return 0;
@@ -972,7 +972,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         return res;
     }
 
-    res = lmx2820_wait_pll_lock(st, 100000);
+    res = lmx2820_wait_pll_lock(st, 1000000);
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_wait_pll_lock() failed, err:%d [%s]",

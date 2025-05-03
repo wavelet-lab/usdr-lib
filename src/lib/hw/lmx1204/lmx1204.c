@@ -68,7 +68,7 @@ static int lmx1204_spi_get(lmx1204_state_t* obj, uint16_t addr, uint16_t* out)
 
 int lmx1204_loaddump(lmx1204_state_t* st)
 {
-    int res = lmx1204_spi_post(st, lmx1204_rom_test, SIZEOF_ARRAY(lmx1204_rom_test));
+    int res = lmx1204_spi_post(st, lmx1204_rom_with_mult, SIZEOF_ARRAY(lmx1204_rom_with_mult));
     if(res)
     {
         USDR_LOG("1204", USDR_LOG_ERROR, "lmx1204_loaddump() err:%d", res);
@@ -77,6 +77,9 @@ int lmx1204_loaddump(lmx1204_state_t* st)
     {
         USDR_LOG("1204", USDR_LOG_DEBUG, "lmx1204_loaddump() OK");
     }
+
+    st->clk_mux = CLK_MUX_MULTIPLIER_MODE;
+
     return res;
 }
 
@@ -133,7 +136,7 @@ UNUSED static int lmx1204_read_all_regs(lmx1204_state_t* st)
     return 0;
 }
 
-static int lmx1204_reset_main_divider(lmx1204_state_t* st, bool set_flag)
+int lmx1204_reset_main_divider(lmx1204_state_t* st, bool set_flag)
 {
     uint16_t r25;
 
@@ -717,25 +720,18 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         return res;
     }
 
-    res = dry_run ? 0 : lmx1204_reset_main_divider(st, true);
-    if(res)
-    {
-        USDR_LOG("1204", USDR_LOG_ERROR, "lmx1204_reset_main_divider(1) err:%d", res);
-        return res;
-    }
-
     uint32_t regs[] =
     {
         MAKE_LMX1204_REG_WR(R90, st->logiclk_div_bypass ? 0x60 : 0x00),
-        //MAKE_LMX1204_R86(0),                //MUXOUT_EN_OVRD=0
+        MAKE_LMX1204_R86(0),                                            //MUXOUT_EN_OVRD=0
         MAKE_LMX1204_R79(0, st->logiclk_div_bypass ? 0x104 : 0x5),
-        MAKE_LMX1204_REG_WR(0x4c, 0),
+        MAKE_LMX1204_REG_WR(0x4c, 0),                                   //R76==0
         MAKE_LMX1204_R72(0, 0, 0, 0, SYSREF_DELAY_BYPASS_ENGAGE_IN_GENERATOR_MODE__BYPASS_IN_REPEATER_MODE),
 
         // need for MULT VCO calibration
         MAKE_LMX1204_R67(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x51cb : 0x50c8),
         MAKE_LMX1204_R34(0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x04c5 : 0),
-        MAKE_LMX1204_R33(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? /*0x5666*/0x6666 : 0x7777),
+        MAKE_LMX1204_R33(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x6666 : 0x7777),
         //
 
         MAKE_LMX1204_R25(0x4, 0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? st->clk_mult_div : st->clk_mult_div - 1, st->clk_mux),
@@ -762,28 +758,19 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         MAKE_LMX1204_R9(0, 0, 0, st->logiclk_div_bypass ? 1 : 0, 0, st->logiclk_div),
         MAKE_LMX1204_R8(0, st->logiclk_div_pre, 1, st->ch_en[LMX1204_CH_LOGIC] ? 1 : 0, st->logisysrefout_fmt, st->logiclkout_fmt),
         MAKE_LMX1204_R7(0, 0, 0, 0, 0, 0, 0, st->sysrefout_en[LMX1204_CH_LOGIC] ? 1 : 0),
-        MAKE_LMX1204_R6(st->clkout_en[LMX1204_CH_LOGIC], 0x3, 0x3, 0x3, 0x3, 0x4),
+        MAKE_LMX1204_R6(st->clkout_en[LMX1204_CH_LOGIC], 0x4, 0x4, 0x4, 0x4, 0x4),
         MAKE_LMX1204_R4(0, 0x6, 0x6,
                         st->sysrefout_en[LMX1204_CH3], st->sysrefout_en[LMX1204_CH2], st->sysrefout_en[LMX1204_CH1], st->sysrefout_en[LMX1204_CH0],
                         st->clkout_en[LMX1204_CH3], st->clkout_en[LMX1204_CH2], st->clkout_en[LMX1204_CH1], st->clkout_en[LMX1204_CH0]),
         MAKE_LMX1204_R3(st->ch_en[LMX1204_CH3], st->ch_en[LMX1204_CH2], st->ch_en[LMX1204_CH1], st->ch_en[LMX1204_CH0], 1, 1, 1, 1, 1, 0, st->smclk_div),
         MAKE_LMX1204_R2(0,0,st->smclk_div_pre, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 1 : 0, 0x3),
         //
-        MAKE_LMX1204_R0(0, 0, 0, 0),    //reset RESET bit last
+        MAKE_LMX1204_R0(0, 0, 0, 0),    //reset RESET bit last -> calibration started
     };
 
     res = dry_run ? common_print_registers_a8d16(regs, SIZEOF_ARRAY(regs), USDR_LOG_DEBUG) : lmx1204_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
         return res;
-
-    usleep(10000);
-
-    res = dry_run ? 0 : lmx1204_reset_main_divider(st, false);
-    if(res)
-    {
-        USDR_LOG("1204", USDR_LOG_ERROR, "lmx1204_reset_main_divider(0) err:%d", res);
-        return res;
-    }
 
     return 0;
 }
@@ -800,7 +787,7 @@ int lmx1204_calibrate(lmx1204_state_t* st)
     {
         MAKE_LMX1204_R67(0x51cb),
         MAKE_LMX1204_R34(0, 0x04c5),
-        MAKE_LMX1204_R33(0x5666),
+        MAKE_LMX1204_R33(0x6666),
         MAKE_LMX1204_R0(0, 0, 0, 0),
     };
 
@@ -834,9 +821,15 @@ int lmx1204_wait_pll_lock(lmx1204_state_t* st, unsigned timeout)
         const uint16_t lock_detect_status = (r75 & RB_LD_MSK) >> RB_LD_OFF;
         switch(lock_detect_status)
         {
-        case RB_LD_LOCKED: return 0;
+        case RB_LD_LOCKED:
+        {
+            uint32_t reg = MAKE_LMX1204_R2(0,0,st->smclk_div_pre, 0, 0x3); //switch off state machine to reduce spurs
+            lmx1204_spi_post(st, &reg, 1);
+            USDR_LOG("1204", USDR_LOG_DEBUG, "VCO locked in %.2f msecs. State machine disabled.", (double)elapsed / 1000);
+            return 0;
+        }
         default:
-            usleep(100);
+            usleep(1000);
             elapsed += (clock_get_time() - tk);
         }
     }

@@ -299,7 +299,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     lmk05318_dpll_settings_t dpll;
     memset(&dpll, 0, sizeof(dpll));
-    dpll.enabled = true;
+    dpll.enabled = false;
     dpll.en[LMK05318_PRIREF] = true;
     dpll.fref[LMK05318_PRIREF] = 1;
     dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
@@ -376,18 +376,16 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMK03518 outputs synced");
     //
 
-    //return 0;
-
-    usleep(2000000);
+    usleep(2000000); //LMX2820[0] will not start without it
 
     //
     //LMX2820 #0 setup
     //
-#if 1
+
     const uint64_t lmx0_freq[] =
     {
-        500000000, //1400000000,
-        500000000, //1400000000
+        500000000*2, //1400000000,
+        500000000*2, //1400000000
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_0, &d->lmx0);
@@ -404,8 +402,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX2820[0] outputs locked & synced");
     //
-#endif
-#if 1
+
     //
     //LMX2820 #1 setup
     //
@@ -434,7 +431,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //
     //LMX1214 setup
     //
-#if 1
+
     const uint64_t ld_clkout = lmx1_freq[0];
     bool ld_en[LMX1214_OUT_CNT] = {1,1,1,1};
     lmx1214_auxclkout_cfg_t ld_aux;
@@ -456,13 +453,11 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     }
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1214 initialized");
-#endif
     //
-#endif
+
     //
     //LMX1204 setup
     //
-#if 1
 
     res = lmx1204_create(dev, 0, SPI_LMX1204, &d->cldistr);
     if(res)
@@ -475,7 +470,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     lmx1204_state_t* lmx1204 = &d->cldistr;
     lmx1204->clkin     = lmx0_freq[0];
     lmx1204->sysrefreq = lmx0_freq[1];
-    lmx1204->clkout    = d->cldistr.clkin;
+    lmx1204->clkout    = d->cldistr.clkin * 4;
     lmx1204->sysrefout = 3125000;
     lmx1204->sysref_mode = LMX1204_CONTINUOUS;
     lmx1204->logiclkout = 125000000;
@@ -510,7 +505,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     lmx1204_stats_t lmx1204status;
     lmx1204_read_status(&d->cldistr, &lmx1204status); //just for log
 
-    res = lmx1204_wait_pll_lock(&d->cldistr, 100000);
+    res = lmx1204_wait_pll_lock(&d->cldistr, 1000000);
 
     lmx1204_read_status(&d->cldistr, &lmx1204status); //just for log
 
@@ -524,7 +519,6 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     USDR_LOG("SYNC", USDR_LOG_INFO, "LMX1204 initialized");
     //
-#endif
 
     //
     // LMK1D1208I[0] setup

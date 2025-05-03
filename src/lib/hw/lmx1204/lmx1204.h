@@ -104,6 +104,7 @@ enum
 int lmx1204_read_status(lmx1204_state_t* st, lmx1204_stats_t* status);
 int lmx1204_calibrate(lmx1204_state_t* st);
 int lmx1204_wait_pll_lock(lmx1204_state_t* st, unsigned timeout);
+int lmx1204_reset_main_divider(lmx1204_state_t* st, bool set_flag);
 int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run);
 int lmx1204_get_temperature(lmx1204_state_t* st, float* value);
 int lmx1204_reload_sysrefout_ch_delay(lmx1204_state_t* st);

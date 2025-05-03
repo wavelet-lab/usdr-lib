@@ -32,7 +32,7 @@ static int lmk1d1208i_reg_print(const uint16_t* regs, unsigned count)
     {
         uint8_t addr = regs[j] >> 8;
         uint8_t data = regs[j];
-        USDR_LOG("1D1208I", USDR_LOG_DEBUG, "WRITING REG R%02u -> 0x%02x [0x%04x]", addr, data, regs[j]);
+        USDR_LOG("1208", USDR_LOG_DEBUG, "WRITING REG R%02u -> 0x%02x [0x%04x]", addr, data, regs[j]);
     }
     return 0;
 }
@@ -70,17 +70,17 @@ int lmk1d1208i_create(lldev_t dev, unsigned subdev, unsigned lsaddr, const lmk1d
     res = lmk1d1208i_reg_rd(st, R5, &r5);
     if(res)
     {
-        USDR_LOG("1D1208I", USDR_LOG_ERROR, "lmk1d1208i_reg_rd() error:%d", res);
+        USDR_LOG("1208", USDR_LOG_ERROR, "lmk1d1208i_reg_rd() error:%d", res);
         return res;
     }
 
     const uint8_t rev_id = (r5 & REV_ID_MSK) >> REV_ID_OFF;
     const uint8_t dev_id = (r5 & DEV_ID_MSK) >> DEV_ID_OFF;
-    USDR_LOG("1D1208I", USDR_LOG_DEBUG, "REV_ID:0x%01x DEV_ID:0x%01x", rev_id, dev_id);
+    USDR_LOG("1208", USDR_LOG_DEBUG, "REV_ID:0x%01x DEV_ID:0x%01x", rev_id, dev_id);
 
     if(rev_id != 0x2 && dev_id != 0x0)
     {
-        USDR_LOG("1D1208I", USDR_LOG_ERROR, "1D1208I chip/bus not found");
+        USDR_LOG("1208", USDR_LOG_ERROR, "1D1208I chip/bus not found");
         return -EINVAL;
     }
 
@@ -117,17 +117,17 @@ int lmk1d1208i_create(lldev_t dev, unsigned subdev, unsigned lsaddr, const lmk1d
     res = lmk1d1208i_reg_wr_n(st, regs, SIZEOF_ARRAY(regs));
     if(res)
     {
-        USDR_LOG("1D1208I", USDR_LOG_ERROR, "lmk1d1208i_reg_wr_n() error:%d", res);
+        USDR_LOG("1208", USDR_LOG_ERROR, "lmk1d1208i_reg_wr_n() error:%d", res);
         return res;
     }
 
-    USDR_LOG("1D1208I", USDR_LOG_DEBUG, "Create OK");
+    USDR_LOG("1208", USDR_LOG_DEBUG, "Create OK");
     return 0;
 }
 
 int lmk1d1208i_destroy(lmk1d1208i_state_t* st)
 {
-    USDR_LOG("1D1208I", USDR_LOG_DEBUG, "Destroy OK");
+    USDR_LOG("1208", USDR_LOG_DEBUG, "Destroy OK");
     return 0;
 }
 
