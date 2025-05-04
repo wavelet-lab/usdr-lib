@@ -31,6 +31,32 @@ struct lmx2820_output_chain_st
 };
 typedef struct lmx2820_output_chain_st lmx2820_output_chain_t;
 
+enum lmx2820_sysref_in_fmt
+{
+    SRREQ_CMOS    = 0,
+    SRREQ_CMOS_AC = 1,
+    SRREQ_LVDS_AC = 2,
+    SRREQ_LVDS_DC = 3,
+};
+typedef enum lmx2820_sysref_in_fmt lmx2820_sysref_in_fmt_t;
+
+struct lmx2820_sysref_chain_st
+{
+    uint64_t srout;
+    bool enabled;
+    bool master_mode; //true:master mode, false:repeater mode
+    bool cont_pulse;  //true:continious, false:pulsed
+    uint8_t pulse_cnt;
+    uint8_t delay_ctrl;
+    double delay;
+    uint8_t div_pre;
+    uint16_t div;
+    double srout_fact;
+    //
+    uint8_t srreq_fmt;
+};
+typedef struct lmx2820_sysref_chain_st lmx2820_sysref_chain_t;
+
 struct lmx2820_stats {
     float temperature;
     uint16_t vco_sel;
@@ -48,6 +74,7 @@ struct lmx2820_state {
     uint16_t instcal_dly;
     lmx2820_input_chain_t lmx2820_input_chain;
     lmx2820_output_chain_t lmx2820_output_chain;
+    lmx2820_sysref_chain_t lmx2820_sysref_chain;
 };
 typedef struct lmx2820_state lmx2820_state_t;
 

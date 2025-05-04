@@ -46,6 +46,18 @@ enum {
 
     OUT_DIV_LOG2_MIN = 1,
     OUT_DIV_LOG2_MAX = 7,
+
+    SYSREF_DIV_PRE_MIN = 2,
+    SYSREF_DIV_PRE_MID = 4,
+    SYSREF_DIV_PRE_MAX = 8,
+    SYSREF_DIV_MIN = 2,
+    SYSREF_DIV_MAX = 2049,
+    SYSREF_FINTERPOLATOR_MIN = 600000000ull,
+    SYSREF_FINTERPOLATOR_MAX = 1500000000ull,
+    SYSREF_PULSE_CNT_MIN = 1,
+    SYSREF_PULSE_CNT_MAX = 15,
+    SYSREF_DELAY_CTRL_MIN = 0,
+    SYSREF_DELAY_CTRL_MAX = 251,
 };
 
 #define RF_ACCURACY 0.0f
@@ -87,6 +99,57 @@ static uint64_t FPD_MAX[MASH_ORDER_THIRD_ORDER + 1] =
 };
 
 #define INSTCAL_R0_MASK (((uint16_t)1 << FCAL_EN_OFF) | ((uint16_t)1 << DBLR_CAL_EN_OFF) | ((uint16_t)1 << INSTCAL_SKIP_ACAL_OFF))
+
+struct jesd_flds
+{
+    uint8_t DAC1_CTRL;
+    uint8_t DAC2_CTRL;
+    uint8_t DAC3_CTRL;
+    uint8_t DAC4_CTRL;
+};
+
+#define JESD_SIZE 252
+static struct jesd_flds JESD[JESD_SIZE];
+
+static void lmx2820_fill_jesd()
+{
+    JESD[0].DAC1_CTRL = 63;
+    JESD[0].DAC2_CTRL = 0;
+    JESD[0].DAC3_CTRL = 0;
+    JESD[0].DAC4_CTRL = 0;
+
+    for(uint8_t i = 1; i < JESD_SIZE; ++i)
+    {
+        if(i < 64)
+        {
+            JESD[i].DAC1_CTRL = JESD[i - 1].DAC1_CTRL - 1;
+            JESD[i].DAC2_CTRL = JESD[i - 1].DAC2_CTRL + 1;
+            JESD[i].DAC3_CTRL = 0;
+            JESD[i].DAC4_CTRL = 0;
+        }
+        else if(i < 127)
+        {
+            JESD[i].DAC1_CTRL = 0;
+            JESD[i].DAC2_CTRL = JESD[i - 1].DAC2_CTRL - 1;
+            JESD[i].DAC3_CTRL = JESD[i - 1].DAC3_CTRL + 1;
+            JESD[i].DAC4_CTRL = 0;
+        }
+        else if(i < 190)
+        {
+            JESD[i].DAC1_CTRL = 0;
+            JESD[i].DAC2_CTRL = 0;
+            JESD[i].DAC3_CTRL = JESD[i - 1].DAC3_CTRL - 1;
+            JESD[i].DAC4_CTRL = JESD[i - 1].DAC4_CTRL + 1;
+        }
+        else
+        {
+            JESD[i].DAC1_CTRL = JESD[i - 1].DAC1_CTRL + 1;
+            JESD[i].DAC2_CTRL = 0;
+            JESD[i].DAC3_CTRL = 0;
+            JESD[i].DAC4_CTRL = JESD[i - 1].DAC4_CTRL - 1;
+        }
+    }
+}
 
 static int lmx2820_spi_post(lmx2820_state_t* obj, uint32_t* regs, unsigned count)
 {
@@ -755,6 +818,103 @@ static int lmx2820_solver_validate_and_save(lmx2820_state_t* st, uint64_t rfouta
     return 0;
 }
 
+static int lmx2820_calculate_systef_chain(lmx2820_state_t* st)
+{
+    if(!st->lmx2820_sysref_chain.enabled)
+    {
+        USDR_LOG("2820", USDR_LOG_INFO, "SYSREF disabled, skipping setup");
+        return 0;
+    }
+
+    lmx2820_sysref_chain_t* sr = &st->lmx2820_sysref_chain;
+
+    if(sr->master_mode == false)
+    {
+        switch(sr->srreq_fmt)
+        {
+        case SRREQ_CMOS:    sr->srreq_fmt = SYSREF_INP_FMT_CMOS_INPUT_AT_SRREQ_P_PIN__1_8_V_TO_3_3_V_LOGIC; break;
+        case SRREQ_CMOS_AC: sr->srreq_fmt = SYSREF_INP_FMT_AC_COUPLE_CMOS_INPUT_AT_SRREQ_P_PIN; break;
+        case SRREQ_LVDS_AC: sr->srreq_fmt = SYSREF_INP_FMT_AC_COUPLED_DIFFERENTIAL_LVDS_INPUT__REQUIRES_EXTERNAL_100_OHM_DIFFERENTIAL_TERMINATION; break;
+        case SRREQ_LVDS_DC: sr->srreq_fmt = SYSREF_INP_FMT_DC_COUPLED_DIFFERENTIAL_LVDS_INPUT__REQUIRES_EXTERNAL_100_OHM_DIFFERENTIAL_TERMINATION; break;
+        default:
+        {
+            USDR_LOG("2820", USDR_LOG_ERROR, "[SYSREF] Invalid SRREG_FMT:%u", sr->srreq_fmt);
+            return -EINVAL;
+        }
+        }
+    }
+
+    if(sr->cont_pulse == false && (sr->pulse_cnt < SYSREF_PULSE_CNT_MIN || sr->pulse_cnt > SYSREF_PULSE_CNT_MAX))
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "[SYSREF] PULSE_CNT:%u out of range [%u;%u]",
+                 sr->pulse_cnt, (int)SYSREF_PULSE_CNT_MIN, (int)SYSREF_PULSE_CNT_MAX);
+        return -EINVAL;
+    }
+
+    if(sr->delay_ctrl < SYSREF_DELAY_CTRL_MIN || sr->delay_ctrl > SYSREF_DELAY_CTRL_MAX)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "[SYSREF] DELAY_CTRL:%u out of range [%u;%u]",
+                 sr->delay_ctrl, (int)SYSREF_DELAY_CTRL_MIN, (int)SYSREF_DELAY_CTRL_MAX);
+        return -EINVAL;
+    }
+
+    const double fvco = st->lmx2820_input_chain.fvco;
+
+    bool found = false;
+    double finterpolator;
+    for(uint8_t i = 3; i > 0; --i)
+    {
+        finterpolator = fvco / (1 << i);
+        if(finterpolator >= SYSREF_FINTERPOLATOR_MIN && finterpolator <= SYSREF_FINTERPOLATOR_MAX)
+        {
+            sr->div_pre = 1 << i;
+            found = true;
+            break;
+        }
+    }
+
+    if(!found)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "[SYSREF] Cannot obtain Finterpolator:[%u;%u] having VCO:%.2f",
+                 (unsigned)SYSREF_FINTERPOLATOR_MIN, (unsigned)SYSREF_FINTERPOLATOR_MAX, fvco);
+        return -EINVAL;
+    }
+
+    double fdiv = finterpolator / 4;
+    unsigned div = (unsigned)(fdiv / sr->srout + 0.5f);
+    if(div < SYSREF_DIV_MIN || div > SYSREF_DIV_MAX)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "[SYSREF] Cannot obtain SROUT:%" PRIu64 " using SYSREF_DIV:[%u;%u]",
+                 sr->srout, (int)SYSREF_DIV_MIN, (int)SYSREF_DIV_MAX);
+        return -EINVAL;
+    }
+    sr->div = div;
+    sr->srout_fact = fvco / sr->div_pre / sr->div / 4;
+
+    lmx2820_fill_jesd();
+    /*
+    for(unsigned i = 0; i < JESD_SIZE; ++i)
+    {
+        USDR_LOG("2820", USDR_LOG_DEBUG, "PHASE_SHIFT:%03u -> DAC1_CTRL:%02u DAC2_CTRL:%02u DAC3_CTRL:%02u DAC4_CTRL:%02u",
+                 i, JESD[i].DAC1_CTRL, JESD[i].DAC2_CTRL, JESD[i].DAC3_CTRL, JESD[i].DAC4_CTRL);
+    }
+    */
+    double delay_per_inc = (double)sr->div_pre / 126.0 / fvco;
+    sr->delay = delay_per_inc * (sr->delay_ctrl + 1);
+
+    USDR_LOG("2820", USDR_LOG_INFO, "[SYSREF] SROUT:%" PRIu64 " VCO:%.4f DIV_PRE:%u DIV:%u SROUT_FACT:%.4f DELAY_PER_INC:%.2fps DELAY:%.2fps",
+             sr->srout, fvco, sr->div_pre, sr->div, sr->srout_fact,
+             delay_per_inc * 1E12, sr->delay * 1E12);
+
+    if((double)sr->srout != sr->srout_fact)
+    {
+        USDR_LOG("2820", USDR_LOG_WARNING, "[SYSREF] SROUT_FACT=%.4f differs from required SROUT, delta:%.4f",
+                 sr->srout_fact, fabs((double)sr->srout - sr->srout_fact));
+    }
+
+    return 0;
+}
+
 int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb)
 {
     int res = 0;
@@ -796,6 +956,10 @@ int lmx2820_solver(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, un
         return res;
 
     res = lmx2820_calculate_input_chain(st, osc_in, vco, mash_order, force_mult);
+    if(res)
+        return res;
+
+    res = lmx2820_calculate_systef_chain(st);
     if(res)
         return res;
 
@@ -874,6 +1038,18 @@ int lmx2820_solver_instcal(lmx2820_state_t* st, uint64_t rfouta, uint64_t rfoutb
     return 0;
 }
 
+static uint8_t lmx2820_encode_sysref_prediv(lmx2820_state_t* st)
+{
+    switch(st->lmx2820_sysref_chain.div_pre)
+    {
+    case SYSREF_DIV_PRE_MAX: return 4;
+    case SYSREF_DIV_PRE_MID: return 2;
+    case SYSREF_DIV_PRE_MIN: return 1;
+    }
+    USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_encode_sysref_prediv() unsupported value!");
+    return 0;
+}
+
 static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned mash_order, unsigned force_mult, uint64_t rfouta, uint64_t rfoutb, bool use_instcal)
 {
     int res = lmx2820_solver(st, osc_in, mash_order, force_mult, rfouta, rfoutb);
@@ -930,10 +1106,45 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
     USDR_LOG("2820", USDR_LOG_DEBUG, "REGS> LP_FD_ADJ:%d HP_FD_ADJ:%d CAL_CLK_DIV:%d INSTCAL_DLY:%d INSTCAL_PLL_NUM:%u INSTCAL_DBLR_EN:%d",
              LP_fd_adj, HP_fd_adj, cal_clk_div, instcal_dly, instcal_pll_num, instcal_dblr_en);
 
+    const lmx2820_sysref_chain_t* sr = &st->lmx2820_sysref_chain;
+
     uint32_t regs[] =
     {
         MAKE_LMX2820_R79(0, OUTB_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outb_mux, 0x7, 0),
         MAKE_LMX2820_R78(0, OUTA_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outa_mux),
+        MAKE_LMX2820_R69(0, sr->enabled ? SROUT_PD_NORMAL_OPERATION : SROUT_PD_POWER_DOWN, 1),
+
+        sr->enabled ?
+            MAKE_LMX2820_R67(sr->cont_pulse ? 0 : sr->pulse_cnt,
+                             JESD[sr->delay_ctrl].DAC4_CTRL,
+                             JESD[sr->delay_ctrl].DAC3_CTRL)
+            :
+            MAKE_LMX2820_R67(0,0,0), //default
+
+        sr->enabled ?
+            MAKE_LMX2820_R66(0x0,
+                             JESD[sr->delay_ctrl].DAC2_CTRL,
+                             JESD[sr->delay_ctrl].DAC1_CTRL)
+            :
+            MAKE_LMX2820_R66(0,0,0x3F), //default
+
+        sr->enabled ?
+            MAKE_LMX2820_R65(0x0, sr->div - 2)
+            :
+            MAKE_LMX2820_R65(0,1), //default
+
+        sr->enabled ?
+            MAKE_LMX2820_R64(0x10,
+                             sr->master_mode ? 0 : sr->srreq_fmt,
+                             lmx2820_encode_sysref_prediv(st),
+                             0, /*sysref_repeat_ns*/
+                             sr->cont_pulse ? 0 : 1,
+                             1, /*sysref enabled*/
+                             sr->master_mode ? 0 : 1,
+                             0x0)
+            :
+            MAKE_LMX2820_R64(0x10, 0, 0x4, 0, 0, 0/*sysref disabled*/, 0, 0x0), //default
+
         MAKE_LMX2820_R45((uint16_t)instcal_pll_num),
         MAKE_LMX2820_R44((uint16_t)(instcal_pll_num >> 16)),
         MAKE_LMX2820_R43((uint16_t)st->lmx2820_input_chain.pll_num),
@@ -949,9 +1160,12 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R12(0, st->lmx2820_input_chain.mult, 0x8),
         MAKE_LMX2820_R11(0x30, st->lmx2820_input_chain.osc_2x ? 1 : 0, 0x3),
         MAKE_LMX2820_R2 (1, cal_clk_div, instcal_dly, QUICK_RECAL_EN_DISABLED),
-        MAKE_LMX2820_R1 (PHASE_SYNC_EN_NORMAL_OPERATION, 0x15E, LD_VTUNE_EN_VCOCAL_AND_VTUNE_LOCK_DETECT, 0,
-                        instcal_dblr_en,
-                        use_instcal ? INSTCAL_EN_ENABLED : INSTCAL_EN_DISABLED),
+        MAKE_LMX2820_R1 (sr->enabled ? PHASE_SYNC_EN_PHASE_SYNCHRONIZATION_ENABLED : PHASE_SYNC_EN_NORMAL_OPERATION,
+                         0x15E,
+                         LD_VTUNE_EN_VCOCAL_AND_VTUNE_LOCK_DETECT,
+                         0,
+                         instcal_dblr_en,
+                         use_instcal ? INSTCAL_EN_ENABLED : INSTCAL_EN_DISABLED),
         MAKE_LMX2820_R0 (1, 1, 0, HP_fd_adj, LP_fd_adj, DBLR_CAL_EN_ENABLED, 1, FCAL_EN_DISABLED, 0, RESET_NORMAL_OPERATION, POWERDOWN_NORMAL_OPERATION)
     };
 
