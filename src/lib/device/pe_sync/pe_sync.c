@@ -384,11 +384,20 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     const uint64_t lmx0_freq[] =
     {
-        500000000*2, //1400000000,
-        500000000*2, //1400000000
+        500000000*2, //1400000000,  //OUT_A
+        500000000*2, //1400000000   //OUT_B
+        25000000,                   //SR_OUT
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_0, &d->lmx0);
+
+    lmx2820_sysref_chain_t* lmx0_sr = &d->lmx0.lmx2820_sysref_chain;
+    lmx0_sr->enabled = false;
+    lmx0_sr->master_mode = true;
+    lmx0_sr->cont_pulse = true;
+    lmx0_sr->srout = lmx0_freq[2];
+    lmx0_sr->delay_ctrl = 0;//60;
+
     res = res ? res : lmx2820_tune(&d->lmx0, lmk_freq[2], 2 /*mash order 2*/, 0 /*force_mult*/, lmx0_freq[0], lmx0_freq[1]);
 
     lmx2820_stats_t lmxstatus0;
@@ -414,6 +423,14 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     };
 
     res = lmx2820_create(dev, 0, SPI_LMX2820_1, &d->lmx1);
+
+    lmx2820_sysref_chain_t* lmx1_sr = &d->lmx1.lmx2820_sysref_chain;
+    lmx1_sr->enabled = false;
+    lmx1_sr->master_mode = true;
+    lmx1_sr->cont_pulse = true;
+    lmx1_sr->srout = 25000000;
+    lmx1_sr->delay_ctrl = 0;//60;
+
     res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], 2 /*mash order 2*/, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
 
     lmx2820_stats_t lmxstatus1;
@@ -468,8 +485,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     //set 1204 params
     lmx1204_state_t* lmx1204 = &d->cldistr;
-    lmx1204->clkin     = lmx0_freq[0];
-    lmx1204->sysrefreq = lmx0_freq[1];
+    lmx1204->clkin     = lmx0_freq[1];         //LMX0 OUT_B
+    lmx1204->sysrefreq = lmx0_freq[2];         //LMX0 SR_OUT
     lmx1204->clkout    = d->cldistr.clkin * 4;
     lmx1204->sysrefout = 3125000;
     lmx1204->sysref_mode = LMX1204_CONTINUOUS;

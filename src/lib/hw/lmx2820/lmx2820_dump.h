@@ -3,6 +3,62 @@
 
 #include <stdint.h>
 
+static uint32_t lmx2820_rom_sysref[] =
+{
+    /*R79 */ 0x4F000E,
+    /*R78 */ 0x4E0000,
+    /*R69 */ 0x450001,
+    /*R67 */ 0x431000,
+    /*R66 */ 0x42003F,
+    /*R65 */ 0x410008,
+    /*R64 */ 0x400284,
+    /*R45 */ 0x2D0000,
+    /*R44 */ 0x2C0000,
+    /*R43 */ 0x2B0000,
+    /*R42 */ 0x2A0000,
+    /*R39 */ 0x270002, /*****/
+    /*R38 */ 0x260000,
+    /*R36 */ 0x240020,
+    /*R35 */ 0x233100,
+    /*R32 */ 0x2016C1,
+    /*R22 */ 0x16E2BF, /*****/
+    /*R14 */ 0x0E3001,
+    /*R13 */ 0x0D0038,
+    /*R12 */ 0x0C0408,
+    /*R11 */ 0x0B0602,
+    /*R2  */ 0x0293E8,
+    /*R1  */ 0x01D7A0,
+    /*R0  */ 0x006630, /****/
+};
+
+/*
+21:21:14.518863 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#0: R079 (0x4f) -> 0x000e [0x4f000e]
+21:21:14.518874 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#1: R078 (0x4e) -> 0x0000 [0x4e0000]
+21:21:14.518881 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#2: R069 (0x45) -> 0x0001 [0x450001]
+21:21:14.518888 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#3: R067 (0x43) -> 0x1000 [0x431000]
+21:21:14.518897 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#4: R066 (0x42) -> 0x003f [0x42003f]
+21:21:14.518904 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#5: R065 (0x41) -> 0x0008 [0x410008]
+21:21:14.518914 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#6: R064 (0x40) -> 0x0284 [0x400284]
+21:21:14.518923 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#7: R045 (0x2d) -> 0x0000 [0x2d0000]
+21:21:14.518928 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#8: R044 (0x2c) -> 0x0000 [0x2c0000]
+21:21:14.518935 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#9: R043 (0x2b) -> 0x0000 [0x2b0000]
+21:21:14.518941 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#10: R042 (0x2a) -> 0x0000 [0x2a0000]
+21:21:14.518948 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#11: R039 (0x27) -> 0x0001 [0x270001]
+21:21:14.518955 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#12: R038 (0x26) -> 0x0000 [0x260000]
+21:21:14.518962 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#13: R036 (0x24) -> 0x0020 [0x240020]
+21:21:14.518969 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#14: R035 (0x23) -> 0x3100 [0x233100]
+21:21:14.518978 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#15: R032 (0x20) -> 0x16c1 [0x2016c1]
+21:21:14.518983 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#16: R022 (0x16) -> 0x62bf [0x1662bf]
+21:21:14.519004 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#17: R014 (0x0e) -> 0x3001 [0x0e3001]
+21:21:14.519020 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#18: R013 (0x0d) -> 0x0038 [0x0d0038]
+21:21:14.519031 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#19: R012 (0x0c) -> 0x0408 [0x0c0408]
+21:21:14.519040 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#20: R011 (0x0b) -> 0x0602 [0x0b0602]
+21:21:14.519052 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#21: R002 (0x02) -> 0x93e8 [0x0293e8]
+21:21:14.519062 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#22: R001 (0x01) -> 0xd7a0 [0x01d7a0]
+21:21:14.519072 DEBUG:   common_print_registers_a8d16:89 [COMN] WRITE#23: R000 (0x00) -> 0x6660 [0x006660]
+*/
+
+
 static uint32_t lmx2820_rom_test[] =
 {
     /*R122*/	0x7A0000,

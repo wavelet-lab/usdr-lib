@@ -342,7 +342,7 @@ int lmx2820_read_status(lmx2820_state_t* st, lmx2820_stats_t* status)
 
 UNUSED static int lmx2820_loaddump(lmx2820_state_t* st)
 {
-    int res = lmx2820_spi_post(st, lmx2820_rom_test, SIZEOF_ARRAY(lmx2820_rom_test));
+    int res = lmx2820_spi_post(st, lmx2820_rom_sysref, SIZEOF_ARRAY(lmx2820_rom_sysref));
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_loaddump() err:%d", res);
@@ -900,7 +900,7 @@ static int lmx2820_calculate_systef_chain(lmx2820_state_t* st)
     }
     */
     double delay_per_inc = (double)sr->div_pre / 126.0 / fvco;
-    sr->delay = delay_per_inc * (sr->delay_ctrl + 1);
+    sr->delay = delay_per_inc * sr->delay_ctrl;
 
     USDR_LOG("2820", USDR_LOG_INFO, "[SYSREF] SROUT:%" PRIu64 " VCO:%.4f DIV_PRE:%u DIV:%u SROUT_FACT:%.4f DELAY_PER_INC:%.2fps DELAY:%.2fps",
              sr->srout, fvco, sr->div_pre, sr->div, sr->srout_fact,
@@ -1115,7 +1115,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R69(0, sr->enabled ? SROUT_PD_NORMAL_OPERATION : SROUT_PD_POWER_DOWN, 1),
 
         sr->enabled ?
-            MAKE_LMX2820_R67(sr->cont_pulse ? 0 : sr->pulse_cnt,
+            MAKE_LMX2820_R67(sr->cont_pulse ? 1 : sr->pulse_cnt,
                              JESD[sr->delay_ctrl].DAC4_CTRL,
                              JESD[sr->delay_ctrl].DAC3_CTRL)
             :
@@ -1134,8 +1134,8 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
             MAKE_LMX2820_R65(0,1), //default
 
         sr->enabled ?
-            MAKE_LMX2820_R64(0x10,
-                             sr->master_mode ? 0 : sr->srreq_fmt,
+            MAKE_LMX2820_R64(0x00, //0x10 by doc
+                             sr->master_mode ? 0x2 : sr->srreq_fmt,
                              lmx2820_encode_sysref_prediv(st),
                              0, /*sysref_repeat_ns*/
                              sr->cont_pulse ? 0 : 1,
@@ -1158,7 +1158,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R14(0x3, st->lmx2820_input_chain.pll_r_pre),
         MAKE_LMX2820_R13(0, st->lmx2820_input_chain.pll_r, 0x18),
         MAKE_LMX2820_R12(0, st->lmx2820_input_chain.mult, 0x8),
-        MAKE_LMX2820_R11(0x30, st->lmx2820_input_chain.osc_2x ? 1 : 0, 0x3),
+        MAKE_LMX2820_R11(0x30, st->lmx2820_input_chain.osc_2x ? 1 : 0, 0x2), //0x3 by doc
         MAKE_LMX2820_R2 (1, cal_clk_div, instcal_dly, QUICK_RECAL_EN_DISABLED),
         MAKE_LMX2820_R1 (sr->enabled ? PHASE_SYNC_EN_PHASE_SYNCHRONIZATION_ENABLED : PHASE_SYNC_EN_NORMAL_OPERATION,
                          0x15E,
@@ -1169,12 +1169,16 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R0 (1, 1, 0, HP_fd_adj, LP_fd_adj, DBLR_CAL_EN_ENABLED, 1, FCAL_EN_DISABLED, 0, RESET_NORMAL_OPERATION, POWERDOWN_NORMAL_OPERATION)
     };
 
+#if 1
     res = lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
         return res;
     }
+#else
+    lmx2820_loaddump(st);
+#endif
 
     //Wait 10 ms to allow the internal LDOs to power up.
     usleep(10000);
