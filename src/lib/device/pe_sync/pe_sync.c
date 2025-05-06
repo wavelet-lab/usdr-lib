@@ -299,7 +299,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     lmk05318_dpll_settings_t dpll;
     memset(&dpll, 0, sizeof(dpll));
-    dpll.enabled = false;
+    dpll.enabled = true;
     dpll.en[LMK05318_PRIREF] = true;
     dpll.fref[LMK05318_PRIREF] = 1;
     dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
@@ -340,7 +340,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return res;
 
     //wait for PRIREF/SECREF validation
-    res = lmk05318_wait_dpll_ref_stat(&d->gen, 2*60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
+    res = lmk05318_wait_dpll_ref_stat(&d->gen, 4*60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
     if(res)
     {
         USDR_LOG("SYNC", USDR_LOG_ERROR, "LMK03518 DPLL input reference freqs are not validated during specified timeout");
