@@ -310,8 +310,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     {
         125000000,
         125000000,
-        250000000,
-        250000000,
+        150000000,
+        150000000,
         156250000,
         156250000,
         10000000,

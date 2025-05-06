@@ -19,6 +19,7 @@ enum {
     OSC_IN_MIN = 5000000ull,
     OSC_IN_MAX = 1400000000ull,
     OSC_IN_MAX_DBLR = 250000000ull,
+    OSC_IN_MAX_SYNC = 200000000ull,
 
     OUT_FREQ_MIN =    45000000ull,
     OUT_FREQ_MAX = 22600000000ull,
@@ -828,6 +829,13 @@ static int lmx2820_calculate_systef_chain(lmx2820_state_t* st)
 
     lmx2820_sysref_chain_t* sr = &st->lmx2820_sysref_chain;
 
+    if(st->lmx2820_input_chain.fosc_in > OSC_IN_MAX_SYNC)
+    {
+        USDR_LOG("2820", USDR_LOG_ERROR, "[SYSREF] OSC_IN:%" PRIu64" is too high (>%" PRIu64 ")",
+                 st->lmx2820_input_chain.fosc_in, (uint64_t)OSC_IN_MAX_SYNC);
+        return -EINVAL;
+    }
+
     if(sr->master_mode == false)
     {
         switch(sr->srreq_fmt)
@@ -1113,6 +1121,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R79(0, OUTB_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outb_mux, 0x7, 0),
         MAKE_LMX2820_R78(0, OUTA_PD_NORMAL_OPERATION, 0, st->lmx2820_output_chain.outa_mux),
         MAKE_LMX2820_R69(0, sr->enabled ? SROUT_PD_NORMAL_OPERATION : SROUT_PD_POWER_DOWN, 1),
+        MAKE_LMX2820_R68(0, 0/*psync pin ignore*/, 0, 0),
 
         sr->enabled ?
             MAKE_LMX2820_R67(sr->cont_pulse ? 1 : sr->pulse_cnt,
@@ -1158,7 +1167,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R14(0x3, st->lmx2820_input_chain.pll_r_pre),
         MAKE_LMX2820_R13(0, st->lmx2820_input_chain.pll_r, 0x18),
         MAKE_LMX2820_R12(0, st->lmx2820_input_chain.mult, 0x8),
-        MAKE_LMX2820_R11(0x30, st->lmx2820_input_chain.osc_2x ? 1 : 0, 0x2), //0x3 by doc
+        MAKE_LMX2820_R11(0x30, st->lmx2820_input_chain.osc_2x ? 1 : 0, 0x3), //0x3 by doc
         MAKE_LMX2820_R2 (1, cal_clk_div, instcal_dly, QUICK_RECAL_EN_DISABLED),
         MAKE_LMX2820_R1 (sr->enabled ? PHASE_SYNC_EN_PHASE_SYNCHRONIZATION_ENABLED : PHASE_SYNC_EN_NORMAL_OPERATION,
                          0x15E,
@@ -1166,7 +1175,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
                          0,
                          instcal_dblr_en,
                          use_instcal ? INSTCAL_EN_ENABLED : INSTCAL_EN_DISABLED),
-        MAKE_LMX2820_R0 (1, 1, 0, HP_fd_adj, LP_fd_adj, DBLR_CAL_EN_ENABLED, 1, FCAL_EN_DISABLED, 0, RESET_NORMAL_OPERATION, POWERDOWN_NORMAL_OPERATION)
+        MAKE_LMX2820_R0 (1, 1, 0, HP_fd_adj, LP_fd_adj, DBLR_CAL_EN_ENABLED, 1, FCAL_EN_ENABLED, 0, RESET_NORMAL_OPERATION, POWERDOWN_NORMAL_OPERATION)
     };
 
 #if 1
@@ -1182,14 +1191,14 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
 
     //Wait 10 ms to allow the internal LDOs to power up.
     usleep(10000);
-
+/*
     res = lmx2820_calibrate(st, true);
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_calibrate(1) failed, err:%d", res);
         return res;
     }
-
+*/
     res = lmx2820_wait_pll_lock(st, 1000000);
     if(res)
     {
@@ -1197,14 +1206,14 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
                  res, (res == -ETIMEDOUT ? "TIMEOUT" : "ERROR"));
         return res;
     }
-
+/*
     res = lmx2820_sync(st);
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_sync() failed, err:%d", res);
         return res;
     }
-
+*/
     if(use_instcal)
     {
         res = lmx2820_calibrate(st, false);
