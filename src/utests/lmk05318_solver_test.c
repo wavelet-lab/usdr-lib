@@ -181,6 +181,82 @@ START_TEST(lmk05318_dpll_test1)
     ck_assert_int_eq( res, 0 );
 }
 
+START_TEST(lmk05318_dsdr_test1)
+{
+    int res = 0;
+
+    lmk05318_xo_settings_t xo;
+    xo.fref = 26000000;
+    xo.doubler_enabled = false;
+    xo.fdet_bypass = false;
+    xo.pll1_fref_rdiv = 1;
+    xo.type = XO_CMOS;
+
+    res = res ? res : lmk05318_port_request(cfg, 0, 491520000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 1, 491520000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 2, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 3, 3840000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 4, 0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5, 122880000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 6, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 7, 122880000, false, LVDS);
+    ck_assert_int_eq( res, 0 );
+
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+
+    dpll.enabled = true;
+    dpll.en[LMK05318_PRIREF] = true;
+    dpll.fref[LMK05318_PRIREF] = 40000000;
+    dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
+    dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
+    dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
+
+    lmk05318_state_t st;
+    memset(&st, 0, sizeof(st));
+
+    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, 8, &st, true /*dry_run*/);
+    ck_assert_int_eq( res, 0 );
+}
+
+START_TEST(lmk05318_dsdr_test2)
+{
+    int res = 0;
+
+    lmk05318_xo_settings_t xo;
+    xo.fref = 26000000;
+    xo.doubler_enabled = false;
+    xo.fdet_bypass = false;
+    xo.pll1_fref_rdiv = 1;
+    xo.type = XO_CMOS;
+
+    res = res ? res : lmk05318_port_request(cfg, 0, 491520000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 1, 491520000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 2, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 3, 3840000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 4, 0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(cfg, 5, 122880000 * 2, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 6, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(cfg, 7, 122880000 * 2, false, LVDS);
+    ck_assert_int_eq( res, 0 );
+
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+
+    dpll.enabled = true;
+    dpll.en[LMK05318_PRIREF] = true;
+    dpll.fref[LMK05318_PRIREF] = 40000000;
+    dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
+    dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
+    dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
+
+    lmk05318_state_t st;
+    memset(&st, 0, sizeof(st));
+
+    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, 8, &st, true /*dry_run*/);
+    ck_assert_int_eq( res, 0 );
+}
+
 Suite * lmk05318_solver_suite(void)
 {
     Suite *s;
@@ -197,6 +273,8 @@ Suite * lmk05318_solver_suite(void)
     tcase_add_test(tc_core, lmk05318_solver_test5);
     tcase_add_test(tc_core, lmk05318_solver_test6);
     tcase_add_test(tc_core, lmk05318_dpll_test1);
+    tcase_add_test(tc_core, lmk05318_dsdr_test1);
+    tcase_add_test(tc_core, lmk05318_dsdr_test2);
 
     suite_add_tcase(s, tc_core);
     return s;

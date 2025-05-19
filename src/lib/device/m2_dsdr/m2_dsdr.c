@@ -1406,26 +1406,82 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     }
     usleep(40000);
 
+    //
+    //LMK05318 init start
+    lmk05318_xo_settings_t xo;
+    xo.doubler_enabled = false;
+    xo.fdet_bypass = false;
+    xo.fref = 26000000;
+    xo.pll1_fref_rdiv = 1;
+    xo.type = XO_CMOS;
 
-    for (unsigned j = 0; j < 25; j++) {
-        usleep(40000);
-        res = res ? res : lmk05318_create(dev, d->subdev, I2C_LMK,
-                                          (d->type == DSDR_PCIE_HIPER_R0) ? 2 : 1 /* TODO FIXME!!! */, &d->lmk);
-        if (res == 0)
-            break;
+    //set true to enable IN_REF1 40M
+    bool enable_in_ref = false;
+
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+    dpll.enabled = enable_in_ref;
+    dpll.en[LMK05318_PRIREF] = true;
+    dpll.fref[LMK05318_PRIREF] = 40000000;
+    dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
+    dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
+    dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
+
+    lmk05318_out_config_t lmk05318_outs_cfg[8];
+    lmk05318_port_request(lmk05318_outs_cfg, 0,         491520000, false, OUT_OFF);
+    lmk05318_port_request(lmk05318_outs_cfg, 1,         491520000, false, LVDS);
+    lmk05318_port_request(lmk05318_outs_cfg, 2,           3840000, false, LVDS);
+    lmk05318_port_request(lmk05318_outs_cfg, 3,           3840000, false, OUT_OFF);
+    lmk05318_port_request(lmk05318_outs_cfg, 4,                 0, false, OUT_OFF);
+    lmk05318_port_request(lmk05318_outs_cfg, 5,   d->dac_rate / 2, false, LVDS);
+    lmk05318_port_request(lmk05318_outs_cfg, 6,           3840000, false, LVDS);
+    lmk05318_port_request(lmk05318_outs_cfg, 7,   d->dac_rate / 2, false, LVDS);
+
+    res = lmk05318_create(dev, d->subdev, I2C_LMK, &xo, &dpll, lmk05318_outs_cfg, 8, &d->lmk, false /*dry_run*/);
+
+    usleep(10000); //wait until lmk digests all this
+
+    //reset LOS flags after soft-reset (inside lmk05318_create())
+    res = lmk05318_reset_los_flags(&d->lmk);
+    if(res)
+        return res;
+
+    //wait for PRIREF/SECREF validation
+    res = lmk05318_wait_dpll_ref_stat(&d->lmk, 100000);
+    if(res)
+    {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "LMK03518 DPLL input reference freqs are not validated during specified timeout");
+        return res;
     }
-    // Update deviders for 245/491MSPS rate
-    if (d->jesdv == DSDR_JESD204C_6664_491) {
-        // GT should be 245.76
-        // FPGA SYSCLK should be 245.76
 
-        res = res ? res : lmk05318_set_out_div(&d->lmk, LMK_FPGA_GT_AFEREF, 4);
-        res = res ? res : lmk05318_set_out_div(&d->lmk, LMK_FPGA_1PPS, 4);
+    //wait for lock
+    //APLL1/DPLL
+    res = lmk05318_wait_apll1_lock(&d->lmk, 100000);
+
+    //APLL2 (if needed)
+    if(res == 0 && d->lmk.vco2_freq)
+    {
+        //reset LOS flags once again because APLL2 LOS is set after APLL1 tuning
+        res = lmk05318_reset_los_flags(&d->lmk);
+        res = res ? res : lmk05318_wait_apll2_lock(&d->lmk, 100000);
     }
 
-    usleep(1000);
+    lmk05318_check_lock(&d->lmk, &los, false /*silent*/); //just to log state
 
-    res = res ? res : lmk05318_check_lock(&d->lmk, &los, false /*silent*/);
+    if(res)
+    {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "LMK03518 PLLs not locked during specified timeout");
+        return res;
+    }
+
+    //sync to make APLL1/APLL2 & out channels in-phase
+    res = lmk05318_sync(&d->lmk);
+    if(res)
+        return res;
+
+    USDR_LOG("DSDR", USDR_LOG_INFO, "LMK03518 outputs synced");
+    //LMK05318 init end
+    //
 
     for (int i = 0; i < 5; i++) {
         uint32_t clk = 0;
@@ -1434,9 +1490,6 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         USDR_LOG("DSDR", USDR_LOG_ERROR, "Clk %d: %d\n", clk >> 28, clk & 0xfffffff);
         usleep(0.5 * 1e6);
     }
-
-    res = res ? res : lmk05318_check_lock(&d->lmk, &los, false /*silent*/);
-    // res = res ? res : lmk05318_set_out_mux(&d->lmk, LMK_FPGA_SYSREF, false, LVDS);
 
     usleep(1000);
     res = res ? res : dev_gpi_get32(dev, IGPI_PGOOD, &pg);

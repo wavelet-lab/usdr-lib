@@ -314,7 +314,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     usleep(10000); //wait until lmk digests all this
 
-    //reset LOS flags after soft-reset (inside lmk05318_create_ex())
+    //reset LOS flags after soft-reset (inside lmk05318_create())
     res = lmk05318_reset_los_flags(&d->gen);
     if(res)
         return res;

@@ -78,7 +78,7 @@ int board_ext_simplesync_init(lldev_t dev,
     usleep(50000);
 
     lmk05318_xo_settings_t xo;
-    xo.doubler_enabled = true;
+    xo.doubler_enabled = false;
     xo.fdet_bypass = false;
     xo.fref = 26000000;
     xo.pll1_fref_rdiv = 1;
@@ -101,6 +101,9 @@ int board_ext_simplesync_init(lldev_t dev,
     res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
     res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
+
+    unsigned los_msk;
+    lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
 
     if (res)
         return res;
@@ -130,6 +133,9 @@ int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
     res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
     res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
+
+    unsigned los_msk;
+    lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
 
     return res;
 }
