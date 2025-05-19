@@ -12,13 +12,12 @@
 #include "def_lmk05318.h"
 #include "lmk05318.h"
 #include "lmk05318_rom.h"
-#include "lmk05318_solver.h"
 
 #include <usdr_logging.h>
 #include "../../xdsp/attribute_switch.h"
 #include "../cal/opt_func.h"
 
-//#define LMK05318_SOLVER_DEBUG
+#undef LMK05318_SOLVER_DEBUG
 
 enum {
     VCO_APLL1 = 2500000000ull,
@@ -81,6 +80,11 @@ enum
 #define DPLL_FDIV_FRAC_MAX 0.9375f
 #define DPLL_FDIV_FRAC_MIN 0.0625f
 
+struct range
+{
+    uint64_t min, max;
+};
+typedef struct range range_t;
 
 static const char* lmk05318_dpll_decode_ref_dc_mode(enum lmk05318_ref_dc_mode_t m)
 {
