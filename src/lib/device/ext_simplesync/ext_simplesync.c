@@ -77,9 +77,6 @@ int board_ext_simplesync_init(lldev_t dev,
     // Wait for power up
     usleep(50000);
 
-#if 0
-    res = lmk05318_create(dev, subdev, i2ca, 0, &ob->lmk);
-#else
     lmk05318_xo_settings_t xo;
     xo.doubler_enabled = true;
     xo.fdet_bypass = false;
@@ -104,7 +101,6 @@ int board_ext_simplesync_init(lldev_t dev,
     res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
     res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
-#endif
 
     if (res)
         return res;
@@ -118,15 +114,6 @@ int board_ext_simplesync_init(lldev_t dev,
 int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
 {
 
-#if 0
-    unsigned div = 255;
-    int res = lmk05318_tune_apll2(&ob->lmk, meas_lo, &div);
-
-    for (unsigned p = 0; p < 4; p++) {
-        res = (res) ? res : lmk05318_set_out_div(&ob->lmk, p, div);
-        res = (res) ? res : lmk05318_set_out_mux(&ob->lmk, p, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    }
-#else
     lmk05318_out_config_t cfg[4];
     lmk05318_port_request(cfg, 0, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
     lmk05318_port_request(cfg, 1, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
@@ -143,6 +130,6 @@ int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
     res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
     res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
-#endif
+
     return res;
 }

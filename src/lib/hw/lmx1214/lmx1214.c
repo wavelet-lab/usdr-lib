@@ -10,8 +10,6 @@
 #include "usdr_logging.h"
 #include "../common/common.h"
 
-#include "lmx1214_dump.h"
-
 #define FREQ_EPS 1.0f
 
 enum
@@ -90,20 +88,6 @@ UNUSED static int lmx1214_read_all_regs(lmx1214_state_t* st)
     }
 
     return 0;
-}
-
-int lmx1214_loaddump(lmx1214_state_t* st)
-{
-    int res = lmx1214_spi_post(st, lmx1214_rom_test, SIZEOF_ARRAY(lmx1214_rom_test));
-    if(res)
-    {
-        USDR_LOG("1214", USDR_LOG_ERROR, "lmx1214_loaddump() err:%d", res);
-    }
-    else
-    {
-        USDR_LOG("1214", USDR_LOG_DEBUG, "lmx1214_loaddump() OK");
-    }
-    return res;
 }
 
 int lmx1214_get_temperature(lmx1214_state_t* st, float* value)

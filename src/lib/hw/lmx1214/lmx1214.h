@@ -61,6 +61,4 @@ int lmx1214_sysref_windowing_beforesync(lmx1214_state_t* st);
 int lmx1214_sysref_windowing_capture(lmx1214_state_t* st);
 int lmx1214_sysref_windowing_aftersync(lmx1214_state_t* st);
 
-int lmx1214_loaddump(lmx1214_state_t* st);
-
 #endif // LMX1214_H

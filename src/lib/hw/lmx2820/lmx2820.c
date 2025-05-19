@@ -10,8 +10,6 @@
 #include "def_lmx2820.h"
 #include <usdr_logging.h>
 #include "../cal/opt_func.h"
-
-#include "lmx2820_dump.h"
 #include "../common/common.h"
 
 enum {
@@ -209,14 +207,7 @@ int lmx2820_sync(lmx2820_state_t* st)
     return lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
 }
 
-//#define LMX2820_RESET_SKIP
-
 int lmx2820_reset(lmx2820_state_t* st)
-#ifdef LMX2820_RESET_SKIP
-{
-    return 0;
-}
-#else
 {
     uint16_t r0;
 
@@ -237,7 +228,6 @@ int lmx2820_reset(lmx2820_state_t* st)
     usleep(10000); //reset takes <1us
     return 0;
 }
-#endif
 
 static int lmx2820_calibrate(lmx2820_state_t* st, bool set_flag)
 {
@@ -341,20 +331,6 @@ int lmx2820_read_status(lmx2820_state_t* st, lmx2820_stats_t* status)
     return 0;
 }
 
-UNUSED static int lmx2820_loaddump(lmx2820_state_t* st)
-{
-    int res = lmx2820_spi_post(st, lmx2820_rom_sysref, SIZEOF_ARRAY(lmx2820_rom_sysref));
-    if(res)
-    {
-        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_loaddump() err:%d", res);
-    }
-    else
-    {
-        USDR_LOG("2820", USDR_LOG_DEBUG, "lmx2820_loaddump() OK");
-    }
-    return res;
-}
-
 int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_t* st)
 {
     memset(st, 0, sizeof(*st));
@@ -369,7 +345,6 @@ int lmx2820_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx2820_state_
     if(res)
         return res;
 
-    //this list is incompleted
     uint32_t regs[] =
     {
         MAKE_LMX2820_R19(0x109, TEMPSENSE_EN_ENABLED, 0x0), //enable temperature sensor
@@ -900,13 +875,7 @@ static int lmx2820_calculate_systef_chain(lmx2820_state_t* st)
     sr->srout_fact = fvco / sr->div_pre / sr->div / 4;
 
     lmx2820_fill_jesd();
-    /*
-    for(unsigned i = 0; i < JESD_SIZE; ++i)
-    {
-        USDR_LOG("2820", USDR_LOG_DEBUG, "PHASE_SHIFT:%03u -> DAC1_CTRL:%02u DAC2_CTRL:%02u DAC3_CTRL:%02u DAC4_CTRL:%02u",
-                 i, JESD[i].DAC1_CTRL, JESD[i].DAC2_CTRL, JESD[i].DAC3_CTRL, JESD[i].DAC4_CTRL);
-    }
-    */
+
     double delay_per_inc = (double)sr->div_pre / 126.0 / fvco;
     sr->delay = delay_per_inc * sr->delay_ctrl;
 
@@ -1178,27 +1147,16 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
         MAKE_LMX2820_R0 (1, 1, 0, HP_fd_adj, LP_fd_adj, DBLR_CAL_EN_ENABLED, 1, FCAL_EN_ENABLED, 0, RESET_NORMAL_OPERATION, POWERDOWN_NORMAL_OPERATION)
     };
 
-#if 1
     res = lmx2820_spi_post(st, regs, SIZEOF_ARRAY(regs));
     if(res)
     {
         USDR_LOG("2820", USDR_LOG_ERROR, "Registers set lmx2820_spi_post() failed, err:%d", res);
         return res;
     }
-#else
-    lmx2820_loaddump(st);
-#endif
 
     //Wait 10 ms to allow the internal LDOs to power up.
     usleep(10000);
-/*
-    res = lmx2820_calibrate(st, true);
-    if(res)
-    {
-        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_calibrate(1) failed, err:%d", res);
-        return res;
-    }
-*/
+
     res = lmx2820_wait_pll_lock(st, 1000000);
     if(res)
     {
@@ -1206,14 +1164,7 @@ static int lmx2820_tune_internal(lmx2820_state_t* st, uint64_t osc_in, unsigned 
                  res, (res == -ETIMEDOUT ? "TIMEOUT" : "ERROR"));
         return res;
     }
-/*
-    res = lmx2820_sync(st);
-    if(res)
-    {
-        USDR_LOG("2820", USDR_LOG_ERROR, "lmx2820_sync() failed, err:%d", res);
-        return res;
-    }
-*/
+
     if(use_instcal)
     {
         res = lmx2820_calibrate(st, false);

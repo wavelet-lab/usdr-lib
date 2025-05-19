@@ -165,10 +165,6 @@ int dev_pe_sync_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 
 static void usdr_device_pe_sync_destroy(pdevice_t udev)
 {
-    // struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
-    // lldev_t dev = d->base.dev;
-    // TODO: power off
-#if 0
     struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
     lldev_t dev = d->base.dev;
 
@@ -178,7 +174,6 @@ static void usdr_device_pe_sync_destroy(pdevice_t udev)
 
     usdr_device_base_destroy(udev);
     USDR_LOG("SYNC", USDR_LOG_WARNING, "PESync destroyed");
-#endif
 }
 
 static int i2c_reg_rd8(lldev_t dev, unsigned lsaddr, uint8_t reg, uint8_t* val)
@@ -200,16 +195,6 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return 0;
     }
 
-#if 0
-    {
-        USDR_LOG("SYNC", USDR_LOG_WARNING, "PESync shutdown...");
-        usdr_device_pe_sync_destroy(udev);
-        usleep(30000000);
-        USDR_LOG("SYNC", USDR_LOG_WARNING, "PESync OFF");
-        return 0;
-    }
-#endif
-
     // gpo_in_ctrl[0] --  0 - Disable input 1PPS / 10Mhz buffer and REF ADC for 1PPS
     // gpo_in_ctrl[1] --  0 - external SMA, 1 - feedback from LCK_FB
     // gpo_in_ctrl[2] --  0 - external SMA, 1 - 1PPS from GPS
@@ -230,10 +215,6 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     // gpo_gen_ctrl[5] -- clk_gpio[0]
     // gpo_gen_ctrl[6] -- clk_gpio[1]
     // gpo_gen_ctrl[7] -- clk_gpio[2]
-    // res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (0 << 0) | (0 << 1) | (1 << 2) | (0 << 5));
-    // usleep(1000);
-    // res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (1 << 0) | (0 << 1) | (1 << 2) | (1 << 5));
-    // usleep(25000);
     res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (1 << 0) | (1 << 1) | (1 << 2) | (1 << 5) | (1 << 3) | (1 << 4));
 
     // gpo_distrib_ctrl[0]   -- En global LDO for all distribution logic
@@ -396,7 +377,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     lmx0_sr->master_mode = true;
     lmx0_sr->cont_pulse = true;
     lmx0_sr->srout = lmx0_freq[2];
-    lmx0_sr->delay_ctrl = 0;//60;
+    lmx0_sr->delay_ctrl = 0;
 
     res = res ? res : lmx2820_tune(&d->lmx0, lmk_freq[2], 2 /*mash order 2*/, 0 /*force_mult*/, lmx0_freq[0], lmx0_freq[1]);
 
@@ -429,7 +410,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     lmx1_sr->master_mode = true;
     lmx1_sr->cont_pulse = true;
     lmx1_sr->srout = 25000000;
-    lmx1_sr->delay_ctrl = 0;//60;
+    lmx1_sr->delay_ctrl = 0;
 
     res = res ? res : lmx2820_tune(&d->lmx1, lmk_freq[3], 2 /*mash order 2*/, 0 /*force_mult*/, lmx1_freq[0], lmx1_freq[1]);
 
@@ -458,7 +439,6 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     res = lmx1214_create(dev, 0, SPI_LMX1214, &d->lodistr);
     res = res ? res : lmx1214_solver(&d->lodistr, lmx1_freq[0], ld_clkout, ld_en, &ld_aux, false /*prec_mode*/, false /*dry run*/);
-    //res = res ? res : lmx1214_loaddump(&d->lodistr);
 
     float lmx1214_tempval;
     lmx1214_get_temperature(&d->lodistr, &lmx1214_tempval); //just for logging
@@ -513,9 +493,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     lmx1204->logiclkout_fmt    = LMX1204_FMT_LVDS;
     lmx1204->logisysrefout_fmt = LMX1204_FMT_LVDS;
-    //
+
     res = lmx1204_solver(&d->cldistr, false/*prec_mode*/, false/*dry_run*/);
-    //res = lmx1204_loaddump(&d->cldistr);
     if(res)
         return res;
 

@@ -11,12 +11,12 @@
 
 #include "def_lmk05318.h"
 #include "lmk05318.h"
-#include "lmk05318_rom.h"
 
 #include <usdr_logging.h>
 #include "../../xdsp/attribute_switch.h"
 #include "../cal/opt_func.h"
 
+//define this for solver extra logging
 #undef LMK05318_SOLVER_DEBUG
 
 enum {
@@ -480,30 +480,6 @@ int lmk05318_reset_los_flags(lmk05318_state_t* d)
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
-UNUSED
-static int lmk05318_empirics_smartload(lmk05318_state_t* d, const empiric_t* regs, unsigned count, unsigned mask_allow, unsigned mask_deny)
-{
-    unsigned n = 0;
-
-    for(unsigned i = 0; i < count; ++i)
-    {
-        const empiric_t v = regs[i];
-        if((v.type & mask_allow) && !(v.type & mask_deny))
-        {
-            USDR_LOG("5318", USDR_LOG_DEBUG, "ADD REGISTER from empirical set [0x%06x]", v.reg);
-            ++n;
-
-            int res = lmk05318_add_reg_to_map(d, &v.reg, 1);
-            if(res)
-                return res;
-        }
-    }
-
-    USDR_LOG("5318", USDR_LOG_DEBUG, "%u REGISTERS added from empirical set", n);
-
-    return 0;
-}
-
 static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
 {
     int res = 0;
@@ -528,7 +504,7 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
             0x005600,   //      |
             0x00571E,   //      |
             0x005884,   //      |
-            0x005980,   //      | BAW lock&unlock detection
+            0x005980,   //      | BAW lock&unlock detection, may depend on XO params
             0x005A00,   //      |
             0x005B14,   //      |
             0x005C00,   //      |
@@ -764,11 +740,7 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
             MAKE_LMK05318_DPLL_REF_UNLOCKDET_VCO_CNTSTRT_BY1(dco_unlock_det1),//R337
             MAKE_LMK05318_DPLL_REF_UNLOCKDET_VCO_CNTSTRT_BY2(dco_unlock_det1),//R338
         };
-#if 0
-        const unsigned mask_allow = REG_OVERRIDE;
-        const unsigned mask_deny  = REG_PLL1 | REG_PLL2 | REG_XO | REG_LDO | REG_NVM | REG_UNKNOWN;
-        res = lmk05318_empirics_smartload(d, lmk05318_rom_dpll_empiric, SIZEOF_ARRAY(lmk05318_rom_dpll_empiric), mask_allow, mask_deny);
-#endif
+
         res = res ? res : lmk05318_add_reg_to_map(d, dpll_regs, SIZEOF_ARRAY(dpll_regs));
     }
 
@@ -833,13 +805,6 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return -ENODEV;
     }
 
-#if 0
-    out->dpll.enabled = true;
-    out->dpll.ref_en[LMK05318_PRIREF] = true;
-    res = lmk05318_reg_wr_n(out, lmk05318_rom_dpll, SIZEOF_ARRAY(lmk05318_rom_dpll));
-    if (res)
-        return res;
-#else
     res = lmk05318_set_xo_fref(out);
     if(res)
     {
@@ -881,7 +846,6 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
         USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 error %d writing registers", res);
         return res;
     }
-#endif
 
     res = dry_run ? 0 : lmk05318_softreset(out);
     if(res)
@@ -893,117 +857,6 @@ int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
     USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 initialized\n");
     return 0;
 }
-
-/*
- * Legacy function, remove it later
- */
-int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int flags, lmk05318_state_t* out)
-{
-    int res;
-    uint8_t dummy[4];
-
-    const uint32_t* lmk_init = flags ? lmk05318_rom_49152_12288_384 : lmk05318_rom;
-    unsigned lmk_init_sz = flags ? SIZEOF_ARRAY(lmk05318_rom_49152_12288_384) : SIZEOF_ARRAY(lmk05318_rom);
-
-    out->dev = dev;
-    out->subdev = subdev;
-    out->lsaddr = lsaddr;
-    out->vco2_freq = 0;
-    out->pd1 = 0;
-    out->pd2 = 0;
-
-    res = lmk05318_reg_get_u32(out, 0, &dummy[0]);
-    if (res)
-        return res;
-
-    USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 DEVID[0/1/2/3] = %02x %02x %02x %02x\n", dummy[3], dummy[2], dummy[1], dummy[0]);
-
-    if ( dummy[3] != 0x10 || dummy[2] != 0x0b || dummy[1] != 0x35 || dummy[0] != 0x42 ) {
-        return -ENODEV;
-    }
-
-    // Do the initialization
-    res = lmk05318_reg_wr_n(out, lmk_init, lmk_init_sz);
-    if (res)
-        return res;
-
-    // Reset
-    uint32_t regs[] = {
-        lmk05318_rom[0] | (1 << RESET_SW_OFF),
-        lmk05318_rom[0] | (0 << RESET_SW_OFF),
-
-        MAKE_LMK05318_XO_CONFIG(flags > 1 ? 1 : 0),
-
-        MAKE_LMK05318_PLL1_CTRL0(0),
-        MAKE_LMK05318_PLL1_CTRL0(1),
-        MAKE_LMK05318_PLL1_CTRL0(0),
-
-    };
-    res = lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));
-    if (res)
-        return res;
-
-    out->fref_pll2_div_rp = 3;
-    out->fref_pll2_div_rs = (((VCO_APLL1 + APLL2_PD_MAX - 1) / APLL2_PD_MAX) + out->fref_pll2_div_rp - 1) / out->fref_pll2_div_rp;
-
-    out->xo.fref = 0;
-    out->xo.doubler_enabled = false;
-    out->xo.fdet_bypass = false;
-    out->xo.type = XO_CMOS;
-
-    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 initialized\n");
-    return 0;
-}
-/**/
-
-/*
- * Legacy function, remove it later
- */
-int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div)
-{
-    const unsigned apll2_post_div = 2;
-
-    unsigned fref = VCO_APLL1 / d->fref_pll2_div_rp / d->fref_pll2_div_rs;
-    if (fref < APLL2_PD_MIN || fref > APLL2_PD_MAX) {
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 PFD should be in range [%" PRIu64 ";%" PRIu64 "] but got %d!\n",
-                 (uint64_t)APLL2_PD_MIN, (uint64_t)APLL2_PD_MAX, fref);
-        return -EINVAL;
-    }
-    if (freq < 1e6) {
-        // Disable
-        uint32_t regs[] = {
-            MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
-        };
-        return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));;
-    }
-
-    unsigned div = ((VCO_APLL2_MAX / apll2_post_div)) / freq;
-    uint64_t fvco = (uint64_t)freq * div * apll2_post_div;
-    unsigned n = fvco / fref;
-    unsigned num = (fvco - n * (uint64_t)fref) * (1ull << 24) / fref;
-    int res;
-
-    USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 APLL2 FREQ=%u FVCO=%" PRIu64 " N=%d NUM=%d DIV=%d\n", freq, fvco, n, num, div);
-
-    uint32_t regs[] = {
-        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
-        MAKE_LMK05318_PLL2_CTRL2(apll2_post_div - 1, apll2_post_div - 1),
-        MAKE_LMK05318_PLL2_NDIV_BY0(n),
-        MAKE_LMK05318_PLL2_NDIV_BY1(n),
-        MAKE_LMK05318_PLL2_NUM_BY0(num),
-        MAKE_LMK05318_PLL2_NUM_BY1(num),
-        MAKE_LMK05318_PLL2_NUM_BY2(num),
-        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 0),
-    };
-
-    res = lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
-    if (res)
-        return res;
-
-    *last_div = div;
-    return 0;
-}
-/**/
 
 VWLT_ATTRIBUTE(optimize("-Ofast"))
 static inline double lmk05318_calc_vco2_div(lmk05318_state_t* d, uint64_t fvco2, unsigned* pn, unsigned* pnum, unsigned* pden)
@@ -1410,11 +1263,6 @@ static int lmk05318_set_out_mux_ex(lmk05318_state_t* d, unsigned port, unsigned 
         (port == 6) ? MAKE_LMK05318_OUTCTL_6(mux, ot) : MAKE_LMK05318_OUTCTL_7(mux, ot),
     };
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
-}
-
-int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype)
-{
-    return lmk05318_set_out_mux_ex(d, port, (pll1 ? OUT_PLL_SEL_APLL1_P1 : OUT_PLL_SEL_APLL2_P1), otype);
 }
 
 static range_t lmk05318_get_freq_range(const lmk05318_out_config_t* cfg)

@@ -192,13 +192,6 @@ static inline int lmk05318_set_port_affinity(lmk05318_out_config_t* cfg, unsigne
     return 0;
 }
 
-/*
- * Legacy functions, remove them later
- */
-int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned flags, lmk05318_state_t* out);
-int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div);
-/**/
-
 int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t div);
 int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype);
 
