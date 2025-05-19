@@ -774,10 +774,10 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
     return lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
 }
 
-int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
-                       const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
-                       lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
-                       lmk05318_state_t* out, bool dry_run)
+int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
+                    const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
+                    lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
+                    lmk05318_state_t* out, bool dry_run)
 {
     int res;
     uint8_t dummy[4] = {0,0,0,0};
@@ -1239,7 +1239,7 @@ static inline const char* lmk05318_decode_fmt(unsigned f)
     return "UNKNOWN";
 }
 
-static int lmk05318_set_out_mux_ex(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
+static int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
 {
     unsigned ot;
     switch (otype) {
@@ -2025,7 +2025,7 @@ have_complete_solution:
         USDR_LOG("5318", USDR_LOG_DEBUG, "OUT%u port:%u div:%" PRIu64 " fmt:%u(%s)",
                  i, out->port, out->result.out_div, out->wanted.type, lmk05318_decode_fmt(out->wanted.type));
 
-        res =             lmk05318_set_out_mux_ex(d, out->port, out->result.mux, out->wanted.type);
+        res =             lmk05318_set_out_mux(d, out->port, out->result.mux, out->wanted.type);
         res = res ? res : lmk05318_set_out_div(d, out->port, out->result.out_div);
         if(res)
         {

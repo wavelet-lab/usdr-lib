@@ -126,10 +126,10 @@ Suite * lmx1204_solver_suite(void)
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
 
-    //tcase_add_test(tc_core, lmx1204_solver_test1);
-    //tcase_add_test(tc_core, lmx1204_solver_test2);
-    //tcase_add_test(tc_core, lmx1204_solver_test3);
-    //tcase_add_test(tc_core, lmx1204_solver_test4);
+    tcase_add_test(tc_core, lmx1204_solver_test1);
+    tcase_add_test(tc_core, lmx1204_solver_test2);
+    tcase_add_test(tc_core, lmx1204_solver_test3);
+    tcase_add_test(tc_core, lmx1204_solver_test4);
     tcase_add_test(tc_core, lmx1204_solver_test5);
 
     suite_add_tcase(s, tc_core);

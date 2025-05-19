@@ -192,9 +192,6 @@ static inline int lmk05318_set_port_affinity(lmk05318_out_config_t* cfg, unsigne
     return 0;
 }
 
-int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t div);
-int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, bool pll1, unsigned otype);
-
 enum lock_msk {
     LMK05318_LOS_XO = 1,
     LMK05318_LOL_PLL1 = 2,
@@ -206,6 +203,7 @@ enum lock_msk {
     LMK05318_BAW_LOCK = 64,
 };
 
+int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t div);
 int lmk05318_sync(lmk05318_state_t* out);
 int lmk05318_mute(lmk05318_state_t* out, uint8_t chmask);
 int lmk05318_reset_los_flags(lmk05318_state_t* d);
@@ -223,10 +221,10 @@ int lmk05318_tune_apll1(lmk05318_state_t* d);
 
 int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs);
 
-int lmk05318_create_ex(lldev_t dev, unsigned subdev, unsigned lsaddr,
-                       const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
-                       lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
-                       lmk05318_state_t* out, bool dry_run);
+int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
+                    const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
+                    lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
+                    lmk05318_state_t* out, bool dry_run);
 
 int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll);
 int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout);

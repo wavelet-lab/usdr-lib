@@ -266,7 +266,6 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     // OUT5: LVDS OFF   156.250 Mhz  | OFF by default
     // OUT6: Dual CMOS   10.000 Mhz
     // OUT7: Dual CMOS        1 Hz
-    // res = res ? res : lmk05318_create()
 
     if(res)
         return res;
@@ -309,7 +308,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6, lmk_freq[6], false, LVCMOS);
     res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7, lmk_freq[7], false, LVCMOS);
 
-    res = res ? res : lmk05318_create_ex(dev, 0, I2C_BUS_LMK05318B, &xo, &dpll, lmk05318_outs_cfg, 8, &d->gen, false /*dry_run*/);
+    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, &xo, &dpll, lmk05318_outs_cfg, 8, &d->gen, false /*dry_run*/);
     if(res)
         return res;
 

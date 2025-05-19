@@ -97,7 +97,7 @@ int board_ext_simplesync_init(lldev_t dev,
     lmk05318_dpll_settings_t dpll;
     dpll.enabled = false;
 
-    res = lmk05318_create_ex(dev, subdev, i2ca, &xo, &dpll, cfg, 4, &ob->lmk, false /*dry_run*/);
+    res = lmk05318_create(dev, subdev, i2ca, &xo, &dpll, cfg, 4, &ob->lmk, false /*dry_run*/);
     res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
     res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
