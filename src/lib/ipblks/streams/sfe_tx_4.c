@@ -13,14 +13,10 @@ enum {
 int sfe_tx4_check_format(const struct stream_config* psc)
 {
     struct bitsfmt bfmt = get_bits_fmt(psc->sfmt);
+    if (bfmt.bits != 0)
+        return 0;
 
-    if (bfmt.bits != 16)
-        return -EINVAL;
-
-    if (!bfmt.complex)
-        return -EINVAL;
-
-    return 0;
+    return -EINVAL;
 }
 
 
@@ -44,6 +40,47 @@ int sfe_tx4_push_ring_buffer(lldev_t dev,
 
     return lowlevel_ls_op(dev, subdev, USDR_LSOP_HWREG, cfg_base,
                               0, NULL, sizeof(regs), regs);
+}
+
+int sfe_extx4_push_ring_buffer(lldev_t dev,
+                               subdev_t subdev,
+                               unsigned cfg_base,
+                               uint32_t* creg0,
+                               uint32_t* creg1,
+                               uint32_t* creg2,
+                               unsigned bytes,
+                               unsigned samples,
+                               unsigned lgbursts,
+                               int64_t timestamp)
+{
+    if ((bytes > (1<<20)) || (samples > (1<<20)))
+        return -EINVAL;
+
+    int res = 0;
+    uint32_t bursts = (1 << lgbursts) - 1;
+
+    uint32_t cfg0 = (bytes - 1) & 0xffffff;
+    uint32_t cfg1 = (bursts << 24) | ((samples - 1) & 0xffffff);
+    uint32_t tsh = (timestamp >> 32);
+    uint32_t tsl = timestamp;
+
+    if (*creg0 != cfg0) {
+        res = res ? res : lowlevel_reg_wr32(dev, subdev, cfg_base, cfg0);
+        *creg0 = cfg0;
+    }
+    if (*creg1 != cfg1) {
+        res = res ? res : lowlevel_reg_wr32(dev, subdev, cfg_base + 1, cfg1);
+        *creg1 = cfg1;
+    }
+    if (*creg2 != tsh) {
+        res = res ? res : lowlevel_reg_wr32(dev, subdev, cfg_base + 2, tsh);
+        *creg2 = tsh;
+    }
+
+    USDR_LOG("EXTX", USDR_LOG_DEBUG, "Push buffer %d [%08x:%08x:%08x:%08x] SZ=%d SPS=%d BRST=%d TS=%" PRId64 "\n",cfg_base,
+             cfg0, cfg1, tsh, tsl, bytes, samples, bursts, timestamp);
+
+    return res ? res : lowlevel_reg_wr32(dev, subdev, cfg_base + 3, tsl);
 }
 
 enum {
@@ -74,7 +111,7 @@ int fe_tx4_swap_ab_get(unsigned channels,
 }
 
 int sfe_tx4_ctl(sfe_cfg_t *pfe,
-                unsigned cfg_base,
+                unsigned sync_base,
                 unsigned chans,
                 uint8_t swap_ab_flag,
                 uint8_t mute_flag,
@@ -84,14 +121,14 @@ int sfe_tx4_ctl(sfe_cfg_t *pfe,
     uint32_t cmd;
     int res;
 
-    res = lowlevel_reg_wr32(pfe->dev, pfe->subdev, cfg_base + 2, TX_CMD_STOP);
+    res = lowlevel_reg_wr32(pfe->dev, pfe->subdev, sync_base, TX_CMD_STOP);
     if (res)
         return res;
 
     if (!start)
         return 0;
 
-    res = lowlevel_reg_wr32(pfe->dev, pfe->subdev, cfg_base + 2, (1 << GP_PORT_TXDMA_CTRL_RESET_BUFS));
+    res = lowlevel_reg_wr32(pfe->dev, pfe->subdev, sync_base, (1 << GP_PORT_TXDMA_CTRL_RESET_BUFS));
     if (res)
         return res;
 
@@ -109,7 +146,7 @@ int sfe_tx4_ctl(sfe_cfg_t *pfe,
         cmd |= (1 << GP_PORT_TXDMA_CTRL_MODE_REP);
     }
 
-    res = lowlevel_reg_wr32(pfe->dev, pfe->subdev, cfg_base + 2, cmd | TX_CMD_START_16BIT);
+    res = lowlevel_reg_wr32(pfe->dev, pfe->subdev, sync_base, cmd | TX_CMD_START_16BIT);
     if (res)
         return res;
 
@@ -117,14 +154,14 @@ int sfe_tx4_ctl(sfe_cfg_t *pfe,
 }
 
 int sfe_tx4_upd(sfe_cfg_t *pfe,
-                unsigned cfg_base,
+                unsigned sync_base,
                 unsigned mute_flags,
                 unsigned swap_ab_flag)
 {
     uint32_t cmd = ((swap_ab_flag & 1) << GP_PORT_TXDMA_CTRL_MODE_SWAP_AB) |
                    ((mute_flags & 1) << GP_PORT_TXDMA_CTRL_MODE_MUTEA) |
                    (((mute_flags >> 1) & 1) << GP_PORT_TXDMA_CTRL_MODE_MUTEB);
-    return lowlevel_reg_wr32(pfe->dev, pfe->subdev, cfg_base + 2, cmd | TX_CMD_UPD_FLAGS);
+    return lowlevel_reg_wr32(pfe->dev, pfe->subdev, sync_base, cmd | TX_CMD_UPD_FLAGS);
 }
 
 

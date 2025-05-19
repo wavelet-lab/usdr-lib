@@ -284,7 +284,8 @@ void* freq_gen_thread_ci16(void* obj)
             phase += phase_delta;
             if (phase > 1.0)
                 phase -= 1.0;
-
+            else if (phase < -1.0)
+                phase += 1.0;
         }
 #endif //USE_WVLT_SINCOS
 
@@ -303,6 +304,7 @@ void* freq_gen_thread_cf32(void* obj)
     const unsigned p = inp->chan;
     double phase = inp->start_phase;
     const unsigned tx_get_samples = inp->samples_count;
+    float gain = inp->gain;
 
     while (!s_stop && !thread_stop) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
@@ -319,11 +321,16 @@ void* freq_gen_thread_cf32(void* obj)
 
         for (unsigned i = 0; i < tx_get_samples; i++) {
             //float ii, qq; (but we use trick to not do inversion, however, it leads to incorrect phase)
-            sincosf(2 * M_PI * phase, &iqp[2 * i + 1], &iqp[2 * i + 0]);
+            float fqp[2];
+            sincosf(2 * M_PI * phase, &fqp[1], &fqp[0]);
+            iqp[2 * i + 0] = gain * fqp[0];
+            iqp[2 * i + 1] = gain * fqp[1];
+
             phase += inp->delta_phase;
             if (phase > 1.0)
                 phase -= 1.0;
-
+            else if (phase < -1.0)
+                phase += 1.0;
         }
 
         ring_buffer_ppost(tbuff[p]);
@@ -377,13 +384,16 @@ static void usage(int severity, const char* me)
                                 "\t[-o <flag: cycle TX from file>] \n"
                                 "\t[-c count [128]] \n"
                                 "\t[-r samplerate [50e6]] \n"
-                                "\t[-F format [ci16] | cf32] \n"
-                                "\t[-C chmsk [autodetect]] \n"
+                                "\t[-F format_rx [ci16] | cf32 | ci16@ci12 | cf32@ci12] \n"
+                                "\t[-i format_tx [ci16] | cf32 | ci16@ci12 | cf32@ci12] \n"
+                                "\t[-C chmsk_rx [autodetect] or \":<comma separated channel names>\", e.g. \":A,B\"] \n"
+                                "\t[-R chmsk_tx [autodetect] or \":<comma separated channel names>\", e.g. \":A,B\"] \n"
                                 "\t[-S RX buffer size (in samples) [4096]] \n"
                                 "\t[-O TX buffer size (in samples) [4096]] \n"
                                 "\t[-t <flag: TX only mode>] \n"
                                 "\t[-T <flag: TX+RX mode>] \n"
                                 "\t[-N <flag: No TX timestamps>] \n"
+                                "\t[-J <flag: use samp/3 LUT table for sin generator (ultra fast)>]\n"
                                 "\t[-q TDD_FREQ [910e6]] \n"
                                 "\t[-e RX_FREQ [900e6]] \n"
                                 "\t[-E TX_FREQ [920e6]] \n"
@@ -400,7 +410,6 @@ static void usage(int severity, const char* me)
                                 "\t[-B Calibration freq [0]] \n"
                                 "\t[-s Sync type [all]] \n"
                                 "\t[-Q <flag: Discover and exit>] \n"
-                                "\t[-R RX_LML_MODE [0]] \n"
                                 "\t[-A Antenna configuration [0]] \n"
                                 "\t[-H comma-separated list of sin generator start phases (FP values)] \n"
                                 "\t[-d comma-separated list of sin generator phase deltas (FP values)] \n"
@@ -409,6 +418,7 @@ static void usage(int severity, const char* me)
                                 "\t[-z <flag: Continue on error>] \n"
                                 "\t[-l loglevel [3(INFO)]] \n"
                                 "\t[-G calibration [algo#]] \n"
+                                "\t[-Z param1=value1,param2=value2,...] \n"
                                 "\t[-h <flag: This help>]",
              me);
 }
@@ -513,6 +523,68 @@ static bool do_receive(pusdr_dms_t strm, unsigned iteration, usdr_dms_recv_nfo_t
     return true;
 }
 
+struct mychannel_info {
+    const char* chlst[64];
+    unsigned chmsk;
+    unsigned chlst_cnt;
+    bool chmsk_alter;
+};
+typedef struct mychannel_info mychannel_info_t;
+
+static void channel_info_init(mychannel_info_t* c) {
+    c->chmsk = 1;
+    c->chmsk_alter = false;
+    c->chlst_cnt = 0;
+    memset(c->chlst, 0, SIZEOF_ARRAY(c->chlst));
+}
+
+static void fill_usdr_channels(usdr_channel_info_t* chans, unsigned chan_map[64], mychannel_info_t* ch) {
+    if (ch->chlst_cnt > 0) {
+        chans->count = ch->chlst_cnt;
+        chans->flags = 0;
+        chans->phys_names = ch->chlst;
+        chans->phys_nums = NULL;
+    } else {
+        unsigned cnt;
+        unsigned i;
+        for (cnt = 0, i = 0; i < 64; i++) {
+            if (ch->chmsk & (((uint64_t)1) << i)) {
+                chan_map[cnt++] = i;
+            }
+        }
+        chans->count = cnt;
+        chans->flags = 0;
+        chans->phys_names = NULL;
+        chans->phys_nums = chan_map;
+    }
+}
+
+struct param_list {
+    char* param;
+    char* value;
+};
+typedef struct param_list param_list_t;
+
+// Parse value settings in format "a=b,c=d,e=f"
+unsigned parse_param_list(char* list, unsigned max_len, param_list_t* out)
+{
+    unsigned params;
+    char *sptr1, *sptr2;
+    char *p, *v;
+    char *pt = strtok_r(list, ",", &sptr1);
+    for (params = 0; (params < max_len) && pt; params++) {
+        p = strtok_r(pt, "=", &sptr2);
+        v = strtok_r(NULL, "=", &sptr2);
+        if (p == NULL || v == NULL)
+            break;
+
+        out[params].param = p;
+        out[params].value = v;
+        pt = strtok_r(NULL, ",", &sptr1);
+    }
+    return params;
+}
+
 int main(UNUSED int argc, UNUSED char** argv)
 {
     int res;
@@ -534,24 +606,27 @@ int main(UNUSED int argc, UNUSED char** argv)
     memset(filename_tx, 0, sizeof(filename_tx[0]) * MAX_CHS);
 
     int opt;
-    unsigned chmsk = 0x1;
-    bool chmsk_alter = false;
-    const char* fmt = "ci16";
+    mychannel_info_t chl_rx;
+    mychannel_info_t chl_tx;
+
+    const char* fmt_rx = "ci16";
+    const char* fmt_tx = "ci16";
+
     unsigned samples_rx = 4096;
     unsigned samples_tx = 4096;
     unsigned loglevel = USDR_LOG_INFO;
     int noinit = 0;
     unsigned dotx = 0; //means "do TX" - enables TX if dotx==1
     unsigned dorx = 1; //means "do RX" - enables RX if dorx==1
-    unsigned rxflags =  DMS_FLAG_NEED_TX_STAT;
+    unsigned rxflags = 0;
     uint64_t temp[2];
     const char* synctype = "all";
     bool listdevs = false;
     unsigned start_tx_delay = 0;
     bool nots = false;
     unsigned antennacfg = 0;
-    unsigned lmlcfg = 0;
     unsigned devices = 1;
+    unsigned swchmax = 0;
     const char* refclkpath = NULL;
     uint32_t cal_freq = 0;
     bool stop_on_error = true;
@@ -560,16 +635,21 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned statistics = 1;
     bool use_lut = false;
     unsigned calibrate = 0;
+    param_list_t extra_params[32];
+    unsigned extra_param_len = 0;
 
     memset(rx_thread_inputs, 0, sizeof(rx_thread_inputs));
     memset(tx_thread_inputs, 0, sizeof(tx_thread_inputs));
     for(unsigned i = 0; i < MAX_CHS; ++i)
     {
         tx_thread_input_t* inp = &tx_thread_inputs[i];
-        inp->start_phase = -1;
-        inp->delta_phase = -1;
+        inp->start_phase = -10;
+        inp->delta_phase = -10;
         inp->gain = INT16_MIN;
     }
+
+    channel_info_init(&chl_rx);
+    channel_info_init(&chl_tx);
 
     //Device parameters
     //                 { endpoint, default_value, ignore flag, stop_on_fail flag }
@@ -597,7 +677,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:")) != -1) {
+    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -708,23 +788,36 @@ int main(UNUSED int argc, UNUSED char** argv)
             count = atoi(optarg);
             explicit_count = true;
             break;
-        //RX LML mode
-        case 'R':
-            lmlcfg = atoi(optarg);
-            break;
         //Sample rate
         case 'r':
             rate = atof(optarg);
             break;
         //Set data format (default: ci16)
         case 'F':
-            fmt = optarg;
+            fmt_rx = optarg;
+            break;
+        case 'i':
+            fmt_tx = optarg;
             break;
         //Channels mask - autodetect if not specified
         case 'C':
-            chmsk = atoi(optarg);
-            chmsk_alter = true;
+        case 'R':
+        {
+            mychannel_info_t* ci = (opt == 'R') ? &chl_tx : &chl_rx;
+            if (*optarg == ':') {
+                char *pt = strtok(optarg + 1, ",");
+                ci->chlst_cnt = 0;
+                while (pt != NULL && ci->chlst_cnt < SIZEOF_ARRAY(ci->chlst)) {
+                    ci->chlst[ci->chlst_cnt++] = pt;
+                    pt = strtok(NULL, ",");
+                }
+            } else {
+                ci->chmsk = atoi(optarg);
+            }
+
+            ci->chmsk_alter = true;
             break;
+        }
         //RX buffer size, in samples
         case 'S':
             samples_rx = atoi(optarg);
@@ -801,6 +894,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'z':
             stop_on_error = false;
             break;
+        case 'Z':
+            extra_param_len = parse_param_list(optarg, SIZEOF_ARRAY(extra_params), extra_params);
+            break;
         //Show usage
         case 'h':
             usdrlog_disablecolorize(NULL);
@@ -869,6 +965,19 @@ int main(UNUSED int argc, UNUSED char** argv)
         return 1;
     }
 
+    // Apply extra parameters
+    for (unsigned l = 0; l < extra_param_len; l++) {
+        param_list_t* p = &extra_params[l];
+        int64_t val = strtoull(p->value, NULL, 10);
+        res = usdr_dme_set_uint(dev, p->param, val);
+        USDR_LOG(LOG_TAG, res == 0 ? USDR_LOG_INFO : USDR_LOG_ERROR, "Parameter `%s` => `%s` result %d %s\n", p->param, p->value,
+                 res, res ? strerror(res) : "");
+
+        if (stop_on_error && res) {
+            return 1;
+        }
+    }
+
     res = usdr_dme_get_u32(dev, "/ll/devices", (unsigned*)&devices);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "Set device count to 1");
@@ -876,14 +985,13 @@ int main(UNUSED int argc, UNUSED char** argv)
         USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Devices in the array: %d", devices);
     }
 
-    if (!chmsk_alter) {
-        unsigned swchmax;
-        res = usdr_dme_get_u32(dev, "/ll/sdr/max_sw_rx_chans", &swchmax);
-        if (res == 0) {
-            chmsk = (1ULL << devices * swchmax) - 1;
+    res = usdr_dme_get_u32(dev, "/ll/sdr/max_sw_rx_chans", &swchmax);
+    if (res == 0) {
+        if (!chl_tx.chmsk_alter) {
+            chl_tx.chmsk = (1ULL << devices * swchmax) - 1;
         }
-        if (devices > 1) {
-            fmt = "ci16";
+        if (!chl_rx.chmsk_alter) {
+            chl_rx.chmsk = (1ULL << devices * swchmax) - 1;
         }
     }
 
@@ -921,11 +1029,6 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
     if (!noinit) {
-        res = usdr_dme_set_uint(dev, "/dm/power/en", 1);
-        if (res) {
-            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set power: errno %d", res);
-        }
-
         //Set sample rate
         res = usdr_dmr_rate_set(dev, NULL, rate);
         if (res) {
@@ -934,17 +1037,15 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
 
         usleep(5000);
-        if (lmlcfg != 0) {
-            USDR_LOG(LOG_TAG, USDR_LOG_INFO, "======================= setting LML mode to %d =======================", lmlcfg);
-        }
-        res = usdr_dme_set_uint(dev, "/debug/hw/lms7002m/0/rxlml", lmlcfg);
-
         print_device_temperature(dev);
     }
 
     //Open RX data stream
     if (dorx) {
-        res = usdr_dms_create_ex(dev, "/ll/srx/0", fmt, chmsk, samples_rx, rxflags, &usds_rx);
+        usdr_channel_info_t chans;
+        unsigned chan_map[64];
+        fill_usdr_channels(&chans, chan_map, &chl_rx);
+        res = usdr_dms_create_ex2(dev, "/ll/srx/0", fmt_rx, &chans, samples_rx, rxflags, NULL, &usds_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to initialize RX data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
@@ -965,7 +1066,10 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Open TX data stream
     if (dotx) {
-        res = usdr_dms_create(dev, "/ll/stx/0", fmt, chmsk, samples_tx, &usds_tx);
+        usdr_channel_info_t chans;
+        unsigned chan_map[64];
+        fill_usdr_channels(&chans, chan_map, &chl_tx);
+        res = usdr_dms_create_ex2(dev, "/ll/stx/0", fmt_tx, &chans, samples_tx, 0, NULL, &usds_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to initialize TX data stream: errno %d", res);
             if (stop_on_error) goto dev_close;
@@ -984,8 +1088,8 @@ int main(UNUSED int argc, UNUSED char** argv)
         memset(&snfo_tx, 0, sizeof(snfo_tx));
     }
 
-    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Configured RX %d (%d bytes) x %d buffs  TX %d x %d buffs  ===  CH_MASK %x FMT %s",
-             s_rx_blksampl, s_rx_blksz, rx_bufcnt, s_tx_blksz, tx_bufcnt, chmsk, fmt);
+    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Configured RX %d (%d bytes) x %d buffs  TX %d x %d buffs  ===  RX_MASK %x/%d FMT %s",
+             s_rx_blksampl, s_rx_blksz, rx_bufcnt, s_tx_blksz, tx_bufcnt, chl_rx.chmsk, chl_rx.chlst_cnt, fmt_rx);
 
     if (rx_bufcnt > MAX_CHS || tx_bufcnt > MAX_CHS) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Too many requested channels %d/%d (MAX: %d)", rx_bufcnt, tx_bufcnt, MAX_CHS);
@@ -993,8 +1097,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     }
 
     // initialize thread input params
-    for(unsigned i = 0; i < rx_bufcnt; ++i)
-    {
+    for(unsigned i = 0; i < rx_bufcnt; ++i) {
         rx_thread_input_t* inp = &rx_thread_inputs[i];
         inp->chan = i;
     }
@@ -1003,23 +1106,20 @@ int main(UNUSED int argc, UNUSED char** argv)
     static double start_dphase[] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
     static int16_t gains[] = {0.0, 0.0, 0.0, 0.0};
 
-    for(unsigned i = 0; i < tx_bufcnt; ++i)
-    {
+    for(unsigned i = 0; i < tx_bufcnt; ++i) {
         tx_thread_input_t* inp = &tx_thread_inputs[i];
         inp->chan = i;
         inp->samplerate = rate;
         inp->samples_count = samples_tx;
-        inp->start_phase = inp->start_phase >= 0 ? inp->start_phase : start_phase[i % (sizeof(start_phase) / sizeof(*start_phase))];
-        inp->delta_phase = inp->delta_phase >= 0 ? inp->delta_phase : start_dphase[i % (sizeof(start_dphase) / sizeof(*start_dphase))];
+        inp->start_phase = inp->start_phase > -1 ? inp->start_phase : start_phase[i % (sizeof(start_phase) / sizeof(*start_phase))];
+        inp->delta_phase = inp->delta_phase > -1 ? inp->delta_phase : start_dphase[i % (sizeof(start_dphase) / sizeof(*start_dphase))];
         inp->gain = inp->gain != INT16_MIN ? inp->gain : gains[i % (sizeof(gains) / sizeof(*gains))];
     }
 
-    for(unsigned i = 0; i < MAX_CHS; ++i)
-    {
+    for(unsigned i = 0; i < MAX_CHS; ++i) {
         USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX SINGEN CH#%2d PHASE_START:%.4f PHASE_DELTA:%.4f",
                  i, tx_thread_inputs[i].start_phase, tx_thread_inputs[i].delta_phase);
     }
-    //
 
     //Create TX buffers and threads
     if (dotx) {
@@ -1046,15 +1146,15 @@ int main(UNUSED int argc, UNUSED char** argv)
             fn_rxtx_thread_t thread_func;
             if(tx_from_file)
                 thread_func = disk_read_thread;
-            else if(strcmp(fmt, SFMT_CI16) == 0)
+            else if(strcmp(fmt_rx, SFMT_CI16) == 0 || strcmp(fmt_rx, SFMT_CI16_CI12) == 0)
                 thread_func = (use_lut) ? freq_gen_thread_ci16_lut : freq_gen_thread_ci16;
-            else if(strcmp(fmt, SFMT_CF32) == 0)
+            else if(strcmp(fmt_rx, SFMT_CF32) == 0 || strcmp(fmt_rx, SFMT_CF32_CI12) == 0)
                 thread_func = freq_gen_thread_cf32;
             else
             {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: invalid format '%s', "
                                                   "use -I option to read from file or specify %s/%s data format (-F option) for sine generator",
-                         i, fmt, SFMT_CI16, SFMT_CF32);
+                         i, fmt_rx, SFMT_CI16, SFMT_CF32);
                 goto dev_close;
             }
 
@@ -1146,10 +1246,10 @@ int main(UNUSED int argc, UNUSED char** argv)
 
 
     //Set antenna configuration
-    res = usdr_dme_set_uint(dev, "/dm/sdr/0/tfe/antcfg", antennacfg);
-    if (res) {
-        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set antenna configuration parameter [%u]: errno %d", antennacfg, res);
-    }
+    // res = usdr_dme_set_uint(dev, "/dm/sdr/0/tfe/antcfg", antennacfg);
+    // if (res) {
+    //     USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set antenna configuration parameter [%u]: errno %d", antennacfg, res);
+    // }
 
     //Set device parameters from the dev_data struct (see above)
     if (!noinit) {
@@ -1196,6 +1296,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     uint64_t overruns_sps = 0;
     uint64_t overruns_cnt = 0;
 
+    unsigned fifo_min = ~0;
     unsigned tx_samples_cnt;
 
     for (unsigned i = 0; !s_stop && (i < count); i++)
@@ -1243,11 +1344,14 @@ int main(UNUSED int argc, UNUSED char** argv)
 
                 s_tx_time += pkt_tx_time;
                 int64_t lag = curtime - s_tx_time;
+                if (fifo_min > txstat.fifo_used)
+                    fifo_min = txstat.fifo_used;
 
                 if ((statistics > 1) || (logprev_tx + 1000000000ULL < curtime)) {
-                    fprintf(stderr, "TX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns UND:%d -- %08x FIFO: %d  len:%d\n", i, count, 0l, 0, took, lag,
-                            txstat.underruns, txstat.ktime, txstat.fifo_used, tx_samples_cnt);
+                    fprintf(stderr, "TX%6d/%d: Sps: %11ld lst:%d  took:%11ld ns lag:%11ld ns UND:%d -- %08x FIFO_MIN: %d  len:%d\n", i, count, 0l, 0, took, lag,
+                            txstat.underruns, txstat.ktime, fifo_min, tx_samples_cnt);
                     logprev_tx = logprev_tx + 1000000000ULL;
+                    fifo_min = ~0;
                 }
             }
 

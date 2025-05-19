@@ -63,7 +63,6 @@ int usdr_dms_create(pdm_dev_t device,
 
 enum {
     DMS_FLAG_NEED_FD = 1,
-    DMS_FLAG_NEED_TX_STAT = 2,
 };
 int usdr_dms_create_ex(pdm_dev_t device,
                        const char* sobj,

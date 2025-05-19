@@ -64,6 +64,9 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
     { DNLL_TFE_COUNT, 0 },
     { DNLL_IDX_REGSP_COUNT, 1 },
     { DNLL_IRQ_COUNT, 8 },
+    { DNLL_BUCKET_COUNT, 1 },
+    { DNLL_GPO_COUNT, 1 },
+    { DNLL_GPI_COUNT, 1 },
 
     // low level buses
     { "/ll/irq/0/core", USDR_MAKE_COREID(USDR_CS_AUX, USDR_AC_PIC32_PCI) },
@@ -93,11 +96,21 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
     { "/ll/gpio/0/base", M2PCI_REG_GPIO_S },
     { "/ll/gpio/0/irq",  -1 },
 
+    { "/ll/qspi_flash/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_QSPI_FLASH_24_RW) },
     { "/ll/qspi_flash/base", M2PCI_REG_QSPI_FLASH },
+    { "/ll/qspi_flash/master_off", 0x1C0000 },
+
+    { "/ll/gpi/0/core", USDR_MAKE_COREID(USDR_CS_GPI, USDR_GPI_32BIT_12) },
+    { "/ll/gpi/0/base", M2PCI_REG_RD_GPI0_12 },
+    { "/ll/gpo/0/core", USDR_MAKE_COREID(USDR_CS_GPO, USDR_GPO_8BIT) },
+    { "/ll/gpo/0/base", M2PCI_REG_STAT_CTRL },
 
     // Indexed area map
     { "/ll/idx_regsp/0/base", M2PCI_REG_WR_BADDR },
     { "/ll/idx_regsp/0/virt_base", VIRT_CFG_SFX_BASE },
+
+    { "/ll/bucket/0/core", USDR_MAKE_COREID(USDR_CS_BUCKET, USDR_BUCKET_16B) },
+    { "/ll/bucket/0/base", M2PCI_REG_WR_PNTFY_CFG },
 
     // data stream cores
     { "/ll/srx/0/core",    USDR_MAKE_COREID(USDR_CS_STREAM, USDR_SC_RXDMA_BRSTN) },
@@ -110,7 +123,6 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
     { "/ll/rfe/0/fifobsz", SRF4_FIFOBSZ },
     { "/ll/rfe/0/core",    USDR_MAKE_COREID(USDR_CS_FE, USDR_FC_BRSTN) },
     { "/ll/rfe/0/base",    CSR_RFE4_BASE },
-
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"ad45lb49" },
     { "/ll/sdr/max_hw_rx_chans",  1 },
@@ -1153,7 +1165,7 @@ int usdr_device_m2_d09_4_ad45_2_create_stream(device_t* dev, const char* sid, co
 
 
         res = (res) ? res : create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE,
+                                    flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE, 0,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
         if (res) {
             return res;

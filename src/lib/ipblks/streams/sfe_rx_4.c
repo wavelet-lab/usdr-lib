@@ -37,6 +37,8 @@ enum exfe_rx_cmd_regs {
     EXFE_CMD_PACKER         = 0x04,
     EXFE_CMD_ENABLE_EXT     = 0x08,
 
+    EXFE_CMD_EXPAND         = 0x0d,
+    EXFE_CMD_TXFMT12        = 0x0e,
     EXFE_CMD_MUTE           = 0x0f,
 
     EXFE_CMD_SHUFFLE_0      = 0x10,
@@ -129,7 +131,10 @@ enum sfr_cmd_rst {
 };
 
 enum {
-    MAX_BURSTS_IN_BUFF = 32,
+    MAX_BURSTS_RX_IN_BUFF = 32,
+
+    // For EX TX
+    MAX_BURSTS_TX_OUT_BUFF = 8,
 };
 
 
@@ -303,7 +308,7 @@ static int _configure_simple_fe_generic(const sfe_cfg_t* fe,
 
     int res;
     rfe_config_t cfg;
-    cfg.cfg_max_bursts = MAX_BURSTS_IN_BUFF;
+    cfg.cfg_max_bursts = MAX_BURSTS_RX_IN_BUFF;
     cfg.cfg_fifo_ram_bytes = fe->cfg_fifomaxbytes;
     cfg.cfg_data_lanes_bytes = fe->cfg_word_bytes;
     cfg.cfg_data_lanes = fe->cfg_raw_chans;
@@ -340,7 +345,7 @@ static int _configure_simple_fe_generic(const sfe_cfg_t* fe,
                                             ((bwords - 1)  << SFE_CMD_BF_BWORDS_OFF) |
                                             (fifo_capacity << SFE_CMD_BF_BTOTAL_OFF));
 
-    pfc->bpb = bwords * 8;
+    pfc->bpb = data.bytes;
     pfc->burstspblk = bursts;
     pfc->oob_len = 0;
     pfc->oob_off = 0;
@@ -516,7 +521,7 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
 
     int res;
     rfe_config_t cfg;
-    cfg.cfg_max_bursts = MAX_BURSTS_IN_BUFF;
+    cfg.cfg_max_bursts = MAX_BURSTS_RX_IN_BUFF;
     cfg.cfg_fifo_ram_bytes = fe->cfg_fifomaxbytes;
     cfg.cfg_data_lanes_bytes = fe->cfg_word_bytes;
     cfg.cfg_data_lanes = fe->cfg_raw_chans;
@@ -551,7 +556,7 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_COMPACTER, chlg);
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_PACKER, bps == 12 ? 1 : 0);
 
-    res = res ? res : exfe_trx4_update_chmap(fe, bfmt.complex, chns, &psc->channels);
+    res = res ? res : exfe_trx4_update_chmap(fe, false, bfmt.complex, chns, &psc->channels);
 
     pfc->bpb = bbytes;
     pfc->burstspblk = bursts;
@@ -562,9 +567,10 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
 
 
 int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
-                          bool complex,
-                          unsigned total_chan_num,
-                          const channel_info_t* newmap)
+                           bool mask,
+                           bool complex,
+                           unsigned total_chan_num,
+                           const channel_info_t* newmap)
 {
     int res = 0;
     uint8_t chmap[MAX_EX_CHANS];
@@ -575,6 +581,7 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     memset(flag_swap_iq, 0, sizeof(flag_swap_iq));
 
     unsigned lg_chans = (fe->cfg_raw_chans == 16) ? 4 : (fe->cfg_raw_chans == 8) ? 3 : (fe->cfg_raw_chans == 4) ? 2 : (fe->cfg_raw_chans == 2) ? 1 : 0;
+    unsigned msk = mask ? ((complex ? total_chan_num / 2 : total_chan_num) - 1) : 0xff;
 
     for (unsigned g = 0; g < fe->cfg_raw_chans; g = g + total_chan_num) {
         for (unsigned f = 0; f < total_chan_num; f++) {
@@ -583,9 +590,9 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
             if (complex) {
                 unsigned swap_iq = (newmap->ch_map[f / 2] & CH_SWAP_IQ_FLAG) ? 1 : 0;
                 flag_swap_iq[g + f] = swap_iq;
-                chmap_o[g + f] = 2 * newmap->ch_map[f / 2] + ((f % 2) ^ swap_iq);
+                chmap_o[g + f] = (2 * (newmap->ch_map[f / 2] & msk) + ((f % 2) ^ swap_iq));
             } else  {
-                chmap_o[g + f] = newmap->ch_map[f];
+                chmap_o[g + f] = (newmap->ch_map[f] & msk);
             }
             chmap[g + f] = chmap_o[g + f]  ^ (swp_msk);
         }
@@ -601,7 +608,7 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     }
 
     for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
-        USDR_LOG("STRM", USDR_LOG_INFO, "EXFE: CH%d => %d (orig %d) %s", g, chmap[g], chmap_o[g], flag_swap_iq[g] ? "SWAP_IQ" : "");
+        USDR_LOG("STRM", USDR_LOG_INFO, "EXFE: CH%d => %d (orig %d MSK %x/%d) %s", g, chmap[g], chmap_o[g], msk, total_chan_num, flag_swap_iq[g] ? "SWAP_IQ" : "");
     }
     for (unsigned f = 0; f < lg_chans; f++) {
         USDR_LOG("STRM", USDR_LOG_INFO, "EXFE: STAGE_%d: %04x", f, ch_remapped[f]);
@@ -611,6 +618,14 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_SHUFFLE_1, ch_remapped[1]);
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_SHUFFLE_2, ch_remapped[2]);
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_SHUFFLE_3, ch_remapped[3]);
+    return res;
+}
+
+int exfe_tx4_config(const sfe_cfg_t* fe, unsigned bmt, unsigned expand)
+{
+    int res = 0;
+    res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_EXPAND, expand);
+    res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_TXFMT12, bmt == 12 ? 1 : 0);
     return res;
 }
 

@@ -4,7 +4,10 @@
 #include "device_bus.h"
 #include "device_names.h"
 #include "device_vfs.h"
+#include "device_cores.h"
 #include <stdio.h>
+
+#include <usdr_logging.h>
 
 int device_bus_init(pdevice_t dev, struct device_bus* pdb)
 {
@@ -45,6 +48,15 @@ int device_bus_init(pdevice_t dev, struct device_bus* pdb)
 
         { DNLL_DRP_COUNT, SIZEOF_ARRAY(pdb->drp_core), &pdb->drp_count, DNLLFP_CORE(DN_DRP, "%d"), pdb->drp_core },
         { DNLL_DRP_COUNT, SIZEOF_ARRAY(pdb->drp_base), &pdb->drp_count, DNLLFP_BASE(DN_DRP, "%d"), pdb->drp_base },
+
+        { DNLL_BUCKET_COUNT, SIZEOF_ARRAY(pdb->bucket_core), &pdb->bucket_count, DNLLFP_CORE(DN_BUCKET, "%d"), pdb->bucket_core },
+        { DNLL_BUCKET_COUNT, SIZEOF_ARRAY(pdb->bucket_base), &pdb->bucket_count, DNLLFP_BASE(DN_BUCKET, "%d"), pdb->bucket_base },
+
+        { DNLL_GPI_COUNT, SIZEOF_ARRAY(pdb->gpi_core), &pdb->gpi_count, DNLLFP_CORE(DN_GPI, "%d"), pdb->gpi_core },
+        { DNLL_GPI_COUNT, SIZEOF_ARRAY(pdb->gpi_base), &pdb->gpi_count, DNLLFP_BASE(DN_GPI, "%d"), pdb->gpi_base },
+
+        { DNLL_GPO_COUNT, SIZEOF_ARRAY(pdb->gpo_core), &pdb->gpo_count, DNLLFP_CORE(DN_GPO, "%d"), pdb->gpo_core },
+        { DNLL_GPO_COUNT, SIZEOF_ARRAY(pdb->gpo_base), &pdb->gpo_count, DNLLFP_BASE(DN_GPO, "%d"), pdb->gpo_base },
     };
 
     struct single_params {
@@ -143,4 +155,47 @@ int device_bus_drp_generic_op(lldev_t dev, subdev_t subdev, const device_bus_t* 
     }
 
     return 0;
+}
+
+int device_bus_gpi_generic_op(lldev_t dev, subdev_t subdev, const device_bus_t* db,
+                              lsopaddr_t ls_op_addr,
+                              size_t meminsz, void* pin,
+                              size_t memoutsz, const void* pout)
+{
+    unsigned gpidx = ls_op_addr >> 24;
+    unsigned bank = ls_op_addr & 0xffffff;
+    if (gpidx >= db->gpi_count)
+        return -EINVAL;
+
+    if (db->gpi_core[gpidx] != USDR_MAKE_COREID(USDR_CS_GPI, USDR_GPI_32BIT_12))
+        return -EINVAL;
+
+    if (memoutsz != 0 || meminsz != 4)
+        return -EINVAL;
+
+    if (bank >= 12 * 4)
+        return -EFAULT;
+
+    return lowlevel_reg_rd32(dev, subdev, db->gpi_base[gpidx] + (bank / 4), (uint32_t*)pin);
+}
+
+int device_bus_gpo_generic_op(lldev_t dev, subdev_t subdev, const device_bus_t* db,
+                              lsopaddr_t ls_op_addr,
+                              size_t meminsz, void* pin,
+                              size_t memoutsz, const void* pout)
+{
+    unsigned gpodx = ls_op_addr >> 24;
+    unsigned bank = ls_op_addr & 0xffffff;
+    if (gpodx >= db->gpo_count)
+        return -EINVAL;
+    if (db->gpo_core[gpodx] != USDR_MAKE_COREID(USDR_CS_GPO, USDR_GPO_8BIT))
+        return -EINVAL;
+    if (bank > 127)
+        return -EINVAL;
+    if (memoutsz != 1 || meminsz != 0)
+        return -EINVAL;
+
+    uint8_t data = *(uint8_t*)pout;
+    USDR_LOG("DGPO", USDR_LOG_DEBUG, "GPO[%d] <= %02x\n", bank, data);
+    return lowlevel_reg_wr32(dev, subdev,  db->gpo_base[gpodx], ((bank & 0x7f) << 24) | (data & 0xff));
 }

@@ -28,6 +28,9 @@
 #define DN_RFE              "rfe"
 #define DN_TFE              "tfe"
 #define DN_DRP              "drp"
+#define DN_BUCKET           "bucket"
+#define DN_GPI              "gpi"
+#define DN_GPO              "gpo"
 
 #define DNLL(x)  DNLL_PREFIX_NAME x
 #define DNLLC(x) DNLL_PREFIX_NAME x "_" DNP_COUNT
@@ -41,6 +44,9 @@
 #define DNLL_RFE_COUNT DNLLC(DN_RFE)
 #define DNLL_TFE_COUNT DNLLC(DN_TFE)
 #define DNLL_DRP_COUNT DNLLC(DN_DRP)
+#define DNLL_BUCKET_COUNT DNLLC(DN_BUCKET)
+#define DNLL_GPI_COUNT DNLLC(DN_GPI)
+#define DNLL_GPO_COUNT DNLLC(DN_GPO)
 
 #define DNLLFP_NAME(b, idx, name) DNLL_PREFIX_NAME b "/" idx "/" name
 #define DNLLFP_BASE(b, idx)  DNLLFP_NAME(b, idx, DNP_BASE)

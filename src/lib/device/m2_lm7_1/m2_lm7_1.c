@@ -58,6 +58,9 @@ const usdr_dev_param_constant_t s_params_m2_lm7_1_rev000[] = {
     { DNLL_IDX_REGSP_COUNT, 1 },
     { DNLL_IRQ_COUNT, 8 }, //TODO fix segfault when int count < configured
     { DNLL_DRP_COUNT, 2 },
+    { DNLL_BUCKET_COUNT, 1 },
+    { DNLL_GPO_COUNT, 1 },
+    { DNLL_GPI_COUNT, 1 },
 
     // low level buses
     { "/ll/irq/0/core", USDR_MAKE_COREID(USDR_CS_AUX, USDR_AC_PIC32_PCI) },
@@ -96,12 +99,26 @@ const usdr_dev_param_constant_t s_params_m2_lm7_1_rev000[] = {
     { "/ll/rfe/0/core",    USDR_MAKE_COREID(USDR_CS_FE, USDR_FC_BRSTN) },
     { "/ll/rfe/0/base",    CSR_RFE4_BASE /*VIRT_CFG_SFX_BASE + 256 */},
 
-
     { "/ll/stx/0/core",    USDR_MAKE_COREID(USDR_CS_STREAM, USDR_SC_TXDMA_OLD) },
     { "/ll/stx/0/base",    M2PCI_REG_WR_TXDMA_CNF_L},
     { "/ll/stx/0/cfg_base",VIRT_CFG_SFX_BASE + 512 },
     { "/ll/stx/0/irq",     M2PCI_INT_TX},
     { "/ll/stx/0/dmacap",  0x555 },
+
+    { "/ll/qspi_flash/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_QSPI_FLASH_24_RW) },
+    { "/ll/qspi_flash/base", M2PCI_REG_QSPI_FLASH },
+    { "/ll/qspi_flash/master_off", 0x1C0000 },
+
+    { "/ll/gpi/0/core", USDR_MAKE_COREID(USDR_CS_GPI, USDR_GPI_32BIT_12) },
+    { "/ll/gpi/0/base", M2PCI_REG_RD_GPI0_12 },
+    { "/ll/gpo/0/core", USDR_MAKE_COREID(USDR_CS_GPO, USDR_GPO_8BIT) },
+    { "/ll/gpo/0/base", M2PCI_REG_STAT_CTRL },
+
+    { "/ll/bucket/0/core", USDR_MAKE_COREID(USDR_CS_BUCKET, USDR_BUCKET_16B) },
+    { "/ll/bucket/0/base", M2PCI_REG_WR_PNTFY_CFG },
+
+    { "/ll/sync/0/core",   USDR_MAKE_COREID(USDR_CS_SYNC, USDR_SYNC_SIMPLE) },
+    { "/ll/sync/0/base",   M2PCI_REG_WR_SYNC_CTRL},
 
     { "/ll/dsp/atcrbs/0/core", USDR_MAKE_COREID(USDR_CS_DSP, 0x23675e) },
     { "/ll/dsp/atcrbs/0/base", M2PCI_REG_WR_LBDSP },
@@ -194,6 +211,7 @@ static int dev_m2_lm7_1_tfe_nco_enable_frequency(pdevice_t ud, pusdr_vfs_obj_t o
 static int dev_m2_lm7_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_calibrate_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value);
 
+static int dev_m2_lm7_1_usbclk_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_dev_atcrbs_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_dev_atcrbs_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value);
@@ -218,6 +236,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/channels",       { NULL, NULL }},
     { "/dm/sensor/temp",        { NULL, dev_m2_lm7_1_senstemp_get }},
 
+    { "/dm/sdr/0/usbclk",         { dev_m2_lm7_1_usbclk_set,  NULL }},
     { "/dm/sdr/0/calibrate",      { dev_m2_lm7_1_calibrate_set, dev_m2_lm7_1_calibrate_get }},
 
     { "/dm/sdr/refclk/frequency", {dev_m2_lm7_1_sdr_refclk_frequency_set, dev_m2_lm7_1_sdr_refclk_frequency_get}},
@@ -586,6 +605,13 @@ int dev_m2_lm7_1_calibrate_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* valu
      struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
      *value = (intptr_t)&d->cal_data[0];
      return 0;
+}
+
+
+int dev_m2_lm7_1_usbclk_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    return xsdr_usbclk(&d->xdev, value ? true : false);
 }
 
 int dev_m2_lm7_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -1124,7 +1150,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         }
 
         res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE,
+                                    flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE, 0,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
         if (res) {
             return res;
@@ -1154,7 +1180,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         }
 
         res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags, M2PCI_REG_WR_TXDMA_CNF_L, VIRT_CFG_SFX_BASE + 512,
+                                    flags, M2PCI_REG_WR_TXDMA_CNF_L, M2PCI_REG_WR_SYNC_CTRL, M2PCI_REG_RD_TXDMA_STAT,
                                     0, 0, &d->tx, &hwchs);
         if (res) {
             return res;

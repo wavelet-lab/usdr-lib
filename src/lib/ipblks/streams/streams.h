@@ -20,17 +20,18 @@ struct sample_format {
 };
 
 // lowlevel sample format for streaming
-#define SFMT_I8   "i8"
+// #define SFMT_I8   "i8"
 #define SFMT_I12  "i12"
 #define SFMT_I16  "i16"
 
-#define SFMT_CI8  "ci8"
+// #define SFMT_CI8  "ci8"
 #define SFMT_CI12 "ci12"
 #define SFMT_CI16 "ci16"
 
 #define SFMT_F32  "f32"
 #define SFMT_CF32 "cf32"
 #define SFMT_CF32_CI12 "cf32@ci12"
+#define SFMT_CI16_CI12 "ci16@ci12"
 
 #define SFMT_FFT512_LOGPWR_I16 "cfftlpwri16"
 

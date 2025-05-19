@@ -18,8 +18,9 @@ struct sfe_cfg {
 
     unsigned cfg_base;
     unsigned cfg_fifomaxbytes;
-    unsigned cfg_word_bytes;
-    unsigned cfg_raw_chans;
+    unsigned cfg_word_bytes;      // Data align in FE data stream
+    unsigned cfg_dma_align_bytes; // Data align in DMA data stream
+    unsigned cfg_raw_chans;       // Maximum number of raw channels in FE
 };
 typedef struct sfe_cfg sfe_cfg_t;
 

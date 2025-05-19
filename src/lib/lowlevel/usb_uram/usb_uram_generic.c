@@ -245,6 +245,12 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
     case USDR_LSOP_DRP: {
         return device_bus_drp_generic_op(dev, subdev, pdb, ls_op_addr, meminsz, pin, memoutsz, pout);
     }
+    case USDR_LSOP_GPI: {
+        return device_bus_gpi_generic_op(dev, subdev, pdb, ls_op_addr, meminsz, pin, memoutsz, pout);
+    }
+    case USDR_LSOP_GPO: {
+        return device_bus_gpo_generic_op(dev, subdev, pdb, ls_op_addr, meminsz, pin, memoutsz, pout);
+    }
     }
     return -EOPNOTSUPP;
 }

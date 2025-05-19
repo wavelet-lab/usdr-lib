@@ -26,10 +26,13 @@ int exfe_rx4_configure(const sfe_cfg_t* fe,
                        struct fifo_config* pfc);
 
 int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
-                          bool complex,
-                          unsigned total_chan_num,
-                          const channel_info_t *newmap);
+                           bool mask,
+                           bool complex,
+                           unsigned total_chan_num,
+                           const channel_info_t *newmap);
 
 int exfe_tx4_mute(const sfe_cfg_t* fe, uint64_t mutemask);
+
+int exfe_tx4_config(const sfe_cfg_t* fe, unsigned bmt, unsigned expand);
 
 #endif

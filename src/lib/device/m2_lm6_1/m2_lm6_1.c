@@ -50,6 +50,9 @@ const usdr_dev_param_constant_t s_params_m2_lm6_1_rev000[] = {
     { DNLL_TFE_COUNT, 0 },
     { DNLL_IDX_REGSP_COUNT, 1 },
     { DNLL_IRQ_COUNT, 8 }, //TODO fix segfault when int count < configured
+    { DNLL_BUCKET_COUNT, 1 },
+    { DNLL_GPO_COUNT, 1 },
+    { DNLL_GPI_COUNT, 1 },
 
     // low level buses
     { "/ll/irq/0/core", USDR_MAKE_COREID(USDR_CS_AUX, USDR_AC_PIC32_PCI) },
@@ -88,6 +91,21 @@ const usdr_dev_param_constant_t s_params_m2_lm6_1_rev000[] = {
     { "/ll/stx/0/cfg_base",VIRT_CFG_SFX_BASE + 512 },
     { "/ll/stx/0/irq",     M2PCI_INT_TX},
     { "/ll/stx/0/dmacap",  0x555 },
+
+    { "/ll/qspi_flash/core", USDR_MAKE_COREID(USDR_CS_BUS, USDR_QSPI_FLASH_24_RW) },
+    { "/ll/qspi_flash/base", M2PCI_REG_QSPI_FLASH },
+    { "/ll/qspi_flash/master_off", 0x1C0000 },
+
+    { "/ll/gpi/0/core", USDR_MAKE_COREID(USDR_CS_GPI, USDR_GPI_32BIT_12) },
+    { "/ll/gpi/0/base", M2PCI_REG_RD_GPI0_12 },
+    { "/ll/gpo/0/core", USDR_MAKE_COREID(USDR_CS_GPO, USDR_GPO_8BIT) },
+    { "/ll/gpo/0/base", M2PCI_REG_STAT_CTRL },
+
+    { "/ll/bucket/0/core", USDR_MAKE_COREID(USDR_CS_BUCKET, USDR_BUCKET_16B) },
+    { "/ll/bucket/0/base", M2PCI_REG_WR_PNTFY_CFG },
+
+    { "/ll/sync/0/core",   USDR_MAKE_COREID(USDR_CS_SYNC, USDR_SYNC_SIMPLE) },
+    { "/ll/sync/0/base",   M2PCI_REG_WR_SYNC_CTRL},
 
     { "/ll/dsp/atcrbs/0/core", USDR_MAKE_COREID(USDR_CS_DSP, 0x23675e) },
     { "/ll/dsp/atcrbs/0/base", M2PCI_REG_WR_LBDSP },
@@ -944,8 +962,13 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         if (d->rx) {
             return -EBUSY;
         }
+        res = usdr_rfic_streaming_up(&d->d, RFIC_LMS6_RX);
+        if (res) {
+            return res;
+        }
+
         res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE,
+                                    flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE, 0,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &chans);
         if (res) {
             return res;
@@ -955,8 +978,13 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         if (d->tx) {
             return -EBUSY;
         }
+        res = usdr_rfic_streaming_up(&d->d, RFIC_LMS6_TX);
+        if (res) {
+            return res;
+        }
+
         res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags, M2PCI_REG_WR_TXDMA_CNF_L, VIRT_CFG_SFX_BASE + 512,
+                                    flags, M2PCI_REG_WR_TXDMA_CNF_L, M2PCI_REG_WR_SYNC_CTRL, M2PCI_REG_RD_TXDMA_STAT,
                                     0, 0, &d->tx, &chans);
         if (res) {
             return res;
@@ -972,9 +1000,11 @@ int usdr_device_m2_lm6_1_unregister_stream(device_t* dev, stream_handle_t* strea
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)dev;
     if (stream == d->tx) {
+        usdr_rfic_streaming_down(&d->d, RFIC_LMS6_TX);
         d->tx->ops->destroy(d->tx);
         d->tx = NULL;
     } else if (stream == d->rx) {
+        usdr_rfic_streaming_down(&d->d, RFIC_LMS6_RX);
         d->rx->ops->destroy(d->rx);
         d->rx = NULL;
     } else {

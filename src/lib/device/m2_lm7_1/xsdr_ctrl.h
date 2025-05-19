@@ -166,6 +166,8 @@ enum {
 };
 
 
+int xsdr_usbclk(xsdr_dev_t *d, bool uclk);
+
 int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray);
 
 int xsdr_trspi_lms8(xsdr_dev_t *d, uint32_t out, uint32_t* in);

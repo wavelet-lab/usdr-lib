@@ -110,6 +110,7 @@ static int _xsdr_init_revo(xsdr_dev_t *d);
 
 static int _xsdr_checkpwr(xsdr_dev_t *d)
 {
+    USDR_LOG("XDEV", USDR_LOG_ERROR, "checkpwr: %d\n", d->pwr_en);
     if (!d->pwr_en) {
        return xsdr_pwren(d, true);
     }
@@ -675,6 +676,7 @@ int xsdr_rfic_fe_set_lna(xsdr_dev_t *d,
 
 int xsdr_tx_antennat_port_cfg(xsdr_dev_t *d, unsigned mask)
 {
+#if 0
     lldev_t dev = d->base.lmsstate.dev;
     unsigned subdev = 0;
     int res = 0;
@@ -695,6 +697,8 @@ int xsdr_tx_antennat_port_cfg(xsdr_dev_t *d, unsigned mask)
 
     res = res ? res : lowlevel_reg_wr32(dev, subdev, M2PCI_REG_WR_TXDMA_COMB, (1 << 11) | ((mask & 7) << 8) | 1);
     return res;
+#endif
+    return -ENOTSUP;
 }
 
 
@@ -1061,7 +1065,7 @@ int _xsdr_pwren_revx(xsdr_dev_t *d, bool on)
         // Haevy load on 1.8VA
         usleep(100000);
     }
-
+    usleep(1000);
     return 0;
 }
 
@@ -1106,6 +1110,12 @@ int xsdr_pwren(xsdr_dev_t *d, bool on)
 
     d->pwr_en = on;
     return res;
+}
+
+int xsdr_usbclk(xsdr_dev_t *d, bool uclk)
+{
+    // Override for testing purposes
+    return dev_gpo_set(d->base.lmsstate.dev, IGPO_USB_CLK_EN, uclk ? 1 : 0);
 }
 
 int xsdr_init(xsdr_dev_t *d)
@@ -1228,8 +1238,14 @@ int xsdr_prepare(xsdr_dev_t *d, bool rxen, bool txen)
         // TODO: Add proper delay calibration
         // assign cfg_rx_idelay_addr = ~igp_phydly[3:0];
         // assign cfg_rx_idelay_data = { 1'b0, igp_phydly[7:4] };
+        // 0..11 D0..D11
+        // 12    IQSEL
+        // 13    *idle*
+        // 14    FCLK
+        // 15    *idle*
         const unsigned coeff = 0x40;
         res = (res) ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_PHYCAL, coeff | 1);
+        usleep(1);
         res = (res) ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_PHYCAL, coeff | 0);
         if (res) {
             return res;
