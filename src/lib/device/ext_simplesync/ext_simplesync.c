@@ -41,6 +41,17 @@ enum {
     I2C_ADDR_LMK = 0x65,
 };
 
+static int simplesync_pd_low_chs(board_ext_simplesync_t* ob)
+{
+    int res = 0;
+    res = res ? res : lmk05318_set_out_mux(&ob->lmk, 0, 0, OUT_OFF);
+    res = res ? res : lmk05318_set_out_mux(&ob->lmk, 1, 0, OUT_OFF);
+    res = res ? res : lmk05318_set_out_mux(&ob->lmk, 2, 0, OUT_OFF);
+    res = res ? res : lmk05318_set_out_mux(&ob->lmk, 3, 0, OUT_OFF);
+    res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
+    return res;
+}
+
 int board_ext_simplesync_init(lldev_t dev,
                               unsigned subdev,
                               unsigned gpio_base,
@@ -85,19 +96,29 @@ int board_ext_simplesync_init(lldev_t dev,
     xo.type = XO_CMOS;
 
     lmk05318_out_config_t cfg[4];
-    lmk05318_port_request(cfg, 4, 25000000, false, LVCMOS);
-    lmk05318_port_request(cfg, 5, 25000000, false, LVCMOS);
-    lmk05318_port_request(cfg, 6, 25000000, false, LVCMOS);
-    lmk05318_port_request(cfg, 7, 25000000, false, LVCMOS);
-    lmk05318_set_port_affinity(cfg, 4, AFF_APLL1);
-    lmk05318_set_port_affinity(cfg, 5, AFF_APLL1);
-    lmk05318_set_port_affinity(cfg, 6, AFF_APLL1);
-    lmk05318_set_port_affinity(cfg, 7, AFF_APLL1);
+    lmk05318_out_config_t* p = &cfg[0];
+
+    lmk05318_port_request(p++, 4, 25000000, false, LVCMOS);
+    lmk05318_port_request(p++, 5, 25000000, false, LVCMOS);
+    lmk05318_port_request(p++, 6, 25000000, false, LVCMOS);
+    lmk05318_port_request(p++, 7, 25000000, false, LVCMOS);
+
+    p = &cfg[0];
+
+    lmk05318_set_port_affinity(p++, AFF_APLL1);
+    lmk05318_set_port_affinity(p++, AFF_APLL1);
+    lmk05318_set_port_affinity(p++, AFF_APLL1);
+    lmk05318_set_port_affinity(p++, AFF_APLL1);
 
     lmk05318_dpll_settings_t dpll;
     dpll.enabled = false;
 
-    res = lmk05318_create(dev, subdev, i2ca, &xo, &dpll, cfg, 4, &ob->lmk, false /*dry_run*/);
+    res = lmk05318_create(dev, subdev, i2ca, &xo, &dpll, cfg, SIZEOF_ARRAY(cfg), &ob->lmk, false /*dry_run*/);
+    if(res)
+        return res;
+
+    res = simplesync_pd_low_chs(ob); //power down chs 0..3
+
     res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
     res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
@@ -116,26 +137,42 @@ int board_ext_simplesync_init(lldev_t dev,
 
 int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
 {
+    int res = 0;
 
-    lmk05318_out_config_t cfg[4];
-    lmk05318_port_request(cfg, 0, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    lmk05318_port_request(cfg, 1, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    lmk05318_port_request(cfg, 2, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    lmk05318_port_request(cfg, 3, meas_lo, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
-    lmk05318_set_port_affinity(cfg, 0, AFF_APLL2);
-    lmk05318_set_port_affinity(cfg, 1, AFF_APLL2);
-    lmk05318_set_port_affinity(cfg, 2, AFF_APLL2);
-    lmk05318_set_port_affinity(cfg, 3, AFF_APLL2);
+    if(meas_lo < 1e6)
+    {
+        res = simplesync_pd_low_chs(ob); //power down chs 0..3
+    }
+    else
+    {
+        lmk05318_out_config_t cfg[4];
+        lmk05318_out_config_t* p = &cfg[0];
 
-    int res = lmk05318_solver(&ob->lmk, cfg, 4);
-    res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
-    res = res ? res : lmk05318_softreset(&ob->lmk);
-    res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
-    res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
-    res = res ? res : lmk05318_sync(&ob->lmk);
+        lmk05318_port_request(p++, 0, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 1, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 2, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 3, meas_lo, false, LVDS);
 
-    unsigned los_msk;
-    lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
+        p = &cfg[0];
+
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+
+        res = lmk05318_solver(&ob->lmk, cfg, SIZEOF_ARRAY(cfg));
+        res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
+        if(res)
+            return res;
+
+        res = res ? res : lmk05318_softreset(&ob->lmk);
+        res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
+        res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
+        res = res ? res : lmk05318_sync(&ob->lmk);
+
+        unsigned los_msk;
+        lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
+    }
 
     return res;
 }

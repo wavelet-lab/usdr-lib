@@ -1239,7 +1239,7 @@ static inline const char* lmk05318_decode_fmt(unsigned f)
     return "UNKNOWN";
 }
 
-static int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
+int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
 {
     unsigned ot;
     switch (otype) {

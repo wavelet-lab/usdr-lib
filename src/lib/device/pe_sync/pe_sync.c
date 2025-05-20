@@ -299,16 +299,18 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     };
 
     lmk05318_out_config_t lmk05318_outs_cfg[8];
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 0, lmk_freq[0], false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 1, lmk_freq[1], false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 2, lmk_freq[2], false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 3, lmk_freq[3], false, LVDS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 4, lmk_freq[4], false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 5, lmk_freq[5], false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 6, lmk_freq[6], false, LVCMOS);
-    res = res ? res : lmk05318_port_request(lmk05318_outs_cfg, 7, lmk_freq[7], false, LVCMOS);
+    lmk05318_out_config_t* p = &lmk05318_outs_cfg[0];
 
-    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, &xo, &dpll, lmk05318_outs_cfg, 8, &d->gen, false /*dry_run*/);
+    res = res ? res : lmk05318_port_request(p++, 0, lmk_freq[0], false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 1, lmk_freq[1], false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 2, lmk_freq[2], false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 3, lmk_freq[3], false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 4, lmk_freq[4], false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, lmk_freq[5], false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 6, lmk_freq[6], false, LVCMOS);
+    res = res ? res : lmk05318_port_request(p++, 7, lmk_freq[7], false, LVCMOS);
+
+    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, &xo, &dpll, lmk05318_outs_cfg, SIZEOF_ARRAY(lmk05318_outs_cfg), &d->gen, false /*dry_run*/);
     if(res)
         return res;
 

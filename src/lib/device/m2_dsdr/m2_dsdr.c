@@ -1445,16 +1445,20 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
 
     lmk05318_out_config_t lmk05318_outs_cfg[8];
-    lmk05318_port_request(lmk05318_outs_cfg, 0,         491520000, false, OUT_OFF);
-    lmk05318_port_request(lmk05318_outs_cfg, 1,         491520000, false, LVDS);
-    lmk05318_port_request(lmk05318_outs_cfg, 2,           3840000, false, LVDS);
-    lmk05318_port_request(lmk05318_outs_cfg, 3,           3840000, false, OUT_OFF);
-    lmk05318_port_request(lmk05318_outs_cfg, 4,                 0, false, OUT_OFF);
-    lmk05318_port_request(lmk05318_outs_cfg, 5,   d->dac_rate / 2, false, LVDS);
-    lmk05318_port_request(lmk05318_outs_cfg, 6,           3840000, false, LVDS);
-    lmk05318_port_request(lmk05318_outs_cfg, 7,   d->dac_rate / 2, false, LVDS);
+    lmk05318_out_config_t* p = &lmk05318_outs_cfg[0];
 
-    res = lmk05318_create(dev, d->subdev, I2C_LMK, &xo, &dpll, lmk05318_outs_cfg, 8, &d->lmk, false /*dry_run*/);
+    lmk05318_port_request(p++, 0,         491520000, false, OUT_OFF);
+    lmk05318_port_request(p++, 1,         491520000, false, LVDS);
+    lmk05318_port_request(p++, 2,           3840000, false, LVDS);
+    lmk05318_port_request(p++, 3,           3840000, false, OUT_OFF);
+    lmk05318_port_request(p++, 4,                 0, false, OUT_OFF);
+    lmk05318_port_request(p++, 5,   d->dac_rate / 2, false, LVDS);
+    lmk05318_port_request(p++, 6,           3840000, false, LVDS);
+    lmk05318_port_request(p++, 7,   d->dac_rate / 2, false, LVDS);
+
+    res = lmk05318_create(dev, d->subdev, I2C_LMK, &xo, &dpll, lmk05318_outs_cfg, SIZEOF_ARRAY(lmk05318_outs_cfg), &d->lmk, false /*dry_run*/);
+    if(res)
+        return res;
 
     usleep(10000); //wait until lmk digests all this
 

@@ -17,14 +17,15 @@ static void setup()
     dev.fref_pll2_div_rs = 6;
 
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, 100000000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 1, 100000000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 2, 122880000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 3, 122880000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 4,  31250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5,   3840000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6, 491520000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 7,         1,  true, OUT_OFF);
+    lmk05318_out_config_t* p = &cfg[0];
+    res = res ? res : lmk05318_port_request(p++, 0, 100000000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 1, 100000000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 2, 122880000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 3, 122880000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 4,  31250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5,   3840000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 6, 491520000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 7,         1,  true, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_registers_map_reset();
@@ -37,7 +38,7 @@ static void teardown()
 START_TEST(lmk05318_solver_test1)
 {
     lmk05318_registers_map_reset();
-    int res = lmk05318_solver(&dev, cfg, OUTS_LEN);
+    int res = lmk05318_solver(&dev, cfg, SIZEOF_ARRAY(cfg));
     ck_assert_int_eq( res, 0 );
 }
 
@@ -48,28 +49,31 @@ START_TEST(lmk05318_solver_test3)
     uint64_t f4_7 = 12500000; //3840000;
 
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, f0_3, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 1, f0_3, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 2, f0_3, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 3, f0_3, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 4, f4_7, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, f4_7, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6, f4_7, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 7, f4_7, false, OUT_OFF);
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 1, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 2, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 3, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 4, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 6, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 7, f4_7, false, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 
-    res = res ? res : lmk05318_set_port_affinity(cfg, 0, AFF_APLL1);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 1, AFF_APLL1);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 2, AFF_APLL1);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 3, AFF_APLL1);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 4, AFF_APLL2);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 5, AFF_APLL2);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 6, AFF_APLL2);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 7, AFF_APLL2);
+    p = &cfg[0];
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL2);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_registers_map_reset();
-    res = lmk05318_solver(&dev, cfg, OUTS_LEN);
+    res = lmk05318_solver(&dev, cfg, SIZEOF_ARRAY(cfg));
     ck_assert_int_eq( res, 0 );
 }
 
@@ -82,22 +86,27 @@ START_TEST(lmk05318_solver_test4)
     memset(cfg, 0, sizeof(cfg));
 
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, f0_3, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 1, f0_3, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 3, f0_3, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 4, f4_7, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, f4_7, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 7, f4_7, false, OUT_OFF);
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 1, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 2, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 3, f0_3, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 4, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 6, f4_7, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 7, f4_7, false, OUT_OFF);
     ck_assert_int_eq( res, 0 );
 
-    res = res ? res : lmk05318_set_port_affinity(cfg, 0, AFF_APLL1);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 1, AFF_APLL1);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 2, AFF_APLL1);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 3, AFF_APLL1);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 4, AFF_APLL2);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 5, AFF_APLL2);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 6, AFF_APLL2);
-    res = res ? res : lmk05318_set_port_affinity(cfg, 7, AFF_APLL2);
+    p = &cfg[0];
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(p++, AFF_APLL2);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_registers_map_reset();
@@ -112,18 +121,20 @@ START_TEST(lmk05318_solver_test4)
 START_TEST(lmk05318_solver_test5)
 {
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, 125000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 1, 125000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 2, 250000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 3, 250000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 4, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6,  10000000, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(cfg, 7,         1, false, LVCMOS);
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 1, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 2, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 3, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 4, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 6,  10000000, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(p++, 7,         1, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_registers_map_reset();
-    res = lmk05318_solver(&dev, cfg, OUTS_LEN);
+    res = lmk05318_solver(&dev, cfg, SIZEOF_ARRAY(cfg));
     ck_assert_int_eq( res, 0 );
 
 }
@@ -131,14 +142,16 @@ START_TEST(lmk05318_solver_test5)
 START_TEST(lmk05318_solver_test6)
 {
     int res = 0;
-    res = res ? res : lmk05318_port_request(cfg, 0, 125000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 1, 125000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 2, 250000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 3, 250000000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 4, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 6,  10000000, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(cfg, 7,         1, false, LVCMOS);
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 1, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 2, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 3, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 4, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 6,  10000000, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(p++, 7,         1, false, LVCMOS);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_xo_settings_t xo;
@@ -160,7 +173,7 @@ START_TEST(lmk05318_solver_test6)
     lmk05318_state_t st;
     memset(&st, 0, sizeof(st));
 
-    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, 8, &st, true /*dry_run*/);
+    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, SIZEOF_ARRAY(cfg), &st, true /*dry_run*/);
     ck_assert_int_eq( res, 0 );
 
 }
@@ -192,14 +205,16 @@ START_TEST(lmk05318_dsdr_test1)
     xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
-    res = res ? res : lmk05318_port_request(cfg, 0, 491520000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 1, 491520000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 2, 3840000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 3, 3840000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 4, 0, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, 122880000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 6, 3840000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 7, 122880000, false, LVDS);
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, 491520000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 1, 491520000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 2, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 3, 3840000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 4, 0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, 122880000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 6, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 7, 122880000, false, LVDS);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_dpll_settings_t dpll;
@@ -215,7 +230,7 @@ START_TEST(lmk05318_dsdr_test1)
     lmk05318_state_t st;
     memset(&st, 0, sizeof(st));
 
-    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, 8, &st, true /*dry_run*/);
+    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, SIZEOF_ARRAY(cfg), &st, true /*dry_run*/);
     ck_assert_int_eq( res, 0 );
 }
 
@@ -230,14 +245,16 @@ START_TEST(lmk05318_dsdr_test2)
     xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
-    res = res ? res : lmk05318_port_request(cfg, 0, 491520000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 1, 491520000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 2, 3840000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 3, 3840000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 4, 0, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(cfg, 5, 122880000 * 2, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 6, 3840000, false, LVDS);
-    res = res ? res : lmk05318_port_request(cfg, 7, 122880000 * 2, false, LVDS);
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, 491520000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 1, 491520000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 2, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 3, 3840000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 4, 0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, 122880000 * 2, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 6, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 7, 122880000 * 2, false, LVDS);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_dpll_settings_t dpll;
@@ -253,8 +270,116 @@ START_TEST(lmk05318_dsdr_test2)
     lmk05318_state_t st;
     memset(&st, 0, sizeof(st));
 
-    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, 8, &st, true /*dry_run*/);
+    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, SIZEOF_ARRAY(cfg), &st, true /*dry_run*/);
     ck_assert_int_eq( res, 0 );
+}
+
+static int simplesync_pd_low_chs(lmk05318_state_t* st)
+{
+    int res = 0;
+    res = res ? res : lmk05318_set_out_mux(st, 0, 0, OUT_OFF);
+    res = res ? res : lmk05318_set_out_mux(st, 1, 0, OUT_OFF);
+    res = res ? res : lmk05318_set_out_mux(st, 2, 0, OUT_OFF);
+    res = res ? res : lmk05318_set_out_mux(st, 3, 0, OUT_OFF);
+    res = res ? res : lmk05318_reg_wr_from_map(st, true /*dry_run*/);
+    return res;
+}
+
+START_TEST(lmk05318_simplesync_test1)
+{
+    int res = 0;
+
+    lmk05318_xo_settings_t xo;
+    xo.fref = 26000000;
+    xo.doubler_enabled = false;
+    xo.fdet_bypass = false;
+    xo.pll1_fref_rdiv = 1;
+    xo.type = XO_CMOS;
+
+    lmk05318_out_config_t cfg1[4];
+    lmk05318_out_config_t* p = &cfg1[0];
+
+    lmk05318_port_request(p++, 4, 25000000, false, LVCMOS);
+    lmk05318_port_request(p++, 5, 25000000, false, LVCMOS);
+    lmk05318_port_request(p++, 6, 25000000, false, LVCMOS);
+    lmk05318_port_request(p++, 7, 25000000, false, LVCMOS);
+
+    p = &cfg1[0];
+
+    lmk05318_set_port_affinity(p++, AFF_APLL1);
+    lmk05318_set_port_affinity(p++, AFF_APLL1);
+    lmk05318_set_port_affinity(p++, AFF_APLL1);
+    lmk05318_set_port_affinity(p++, AFF_APLL1);
+
+    lmk05318_dpll_settings_t dpll;
+    dpll.enabled = false;
+
+    lmk05318_state_t st;
+    memset(&st, 0, sizeof(st));
+
+    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg1, SIZEOF_ARRAY(cfg1), &st, true /*dry_run*/);
+    res = res ? res : simplesync_pd_low_chs(&st);
+
+    ck_assert_int_eq( res, 0 );
+
+    uint64_t meas_lo = 122800000;
+
+    if(meas_lo < 1e6)
+    {
+        res = simplesync_pd_low_chs(&st);
+    }
+    else
+    {
+        lmk05318_out_config_t cfg2[4];
+        p = cfg2;
+
+        lmk05318_port_request(p++, 0, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 1, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 2, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 3, meas_lo, false, LVDS);
+
+        p = cfg2;
+
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+
+        res = lmk05318_solver(&st, cfg2, SIZEOF_ARRAY(cfg2));
+        res = res ? res : lmk05318_reg_wr_from_map(&st, true /*dry_run*/);
+    }
+
+    ck_assert_int_eq( res, 0 );
+
+    meas_lo = 122800;
+
+    if(meas_lo < 1e6)
+    {
+        res = simplesync_pd_low_chs(&st);
+    }
+    else
+    {
+        lmk05318_out_config_t cfg2[4];
+        p = cfg2;
+
+        lmk05318_port_request(p++, 0, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 1, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 2, meas_lo, false, LVDS);
+        lmk05318_port_request(p++, 3, meas_lo, false, LVDS);
+
+        p = cfg2;
+
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+        lmk05318_set_port_affinity(p++, AFF_APLL2);
+
+        res = lmk05318_solver(&st, cfg2, SIZEOF_ARRAY(cfg2));
+        res = res ? res : lmk05318_reg_wr_from_map(&st, true /*dry_run*/);
+    }
+
+    ck_assert_int_eq( res, 0 );
+
 }
 
 Suite * lmk05318_solver_suite(void)
@@ -275,6 +400,7 @@ Suite * lmk05318_solver_suite(void)
     tcase_add_test(tc_core, lmk05318_dpll_test1);
     tcase_add_test(tc_core, lmk05318_dsdr_test1);
     tcase_add_test(tc_core, lmk05318_dsdr_test2);
+    tcase_add_test(tc_core, lmk05318_simplesync_test1);
 
     suite_add_tcase(s, tc_core);
     return s;

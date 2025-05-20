@@ -159,7 +159,7 @@ typedef struct lmk05318_out_config lmk05318_out_config_t;
 
 #define LMK05318_FREQ_DELTA 2
 
-static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
+static inline int lmk05318_port_request(lmk05318_out_config_t* p,
                                         unsigned port,
                                         uint32_t freq,
                                         bool revert_phase,
@@ -168,7 +168,6 @@ static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
     if(port > LMK05318_MAX_OUT_PORTS - 1)
         return -EINVAL;
 
-    lmk05318_out_config_t* p = cfg + port;
     memset(p, 0, sizeof(*p));
     p->port = port;
     p->wanted.freq = freq;
@@ -181,14 +180,9 @@ static inline int lmk05318_port_request(lmk05318_out_config_t* cfg,
     return 0;
 }
 
-static inline int lmk05318_set_port_affinity(lmk05318_out_config_t* cfg, unsigned port, lmk05318_port_affinity_t aff)
+static inline int lmk05318_set_port_affinity(lmk05318_out_config_t* p, lmk05318_port_affinity_t aff)
 {
-    if(port > LMK05318_MAX_OUT_PORTS - 1)
-        return -EINVAL;
-
-    lmk05318_out_config_t* p = cfg + port;
     p->wanted.pll_affinity = aff;
-
     return 0;
 }
 
@@ -211,6 +205,7 @@ int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent);
 int lmk05318_wait_apll1_lock(lmk05318_state_t* d, unsigned timeout);
 int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout);
 int lmk05318_softreset(lmk05318_state_t* out);
+int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype);
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out);
 int lmk05318_reg_rd(lmk05318_state_t* d, uint16_t reg, uint8_t* val);
