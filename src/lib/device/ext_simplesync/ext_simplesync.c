@@ -130,13 +130,13 @@ int board_ext_simplesync_init(lldev_t dev,
     return 0;
 }
 
-
+#define LO_FREQ_CUTOFF  3500000ul // VCO2_MIN / 7 / 256 = 3069196.43 Hz
 
 int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
 {
     int res = 0;
 
-    if(meas_lo < 1e6)
+    if(meas_lo < LO_FREQ_CUTOFF)
     {
         res = simplesync_pd_low_chs(ob); //power down chs 0..3
     }

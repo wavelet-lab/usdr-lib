@@ -285,6 +285,36 @@ static int simplesync_pd_low_chs(lmk05318_state_t* st)
     return res;
 }
 
+#define LO_FREQ_CUTOFF  3500000ul // VCO2_MIN / 7 / 256 = 3069196.43 Hz
+
+static int lmk05318_simplesync_set_lo_freq(lmk05318_state_t* st, uint64_t meas_lo)
+{
+    int res;
+    if(meas_lo < LO_FREQ_CUTOFF)
+    {
+        res = simplesync_pd_low_chs(st);
+    }
+    else
+    {
+        lmk05318_out_config_t cfg2[4];
+
+        lmk05318_port_request(&cfg2[0], 0, meas_lo, false, LVDS);
+        lmk05318_port_request(&cfg2[1], 1, meas_lo, false, LVDS);
+        lmk05318_port_request(&cfg2[2], 2, meas_lo, false, LVDS);
+        lmk05318_port_request(&cfg2[3], 3, meas_lo, false, LVDS);
+
+        lmk05318_set_port_affinity(&cfg2[0], AFF_APLL2);
+        lmk05318_set_port_affinity(&cfg2[1], AFF_APLL2);
+        lmk05318_set_port_affinity(&cfg2[2], AFF_APLL2);
+        lmk05318_set_port_affinity(&cfg2[3], AFF_APLL2);
+
+        res = lmk05318_solver(st, cfg2, SIZEOF_ARRAY(cfg2));
+        res = res ? res : lmk05318_reg_wr_from_map(st, true /*dry_run*/);
+    }
+
+    return res;
+}
+
 START_TEST(lmk05318_simplesync_test1)
 {
     int res = 0;
@@ -322,64 +352,17 @@ START_TEST(lmk05318_simplesync_test1)
 
     ck_assert_int_eq( res, 0 );
 
-    uint64_t meas_lo = 122800000;
-
-    if(meas_lo < 1e6)
-    {
-        res = simplesync_pd_low_chs(&st);
-    }
-    else
-    {
-        lmk05318_out_config_t cfg2[4];
-        p = cfg2;
-
-        lmk05318_port_request(p++, 0, meas_lo, false, LVDS);
-        lmk05318_port_request(p++, 1, meas_lo, false, LVDS);
-        lmk05318_port_request(p++, 2, meas_lo, false, LVDS);
-        lmk05318_port_request(p++, 3, meas_lo, false, LVDS);
-
-        p = cfg2;
-
-        lmk05318_set_port_affinity(p++, AFF_APLL2);
-        lmk05318_set_port_affinity(p++, AFF_APLL2);
-        lmk05318_set_port_affinity(p++, AFF_APLL2);
-        lmk05318_set_port_affinity(p++, AFF_APLL2);
-
-        res = lmk05318_solver(&st, cfg2, SIZEOF_ARRAY(cfg2));
-        res = res ? res : lmk05318_reg_wr_from_map(&st, true /*dry_run*/);
-    }
-
+    res = lmk05318_simplesync_set_lo_freq(&st, 122800000);
     ck_assert_int_eq( res, 0 );
 
-    meas_lo = 122800;
-
-    if(meas_lo < 1e6)
-    {
-        res = simplesync_pd_low_chs(&st);
-    }
-    else
-    {
-        lmk05318_out_config_t cfg2[4];
-        p = cfg2;
-
-        lmk05318_port_request(p++, 0, meas_lo, false, LVDS);
-        lmk05318_port_request(p++, 1, meas_lo, false, LVDS);
-        lmk05318_port_request(p++, 2, meas_lo, false, LVDS);
-        lmk05318_port_request(p++, 3, meas_lo, false, LVDS);
-
-        p = cfg2;
-
-        lmk05318_set_port_affinity(p++, AFF_APLL2);
-        lmk05318_set_port_affinity(p++, AFF_APLL2);
-        lmk05318_set_port_affinity(p++, AFF_APLL2);
-        lmk05318_set_port_affinity(p++, AFF_APLL2);
-
-        res = lmk05318_solver(&st, cfg2, SIZEOF_ARRAY(cfg2));
-        res = res ? res : lmk05318_reg_wr_from_map(&st, true /*dry_run*/);
-    }
-
+    res = lmk05318_simplesync_set_lo_freq(&st, 3500000);
     ck_assert_int_eq( res, 0 );
 
+    res = lmk05318_simplesync_set_lo_freq(&st, 3000000);
+    ck_assert_int_eq( res, 0 );
+
+    res = lmk05318_simplesync_set_lo_freq(&st, 0);
+    ck_assert_int_eq( res, 0 );
 }
 
 Suite * lmk05318_solver_suite(void)
