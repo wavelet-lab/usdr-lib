@@ -136,7 +136,7 @@ int board_xmass_init(lldev_t dev,
 
     //LMK05318 init start
     lmk05318_xo_settings_t xo;
-    xo.doubler_enabled = false;
+    xo.doubler_enabled = true;
     xo.fdet_bypass = false;
     xo.fref = 26000000;
     xo.pll1_fref_rdiv = 1;

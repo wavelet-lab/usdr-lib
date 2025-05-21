@@ -29,7 +29,7 @@ enum {
     VCO_APLL2_MAX = 6250000000ull,
 
     APLL1_PD_MIN = 1000000,
-    APLL1_PD_MAX = 50000000,
+    APLL1_PD_MAX = 80000000,
 
     APLL2_PD_MIN = 10000000,
     APLL2_PD_MAX = 150000000,
@@ -75,6 +75,12 @@ enum
     SDM_ORDER_SECOND = 0x2,
     SDM_ORDER_THIRD = 0x3,
     SDM_ORDER_FORTH = 0x4,
+};
+
+enum
+{
+    XO25 = 25000000,
+    XO26 = 26000000,
 };
 
 #define DPLL_FDIV_FRAC_MAX 0.9375f
@@ -487,6 +493,82 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
     if(d->dpll.enabled == false)
     {
         // WITHOUT DPLL
+
+        switch(d->xo.fref)
+        {
+        case XO25:
+        {
+            USDR_LOG("5318", USDR_LOG_INFO, "XO=25M, applying specific settings...");
+
+            uint32_t bawlock_regs[] =
+            {
+                0x00510A,   //R81
+                0x005200,   //      |
+                0x00530E,   //      |
+                0x0054A6,   //      |
+                0x005500,   //      |
+                0x005600,   //      |
+                0x00571E,   //      |
+                0x005884,   //      |
+                0x005980,   //      | BAW lock&unlock detection, may depend on XO params
+                0x005A00,   //      |
+                0x005B14,   //      |
+                0x005C00,   //      |
+                0x005D0E,   //      |
+                0x005EA6,   //      |
+                0x005F00,   //      |
+                0x006000,   //      |
+                0x00611E,   //      |
+                0x006284,   //      |
+                0x006380,   //R99
+            };
+
+            res = lmk05318_add_reg_to_map(d, bawlock_regs, SIZEOF_ARRAY(bawlock_regs));
+            if(res)
+                return res;
+
+            break;
+        }
+        case XO26:
+        {
+            USDR_LOG("5318", USDR_LOG_INFO, "XO=26M, applying specific settings...");
+
+            uint32_t bawlock_regs[] =
+            {
+                0x00510A,
+                0x005200,
+                0x00530F,
+                0x00543C,
+                0x005500,
+                0x005600,
+                0x00571E,
+                0x005884,
+                0x005980,
+                0x005A00,
+                0x005B14,
+                0x005C00,
+                0x005D0F,
+                0x005E3C,
+                0x005F00,
+                0x006000,
+                0x00611E,
+                0x006284,
+                0x006380,
+            };
+
+            res = lmk05318_add_reg_to_map(d, bawlock_regs, SIZEOF_ARRAY(bawlock_regs));
+            if(res)
+                return res;
+
+            break;
+        }
+        default:
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "XO=%" PRIu64 " not supported! Use 25 or 26M", (uint64_t)d->xo.fref);
+            return -EINVAL;
+        }
+        }
+
         uint32_t no_dpll_regs[] =
         {
             MAKE_LMK05318_DEV_CTL(0, 0, 0/*SYNC_AUTO_DPLL*/, 1, 1, 1, 1),    //R12   set APLL1 mode - NO DPLL
@@ -495,27 +577,6 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
             MAKE_LMK05318_DPLL_GEN_CTL(0, 0, 0, 0, 0, 0, 0),                 //R252   disable DPLL
             MAKE_LMK05318_PLL1_CALCTRL0(1, 0, 1),                            //R79 BAW_LOCKDET_EN=1 PLL1_VCOWAIT=1
             MAKE_LMK05318_BAW_LOCKDET_PPM_MAX_BY1(1, 0),                     //R80 BAW_LOCK=1
-
-            0x00510A,   //R81
-            0x005200,   //      |
-            0x00530E,   //      |
-            0x0054A6,   //      |
-            0x005500,   //      |
-            0x005600,   //      |
-            0x00571E,   //      |
-            0x005884,   //      |
-            0x005980,   //      | BAW lock&unlock detection, may depend on XO params
-            0x005A00,   //      |
-            0x005B14,   //      |
-            0x005C00,   //      |
-            0x005D0E,   //      |
-            0x005EA6,   //      |
-            0x005F00,   //      |
-            0x006000,   //      |
-            0x00611E,   //      |
-            0x006284,   //      |
-            0x006380,   //R99
-
         };
         res = lmk05318_add_reg_to_map(d, no_dpll_regs, SIZEOF_ARRAY(no_dpll_regs));
     }
@@ -907,7 +968,7 @@ static inline double lmk05318_calc_vco2_div(lmk05318_state_t* d, uint64_t fvco2,
     return fvco2_fact;
 }
 
-static int lmk05318_tune_apll2_ex(lmk05318_state_t* d)
+static int lmk05318_tune_apll2(lmk05318_state_t* d)
 {
     int res;
 
@@ -2007,7 +2068,7 @@ have_complete_solution:
     }
 
     //tune APLL2
-    res = lmk05318_tune_apll2_ex(d);
+    res = lmk05318_tune_apll2(d);
     if(res)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "error %d tuning APLL2", res);
