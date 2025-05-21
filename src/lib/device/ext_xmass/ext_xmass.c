@@ -155,11 +155,55 @@ int board_xmass_init(lldev_t dev,
     res = res ? res : _board_xmass_fill_lmk05318(ob, lmk05318_outs_cfg);
     res = res ? res : lmk05318_create(dev, subdev, i2c_lmka, &xo, &dpll, lmk05318_outs_cfg, 8, &ob->lmk, false);
 
-    ob->i2c_xraa = i2c_xraa;
-
     if (res) {
         USDR_LOG("XMSS", USDR_LOG_ERROR, "Unable to initialize XMASS\n");
     }
+
+    usleep(10000); //wait until lmk digests all this
+
+    //reset LOS flags after soft-reset (inside lmk05318_create())
+    res = lmk05318_reset_los_flags(&ob->lmk);
+    if(res)
+        return res;
+
+    //wait for PRIREF/SECREF validation
+    res = lmk05318_wait_dpll_ref_stat(&ob->lmk, 4*60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
+    if(res)
+    {
+        USDR_LOG("XMSS", USDR_LOG_ERROR, "LMK03518 DPLL input reference freqs are not validated during specified timeout");
+        return res;
+    }
+
+    //wait for lock
+    //APLL1/DPLL
+    res = lmk05318_wait_apll1_lock(&ob->lmk, 100000);
+
+    //APLL2 (if needed)
+    if(res == 0 && ob->lmk.vco2_freq)
+    {
+        //reset LOS flags once again because APLL2 LOS is set after APLL1 tuning
+        res = lmk05318_reset_los_flags(&ob->lmk);
+        res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 100000);
+    }
+
+    unsigned los_msk;
+    lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
+
+    if(res)
+    {
+        USDR_LOG("XMSS", USDR_LOG_ERROR, "LMK03518 PLLs not locked during specified timeout");
+        return res;
+    }
+
+    //sync to make APLL1/APLL2 & out channels in-phase
+    res = lmk05318_sync(&ob->lmk);
+    if(res)
+        return res;
+
+    USDR_LOG("XMSS", USDR_LOG_INFO, "LMK03518 outputs synced");
+
+    ob->i2c_xraa = i2c_xraa;
+
     return res;
 }
 
