@@ -365,6 +365,30 @@ START_TEST(lmk05318_simplesync_test1)
     ck_assert_int_eq( res, 0 );
 }
 
+START_TEST(lmk05318_solver_test7)
+{
+    int res = 0;
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0,          0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 1,          0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 2,          0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 3,          0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 4, 1000666000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 5,          0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 6,   25000000, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(p++, 7,          1, false, LVCMOS);
+
+    res = res ? res : lmk05318_set_port_affinity(&cfg[4], AFF_APLL2);
+
+    ck_assert_int_eq( res, 0 );
+
+    lmk05318_registers_map_reset();
+    res = lmk05318_solver(&dev, cfg, SIZEOF_ARRAY(cfg));
+    ck_assert_int_eq( res, 0 );
+
+}
+
 Suite * lmk05318_solver_suite(void)
 {
     Suite *s;
@@ -384,6 +408,8 @@ Suite * lmk05318_solver_suite(void)
     tcase_add_test(tc_core, lmk05318_dsdr_test1);
     tcase_add_test(tc_core, lmk05318_dsdr_test2);
     tcase_add_test(tc_core, lmk05318_simplesync_test1);
+    tcase_add_test(tc_core, lmk05318_solver_test7);
+
 
     suite_add_tcase(s, tc_core);
     return s;
