@@ -9,6 +9,7 @@
 #include "ext_supersync/ext_supersync.h"
 #include "ext_simplesync/ext_simplesync.h"
 #include "ext_fe_100_5000/ext_fe_100_5000.h"
+#include "ext_xmass/ext_xmass.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -24,12 +25,21 @@ static int _debug_ext_fe_100_5000_cmd_set(pdevice_t ud, pusdr_vfs_obj_t obj, uin
 static int _debug_ext_fe_100_5000_cmd_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 
-static int _debug_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-static int _debug_lmk05318_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int _debug_simplesync_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int _debug_simplesync_lmk05318_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int _debug_xmass_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int _debug_xmass_lmk05318_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
 static int _debug_lmk05318_calfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int _debug_lmk5c33216_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int _debug_lmk5c33216_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
+static int _debug_xmass_ctrl_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int _debug_xmass_ctrl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
+static int _debug_xmass_calfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int _debug_xmass_calfreq_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 static int _debug_typefe_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
@@ -41,32 +51,35 @@ const usdr_dev_param_func_t s_fe_params[] = {
     { "/ll/mdev",               { _debug_ll_mdev_set, NULL}},
 };
 
-static
-const usdr_dev_param_func_t s_fe_pcie_params[] = {
+static const usdr_dev_param_func_t s_fe_pcie_params[] = {
     { "/debug/hw/pciefe/0/reg", { _debug_pciefe_reg_set, _debug_pciefe_reg_get }},
     { "/debug/hw/pciefe_cmd/0/reg", { _debug_pciefe_cmd_set, _debug_pciefe_cmd_get }},
 };
 
-static
-const usdr_dev_param_func_t s_lmk05318_params[] = {
-    { "/debug/hw/lmk05318/0/reg", { _debug_lmk05318_reg_set, _debug_lmk05318_reg_get }},
+static const usdr_dev_param_func_t s_simplesync_params[] = {
+    { "/debug/hw/lmk05318/0/reg", { _debug_simplesync_lmk05318_reg_set, _debug_simplesync_lmk05318_reg_get }},
     { "/dm/sync/cal/freq", { _debug_lmk05318_calfreq_set, NULL }},
 };
 
-static
-const usdr_dev_param_func_t s_lmk5c33216_params[] = {
+static const usdr_dev_param_func_t s_lmk5c33216_params[] = {
     { "/debug/hw/lmk5c33216/0/reg", { _debug_lmk5c33216_reg_set, _debug_lmk5c33216_reg_get }},
 };
 
-
-static
-const usdr_dev_param_func_t s_ext_fe_100_5000_params[] = {
+static const usdr_dev_param_func_t s_ext_fe_100_5000_params[] = {
     { "/debug/hw/fe_100_5000_cmd/0/reg", { _debug_ext_fe_100_5000_cmd_set, _debug_ext_fe_100_5000_cmd_get }},
+};
+
+static const usdr_dev_param_func_t s_xmass_params[] = {
+    { "/debug/hw/lmk05318/0/reg", { _debug_xmass_lmk05318_reg_set, _debug_xmass_lmk05318_reg_get }},
+    { "/debug/hw/xmass_ctrl/0/reg", { _debug_xmass_ctrl_reg_set, _debug_xmass_ctrl_reg_get }},
+    { "/dm/sync/cal/freq", { _debug_xmass_calfreq_set, _debug_xmass_calfreq_get }},
+    { "/dm/sdr/0/sync/cal/freq", { _debug_xmass_calfreq_set, _debug_xmass_calfreq_get }},
 };
 
 
 enum fe_type {
     FET_PCIE_DEVBOARD,
+    FET_PCIE_XMASS,
     FET_PCIE_SUPER_SYNC,
     FET_PCIE_SIMPLE_SYNC,
     FET_PICE_BREAKOUT,
@@ -78,6 +91,7 @@ typedef enum fe_type fe_type_t;
 
 static const char* s_fe_names[] = {
     "pciefe",
+    "xmass",
     "supersync",
     "simplesync",
     "exm2pe",
@@ -95,6 +109,7 @@ struct dev_fe {
         board_ext_simplesync_t simplesync;
         board_ext_supersync_t supersync;
         ext_fe_100_5000_t fe_100_5000;
+        board_xmass_t xmass;
     } fe;
 
     uint32_t debug_pciefe_last;
@@ -102,6 +117,7 @@ struct dev_fe {
     uint32_t debug_ext_fe_100_5000_cmd_last;
     uint32_t debug_lmk05318_last;
     uint32_t debug_lmk5c33216_last;
+    uint32_t debug_xmass_ctrl_last;
 };
 typedef struct dev_fe dev_fe_t;
 
@@ -183,6 +199,7 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, unsi
         case FET_PCIE_SUPER_SYNC: res = board_ext_supersync_init(dev, 0, gpiobase, compat, def_i2c_loc, &dfe.fe.supersync); break;
         case FET_PCIE_SIMPLE_SYNC: res = board_ext_simplesync_init(dev, 0, gpiobase, compat, def_i2c_loc, &dfe.fe.simplesync); break;
         case FET_PCIE_FE1005000: res = ext_fe_100_5000_init(dev, 0, gpiobase, spiext_cfg, 4, hint_strip, compat, &dfe.fe.fe_100_5000); break;
+        case FET_PCIE_XMASS: res = board_xmass_init(dev, 0, gpiobase, compat, def_i2c_loc, &dfe.fe.xmass); break;
         default: return -EIO;
         }
 
@@ -230,8 +247,8 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, unsi
     case FET_PCIE_SIMPLE_SYNC:
         res = usdr_vfs_obj_param_init_array_param(base,
                                                   (void*)n,
-                                                  s_lmk05318_params,
-                                                  SIZEOF_ARRAY(s_lmk05318_params));
+                                                  s_simplesync_params,
+                                                  SIZEOF_ARRAY(s_simplesync_params));
         break;
     case FET_PCIE_SUPER_SYNC:
         res = usdr_vfs_obj_param_init_array_param(base,
@@ -244,6 +261,12 @@ int device_fe_probe(device_t* base, const char* compat, const char* fename, unsi
                                                   (void*)n,
                                                   s_ext_fe_100_5000_params,
                                                   SIZEOF_ARRAY(s_ext_fe_100_5000_params));
+        break;
+    case FET_PCIE_XMASS:
+        res = usdr_vfs_obj_param_init_array_param(base,
+                                                  (void*)n,
+                                                  s_xmass_params,
+                                                  SIZEOF_ARRAY(s_xmass_params));
         break;
     default:
         break;
@@ -371,18 +394,24 @@ int _debug_pciefe_cmd_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
     return res;
 }
 
-
-int _debug_lmk05318_reg_get(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+static int _debug_lmk05318_reg_get(dev_fe_t* o, uint64_t* ovalue)
 {
-    dev_fe_t* o = (dev_fe_t*)obj->object;
     *ovalue = o->debug_lmk05318_last;
     return 0;
 }
 
-
-int _debug_lmk05318_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
+int _debug_simplesync_lmk05318_reg_get(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
-    dev_fe_t* o = (dev_fe_t*)obj->object;
+    return _debug_lmk05318_reg_get((dev_fe_t*)obj->object, ovalue);
+}
+
+int _debug_xmass_lmk05318_reg_get(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    return _debug_lmk05318_reg_get((dev_fe_t*)obj->object, ovalue);
+}
+
+int _debug_lmk05318_reg_set(dev_fe_t* o, lmk05318_state_t* lmk, uint64_t value)
+{
     int res;
     unsigned addr = (value >> 8) & 0x7fff;
     unsigned data = value & 0xff;
@@ -391,13 +420,13 @@ int _debug_lmk05318_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
     o->debug_lmk05318_last = ~0u;
 
     if (value & 0x800000) {
-        res = lmk05318_reg_wr(&o->fe.simplesync.lmk, addr, data);
+        res = lmk05318_reg_wr(lmk, addr, data);
 
         USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK05318 WR REG %04x => %04x\n",
-                (unsigned)addr, data);
+                 (unsigned)addr, data);
     } else {
         d = 0xff;
-        res = lmk05318_reg_rd(&o->fe.simplesync.lmk, addr, &d);
+        res = lmk05318_reg_rd(lmk, addr, &d);
         o->debug_lmk05318_last = d;
 
         USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK05318 RD REG %04x <= %04x\n",
@@ -406,6 +435,66 @@ int _debug_lmk05318_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
     }
 
     return res;
+}
+
+int _debug_simplesync_lmk05318_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dev_fe_t* o = (dev_fe_t*)obj->object;
+    return _debug_lmk05318_reg_set(o, &o->fe.simplesync.lmk, value);
+}
+
+int _debug_xmass_lmk05318_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dev_fe_t* o = (dev_fe_t*)obj->object;
+    return _debug_lmk05318_reg_set(o, &o->fe.xmass.lmk, value);
+}
+
+int _debug_xmass_ctrl_reg_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dev_fe_t* o = (dev_fe_t*)obj->object;
+    unsigned addr = (value >> 24) & 0x7f;
+    unsigned data = value & 0xffffff;
+    int res;
+    board_xmass_t* board = &o->fe.xmass;
+    uint32_t d;
+    o->debug_xmass_ctrl_last = ~0u;
+
+    if (value & 0x80000000) {
+        res = board_xmass_ctrl_cmd_wr(board, addr, data);
+
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "XMASS_CTRL WR REG %04x => %04x\n",
+                 (unsigned)addr, data);
+    } else {
+        d = 0xffffff;
+        res = board_xmass_ctrl_cmd_rd(board, addr, &d);
+        o->debug_xmass_ctrl_last = d;
+
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "XMASS_CTRL RD REG %04x <= %04x\n",
+                 (unsigned)addr,
+                 o->debug_xmass_ctrl_last);
+    }
+
+    return res;
+}
+
+int _debug_xmass_ctrl_reg_get(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dev_fe_t* o = (dev_fe_t*)obj->object;
+    *ovalue = o->debug_xmass_ctrl_last;
+    return 0;
+}
+
+int _debug_xmass_calfreq_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dev_fe_t* o = (dev_fe_t*)obj->object;
+    return board_xmass_tune_cal_lo(&o->fe.xmass, value);
+}
+
+int _debug_xmass_calfreq_get(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dev_fe_t* o = (dev_fe_t*)obj->object;
+    *ovalue = o->fe.xmass.calfreq;
+    return 0;
 }
 
 int _debug_lmk05318_calfreq_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
