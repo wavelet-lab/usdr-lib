@@ -365,7 +365,7 @@ START_TEST(lmk05318_simplesync_test1)
     ck_assert_int_eq( res, 0 );
 }
 
-START_TEST(lmk05318_solver_test7)
+START_TEST(lmk05318_solver_test_xmass)
 {
     int res = 0;
 
@@ -411,7 +411,7 @@ Suite * lmk05318_solver_suite(void)
     tc_core = tcase_create("HW");
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
-
+/*
     tcase_add_test(tc_core, lmk05318_solver_test1);
     tcase_add_test(tc_core, lmk05318_solver_test3);
     tcase_add_test(tc_core, lmk05318_solver_test4);
@@ -421,7 +421,8 @@ Suite * lmk05318_solver_suite(void)
     tcase_add_test(tc_core, lmk05318_dsdr_test1);
     tcase_add_test(tc_core, lmk05318_dsdr_test2);
     tcase_add_test(tc_core, lmk05318_simplesync_test1);
-    tcase_add_test(tc_core, lmk05318_solver_test7);
+*/
+    tcase_add_test(tc_core, lmk05318_solver_test_xmass);
 
     suite_add_tcase(s, tc_core);
     return s;

@@ -1146,8 +1146,30 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
     // without DPLL we use programmed 24-bit numerator & programmed 24-bit denominator
     else
     {
-        den = ((uint64_t)1 << 24) - 1; //max 24-bit
+        den = d->xo.fref * (d->xo.doubler_enabled ? 2 : 1);
         num = (uint64_t)(n_frac * den + 0.5);
+
+        uint64_t nod = find_gcd(num, den);
+        if(nod > 1)
+        {
+#ifdef LMK05318_SOLVER_DEBUG
+            USDR_LOG("5318", USDR_LOG_DEBUG, "PLL1 NUM/DEN reduced NOD:%" PRIu64 ": %" PRIu64 "/%" PRIu64" -> %" PRIu64 "/%" PRIu64,
+                     nod, num, den, num/nod, den/nod);
+#endif
+            num /= nod;
+            den /= nod;
+        }
+
+        static const uint64_t MAX_DEN = ((uint64_t)1 << 24) - 1;
+
+        if(den > MAX_DEN)
+        {
+#ifdef LMK05318_SOLVER_DEBUG
+            USDR_LOG("5318", USDR_LOG_ERROR, "PLL1_DEN overflow, cannot solve in integer values");
+#endif
+            return -EINVAL;
+        }
+
         apll1_sdm_order = num ? SDM_ORDER_THIRD : SDM_ORDER_INT;
     }
 
