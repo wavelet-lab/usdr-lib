@@ -242,7 +242,7 @@ int board_xmass_tune_cal_lo(board_xmass_t* ob, uint32_t callo)
     res = res ? res : _board_xmass_fill_lmk05318(ob, lmk05318_outs_cfg);
     res = res ? res : lmk05318_solver(&ob->lmk, lmk05318_outs_cfg, 8);
     res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false);
-    res = res ? res : lmk05318_softreset(&ob->lmk);
+    // res = res ? res : lmk05318_softreset(&ob->lmk);
     usleep(10000); //wait until lmk digests all this
 
     res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
