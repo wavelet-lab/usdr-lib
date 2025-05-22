@@ -44,11 +44,10 @@ enum {
 static int simplesync_pd_low_chs(board_ext_simplesync_t* ob)
 {
     int res = 0;
-    res = res ? res : lmk05318_set_out_mux(&ob->lmk, 0, 0, OUT_OFF);
-    res = res ? res : lmk05318_set_out_mux(&ob->lmk, 1, 0, OUT_OFF);
-    res = res ? res : lmk05318_set_out_mux(&ob->lmk, 2, 0, OUT_OFF);
-    res = res ? res : lmk05318_set_out_mux(&ob->lmk, 3, 0, OUT_OFF);
-    res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
+    res = res ? res : lmk05318_disable_port(&ob->lmk, 0);
+    res = res ? res : lmk05318_disable_port(&ob->lmk, 1);
+    res = res ? res : lmk05318_disable_port(&ob->lmk, 2);
+    res = res ? res : lmk05318_disable_port(&ob->lmk, 3);
     return res;
 }
 
@@ -159,8 +158,7 @@ int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
         if(res)
             return res;
 
-        res = res ? res : lmk05318_softreset(&ob->lmk);
-        res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
+        res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
         res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
         res = res ? res : lmk05318_sync(&ob->lmk);
 

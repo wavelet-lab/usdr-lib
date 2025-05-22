@@ -1310,7 +1310,7 @@ int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
     return lmk05318_add_reg_to_map(d, &reg, 1);
 }
 
-static inline const char* lmk05318_decode_fmt(unsigned f)
+static inline const char* lmk05318_decode_fmt_to_string(unsigned f)
 {
     switch (f) {
     case LVDS:           return "OUT_OPTS_AC_LVDS";
@@ -1333,30 +1333,87 @@ static inline const char* lmk05318_decode_fmt(unsigned f)
     return "UNKNOWN";
 }
 
-int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
+static inline uint8_t lmk05318_decode_fmt(unsigned f)
 {
-    unsigned ot;
-    switch (otype) {
-    case LVDS:           ot = OUT_OPTS_AC_LVDS; break;
-    case CML:            ot = OUT_OPTS_AC_CML; break;
-    case LVPECL:         ot = OUT_OPTS_AC_LVPECL; break;
-    case HCSL_EXT_50:    ot = OUT_OPTS_HCSL_EXT_50; break;
-    case HCSL_INT_50:    ot = OUT_OPTS_HCSL_INT_50; break;
-    case LVCMOS_HIZ_HIZ: ot = OUT_OPTS_LVCMOS_HIZ_HIZ; break;
-    case LVCMOS_HIZ_N:   ot = OUT_OPTS_LVCMOS_HIZ_N; break;
-    case LVCMOS_HIZ_P:   ot = OUT_OPTS_LVCMOS_HIZ_P; break;
-    case LVCMOS_LOW_LOW: ot = OUT_OPTS_LVCMOS_LOW_LOW; break;
-    case LVCMOS_N_HIZ:   ot = OUT_OPTS_LVCMOS_N_HIZ; break;
-    case LVCMOS_N_N:     ot = OUT_OPTS_LVCMOS_N_N; break;
-    case LVCMOS_N_P:     ot = OUT_OPTS_LVCMOS_N_P; break;
-    case LVCMOS_P_HIZ:   ot = OUT_OPTS_LVCMOS_P_HIZ; break;
-    case LVCMOS_P_N:     ot = OUT_OPTS_LVCMOS_P_N; break;
-    case LVCMOS_P_P:     ot = OUT_OPTS_LVCMOS_P_P; break;
-    default: ot = OUT_OPTS_Disabled;
+    switch (f) {
+    case LVDS:           return OUT_OPTS_AC_LVDS;
+    case CML:            return OUT_OPTS_AC_CML;
+    case LVPECL:         return OUT_OPTS_AC_LVPECL;
+    case HCSL_EXT_50:    return OUT_OPTS_HCSL_EXT_50;
+    case HCSL_INT_50:    return OUT_OPTS_HCSL_INT_50;
+    case LVCMOS_HIZ_HIZ: return OUT_OPTS_LVCMOS_HIZ_HIZ;
+    case LVCMOS_HIZ_N:   return OUT_OPTS_LVCMOS_HIZ_N;
+    case LVCMOS_HIZ_P:   return OUT_OPTS_LVCMOS_HIZ_P;
+    case LVCMOS_LOW_LOW: return OUT_OPTS_LVCMOS_LOW_LOW;
+    case LVCMOS_N_HIZ:   return OUT_OPTS_LVCMOS_N_HIZ;
+    case LVCMOS_N_N:     return OUT_OPTS_LVCMOS_N_N;
+    case LVCMOS_N_P:     return OUT_OPTS_LVCMOS_N_P;
+    case LVCMOS_P_HIZ:   return OUT_OPTS_LVCMOS_P_HIZ;
+    case LVCMOS_P_N:     return OUT_OPTS_LVCMOS_P_N;
+    case LVCMOS_P_P:     return OUT_OPTS_LVCMOS_P_P;
+    }
+    return OUT_OPTS_Disabled;
+}
+
+int lmk05318_disable_port(lmk05318_state_t* d, unsigned port)
+{
+    uint16_t regno;
+    switch(port)
+    {
+    case 0: regno = OUTCTL_0; break;
+    case 1: regno = OUTCTL_1; break;
+    case 2: regno = OUTCTL_2; break;
+    case 3: regno = OUTCTL_3; break;
+    case 4: regno = OUTCTL_4; break;
+    case 5: regno = OUTCTL_5; break;
+    case 6: regno = OUTCTL_6; break;
+    case 7: regno = OUTCTL_7; break;
+    default:
+        return -EINVAL;
     }
 
+    uint8_t regval;
+    int res = lmk05318_reg_rd(d, regno, &regval);
+    if(res)
+        return res;
+
+    return lmk05318_reg_wr(d, regno, regval & ~OUT0_FMT_MSK);
+}
+
+int lmk05318_enable_port(lmk05318_state_t* d, unsigned port, unsigned fmt)
+{
+    uint16_t regno;
+    switch(port)
+    {
+    case 0: regno = OUTCTL_0; break;
+    case 1: regno = OUTCTL_1; break;
+    case 2: regno = OUTCTL_2; break;
+    case 3: regno = OUTCTL_3; break;
+    case 4: regno = OUTCTL_4; break;
+    case 5: regno = OUTCTL_5; break;
+    case 6: regno = OUTCTL_6; break;
+    case 7: regno = OUTCTL_7; break;
+    default:
+        return -EINVAL;
+    }
+
+    uint8_t ot = lmk05318_decode_fmt(fmt);
+
+    uint8_t regval;
+    int res = lmk05318_reg_rd(d, regno, &regval);
+    if(res)
+        return res;
+
+    return lmk05318_reg_wr(d, regno, regval | ((ot << OUT0_FMT_OFF) & OUT0_FMT_MSK));
+}
+
+
+int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, unsigned mux, unsigned otype)
+{
     if (port > 7)
         return -EINVAL;
+
+    uint8_t ot = lmk05318_decode_fmt(otype);
 
     uint32_t regs[] = {
         (port == 0) ? MAKE_LMK05318_OUTCTL_0(mux, ot) :
@@ -1906,19 +1963,13 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     {
         lmk05318_out_config_t* out = _outs + i;
 
-        if(out->wanted.freq == 0)
-        {
-            USDR_LOG("5318", USDR_LOG_DEBUG, "skipping port#%d freq=0", out->port);
-            continue;
-        }
-
         if(out->port > LMK05318_MAX_OUT_PORTS - 1)
         {
             USDR_LOG("5318", USDR_LOG_ERROR, "port value should be in [0; %d] diap", (LMK05318_MAX_OUT_PORTS - 1));
             return -EINVAL;
         }
 
-        if(out->wanted.type > HCSL_INT_50 && out->port < 4)
+        if(out->wanted.type > HCSL_INT_50 && out->port < 4 && out->wanted.freq)
         {
             USDR_LOG("5318", USDR_LOG_ERROR, "LVCMOS output type supported for ports# 4..7 only");
             return -EINVAL;
@@ -1947,10 +1998,17 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
             return -EINVAL;
         }
 
-        range_t r = lmk05318_get_freq_range(out);
-        out->freq_min = r.min;
-        out->freq_max = r.max;
-        out->max_odiv = lmk05318_max_odiv(out->port);
+        if(out->wanted.freq == 0)
+        {
+            USDR_LOG("5318", USDR_LOG_DEBUG, "skipping port#%d freq=0", out->port);
+        }
+        else
+        {
+            range_t r = lmk05318_get_freq_range(out);
+            out->freq_min = r.min;
+            out->freq_max = r.max;
+            out->max_odiv = lmk05318_max_odiv(out->port);
+        }
 
         *norm_out = *out;
         norm_out->solved = false;
@@ -1961,7 +2019,8 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
     for(unsigned i = 0; i < LMK05318_MAX_REAL_PORTS; ++i)
     {
         outs[i].solved = outs[i].wanted.freq == 0;
-        USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d freq:%d (-%d, +%d) *%s*",
+        USDR_LOG("5318", USDR_LOG_DEBUG, "port:%s%d freq:%d (-%d, +%d) *%s*",
+                 outs[i].port == 1 ? "0-" : (outs[i].port == 3 ? "2-" : "  "),
                  outs[i].port, outs[i].wanted.freq, outs[i].wanted.freq_delta_minus, outs[i].wanted.freq_delta_plus,
                  outs[i].solved ? "not used" : "active");
     }
@@ -2093,7 +2152,7 @@ have_complete_solution:
 
         USDR_LOG("5318", is_freq_ok ? USDR_LOG_DEBUG : USDR_LOG_ERROR, "port:%d solved [OD:%" PRIu64 " freq:%.8f mux:%d(%s) fmt:%u(%s)] %s",
                  out_dst->port, out_dst->result.out_div, out_dst->result.freq, out_dst->result.mux,
-                 lmk05318_decode_mux(out_dst->result.mux), out_dst->wanted.type, lmk05318_decode_fmt(out_dst->wanted.type),
+                 lmk05318_decode_mux(out_dst->result.mux), out_dst->wanted.type, lmk05318_decode_fmt_to_string(out_dst->wanted.type),
                  is_freq_ok ? "**OK**" : "**BAD**");
     }
 
@@ -2125,13 +2184,21 @@ have_complete_solution:
         const lmk05318_out_config_t* out = _outs + i;
 
         if(out->wanted.freq == 0)
-            continue;
+        {
+            USDR_LOG("5318", USDR_LOG_DEBUG, "OUT%u port:%u DISABLED fmt:%u(%s)",
+                     i, out->port, OUT_OFF, lmk05318_decode_fmt_to_string(OUT_OFF));
 
-        USDR_LOG("5318", USDR_LOG_DEBUG, "OUT%u port:%u div:%" PRIu64 " fmt:%u(%s)",
-                 i, out->port, out->result.out_div, out->wanted.type, lmk05318_decode_fmt(out->wanted.type));
+            res = lmk05318_set_out_mux(d, out->port, 0, OUT_OFF);
+        }
+        else
+        {
+            USDR_LOG("5318", USDR_LOG_DEBUG, "OUT%u port:%u div:%" PRIu64 " fmt:%u(%s)",
+                     i, out->port, out->result.out_div, out->wanted.type, lmk05318_decode_fmt_to_string(out->wanted.type));
 
-        res =             lmk05318_set_out_mux(d, out->port, out->result.mux, out->wanted.type);
-        res = res ? res : lmk05318_set_out_div(d, out->port, out->result.out_div);
+            res =             lmk05318_set_out_mux(d, out->port, out->result.mux, out->wanted.type);
+            res = res ? res : lmk05318_set_out_div(d, out->port, out->result.out_div);
+        }
+
         if(res)
         {
             USDR_LOG("5318", USDR_LOG_ERROR, "error %d setting mux/div for port#%d", res, out->port);

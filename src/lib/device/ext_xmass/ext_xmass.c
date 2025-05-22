@@ -245,10 +245,10 @@ int board_xmass_tune_cal_lo(board_xmass_t* ob, uint32_t callo)
 
     res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
+    res = res ? res : lmk05318_sync(&ob->lmk);
 
     lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
 
-    res = res ? res : lmk05318_sync(&ob->lmk);
     return res;
 }
 
