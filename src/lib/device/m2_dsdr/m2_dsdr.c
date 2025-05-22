@@ -1105,7 +1105,7 @@ int _debug_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
         return 0;
     }
 
-    if (value & 0x800000) {
+    if (!(value & 0x800000)) {
         res = lmk05318_reg_wr(&o->lmk, addr, data);
 
         USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK05318 WR REG %04x => %04x\n",

@@ -112,7 +112,7 @@ int board_xmass_init(lldev_t dev,
     unsigned i2c_lmka = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_LMK);
     unsigned i2c_xraa = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_XRA1201);
     uint16_t val;
-    uint16_t out_msk = 0xe000 | (1 << 5);
+    uint16_t out_msk = 0xe000;
 
     res = (res) ? res : tca9555_reg16_get(dev, subdev, i2c_xraa, TCA9555_CFG0, &val);
     res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_CFG0, out_msk);
@@ -127,7 +127,7 @@ int board_xmass_init(lldev_t dev,
     }
 
     // En LMK to ckeck it
-    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0,(3) | (1<<4) | (1 << 7) | (1 << 5) | (1 << 11));
+    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 5));
 
     usleep(250000);
 
