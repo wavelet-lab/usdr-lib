@@ -161,11 +161,6 @@ int board_xmass_init(lldev_t dev,
 
     usleep(10000); //wait until lmk digests all this
 
-    //reset LOS flags after soft-reset (inside lmk05318_create())
-    res = lmk05318_reset_los_flags(&ob->lmk);
-    if(res)
-        return res;
-
     //wait for PRIREF/SECREF validation
     res = lmk05318_wait_dpll_ref_stat(&ob->lmk, 4*60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
     if(res)
@@ -177,14 +172,7 @@ int board_xmass_init(lldev_t dev,
     //wait for lock
     //APLL1/DPLL
     res = lmk05318_wait_apll1_lock(&ob->lmk, 100000);
-
-    //APLL2 (if needed)
-    if(res == 0 && ob->lmk.vco2_freq)
-    {
-        //reset LOS flags once again because APLL2 LOS is set after APLL1 tuning
-        res = lmk05318_reset_los_flags(&ob->lmk);
-        res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 100000);
-    }
+    res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 100000);
 
     unsigned los_msk;
     lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
@@ -255,11 +243,14 @@ int board_xmass_tune_cal_lo(board_xmass_t* ob, uint32_t callo)
     res = res ? res : lmk05318_solver(&ob->lmk, lmk05318_outs_cfg, 8);
     res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false);
     res = res ? res : lmk05318_softreset(&ob->lmk);
-    res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
-    res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
-    res = res ? res : lmk05318_sync(&ob->lmk);
-    res = res ? res : lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
+    usleep(10000); //wait until lmk digests all this
 
+    res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
+    res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
+
+    lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
+
+    res = res ? res : lmk05318_sync(&ob->lmk);
     return res;
 }
 

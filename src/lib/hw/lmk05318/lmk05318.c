@@ -2163,6 +2163,10 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, unsigned timeout)
     unsigned los_msk;
     bool pll1_vm_inside;
 
+    res = lmk05318_reset_los_flags(d);
+    if(res)
+        return res;
+
     while(timeout == 0 || elapsed < timeout)
     {
         uint64_t tk = clock_get_time();
@@ -2213,12 +2217,22 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, unsigned timeout)
 
 int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
 {
+    if(d->vco2_freq == 0)
+    {
+        USDR_LOG("5318", USDR_LOG_DEBUG, "APLL2 disabled, check lock ignored");
+        return 0;
+    }
+
     int res = 0;
     unsigned elapsed = 0;
     bool locked = false;
     uint8_t reg;
     unsigned los_msk;
     bool pll2_vm_inside;
+
+    res = lmk05318_reset_los_flags(d);
+    if(res)
+        return res;
 
     while(timeout == 0 || elapsed < timeout)
     {
