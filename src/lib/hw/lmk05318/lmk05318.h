@@ -107,11 +107,24 @@ struct lmk05318_state {
 };
 
 enum lmk05318_type {
+    OUT_OFF = 0,
+    //
     LVDS,
     CML,
     LVPECL,
-    LVCMOS,
-    OUT_OFF,
+    HCSL_EXT_50,
+    HCSL_INT_50,
+    // formats below supported by ports 4..7 only
+    LVCMOS_HIZ_HIZ,
+    LVCMOS_HIZ_N,
+    LVCMOS_HIZ_P,
+    LVCMOS_LOW_LOW,
+    LVCMOS_N_HIZ,
+    LVCMOS_N_N,
+    LVCMOS_N_P,
+    LVCMOS_P_HIZ,
+    LVCMOS_P_N,
+    LVCMOS_P_P,
 };
 
 typedef struct lmk05318_state lmk05318_state_t;

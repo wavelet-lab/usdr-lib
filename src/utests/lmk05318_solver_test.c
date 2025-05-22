@@ -129,8 +129,8 @@ START_TEST(lmk05318_solver_test5)
     res = res ? res : lmk05318_port_request(p++, 3, 250000000, false, LVDS);
     res = res ? res : lmk05318_port_request(p++, 4, 156250000, false, OUT_OFF);
     res = res ? res : lmk05318_port_request(p++, 5, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(p++, 6,  10000000, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(p++, 7,         1, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(p++, 6,  10000000, false, LVCMOS_P_N);
+    res = res ? res : lmk05318_port_request(p++, 7,         1, false, LVCMOS_P_N);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_registers_map_reset();
@@ -150,8 +150,8 @@ START_TEST(lmk05318_solver_test6)
     res = res ? res : lmk05318_port_request(p++, 3, 250000000, false, LVDS);
     res = res ? res : lmk05318_port_request(p++, 4, 156250000, false, OUT_OFF);
     res = res ? res : lmk05318_port_request(p++, 5, 156250000, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(p++, 6,  10000000, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(p++, 7,         1, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(p++, 6,  10000000, false, LVCMOS_P_N);
+    res = res ? res : lmk05318_port_request(p++, 7,         1, false, LVCMOS_P_N);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_xo_settings_t xo;
@@ -329,10 +329,10 @@ START_TEST(lmk05318_simplesync_test1)
     lmk05318_out_config_t cfg1[4];
     lmk05318_out_config_t* p = &cfg1[0];
 
-    lmk05318_port_request(p++, 4, 25000000, false, LVCMOS);
-    lmk05318_port_request(p++, 5, 25000000, false, LVCMOS);
-    lmk05318_port_request(p++, 6, 25000000, false, LVCMOS);
-    lmk05318_port_request(p++, 7, 25000000, false, LVCMOS);
+    lmk05318_port_request(p++, 4, 25000000, false, LVCMOS_P_N);
+    lmk05318_port_request(p++, 5, 25000000, false, LVCMOS_P_N);
+    lmk05318_port_request(p++, 6, 25000000, false, LVCMOS_P_N);
+    lmk05318_port_request(p++, 7, 25000000, false, LVCMOS_P_N);
 
     p = &cfg1[0];
 
@@ -384,8 +384,8 @@ START_TEST(lmk05318_solver_test7)
     res = res ? res : lmk05318_port_request(p++, 3,          0, false, OUT_OFF);
     res = res ? res : lmk05318_port_request(p++, 4, 1000666000, false, LVDS);
     res = res ? res : lmk05318_port_request(p++, 5,          0, false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(p++, 6,   25000000, false, LVCMOS);
-    res = res ? res : lmk05318_port_request(p++, 7,          1, false, LVCMOS);
+    res = res ? res : lmk05318_port_request(p++, 6,   25000000, false, LVCMOS_P_N);
+    res = res ? res : lmk05318_port_request(p++, 7,          1, false, LVCMOS_P_N);
 
     res = res ? res : lmk05318_set_port_affinity(&cfg[4], AFF_APLL2);
     ck_assert_int_eq( res, 0 );

@@ -306,8 +306,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : lmk05318_port_request(&lmk_out[3], 3, lmk_freq[3], false, LVDS);
     res = res ? res : lmk05318_port_request(&lmk_out[4], 4, lmk_freq[4], false, OUT_OFF);
     res = res ? res : lmk05318_port_request(&lmk_out[5], 5, lmk_freq[5], false, OUT_OFF);
-    res = res ? res : lmk05318_port_request(&lmk_out[6], 6, lmk_freq[6], false, LVCMOS);
-    res = res ? res : lmk05318_port_request(&lmk_out[7], 7, lmk_freq[7], false, LVCMOS);
+    res = res ? res : lmk05318_port_request(&lmk_out[6], 6, lmk_freq[6], false, LVCMOS_P_N);
+    res = res ? res : lmk05318_port_request(&lmk_out[7], 7, lmk_freq[7], false, LVCMOS_P_N);
 
     res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, &xo, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->gen, false /*dry_run*/);
     if(res)

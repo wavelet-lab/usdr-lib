@@ -1291,10 +1291,21 @@ int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, uint64_t udiv)
 static inline const char* lmk05318_decode_fmt(unsigned f)
 {
     switch (f) {
-    case LVDS: return "OUT_OPTS_AC_LVDS";
-    case CML: return "OUT_OPTS_AC_CML";
-    case LVPECL: return "OUT_OPTS_AC_LVPECL";
-    case LVCMOS: return "OUT_OPTS_LVCMOS_P_N";
+    case LVDS:           return "OUT_OPTS_AC_LVDS";
+    case CML:            return "OUT_OPTS_AC_CML";
+    case LVPECL:         return "OUT_OPTS_AC_LVPECL";
+    case HCSL_EXT_50:    return "OUT_OPTS_HCSL_EXT_50";
+    case HCSL_INT_50:    return "OUT_OPTS_HCSL_INT_50";
+    case LVCMOS_HIZ_HIZ: return "OUT_OPTS_LVCMOS_HIZ_HIZ";
+    case LVCMOS_HIZ_N:   return "OUT_OPTS_LVCMOS_HIZ_N";
+    case LVCMOS_HIZ_P:   return "OUT_OPTS_LVCMOS_HIZ_P";
+    case LVCMOS_LOW_LOW: return "OUT_OPTS_LVCMOS_LOW_LOW";
+    case LVCMOS_N_HIZ:   return "OUT_OPTS_LVCMOS_N_HIZ";
+    case LVCMOS_N_N:     return "OUT_OPTS_LVCMOS_N_N";
+    case LVCMOS_N_P:     return "OUT_OPTS_LVCMOS_N_P";
+    case LVCMOS_P_HIZ:   return "OUT_OPTS_LVCMOS_P_HIZ";
+    case LVCMOS_P_N:     return "OUT_OPTS_LVCMOS_P_N";
+    case LVCMOS_P_P:     return "OUT_OPTS_LVCMOS_P_P";
     default: return "OUT_OPTS_Disabled";
     }
     return "UNKNOWN";
@@ -1304,11 +1315,22 @@ int lmk05318_set_out_mux(lmk05318_state_t* d, unsigned port, unsigned mux, unsig
 {
     unsigned ot;
     switch (otype) {
-    case LVDS: ot = OUT_OPTS_AC_LVDS; break;
-    case CML: ot = OUT_OPTS_AC_CML; break;
-    case LVPECL: ot = OUT_OPTS_AC_LVPECL; break;
-    case LVCMOS: ot = OUT_OPTS_LVCMOS_P_N; break;
-    default: ot = OUT_OPTS_Disabled; break;
+    case LVDS:           ot = OUT_OPTS_AC_LVDS; break;
+    case CML:            ot = OUT_OPTS_AC_CML; break;
+    case LVPECL:         ot = OUT_OPTS_AC_LVPECL; break;
+    case HCSL_EXT_50:    ot = OUT_OPTS_HCSL_EXT_50; break;
+    case HCSL_INT_50:    ot = OUT_OPTS_HCSL_INT_50; break;
+    case LVCMOS_HIZ_HIZ: ot = OUT_OPTS_LVCMOS_HIZ_HIZ; break;
+    case LVCMOS_HIZ_N:   ot = OUT_OPTS_LVCMOS_HIZ_N; break;
+    case LVCMOS_HIZ_P:   ot = OUT_OPTS_LVCMOS_HIZ_P; break;
+    case LVCMOS_LOW_LOW: ot = OUT_OPTS_LVCMOS_LOW_LOW; break;
+    case LVCMOS_N_HIZ:   ot = OUT_OPTS_LVCMOS_N_HIZ; break;
+    case LVCMOS_N_N:     ot = OUT_OPTS_LVCMOS_N_N; break;
+    case LVCMOS_N_P:     ot = OUT_OPTS_LVCMOS_N_P; break;
+    case LVCMOS_P_HIZ:   ot = OUT_OPTS_LVCMOS_P_HIZ; break;
+    case LVCMOS_P_N:     ot = OUT_OPTS_LVCMOS_P_N; break;
+    case LVCMOS_P_P:     ot = OUT_OPTS_LVCMOS_P_P; break;
+    default: ot = OUT_OPTS_Disabled;
     }
 
     if (port > 7)
@@ -1874,7 +1896,7 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
             return -EINVAL;
         }
 
-        if(out->wanted.type == LVCMOS && out->port < 4)
+        if(out->wanted.type > HCSL_INT_50 && out->port < 4)
         {
             USDR_LOG("5318", USDR_LOG_ERROR, "LVCMOS output type supported for ports# 4..7 only");
             return -EINVAL;

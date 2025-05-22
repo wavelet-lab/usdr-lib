@@ -97,10 +97,10 @@ int board_ext_simplesync_init(lldev_t dev,
 
     lmk05318_out_config_t lmk_out[4];
 
-    lmk05318_port_request(&lmk_out[0], 4, 25000000, false, LVCMOS);
-    lmk05318_port_request(&lmk_out[1], 5, 25000000, false, LVCMOS);
-    lmk05318_port_request(&lmk_out[2], 6, 25000000, false, LVCMOS);
-    lmk05318_port_request(&lmk_out[3], 7, 25000000, false, LVCMOS);
+    lmk05318_port_request(&lmk_out[0], 4, 25000000, false, LVCMOS_P_N);
+    lmk05318_port_request(&lmk_out[1], 5, 25000000, false, LVCMOS_P_N);
+    lmk05318_port_request(&lmk_out[2], 6, 25000000, false, LVCMOS_P_N);
+    lmk05318_port_request(&lmk_out[3], 7, 25000000, false, LVCMOS_P_N);
 
     lmk05318_set_port_affinity(&lmk_out[0], AFF_APLL1);
     lmk05318_set_port_affinity(&lmk_out[1], AFF_APLL1);

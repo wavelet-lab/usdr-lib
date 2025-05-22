@@ -81,8 +81,8 @@ static int _board_xmass_fill_lmk05318(board_xmass_t* ob, lmk05318_out_config_t l
     lmk05318_port_request(&lmk05318_outs_cfg[3], 3, 0, false, OUT_OFF);
     lmk05318_port_request(&lmk05318_outs_cfg[4], 4, cfreq, false, cfreq == 0 ? OUT_OFF : LVDS);
     lmk05318_port_request(&lmk05318_outs_cfg[5], 5, 0, false, OUT_OFF);
-    lmk05318_port_request(&lmk05318_outs_cfg[6], 6, ob->refclk, false, LVCMOS);
-    lmk05318_port_request(&lmk05318_outs_cfg[7], 7, 1, false, LVCMOS);
+    lmk05318_port_request(&lmk05318_outs_cfg[6], 6, ob->refclk, false, LVCMOS_P_N);
+    lmk05318_port_request(&lmk05318_outs_cfg[7], 7, 1, false, LVCMOS_P_N);
 
     lmk05318_set_port_affinity(&lmk05318_outs_cfg[4], AFF_APLL2);
     return 0;
@@ -242,8 +242,6 @@ int board_xmass_tune_cal_lo(board_xmass_t* ob, uint32_t callo)
     res = res ? res : _board_xmass_fill_lmk05318(ob, lmk05318_outs_cfg);
     res = res ? res : lmk05318_solver(&ob->lmk, lmk05318_outs_cfg, 8);
     res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false);
-    // res = res ? res : lmk05318_softreset(&ob->lmk);
-    usleep(10000); //wait until lmk digests all this
 
     res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
