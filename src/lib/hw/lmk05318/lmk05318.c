@@ -19,6 +19,9 @@
 //define this for solver extra logging
 #undef LMK05318_SOLVER_DEBUG
 
+//remove this to enable additional checks for dpll mode
+#define DISABLE_ADDITIONAL_DPLL_CHECKS
+
 enum {
     VCO_APLL1 = 2500000000ull,
     VCO_APLL1_DELTA_MAX = 250000,
@@ -1136,6 +1139,7 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
         num = (uint64_t)(n_frac * den + 0.5);
         apll1_sdm_order = SDM_ORDER_THIRD; //for DPLL correction
 
+#ifndef DISABLE_ADDITIONAL_DPLL_CHECKS
         //additional checks for DPLL mode
         if((double)num / den <= DPLL_FDIV_FRAC_MIN || (double)num / den >= DPLL_FDIV_FRAC_MAX)
         {
@@ -1163,6 +1167,8 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
             USDR_LOG("5318", USDR_LOG_INFO, "[APLL1] Integer boundary spur = %.2fMHz (>%.2fMHz)",
                      min_diff / 1e6, (double)DPLL_MIN_BAW_DIFF / 1e6);
         }
+#endif //DISABLE_ADDITIONAL_DPLL_CHECKS
+
     }
     // without DPLL we use programmed 24-bit numerator & programmed 24-bit denominator
     else
