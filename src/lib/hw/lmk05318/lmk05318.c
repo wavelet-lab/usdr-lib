@@ -85,6 +85,7 @@ enum
 
 #define DPLL_FDIV_FRAC_MAX 0.9375f
 #define DPLL_FDIV_FRAC_MIN 0.0625f
+#define DPLL_MIN_BAW_DIFF  2500000ul
 
 struct range
 {
@@ -1135,12 +1136,32 @@ int lmk05318_tune_apll1(lmk05318_state_t* d)
         num = (uint64_t)(n_frac * den + 0.5);
         apll1_sdm_order = SDM_ORDER_THIRD; //for DPLL correction
 
-        //additional check for DPLL mode
-        if(num && ((double)num / den <= DPLL_FDIV_FRAC_MIN || (double)num / den >= DPLL_FDIV_FRAC_MAX))
+        //additional checks for DPLL mode
+        if((double)num / den <= DPLL_FDIV_FRAC_MIN || (double)num / den >= DPLL_FDIV_FRAC_MAX)
         {
             USDR_LOG("5318", USDR_LOG_ERROR, "[APLL1] NUM/DEN ratio:%.8f out of range (%.4f;%.4f)",
                      (double)num / den, DPLL_FDIV_FRAC_MIN, DPLL_FDIV_FRAC_MAX);
             return -EINVAL;
+        }
+        else
+        {
+            USDR_LOG("5318", USDR_LOG_INFO, "[APLL1] NUM/DEN ratio:%.8f within valid range (%.4f;%.4f)",
+                    (double)num / den, DPLL_FDIV_FRAC_MIN, DPLL_FDIV_FRAC_MAX);
+        }
+
+        const double f_lo = fpd1 * floor(r);
+        const double f_hi = fpd1 * ceil(r);
+        const double min_diff = MIN(fabs(f_lo - fvco), fabs(f_hi - fvco));
+        if(min_diff <= DPLL_MIN_BAW_DIFF)
+        {
+            USDR_LOG("5318", USDR_LOG_ERROR, "[APLL1] Min difference between VCO1 and FPD*<N> = %.4f <= %lu",
+                     min_diff, DPLL_MIN_BAW_DIFF);
+            return -EINVAL;
+        }
+        else
+        {
+            USDR_LOG("5318", USDR_LOG_INFO, "[APLL1] Integer boundary spur = %.2fMHz (>%.2fMHz)",
+                     min_diff / 1e6, (double)DPLL_MIN_BAW_DIFF / 1e6);
         }
     }
     // without DPLL we use programmed 24-bit numerator & programmed 24-bit denominator

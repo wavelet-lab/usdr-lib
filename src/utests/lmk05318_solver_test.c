@@ -155,7 +155,7 @@ START_TEST(lmk05318_solver_test6)
     ck_assert_int_eq( res, 0 );
 
     lmk05318_xo_settings_t xo;
-    xo.fref = 25000000;
+    xo.fref = 12800000;
     xo.doubler_enabled = true;
     xo.fdet_bypass = false;
     xo.pll1_fref_rdiv = 1;
@@ -200,7 +200,7 @@ START_TEST(lmk05318_dsdr_test1)
 
     lmk05318_xo_settings_t xo;
     xo.fref = 26000000;
-    xo.doubler_enabled = false;
+    xo.doubler_enabled = true;
     xo.fdet_bypass = false;
     xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
@@ -240,7 +240,7 @@ START_TEST(lmk05318_dsdr_test2)
 
     lmk05318_xo_settings_t xo;
     xo.fref = 26000000;
-    xo.doubler_enabled = false;
+    xo.doubler_enabled = true;
     xo.fdet_bypass = false;
     xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
@@ -321,7 +321,7 @@ START_TEST(lmk05318_simplesync_test1)
 
     lmk05318_xo_settings_t xo;
     xo.fref = 26000000;
-    xo.doubler_enabled = false;
+    xo.doubler_enabled = true;
     xo.fdet_bypass = false;
     xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
@@ -411,7 +411,6 @@ Suite * lmk05318_solver_suite(void)
     tc_core = tcase_create("HW");
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
-
     tcase_add_test(tc_core, lmk05318_solver_test1);
     tcase_add_test(tc_core, lmk05318_solver_test3);
     tcase_add_test(tc_core, lmk05318_solver_test4);
