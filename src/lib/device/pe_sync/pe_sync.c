@@ -271,10 +271,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
         return res;
 
     lmk05318_xo_settings_t xo;
+    memset(&xo, 0, sizeof(xo));
     xo.fref = 25000000;
-    xo.doubler_enabled = true;
-    xo.fdet_bypass = false;
-    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     lmk05318_dpll_settings_t dpll;
@@ -315,11 +313,6 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
 
     usleep(10000); //wait until lmk digests all this
 
-    //reset LOS flags after soft-reset (inside lmk05318_create())
-    res = lmk05318_reset_los_flags(&d->gen);
-    if(res)
-        return res;
-
     //wait for PRIREF/SECREF validation
     res = lmk05318_wait_dpll_ref_stat(&d->gen, 4*60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
     if(res)
@@ -329,16 +322,8 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     }
 
     //wait for lock
-    //APLL1/DPLL
     res = lmk05318_wait_apll1_lock(&d->gen, 100000);
-
-    //APLL2 (if needed)
-    if(res == 0 && d->gen.vco2_freq)
-    {
-        //reset LOS flags once again because APLL2 LOS is set after APLL1 tuning
-        res = lmk05318_reset_los_flags(&d->gen);
-        res = res ? res : lmk05318_wait_apll2_lock(&d->gen, 100000);
-    }
+    res = res ? res : lmk05318_wait_apll2_lock(&d->gen, 100000);
 
     unsigned los_msk;
     lmk05318_check_lock(&d->gen, &los_msk, false /*silent*/); //just to log state

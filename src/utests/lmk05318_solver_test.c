@@ -139,7 +139,7 @@ START_TEST(lmk05318_solver_test5)
 
 }
 
-START_TEST(lmk05318_solver_test6)
+START_TEST(lmk05318_solver_pesync)
 {
     int res = 0;
     lmk05318_out_config_t* p = &cfg[0];
@@ -155,10 +155,8 @@ START_TEST(lmk05318_solver_test6)
     ck_assert_int_eq( res, 0 );
 
     lmk05318_xo_settings_t xo;
+    memset(&xo, 0, sizeof(xo));
     xo.fref = 12800000;
-    xo.doubler_enabled = true;
-    xo.fdet_bypass = false;
-    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     lmk05318_dpll_settings_t dpll;
@@ -169,6 +167,38 @@ START_TEST(lmk05318_solver_test6)
     dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
     dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
     dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
+
+    lmk05318_state_t st;
+    memset(&st, 0, sizeof(st));
+
+    res = lmk05318_create(NULL, 0, 0, &xo, &dpll, cfg, SIZEOF_ARRAY(cfg), &st, true /*dry_run*/);
+    ck_assert_int_eq( res, 0 );
+
+}
+
+START_TEST(lmk05318_solver_pesync_free_run)
+{
+    int res = 0;
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 1, 125000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 2, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 3, 250000000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 4, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, 156250000, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 6,  10000000, false, LVCMOS_P_N);
+    res = res ? res : lmk05318_port_request(p++, 7,         1, false, LVCMOS_P_N);
+    ck_assert_int_eq( res, 0 );
+
+    lmk05318_xo_settings_t xo;
+    memset(&xo, 0, sizeof(xo));
+    xo.fref = 25000000;
+    xo.type = XO_CMOS;
+
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+    dpll.enabled = false;
 
     lmk05318_state_t st;
     memset(&st, 0, sizeof(st));
@@ -199,10 +229,8 @@ START_TEST(lmk05318_dsdr_test1)
     int res = 0;
 
     lmk05318_xo_settings_t xo;
+    memset(&xo, 0, sizeof(xo));
     xo.fref = 26000000;
-    xo.doubler_enabled = true;
-    xo.fdet_bypass = false;
-    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     lmk05318_out_config_t* p = &cfg[0];
@@ -239,10 +267,8 @@ START_TEST(lmk05318_dsdr_test2)
     int res = 0;
 
     lmk05318_xo_settings_t xo;
+    memset(&xo, 0, sizeof(xo));
     xo.fref = 26000000;
-    xo.doubler_enabled = true;
-    xo.fdet_bypass = false;
-    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     lmk05318_out_config_t* p = &cfg[0];
@@ -320,10 +346,8 @@ START_TEST(lmk05318_simplesync_test1)
     int res = 0;
 
     lmk05318_xo_settings_t xo;
+    memset(&xo, 0, sizeof(xo));
     xo.fref = 26000000;
-    xo.doubler_enabled = true;
-    xo.fdet_bypass = false;
-    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     lmk05318_out_config_t cfg1[4];
@@ -370,10 +394,8 @@ START_TEST(lmk05318_solver_test_xmass)
     int res = 0;
 
     lmk05318_xo_settings_t xo;
+    memset(&xo, 0, sizeof(xo));
     xo.fref = 26000000;
-    xo.doubler_enabled = true;
-    xo.fdet_bypass = false;
-    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     lmk05318_out_config_t* p = &cfg[0];
@@ -415,7 +437,8 @@ Suite * lmk05318_solver_suite(void)
     tcase_add_test(tc_core, lmk05318_solver_test3);
     tcase_add_test(tc_core, lmk05318_solver_test4);
     tcase_add_test(tc_core, lmk05318_solver_test5);
-    tcase_add_test(tc_core, lmk05318_solver_test6);
+    tcase_add_test(tc_core, lmk05318_solver_pesync);
+    tcase_add_test(tc_core, lmk05318_solver_pesync_free_run);
     tcase_add_test(tc_core, lmk05318_dpll_test1);
     tcase_add_test(tc_core, lmk05318_dsdr_test1);
     tcase_add_test(tc_core, lmk05318_dsdr_test2);

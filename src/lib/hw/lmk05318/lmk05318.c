@@ -82,8 +82,9 @@ enum
 
 enum
 {
-    XO25 = 25000000,
-    XO26 = 26000000,
+    XO12_8 = 12800000,
+    XO25   = 25000000,
+    XO26   = 26000000,
 };
 
 #define DPLL_FDIV_FRAC_MAX 0.9375f
@@ -490,6 +491,112 @@ int lmk05318_reset_los_flags(lmk05318_state_t* d)
     return lmk05318_reg_wr_n(d, regs, SIZEOF_ARRAY(regs));
 }
 
+static int lmk05318_set_xo_bawdetect_registers(lmk05318_state_t* d)
+{
+    int res = 0;
+
+    switch(d->xo.fref)
+    {
+    case XO12_8:
+    {
+        USDR_LOG("5318", USDR_LOG_INFO, "XO=12.8M, applying specific settings...");
+
+        static uint32_t regs[] =
+        {
+            0x00510A,
+            0x005200,
+            0x005307,
+            0x005480,
+            0x005500,
+            0x005600,
+            0x00571E,
+            0x005884,
+            0x005980,
+            0x005A00,
+            0x005B14,
+            0x005C00,
+            0x005D07,
+            0x005E80,
+            0x005F00,
+            0x006000,
+            0x00611E,
+            0x006284,
+            0x006380,
+        };
+
+        res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+        break;
+    }
+    case XO25:
+    {
+        USDR_LOG("5318", USDR_LOG_INFO, "XO=25M, applying specific settings...");
+
+        static uint32_t regs[] =
+        {
+            0x00510A,   //R81
+            0x005200,   //      |
+            0x00530E,   //      |
+            0x0054A6,   //      |
+            0x005500,   //      |
+            0x005600,   //      |
+            0x00571E,   //      |
+            0x005884,   //      |
+            0x005980,   //      | BAW lock&unlock detection, may depend on XO params
+            0x005A00,   //      |
+            0x005B14,   //      |
+            0x005C00,   //      |
+            0x005D0E,   //      |
+            0x005EA6,   //      |
+            0x005F00,   //      |
+            0x006000,   //      |
+            0x00611E,   //      |
+            0x006284,   //      |
+            0x006380,   //R99
+        };
+
+        res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+        break;
+    }
+    case XO26:
+    {
+        USDR_LOG("5318", USDR_LOG_INFO, "XO=26M, applying specific settings...");
+
+        static uint32_t regs[] =
+        {
+            0x00510A,
+            0x005200,
+            0x00530F,
+            0x00543C,
+            0x005500,
+            0x005600,
+            0x00571E,
+            0x005884,
+            0x005980,
+            0x005A00,
+            0x005B14,
+            0x005C00,
+            0x005D0F,
+            0x005E3C,
+            0x005F00,
+            0x006000,
+            0x00611E,
+            0x006284,
+            0x006380,
+        };
+
+        res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+        break;
+    }
+    default:
+    {
+        USDR_LOG("5318", USDR_LOG_ERROR, "XO=%.2fMHz not supported! Use 12.8, 25 or 26M", (double)d->xo.fref / 1e6);
+        return -EINVAL;
+    }
+    }
+
+    return res;
+}
+
 static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
 {
     int res = 0;
@@ -497,82 +604,6 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
     if(d->dpll.enabled == false)
     {
         // WITHOUT DPLL
-
-        switch(d->xo.fref)
-        {
-        case XO25:
-        {
-            USDR_LOG("5318", USDR_LOG_INFO, "XO=25M, applying specific settings...");
-
-            uint32_t bawlock_regs[] =
-            {
-                0x00510A,   //R81
-                0x005200,   //      |
-                0x00530E,   //      |
-                0x0054A6,   //      |
-                0x005500,   //      |
-                0x005600,   //      |
-                0x00571E,   //      |
-                0x005884,   //      |
-                0x005980,   //      | BAW lock&unlock detection, may depend on XO params
-                0x005A00,   //      |
-                0x005B14,   //      |
-                0x005C00,   //      |
-                0x005D0E,   //      |
-                0x005EA6,   //      |
-                0x005F00,   //      |
-                0x006000,   //      |
-                0x00611E,   //      |
-                0x006284,   //      |
-                0x006380,   //R99
-            };
-
-            res = lmk05318_add_reg_to_map(d, bawlock_regs, SIZEOF_ARRAY(bawlock_regs));
-            if(res)
-                return res;
-
-            break;
-        }
-        case XO26:
-        {
-            USDR_LOG("5318", USDR_LOG_INFO, "XO=26M, applying specific settings...");
-
-            uint32_t bawlock_regs[] =
-            {
-                0x00510A,
-                0x005200,
-                0x00530F,
-                0x00543C,
-                0x005500,
-                0x005600,
-                0x00571E,
-                0x005884,
-                0x005980,
-                0x005A00,
-                0x005B14,
-                0x005C00,
-                0x005D0F,
-                0x005E3C,
-                0x005F00,
-                0x006000,
-                0x00611E,
-                0x006284,
-                0x006380,
-            };
-
-            res = lmk05318_add_reg_to_map(d, bawlock_regs, SIZEOF_ARRAY(bawlock_regs));
-            if(res)
-                return res;
-
-            break;
-        }
-        default:
-        {
-            USDR_LOG("5318", USDR_LOG_ERROR, "XO=%" PRIu64 " not supported! Use 25 or 26M", (uint64_t)d->xo.fref);
-            return -EINVAL;
-        }
-        }
-
         uint32_t no_dpll_regs[] =
         {
             MAKE_LMK05318_DEV_CTL(0, 0, 0/*SYNC_AUTO_DPLL*/, 1, 1, 1, 1),    //R12   set APLL1 mode - NO DPLL
@@ -1056,7 +1087,6 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
 {
     const uint32_t xo_fref = d->xo.fref;
     const int xo_type = d->xo.type;
-    const bool xo_doubler_enabled = d->xo.doubler_enabled;
     const bool xo_fdet_bypass = d->xo.fdet_bypass;
 
     if(xo_fref < XO_FREF_MIN || xo_fref > XO_FREF_MAX)
@@ -1066,7 +1096,20 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
         return -EINVAL;
     }
 
-    if(d->xo.pll1_fref_rdiv < APLL1_DIVIDER_MIN || d->xo.pll1_fref_rdiv > APLL1_DIVIDER_MAX)
+    if(xo_fref * 2 <= APLL1_PD_MAX)
+    {
+        //use XO doubler
+        d->xo.doubler_enabled = true;
+        d->xo.pll1_fref_rdiv = 1;
+    }
+    else
+    {
+        //use XO divider
+        d->xo.doubler_enabled = false;
+        d->xo.pll1_fref_rdiv = ceil((double)xo_fref / APLL1_PD_MAX);
+    }
+
+    if(d->xo.pll1_fref_rdiv > APLL1_DIVIDER_MAX)
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "[XO] APPL1_RDIV:%d out of range [%d;%d]", d->xo.pll1_fref_rdiv, (int)APLL1_DIVIDER_MIN, (int)APLL1_DIVIDER_MAX);
         return -EINVAL;
@@ -1089,19 +1132,18 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
     USDR_LOG("5318", USDR_LOG_INFO, "[XO] FREF:%u TYPE:%u(%s) DOUBLER:%u RDIV:%u FDET_BYPASS:%u",
              xo_fref,
              xo_type_raw, lmk05318_decode_xo_type(xo_type_raw),
-             xo_doubler_enabled, d->xo.pll1_fref_rdiv, xo_fdet_bypass);
+             d->xo.doubler_enabled, d->xo.pll1_fref_rdiv, xo_fdet_bypass);
 
     uint32_t regs[] = {
-        MAKE_LMK05318_XO_CLKCTL1(xo_doubler_enabled ? 1 : 0, xo_fdet_bypass ? 1 : 0, 0, 1),   //R42
+        MAKE_LMK05318_XO_CLKCTL1(d->xo.doubler_enabled ? 1 : 0, xo_fdet_bypass ? 1 : 0, 0, 1),//R42
         MAKE_LMK05318_XO_CLKCTL2(1, xo_type_raw, 2),                                          //R43
         MAKE_LMK05318_XO_CONFIG(d->xo.pll1_fref_rdiv - 1),                                    //R44
     };
 
     int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
-    if(res)
-        return res;
+    res = res ? res : lmk05318_set_xo_bawdetect_registers(d);
 
-    return 0;
+    return res;
 }
 
 int lmk05318_tune_apll1(lmk05318_state_t* d)

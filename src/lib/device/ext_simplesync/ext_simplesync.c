@@ -88,10 +88,8 @@ int board_ext_simplesync_init(lldev_t dev,
     usleep(50000);
 
     lmk05318_xo_settings_t xo;
-    xo.doubler_enabled = true;
-    xo.fdet_bypass = false;
+    memset(&xo, 0, sizeof(xo));
     xo.fref = 26000000;
-    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     lmk05318_out_config_t lmk_out[4];
@@ -114,9 +112,8 @@ int board_ext_simplesync_init(lldev_t dev,
         return res;
 
     res = simplesync_pd_low_chs(ob); //power down chs 0..3
-
-    res = res ? res : lmk05318_reset_los_flags(&ob->lmk);
     res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
+    res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
 
     unsigned los_msk;

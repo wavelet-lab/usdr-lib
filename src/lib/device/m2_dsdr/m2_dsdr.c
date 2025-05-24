@@ -1426,10 +1426,8 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     //
     //LMK05318 init start
     lmk05318_xo_settings_t xo;
-    xo.doubler_enabled = true;
-    xo.fdet_bypass = false;
+    memset(&xo, 0, sizeof(xo));
     xo.fref = 26000000;
-    xo.pll1_fref_rdiv = 1;
     xo.type = XO_CMOS;
 
     //set true to enable IN_REF1 40M
@@ -1461,11 +1459,6 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     usleep(10000); //wait until lmk digests all this
 
-    //reset LOS flags after soft-reset (inside lmk05318_create())
-    res = lmk05318_reset_los_flags(&d->lmk);
-    if(res)
-        return res;
-
     //wait for PRIREF/SECREF validation
     res = lmk05318_wait_dpll_ref_stat(&d->lmk, 100000);
     if(res)
@@ -1475,16 +1468,8 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     }
 
     //wait for lock
-    //APLL1/DPLL
     res = lmk05318_wait_apll1_lock(&d->lmk, 100000);
-
-    //APLL2 (if needed)
-    if(res == 0 && d->lmk.vco2_freq)
-    {
-        //reset LOS flags once again because APLL2 LOS is set after APLL1 tuning
-        res = lmk05318_reset_los_flags(&d->lmk);
-        res = res ? res : lmk05318_wait_apll2_lock(&d->lmk, 100000);
-    }
+    res = res ? res : lmk05318_wait_apll2_lock(&d->lmk, 100000);
 
     lmk05318_check_lock(&d->lmk, &los, false /*silent*/); //just to log state
 
