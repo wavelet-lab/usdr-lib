@@ -225,6 +225,9 @@ static int dev_m2_lm7_1_debug_clkinfo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uin
 
 static int dev_m2_lm7_1_revision_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 
+static int dev_m2_lm7_1_sdr_tx_phase_ovr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_sdr_vio_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static
 const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/rate/master",        { dev_m2_lm7_1_rate_set, NULL }},
@@ -241,6 +244,10 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
 
     { "/dm/sdr/refclk/frequency", {dev_m2_lm7_1_sdr_refclk_frequency_set, dev_m2_lm7_1_sdr_refclk_frequency_get}},
     { "/dm/sdr/refclk/path",      {dev_m2_lm7_1_sdr_refclk_path_set, NULL}},
+
+
+    { "/dm/sdr/0/vio",          { dev_m2_lm7_1_sdr_vio_set, NULL }},
+    { "/dm/sdr/0/tx/phase_ovr", { dev_m2_lm7_1_sdr_tx_phase_ovr_set, NULL }},
 
     { "/dm/sdr/0/rx/dccorr",    { dev_m2_lm7_1_sdr_rx_dccorr_set, NULL }},
     { "/dm/sdr/0/tx/dccorr",    { dev_m2_lm7_1_sdr_tx_dccorr_set, NULL }},
@@ -343,7 +350,7 @@ int dev_m2_lm7_1_dev_dac_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t 
 
 int dev_m2_lm7_1_phyrxlm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    return xsdr_phy_tune(&((struct dev_m2_lm7_1_gps *)ud)->xdev, value);
+    return xsdr_phy_tune_rx(&((struct dev_m2_lm7_1_gps *)ud)->xdev, value);
 }
 
 int dev_m2_lm7_1_lms7002rxlml_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -371,6 +378,18 @@ int dev_m2_lm7_1_dev_atcrbs_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* val
     return res;
 }
 
+int dev_m2_lm7_1_sdr_tx_phase_ovr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    d->xdev.tx_override_phase = value;
+    return 0;
+}
+
+int dev_m2_lm7_1_sdr_vio_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    return xsdr_set_vio(&d->xdev, value);
+}
 
 int dev_m2_lm7_1_debug_lms7002m_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -968,6 +987,24 @@ int dev_m2_lm7_1_sensor_freqpps_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t 
 }
 
 static
+int usdr_device_m2_lm7_1_lsop(lldev_t dev, subdev_t subdev,
+           unsigned ls_op, lsopaddr_t ls_op_addr,
+           size_t meminsz, void* pin, size_t memoutsz,
+           const void* pout)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)lowlevel_get_device(dev);
+    int res = -ENOENT;
+    if (ls_op == USDR_LSOP_DRP) {
+        res = xsdr_override_drp(&d->xdev, ls_op_addr, meminsz, pin, memoutsz, pout);
+    }
+
+    if (res != -ENOENT)
+        return res;
+
+    return d->p_original_ops->ls_op(dev, subdev, ls_op, ls_op_addr, meminsz, pin, memoutsz, pout);
+}
+
+static
 int usdr_device_m2_lm7_1_stream_initialize(lldev_t dev, subdev_t subdev, lowlevel_stream_params_t* params, stream_t* channel)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)lowlevel_get_device(dev);
@@ -1050,6 +1087,7 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
 
     // Proxy operations
     memcpy(&d->my_ops, lowlevel_get_ops(dev), sizeof (lowlevel_ops_t));
+    d->my_ops.ls_op = &usdr_device_m2_lm7_1_lsop;
     d->my_ops.stream_initialize = &usdr_device_m2_lm7_1_stream_initialize;
     d->my_ops.stream_deinitialize = &usdr_device_m2_lm7_1_stream_deinitialize;
     d->p_original_ops = lowlevel_get_ops(dev);
@@ -1138,6 +1176,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         if (rxcfg.bifurcation_valid && d->bifurcation_en) {
             d->xdev.siso_sdr_active_rx = true;
             flags |= DMS_FLAG_BIFURCATION;
+            // TODO: update samplerate settings
         }
 
         // Reset samplerate with proper bifurcation flags
@@ -1177,6 +1216,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         if (txcfg.bifurcation_valid && d->bifurcation_en) {
             d->xdev.siso_sdr_active_tx = true;
             flags |= DMS_FLAG_BIFURCATION;
+            // TODO: update samplerate settings
         }
 
         res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,

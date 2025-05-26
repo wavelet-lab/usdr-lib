@@ -107,6 +107,11 @@ int lowlevel_discovery(unsigned pcount, const char** devparam, const char **devv
     return count;
 }
 
+void lowlevel_ops_set_custom(lldev_t obj, lowlevel_ops_t* newops)
+{
+    obj->ops = newops;
+}
+
 void __attribute__ ((constructor(110))) setup_lowlevel(void) {
     lowlevel_initialize_plugins();
 }
