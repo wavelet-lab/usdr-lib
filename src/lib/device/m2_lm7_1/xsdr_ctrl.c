@@ -496,7 +496,7 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
             res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS_PWR, 0x8f);
             res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS_PWR, 0x0f);
 
-            unsigned dly = (d->tx_override_phase) ? d->tx_override_phase : 3;
+            unsigned dly = (d->tx_override_phase) ? (d->tx_override_phase - 1) : 3;
             res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_DLY_VALUE, dly);
         }
     }
