@@ -425,7 +425,7 @@ int _debug_lmk05318_reg_set(dev_fe_t* o, lmk05318_state_t* lmk, uint64_t value)
         USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK05318 WR REG %04x => %04x\n",
                  (unsigned)addr, data);
     } else {
-        d = 0xffffffff;
+        d = 0xff;
         res = lmk05318_reg_rd(lmk, addr, &d);
         o->debug_lmk05318_last = d;
 
