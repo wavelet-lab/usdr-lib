@@ -1425,10 +1425,6 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     //
     //LMK05318 init start
-    lmk05318_xo_settings_t xo;
-    memset(&xo, 0, sizeof(xo));
-    xo.fref = 26000000;
-    xo.type = XO_CMOS;
 
     //set true to enable IN_REF1 40M
     bool enable_in_ref = false;
@@ -1453,7 +1449,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     lmk05318_port_request(&lmk_out[6], 6,           3840000, false, LVDS);
     lmk05318_port_request(&lmk_out[7], 7,   d->dac_rate / 2, false, LVDS);
 
-    res = lmk05318_create(dev, d->subdev, I2C_LMK, &xo, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->lmk, false /*dry_run*/);
+    res = lmk05318_create(dev, d->subdev, I2C_LMK, 26000000, XO_CMOS, false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->lmk, false /*dry_run*/);
     if(res)
         return res;
 

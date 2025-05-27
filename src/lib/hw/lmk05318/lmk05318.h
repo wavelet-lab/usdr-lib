@@ -232,7 +232,8 @@ int lmk05318_tune_apll1(lmk05318_state_t* d);
 int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned n_outs);
 
 int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
-                    const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
+                    uint32_t xo_freq, xo_input_type_t xo_fmttype, bool xo_fdet_bypass,
+                    lmk05318_dpll_settings_t* dpll,
                     lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
                     lmk05318_state_t* out, bool dry_run);
 

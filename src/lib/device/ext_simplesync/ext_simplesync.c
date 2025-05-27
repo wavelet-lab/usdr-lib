@@ -87,11 +87,6 @@ int board_ext_simplesync_init(lldev_t dev,
     // Wait for power up
     usleep(50000);
 
-    lmk05318_xo_settings_t xo;
-    memset(&xo, 0, sizeof(xo));
-    xo.fref = 26000000;
-    xo.type = XO_CMOS;
-
     lmk05318_out_config_t lmk_out[4];
 
     lmk05318_port_request(&lmk_out[0], 4, 25000000, false, LVCMOS_P_N);
@@ -104,10 +99,7 @@ int board_ext_simplesync_init(lldev_t dev,
     lmk05318_set_port_affinity(&lmk_out[2], AFF_APLL1);
     lmk05318_set_port_affinity(&lmk_out[3], AFF_APLL1);
 
-    lmk05318_dpll_settings_t dpll;
-    dpll.enabled = false;
-
-    res = lmk05318_create(dev, subdev, i2ca, &xo, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &ob->lmk, false /*dry_run*/);
+    res = lmk05318_create(dev, subdev, i2ca, 26000000, XO_CMOS, false, NULL, lmk_out, SIZEOF_ARRAY(lmk_out), &ob->lmk, false /*dry_run*/);
     if(res)
         return res;
 

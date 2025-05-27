@@ -135,11 +135,6 @@ int board_xmass_init(lldev_t dev,
     ob->calfreq = 444e6;
 
     //LMK05318 init start
-    lmk05318_xo_settings_t xo;
-    memset(&xo, 0, sizeof(xo));
-    xo.fref = 26000000;
-    xo.type = XO_AC_DIFF_EXT;
-
     lmk05318_dpll_settings_t dpll;
     memset(&dpll, 0, sizeof(dpll));
     dpll.enabled = false;
@@ -151,7 +146,7 @@ int board_xmass_init(lldev_t dev,
 
     lmk05318_out_config_t lmk05318_outs_cfg[8];
     res = res ? res : _board_xmass_fill_lmk05318(ob, lmk05318_outs_cfg);
-    res = res ? res : lmk05318_create(dev, subdev, i2c_lmka, &xo, &dpll, lmk05318_outs_cfg, 8, &ob->lmk, false);
+    res = res ? res : lmk05318_create(dev, subdev, i2c_lmka, 26000000, XO_AC_DIFF_EXT, false, &dpll, lmk05318_outs_cfg, 8, &ob->lmk, false);
 
     if (res) {
         USDR_LOG("XMSS", USDR_LOG_ERROR, "Unable to initialize XMASS\n");

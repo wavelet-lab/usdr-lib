@@ -270,11 +270,6 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
-    lmk05318_xo_settings_t xo;
-    memset(&xo, 0, sizeof(xo));
-    xo.fref = 25000000;
-    xo.type = XO_CMOS;
-
     lmk05318_dpll_settings_t dpll;
     memset(&dpll, 0, sizeof(dpll));
     dpll.enabled = true;
@@ -307,7 +302,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : lmk05318_port_request(&lmk_out[6], 6, lmk_freq[6], false, LVCMOS_P_N);
     res = res ? res : lmk05318_port_request(&lmk_out[7], 7, lmk_freq[7], false, LVCMOS_P_N);
 
-    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, &xo, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->gen, false /*dry_run*/);
+    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, 25000000, XO_CMOS, false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->gen, false /*dry_run*/);
     if(res)
         return res;
 

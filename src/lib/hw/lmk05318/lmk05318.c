@@ -601,6 +601,11 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
 {
     int res = 0;
 
+    if(!dpll)
+    {
+        d->dpll.enabled = false;
+    }
+
     if(d->dpll.enabled == false)
     {
         // WITHOUT DPLL
@@ -871,7 +876,8 @@ static int lmk05318_set_common_registers(lmk05318_state_t* d, lmk05318_dpll_sett
 }
 
 int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
-                    const lmk05318_xo_settings_t* xo, lmk05318_dpll_settings_t* dpll,
+                    uint32_t xo_freq, xo_input_type_t xo_fmttype, bool xo_fdet_bypass,
+                    lmk05318_dpll_settings_t* dpll,
                     lmk05318_out_config_t* out_ports_cfg, unsigned out_ports_len,
                     lmk05318_state_t* out, bool dry_run)
 {
@@ -889,7 +895,10 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
     out->pd2 = 0;
     out->fref_pll2_div_rp = 3;
     out->fref_pll2_div_rs = (((VCO_APLL1 + APLL2_PD_MAX - 1) / APLL2_PD_MAX) + out->fref_pll2_div_rp - 1) / out->fref_pll2_div_rp;
-    out->xo = *xo;
+
+    out->xo.fref = xo_freq;
+    out->xo.type = xo_fmttype;
+    out->xo.fdet_bypass = xo_fdet_bypass;
 
     res = dry_run ? 0 : lmk05318_reg_get_u32(out, 0, &dummy[0]);
     if (res)
