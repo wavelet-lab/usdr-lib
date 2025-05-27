@@ -120,6 +120,9 @@ int board_xmass_init(lldev_t dev,
     // Configure 1PPS input
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO2, GPIO_CFG_ALT0);
 
+    // Configure SYSREF_GEN
+    res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO3, GPIO_CFG_ALT0);
+
     unsigned i2c_lmka = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_LMK);
     unsigned i2c_xraa = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_XRA1201);
     uint16_t val;
@@ -138,7 +141,7 @@ int board_xmass_init(lldev_t dev,
     }
 
     // En LMK to ckeck it
-    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 5));
+    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 6) | (1 << 5));
 
     usleep(250000);
 
@@ -197,8 +200,8 @@ int board_xmass_init(lldev_t dev,
     //if(res)
     //    return res;
 
-    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (0 << 5));
-    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 5));
+    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 6) | (0 << 5));
+    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 6) | (1 << 5));
     USDR_LOG("XMSS", USDR_LOG_INFO, "LMK03518 outputs synced");
 
     ob->i2c_xraa = i2c_xraa;
@@ -253,7 +256,7 @@ int board_xmass_ctrl_cmd_rd(board_xmass_t* ob, uint32_t addr, uint32_t* preg)
 int board_xmass_sync_source(board_xmass_t* ob, unsigned sync_src)
 {
     int res;
-    unsigned default_cmd = (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 5);
+    unsigned default_cmd = (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 6) | (1 << 5);
 
     switch (sync_src) {
     case 0:
