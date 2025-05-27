@@ -13,6 +13,16 @@
 
 #include "def_ext_xmass_ctrl.h"
 
+
+enum {
+    XMASS_GPIO_RF_CAL_DST_SEL = 2, // 0 - RF_CAL_EXT (general rx port) / 1 - RF_CAL_INT (LNA3 port)
+    XMASS_GPIO_RF_CAL_SRC_SEL = 3, // 0 - RF_LO_SRC (from LMK)         / 1 - RF_NOISE_SRC (from NOISE GEN)
+
+    XMASS_GPIO_RF_CAL_SW = 9,      // 0 - Use RF cal source as FB, 1 - Use XSDR TX as FB
+    XMASS_GPIO_RF_LB_SW = 10,      // 0 - Normal operation, 1 - use LB path to XSDR RX
+    XMASS_GPIO_RF_NOISE_EN = 11,   // Enable 14V generator for Zener
+};
+
 // XRA1201IL24TR-F (0x28 I2C)
 // Port0:
 //  0 GPIO_BDISTRIB    : Enable OUT_REF_B[0:3] and OUT_SYREF_B[0:3] for 4 board sync
@@ -82,7 +92,8 @@ static int _board_xmass_fill_lmk05318(board_xmass_t* ob, lmk05318_out_config_t l
     lmk05318_port_request(&lmk05318_outs_cfg[4], 4, cfreq, false, cfreq == 0 ? OUT_OFF : LVDS);
     lmk05318_port_request(&lmk05318_outs_cfg[5], 5, 0, false, OUT_OFF);
     lmk05318_port_request(&lmk05318_outs_cfg[6], 6, ob->refclk, false, LVCMOS_P_N);
-    lmk05318_port_request(&lmk05318_outs_cfg[7], 7, 1, false, LVCMOS_P_N);
+    // lmk05318_port_request(&lmk05318_outs_cfg[7], 7, 1, false, LVCMOS_P_N);
+    lmk05318_port_request(&lmk05318_outs_cfg[7], 7, 0, false, OUT_OFF);
 
     lmk05318_set_port_affinity(&lmk05318_outs_cfg[4], AFF_APLL2);
     return 0;
@@ -182,16 +193,21 @@ int board_xmass_init(lldev_t dev,
     }
 
     //sync to make APLL1/APLL2 & out channels in-phase
-    res = lmk05318_sync(&ob->lmk);
-    if(res)
-        return res;
+    //res = lmk05318_sync(&ob->lmk);
+    //if(res)
+    //    return res;
 
+    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (0 << 5));
+    res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 5));
     USDR_LOG("XMSS", USDR_LOG_INFO, "LMK03518 outputs synced");
 
     ob->i2c_xraa = i2c_xraa;
 
+    //res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 5) | (1 << 10));
     return res;
 }
+
+
 
 int board_xmass_ctrl_cmd_wr(board_xmass_t* ob, uint32_t addr, uint32_t reg)
 {
@@ -225,6 +241,40 @@ int board_xmass_ctrl_cmd_rd(board_xmass_t* ob, uint32_t addr, uint32_t* preg)
     }
 
     *preg = oval;
+    return res;
+}
+
+// 0 - off
+// 1 - LO
+// 2 - noise
+// 3 - LO    - LNA3
+// 4 - noise - LNA3
+
+int board_xmass_sync_source(board_xmass_t* ob, unsigned sync_src)
+{
+    int res;
+    unsigned default_cmd = (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 5);
+
+    switch (sync_src) {
+    case 0:
+        res = tca9555_reg16_set(ob->lmk.dev, ob->lmk.subdev, ob->i2c_xraa, TCA9555_OUT0, default_cmd);
+        break;
+    case 2:
+        res = tca9555_reg16_set(ob->lmk.dev, ob->lmk.subdev, ob->i2c_xraa, TCA9555_OUT0, default_cmd | (1 << XMASS_GPIO_RF_LB_SW) | (1 << XMASS_GPIO_RF_NOISE_EN) | (1 << XMASS_GPIO_RF_CAL_SRC_SEL));
+        break;
+    case 1:
+        res = tca9555_reg16_set(ob->lmk.dev, ob->lmk.subdev, ob->i2c_xraa, TCA9555_OUT0, default_cmd | (1 << XMASS_GPIO_RF_LB_SW));
+        break;
+    case 4:
+        res = tca9555_reg16_set(ob->lmk.dev, ob->lmk.subdev, ob->i2c_xraa, TCA9555_OUT0, default_cmd | (1 << XMASS_GPIO_RF_LB_SW) | (1 << XMASS_GPIO_RF_CAL_DST_SEL) | (1 << XMASS_GPIO_RF_NOISE_EN) | (1 << XMASS_GPIO_RF_CAL_SRC_SEL));
+        break;
+    case 3:
+        res = tca9555_reg16_set(ob->lmk.dev, ob->lmk.subdev, ob->i2c_xraa, TCA9555_OUT0, default_cmd | (1 << XMASS_GPIO_RF_LB_SW) | (1 << XMASS_GPIO_RF_CAL_DST_SEL));
+        break;
+    default:
+        return -EINVAL;
+    }
+
     return res;
 }
 
