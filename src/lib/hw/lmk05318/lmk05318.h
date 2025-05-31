@@ -240,4 +240,7 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
 int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll);
 int lmk05318_wait_dpll_ref_stat(lmk05318_state_t* d, unsigned timeout);
 
+int lmk05318_apll1_calibrate(lmk05318_state_t* d);
+int lmk05318_apll2_calibrate(lmk05318_state_t* d);
+
 #endif

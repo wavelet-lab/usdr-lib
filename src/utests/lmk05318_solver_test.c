@@ -362,6 +362,8 @@ START_TEST(lmk05318_solver_test_xmass)
     res = res ? res : lmk05318_port_request(p++, 7,          1, false, LVCMOS_P_N);
 
     res = res ? res : lmk05318_set_port_affinity(&cfg[4], AFF_APLL2);
+    res = res ? res : lmk05318_set_port_affinity(&cfg[6], AFF_APLL1);
+    res = res ? res : lmk05318_set_port_affinity(&cfg[7], AFF_APLL1);
     ck_assert_int_eq( res, 0 );
 
     lmk05318_state_t st;
@@ -370,11 +372,28 @@ START_TEST(lmk05318_solver_test_xmass)
     ck_assert_int_eq( res, 0 );
 
     res = lmk05318_port_request(&cfg[4], 4, 4000000, false, LVDS);
+    res = res ? res : lmk05318_set_port_affinity(&cfg[4], AFF_APLL2);
     res = res ? res : lmk05318_solver(&st, cfg, 8);
     res = res ? res : lmk05318_reg_wr_from_map(&st, true);
-
     ck_assert_int_eq( res, 0 );
-}
+
+    res = lmk05318_port_request(&cfg[4], 4, 5000000, false, LVDS);
+    res = res ? res : lmk05318_set_port_affinity(&cfg[4], AFF_APLL2);
+    res = res ? res : lmk05318_solver(&st, &cfg[4], 1);
+    res = res ? res : lmk05318_reg_wr_from_map(&st, true);
+    ck_assert_int_eq( res, 0 );
+
+    res = lmk05318_port_request(&cfg[4], 4, 0, false, LVDS);
+    res = res ? res : lmk05318_set_port_affinity(&cfg[4], AFF_APLL2);
+    res = res ? res : lmk05318_solver(&st, cfg, 8);
+    res = res ? res : lmk05318_reg_wr_from_map(&st, true);
+    ck_assert_int_eq( res, 0 );
+
+    res = lmk05318_port_request(&cfg[4], 4, 6000000, false, LVDS);
+    res = res ? res : lmk05318_set_port_affinity(&cfg[4], AFF_APLL2);
+    res = res ? res : lmk05318_solver(&st, cfg, 8);
+    res = res ? res : lmk05318_reg_wr_from_map(&st, true);
+    ck_assert_int_eq( res, 0 );}
 
 Suite * lmk05318_solver_suite(void)
 {

@@ -85,6 +85,8 @@ static int _board_xmass_fill_lmk05318(board_xmass_t* ob, lmk05318_out_config_t l
     lmk05318_port_request(&lmk05318_outs_cfg[7], 7, 1, false, LVCMOS_P_N);
 
     lmk05318_set_port_affinity(&lmk05318_outs_cfg[4], AFF_APLL2);
+    lmk05318_set_port_affinity(&lmk05318_outs_cfg[6], AFF_APLL1);
+    lmk05318_set_port_affinity(&lmk05318_outs_cfg[7], AFF_APLL1);
     return 0;
 }
 
@@ -147,12 +149,9 @@ int board_xmass_init(lldev_t dev,
     lmk05318_out_config_t lmk05318_outs_cfg[8];
     res = res ? res : _board_xmass_fill_lmk05318(ob, lmk05318_outs_cfg);
     res = res ? res : lmk05318_create(dev, subdev, i2c_lmka, 26000000, XO_AC_DIFF_EXT, false, &dpll, lmk05318_outs_cfg, 8, &ob->lmk, false);
-
     if (res) {
         USDR_LOG("XMSS", USDR_LOG_ERROR, "Unable to initialize XMASS\n");
     }
-
-    usleep(10000); //wait until lmk digests all this
 
     //wait for PRIREF/SECREF validation
     res = lmk05318_wait_dpll_ref_stat(&ob->lmk, 4*60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
@@ -235,8 +234,8 @@ int board_xmass_tune_cal_lo(board_xmass_t* ob, uint32_t callo)
     res = res ? res : _board_xmass_fill_lmk05318(ob, lmk05318_outs_cfg);
     res = res ? res : lmk05318_solver(&ob->lmk, lmk05318_outs_cfg, 8);
     res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false);
+    usleep(10000);
 
-    res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
     res = res ? res : lmk05318_sync(&ob->lmk);
 

@@ -306,8 +306,6 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     if(res)
         return res;
 
-    usleep(10000); //wait until lmk digests all this
-
     //wait for PRIREF/SECREF validation
     res = lmk05318_wait_dpll_ref_stat(&d->gen, 4*60000000); //60s - searching for satellites may take a lot of time if GPS in just turned on
     if(res)

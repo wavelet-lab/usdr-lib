@@ -427,6 +427,26 @@ int lmk05318_reg_wr_from_map(lmk05318_state_t* d, bool dry_run)
 }
 
 
+static int lmk05318_trigger_reg_with_sleep(lmk05318_state_t* out, uint32_t regs[2])
+{
+    int res = lmk05318_reg_wr_n(out, &regs[0], 1);
+    if(res)
+        return res;
+
+    usleep(10000);
+
+    res = lmk05318_reg_wr_n(out, &regs[1], 1);
+    if(res)
+        return res;
+
+    usleep(10000);
+    return res;
+}
+
+UNUSED static int lmk05318_trigger_reg(lmk05318_state_t* out, uint32_t regs[2])
+{
+    return lmk05318_reg_wr_n(out, &regs[0], 2);
+}
 
 
 int lmk05318_softreset(lmk05318_state_t* out)
@@ -438,13 +458,13 @@ int lmk05318_softreset(lmk05318_state_t* out)
     if(res)
         return res;
 
-    uint32_t regs[] =
+    uint32_t regs[2] =
     {
         MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl |  mask),
         MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl & ~mask),
     };
 
-    return lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));;
+    return lmk05318_trigger_reg_with_sleep(out, regs);
 }
 
 int lmk05318_sync(lmk05318_state_t* out)
@@ -456,13 +476,13 @@ int lmk05318_sync(lmk05318_state_t* out)
     if(res)
         return res;
 
-    uint32_t regs[] =
-        {
-            MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl |  mask),
-            MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl & ~mask),
-        };
+    uint32_t regs[2] =
+    {
+        MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl |  mask),
+        MAKE_LMK05318_REG_WR(DEV_CTL, reg_ctrl & ~mask),
+    };
 
-    return lmk05318_reg_wr_n(out, regs, SIZEOF_ARRAY(regs));;
+    return lmk05318_trigger_reg_with_sleep(out, regs);
 }
 
 int lmk05318_mute(lmk05318_state_t* out, uint8_t chmask)
@@ -952,6 +972,8 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr,
         return res;
     }
 
+    usleep(10000); //wait for LMK digests it all
+
     res = dry_run ? 0 : lmk05318_softreset(out);
     if(res)
     {
@@ -1010,6 +1032,28 @@ static inline double lmk05318_calc_vco2_div(lmk05318_state_t* d, uint64_t fvco2,
         *pden = den;
 
     return fvco2_fact;
+}
+
+int lmk05318_apll1_calibrate(lmk05318_state_t* d)
+{
+    uint32_t regs[2] =
+    {
+        MAKE_LMK05318_PLL1_CTRL0(1),
+        MAKE_LMK05318_PLL1_CTRL0(0),
+    };
+
+    return lmk05318_trigger_reg_with_sleep(d, regs);
+}
+
+int lmk05318_apll2_calibrate(lmk05318_state_t* d)
+{
+    uint32_t regs[2] =
+    {
+        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 1),
+        MAKE_LMK05318_PLL2_CTRL0(d->fref_pll2_div_rs - 1, d->fref_pll2_div_rp - 3, 0),
+    };
+
+    return lmk05318_trigger_reg_with_sleep(d, regs);
 }
 
 static int lmk05318_tune_apll2(lmk05318_state_t* d)
@@ -1150,7 +1194,7 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
     };
 
     int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
-    res = res ? res : lmk05318_set_xo_bawdetect_registers(d);
+    //res = res ? res : lmk05318_set_xo_bawdetect_registers(d);
 
     return res;
 }
@@ -2352,6 +2396,10 @@ int lmk05318_wait_apll1_lock(lmk05318_state_t* d, unsigned timeout)
     unsigned los_msk;
     bool pll1_vm_inside;
 
+    res = lmk05318_apll1_calibrate(d);
+    if(res)
+        return res;
+
     res = lmk05318_reset_los_flags(d);
     if(res)
         return res;
@@ -2418,6 +2466,10 @@ int lmk05318_wait_apll2_lock(lmk05318_state_t* d, unsigned timeout)
     uint8_t reg;
     unsigned los_msk;
     bool pll2_vm_inside;
+
+    res = lmk05318_apll2_calibrate(d);
+    if(res)
+        return res;
 
     res = lmk05318_reset_los_flags(d);
     if(res)

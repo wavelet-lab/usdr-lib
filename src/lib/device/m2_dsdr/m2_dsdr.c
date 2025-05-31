@@ -1453,8 +1453,6 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     if(res)
         return res;
 
-    usleep(10000); //wait until lmk digests all this
-
     //wait for PRIREF/SECREF validation
     res = lmk05318_wait_dpll_ref_stat(&d->lmk, 100000);
     if(res)

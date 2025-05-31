@@ -142,12 +142,11 @@ int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
         lmk05318_set_port_affinity(&lmk_out[2], AFF_APLL2);
         lmk05318_set_port_affinity(&lmk_out[3], AFF_APLL2);
 
-        res = lmk05318_solver(&ob->lmk, lmk_out, SIZEOF_ARRAY(lmk_out));
+        res = res ? res : lmk05318_solver(&ob->lmk, lmk_out, SIZEOF_ARRAY(lmk_out));
         res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
         if(res)
             return res;
 
-        res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
         res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
         res = res ? res : lmk05318_sync(&ob->lmk);
 
