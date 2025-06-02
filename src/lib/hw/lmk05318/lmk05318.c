@@ -1194,7 +1194,7 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
     };
 
     int res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
-    //res = res ? res : lmk05318_set_xo_bawdetect_registers(d);
+    res = res ? res : lmk05318_set_xo_bawdetect_registers(d);
 
     return res;
 }
@@ -1572,7 +1572,7 @@ static inline int lmk05318_get_output_divider(const lmk05318_out_config_t* cfg, 
         return 1;
 
     double factf = ifreq / (*div);
-    return (factf == cfg->wanted.freq) ? 0 : 1;
+    return (fabs(factf - (double)cfg->wanted.freq) < 1E-6) ? 0 : 1;
 }
 
 VWLT_ATTRIBUTE(optimize("-Ofast"))
