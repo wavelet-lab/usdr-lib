@@ -1985,13 +1985,13 @@ static inline int lmk05318_solver_helper(lmk05318_out_config_t* outs, unsigned c
 
         for(uint64_t f = sol->fvco2.min; f <= sol->fvco2.max; ++f)
         {
-            unsigned n, num, den;
+            unsigned n = 0, num = 0, den = 0;
             double fvco2 = lmk05318_calc_vco2_div(lmkst, f, &n, &num, &den);
 
             if(fvco2 < sol->fvco2.min || fvco2 > sol->fvco2.max)
                 continue;
 
-            if(fvco2 != (uint64_t)fvco2)
+            if(fabs(fvco2 - (uint64_t)fvco2) > 1E-6)
                 continue;
 
             bool ok_flag = true;
