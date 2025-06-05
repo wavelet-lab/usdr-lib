@@ -101,18 +101,7 @@ static void teardown()
 
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
-    const char* fn_name = NULL;
-    conv_function_t fn = get_wvlt_sincos_i16_c(o, &fn_name);
-
-    //ignore dups
-    if(last_fn_name && !strcmp(last_fn_name, fn_name))
-        return NULL;
-
-    if(log)
-        fprintf(stderr, "%-20s\t", fn_name);
-
-    last_fn_name = fn_name;
-    return fn;
+    return generic_get_fn(o, log, get_wvlt_sincos_i16_c, &last_fn_name);
 }
 
 static sincos_i16_interleaved_ctrl_function_t get_fn_interleaved(generic_opts_t o, int log)
