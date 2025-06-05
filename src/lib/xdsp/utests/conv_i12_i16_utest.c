@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_i12_i16_2.h"
 
-//#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
 #define IN_STREAM_SIZE_BZ (132u)                    // (6 + 3 + 2)*12 = 132 bytes
 #define WORD_COUNT (IN_STREAM_SIZE_BZ * 8u / 12u)   // 88 i12 words
@@ -31,9 +31,11 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in,         ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(int16_t) * SPEED_WORD_COUNT);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(int16_t) * SPEED_WORD_COUNT);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in,         ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(int16_t) * SPEED_WORD_COUNT);
+    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(int16_t) * SPEED_WORD_COUNT);
+    ck_assert_int_eq(res, 0);
 
     //fill
 
@@ -194,19 +196,13 @@ END_TEST
 
 Suite * conv_i12_i16_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_i12_i16");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_i12_i16_check);
-    tcase_add_test(tc_core, conv_i12_i16_check_simd);
-    tcase_add_loop_test(tc_core, conv_i12_i16_speed, 0, 3);
+    Suite* s = suite_create("conv_i12_i16");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, conv_i12_i16_check);
+    ADD_REGRESS_TEST(s, conv_i12_i16_check_simd);
+    ADD_PERF_LOOP_TEST(s, conv_i12_i16_speed, 60, 0, 3);
+
     return s;
 }

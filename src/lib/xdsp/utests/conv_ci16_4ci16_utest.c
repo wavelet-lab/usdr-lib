@@ -10,9 +10,9 @@
 #include "xdsp_utest_common.h"
 #include "conv_ci16_4ci16_2.h"
 
-#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
-#define CHECK_WORD_COUNT (4096u + 77u)
+#define CHECK_WORD_COUNT (4096u + 80u) //must be a multiple of 4
 #define CHECK_SIZE_BZ (CHECK_WORD_COUNT * sizeof(int16_t))
 
 #define SPEED_WORD_COUNT (65536u)
@@ -38,17 +38,21 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in,          ALIGN_BYTES, SPEED_SIZE_BZ);
+    int res = 0;
 
-    posix_memalign((void**)&out1,        ALIGN_BYTES, SPEED_SIZE_BZ/4);
-    posix_memalign((void**)&out2,        ALIGN_BYTES, SPEED_SIZE_BZ/4);
-    posix_memalign((void**)&out3,        ALIGN_BYTES, SPEED_SIZE_BZ/4);
-    posix_memalign((void**)&out4,        ALIGN_BYTES, SPEED_SIZE_BZ/4);
+    res = res ? res : posix_memalign((void**)&in,          ALIGN_BYTES, SPEED_SIZE_BZ);
 
-    posix_memalign((void**)&out1_etalon, ALIGN_BYTES, CHECK_SIZE_BZ/4);
-    posix_memalign((void**)&out2_etalon, ALIGN_BYTES, CHECK_SIZE_BZ/4);
-    posix_memalign((void**)&out3_etalon, ALIGN_BYTES, CHECK_SIZE_BZ/4);
-    posix_memalign((void**)&out4_etalon, ALIGN_BYTES, CHECK_SIZE_BZ/4);
+    res = res ? res : posix_memalign((void**)&out1,        ALIGN_BYTES, SPEED_SIZE_BZ/4);
+    res = res ? res : posix_memalign((void**)&out2,        ALIGN_BYTES, SPEED_SIZE_BZ/4);
+    res = res ? res : posix_memalign((void**)&out3,        ALIGN_BYTES, SPEED_SIZE_BZ/4);
+    res = res ? res : posix_memalign((void**)&out4,        ALIGN_BYTES, SPEED_SIZE_BZ/4);
+
+    res = res ? res : posix_memalign((void**)&out1_etalon, ALIGN_BYTES, CHECK_SIZE_BZ/4);
+    res = res ? res : posix_memalign((void**)&out2_etalon, ALIGN_BYTES, CHECK_SIZE_BZ/4);
+    res = res ? res : posix_memalign((void**)&out3_etalon, ALIGN_BYTES, CHECK_SIZE_BZ/4);
+    res = res ? res : posix_memalign((void**)&out4_etalon, ALIGN_BYTES, CHECK_SIZE_BZ/4);
+
+    ck_assert_int_eq(res, 0);
 
     out[0] = out1;
     out[1] = out2;
@@ -61,7 +65,6 @@ static void setup()
     for(unsigned i = 0; i < SPEED_WORD_COUNT; ++i)
     {
         int sign = (float)(rand()) / (float)RAND_MAX > 0.5 ? -1 : 1;
-        //in[i] = sign * 32767 * ((float)(rand()) / (float)RAND_MAX);
         in[i] = sign * i;
     }
 }
@@ -133,8 +136,9 @@ START_TEST(conv_ci16_4ci16_check_simd)
 
     //get etalon output data (generic foo)
     (*get_fn(OPT_GENERIC, 0))(&pin, bzin, pout, bzout);
+#ifdef DEBUG_PRINT
     print_data("ETALON");
-
+#endif
     memcpy(out1_etalon, out[0], bzout / 4);
     memcpy(out2_etalon, out[1], bzout / 4);
     memcpy(out3_etalon, out[2], bzout / 4);
@@ -198,18 +202,12 @@ END_TEST
 
 Suite * conv_ci16_4ci16_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_ci16_4ci16");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_ci16_4ci16_check_simd);
-    tcase_add_loop_test(tc_core, conv_ci16_4ci16_speed, 0, 4);
+    Suite* s = suite_create("conv_ci16_4ci16");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, conv_ci16_4ci16_check_simd);
+    ADD_PERF_LOOP_TEST(s, conv_ci16_4ci16_speed, 60, 0, 4);
+
     return s;
 }

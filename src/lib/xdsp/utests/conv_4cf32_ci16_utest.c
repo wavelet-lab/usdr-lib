@@ -8,9 +8,9 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_4cf32_ci16_2.h"
+#include "conv_4cf32_ci16_2.h"
 
-#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
 #define WORD_COUNT (8192u)
 #define OUT_BZ (WORD_COUNT * sizeof(int16_t))
@@ -36,12 +36,14 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in_0,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
-    posix_memalign((void**)&in_1,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
-    posix_memalign((void**)&in_2,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
-    posix_memalign((void**)&in_3,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
-    posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in_0,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
+    res = res ? res : posix_memalign((void**)&in_1,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
+    res = res ? res : posix_memalign((void**)&in_2,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
+    res = res ? res : posix_memalign((void**)&in_3,       ALIGN_BYTES, WORD_COUNT * sizeof(float) / 4);
+    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
+    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
+    ck_assert_int_eq(res, 0);
 
     in[0] = in_0;
     in[1] = in_1;
@@ -214,18 +216,12 @@ END_TEST
 
 Suite * conv_4cf32_ci16_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_4cf32_ci16");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_4cf32_ci16_check_simd);
-    tcase_add_loop_test(tc_core, conv_4cf32_ci16_speed, 0, 3);
+    Suite* s = suite_create("conv_4cf32_ci16");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, conv_4cf32_ci16_check_simd);
+    ADD_PERF_LOOP_TEST(s, conv_4cf32_ci16_speed, 60, 0, 3);
+
     return s;
 }

@@ -10,9 +10,9 @@
 #include "xdsp_utest_common.h"
 #include "conv_ci16_4cf32_2.h"
 
-#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
-#define WORD_COUNT (4096u + 77u)
+#define WORD_COUNT (4096u + 80u)
 #define IN_STREAM_SIZE_BZ (WORD_COUNT * sizeof(int16_t))
 
 #define SPEED_WORD_COUNT (32768u)
@@ -38,15 +38,17 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in,          ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&out1,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
-    posix_memalign((void**)&out1_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
-    posix_memalign((void**)&out2,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
-    posix_memalign((void**)&out2_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
-    posix_memalign((void**)&out3,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
-    posix_memalign((void**)&out3_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
-    posix_memalign((void**)&out4,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
-    posix_memalign((void**)&out4_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in,          ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&out1,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    res = res ? res : posix_memalign((void**)&out1_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    res = res ? res : posix_memalign((void**)&out2,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    res = res ? res : posix_memalign((void**)&out2_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    res = res ? res : posix_memalign((void**)&out3,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    res = res ? res : posix_memalign((void**)&out3_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    res = res ? res : posix_memalign((void**)&out4,        ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    res = res ? res : posix_memalign((void**)&out4_etalon, ALIGN_BYTES, sizeof(float) * SPEED_WORD_COUNT/4);
+    ck_assert_int_eq(res, 0);
 
     out[0] = out1;
     out[1] = out2;
@@ -195,18 +197,12 @@ END_TEST
 
 Suite * conv_ci16_4cf32_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_ci16_4cf32");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_ci16_4cf32_check_simd);
-    tcase_add_loop_test(tc_core, conv_ci16_4cf32_speed, 0, 3);
+    Suite* s = suite_create("conv_ci16_4cf32");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, conv_ci16_4cf32_check_simd);
+    ADD_PERF_LOOP_TEST(s, conv_ci16_4cf32_speed, 60, 0, 3);
+
     return s;
 }

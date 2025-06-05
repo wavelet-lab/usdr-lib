@@ -11,7 +11,7 @@
 #include "sincos_functions.h"
 #include <math.h>
 
-//#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
 #define WORD_COUNT (65536)
 #define STREAM_SIZE_BZ (WORD_COUNT * sizeof(int16_t))
@@ -43,15 +43,17 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in_check,       ALIGN_BYTES, STREAM_SIZE_BZ);
-    posix_memalign((void**)&in,             ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&sindata,        ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&sindata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
-    posix_memalign((void**)&cosdata,        ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&cosdata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in_check,       ALIGN_BYTES, STREAM_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&in,             ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&sindata,        ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&sindata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&cosdata,        ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&cosdata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
 
-    posix_memalign((void**)&sincosdata,        ALIGN_BYTES, SPEED_WORD_COUNT * 2 * sizeof(int16_t));
-    posix_memalign((void**)&sincosdata_etalon, ALIGN_BYTES, WORD_COUNT * 2 * sizeof(int16_t));
+    res = res ? res : posix_memalign((void**)&sincosdata,        ALIGN_BYTES, SPEED_WORD_COUNT * 2 * sizeof(int16_t));
+    res = res ? res : posix_memalign((void**)&sincosdata_etalon, ALIGN_BYTES, WORD_COUNT * 2 * sizeof(int16_t));
+    ck_assert_int_eq(res, 0);
 
     srand( time(0) );
 
@@ -341,20 +343,14 @@ END_TEST
 
 Suite * wvlt_sincos_i16_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("wvlt_sincos_i16");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, wvlt_sincos_i16_check_simd);
-    tcase_add_loop_test(tc_core, wvlt_sincos_i16_speed, 0, 3);
-    tcase_add_test(tc_core, wvlt_sincos_i16_interleaved_ctrl_check_simd);
-    tcase_add_loop_test(tc_core, wvlt_sincos_i16_interleaved_ctrl_speed, 0, 3);
+    Suite* s = suite_create("wvlt_sincos_i16");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, wvlt_sincos_i16_check_simd);
+    ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_speed, 60, 0, 3);
+    ADD_REGRESS_TEST(s, wvlt_sincos_i16_interleaved_ctrl_check_simd);
+    ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_interleaved_ctrl_speed, 60, 0, 3);
+
     return s;
 }

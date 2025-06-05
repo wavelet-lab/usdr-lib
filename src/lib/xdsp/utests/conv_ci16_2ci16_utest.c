@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_ci16_2ci16_2.h"
+#include "conv_ci16_2ci16_2.h"
 
 #undef DEBUG_PRINT
 
@@ -34,11 +34,13 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in,          ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&out1,        ALIGN_BYTES, SPEED_SIZE_BZ/2);
-    posix_memalign((void**)&out1_etalon, ALIGN_BYTES, SPEED_SIZE_BZ/2);
-    posix_memalign((void**)&out2,        ALIGN_BYTES, SPEED_SIZE_BZ/2);
-    posix_memalign((void**)&out2_etalon, ALIGN_BYTES, SPEED_SIZE_BZ/2);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in,          ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&out1,        ALIGN_BYTES, SPEED_SIZE_BZ/2);
+    res = res ? res : posix_memalign((void**)&out1_etalon, ALIGN_BYTES, SPEED_SIZE_BZ/2);
+    res = res ? res : posix_memalign((void**)&out2,        ALIGN_BYTES, SPEED_SIZE_BZ/2);
+    res = res ? res : posix_memalign((void**)&out2_etalon, ALIGN_BYTES, SPEED_SIZE_BZ/2);
+    ck_assert_int_eq(res, 0);
 
     out[0] = out1;
     out[1] = out2;
@@ -173,18 +175,12 @@ END_TEST
 
 Suite * conv_ci16_2ci16_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_ci16_2ci16");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_ci16_2ci16_check_simd);
-    tcase_add_loop_test(tc_core, conv_ci16_2ci16_speed, 0, 3);
+    Suite* s = suite_create("conv_ci16_2ci16");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, conv_ci16_2ci16_check_simd);
+    ADD_PERF_LOOP_TEST(s, conv_ci16_2ci16_speed, 60, 0, 3);
+
     return s;
 }
