@@ -41,6 +41,8 @@ static int _debug_xmass_ctrl_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
 static int _debug_xmass_calfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int _debug_xmass_calfreq_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
+static int _debug_xmass_calpath_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int _debug_typefe_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 static int _debug_ll_mdev_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -74,6 +76,7 @@ static const usdr_dev_param_func_t s_xmass_params[] = {
     { "/debug/hw/xmass_ctrl/0/reg", { _debug_xmass_ctrl_reg_set, _debug_xmass_ctrl_reg_get }},
     { "/dm/sync/cal/freq", { _debug_xmass_calfreq_set, _debug_xmass_calfreq_get }},
     { "/dm/sdr/0/sync/cal/freq", { _debug_xmass_calfreq_set, _debug_xmass_calfreq_get }},
+    { "/dm/sdr/0/sync/cal/path", { _debug_xmass_calpath_set, NULL }},
 };
 
 
@@ -488,6 +491,12 @@ int _debug_xmass_calfreq_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value
 {
     dev_fe_t* o = (dev_fe_t*)obj->object;
     return board_xmass_tune_cal_lo(&o->fe.xmass, value);
+}
+
+int _debug_xmass_calpath_set(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dev_fe_t* o = (dev_fe_t*)obj->object;
+    return board_xmass_sync_source(&o->fe.xmass, value);
 }
 
 int _debug_xmass_calfreq_get(pdevice_t ud_x, pusdr_vfs_obj_t obj, uint64_t* ovalue)

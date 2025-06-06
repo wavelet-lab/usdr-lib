@@ -50,4 +50,12 @@ int board_xmass_ctrl_cmd_rd(board_xmass_t* ob, uint32_t addr, uint32_t* preg);
 
 int board_xmass_tune_cal_lo(board_xmass_t* ob, uint32_t callo);
 
+// 0 - off
+// 1 - LO
+// 2 - noise
+// 3 - LO    - LNA3
+// 4 - noise - LNA3
+int board_xmass_sync_source(board_xmass_t* ob, unsigned sync_src);
+
+
 #endif
