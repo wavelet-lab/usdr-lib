@@ -226,7 +226,6 @@ int lowlevel_discovery(unsigned pcount, const char** devparam, const char **devv
                        unsigned maxbuf, char* buf);
 int lowlevel_create(unsigned pcount, const char** devparam, const char **devval, lldev_t* odev, unsigned vidpid, void* webops, uintptr_t param);
 
-
 device_t* lowlevel_get_device(lldev_t obj);
 
 // Basic object
@@ -236,5 +235,7 @@ struct lowlevel_dev {
 };
 typedef struct lowlevel_dev lowlevel_dev_t;
 
+// Set new low-level device filter to specifically process some exceptions
+void lowlevel_ops_set_custom(lldev_t obj, lowlevel_ops_t* newops);
 
 #endif
