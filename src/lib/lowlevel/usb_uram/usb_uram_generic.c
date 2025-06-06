@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "../../device/generic_usdr/generic_regs.h"
-#include <assert.h>
 
 usb_uram_generic_t* get_uram_generic(lldev_t dev);
 
@@ -262,19 +261,18 @@ int usb_uram_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_addr, size_t
     usb_uram_generic_t* gen = get_uram_generic(dev);
 
     unsigned int_number, reg;
-    const char* busname;
-
+    char busname[4];
     switch(lsop)
     {
     case USDR_LSOP_SPI:
         int_number = gen->spi_int_number[ls_op_addr];
         reg = gen->db.spi_core[ls_op_addr];
-        busname = "SPI";
+        strcpy(busname, "SPI");
         break;
     case USDR_LSOP_I2C_DEV:
         int_number = gen->i2c_int_number[ls_op_addr];
         reg = gen->db.i2c_base[ls_op_addr];
-        busname = "I2C";
+        strcpy(busname, "I2C");
         break;
     default:
         return -EOPNOTSUPP;

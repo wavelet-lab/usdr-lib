@@ -4,7 +4,6 @@
 #include "opt_func.h"
 #include <limits.h>
 #include <usdr_logging.h>
-#include <stdio.h>
 
 int find_golden_min(int start, int stop, void* param, evaluate_fn_t fn, int* px, int* pv, int exparam)
 {
@@ -171,45 +170,3 @@ int find_best_2d(struct opt_iteration2d *ops, unsigned max_count, void* param, i
     return 0;
 }
 
-// Function to implement Stein's Algorithm
-// Borrowed from: https://www.geeksforgeeks.org/steins-algorithm-for-finding-gcd/ (C)
-//
-uint64_t find_gcd(uint64_t a, uint64_t b)
-{
-    if (a == b)
-        return a;
-
-    // GCD(0, b) == b; GCD(a, 0) == a,
-    // GCD(0, 0) == 0
-    if (a == 0)
-        return b;
-    if (b == 0)
-        return a;
-
-    // look for factors of 2
-    if (~a & 1) // a is even
-    {
-        if (b & 1) // b is odd
-            return find_gcd(a >> 1, b);
-        else // both a and b are even
-            return find_gcd(a >> 1, b >> 1) << 1;
-    }
-
-    if (~b & 1) // a is odd, b is even
-        return find_gcd(a, b >> 1);
-
-    // reduce larger number
-    if (a > b)
-        return find_gcd((a - b) >> 1, b);
-
-    return find_gcd((b - a) >> 1, a);
-}
-
-void binary_print_u32(uint32_t x, char* s, bool reverse)
-{
-    unsigned len = 0;
-    for(unsigned i = 0; i < sizeof(x) * 8; ++i)
-    {
-        len += sprintf(s + len, "%1u", reverse ? (x >> i) & 0x1 : (int32_t)(x << i) < 0);
-    }
-}

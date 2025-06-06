@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "xdsp_utest_common.h"
-#include "fft_window_functions.h"
+#include "../fft_window_functions.h"
 
 #define FFT_SIZE (65536)
 static const unsigned packet_lens[3] = { 256, 4096, FFT_SIZE };
@@ -30,15 +30,31 @@ static void recalcWnd(unsigned fft_size)
         wnd[i+1] = (1 - cos(2 * M_PI * (i + 1) / fft_size)) / 2;
     }
 }
+#if 0
+static void recalcWnd(unsigned fft_size)
+{
+    float wc = 0.f;
+    for(unsigned i = 0; i < fft_size; ++i)
+    {
+        //Hann
+        wnd[i] = (1 - cos(2 * M_PI * i / fft_size)) / 2;
+        wc += wnd[i] * wnd[i];
+    }
 
+    float corr = 1.0f / sqrt(wc / fft_size);
+
+    for(unsigned i = 0; i < fft_size; ++i)
+    {
+        wnd[i] *= corr;
+    }
+}
+#endif
 static void setup()
 {
-    int res = 0;
-    res = res ? res : posix_memalign((void**)&in,          ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
-    res = res ? res : posix_memalign((void**)&out,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
-    res = res ? res : posix_memalign((void**)&out_etalon,  ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
-    res = res ? res : posix_memalign((void**)&wnd,         ALIGN_BYTES, sizeof(float) * 2 * FFT_SIZE);
-    ck_assert_int_eq(res, 0);
+    posix_memalign((void**)&in,          ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
+    posix_memalign((void**)&out,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
+    posix_memalign((void**)&out_etalon,  ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
+    posix_memalign((void**)&wnd,         ALIGN_BYTES, sizeof(float) * 2 * FFT_SIZE);
 
     for(unsigned i = 0; i < FFT_SIZE; ++i)
     {
@@ -149,12 +165,17 @@ END_TEST
 
 Suite * fft_window_cf32_suite(void)
 {
+    Suite *s;
+    TCase *tc_core;
+
     max_opt = cpu_vcap_get();
 
-    Suite* s = suite_create("fft_window_cf32_functions");
-
-    ADD_REGRESS_TEST(s, wnd_check);
-    ADD_PERF_LOOP_TEST(s, wnd_speed, 300, 0, 3);
-
+    s = suite_create("fft_window_cf32_functions");
+    tc_core = tcase_create("XFFT");
+    tcase_set_timeout(tc_core, 300);
+    tcase_add_unchecked_fixture(tc_core, setup, teardown);
+    tcase_add_test(tc_core, wnd_check);
+    tcase_add_loop_test(tc_core, wnd_speed, 0, 3);
+    suite_add_tcase(s, tc_core);
     return s;
 }

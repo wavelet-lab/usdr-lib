@@ -768,7 +768,7 @@ int lms7002m_streaming_up(lms7002_dev_t *d, unsigned dir,
                 USDR_LOG("XDEV", USDR_LOG_INFO, "%s: RBB Restore BW[%d]=%d\n",
                             devstr, ich, d->rx_bw[ich].value);
             } else {
-                bandwidth = d->cgen_clk / d->rxcgen_div / d->rxtsp_div / d->rx_dsp_decim;
+                bandwidth = d->cgen_clk / d->rxcgen_div / d->rxtsp_div / d->rx_host_decim;
                 USDR_LOG("XDEV", USDR_LOG_INFO, "%s: No RBB[%d] was set; defaulting to current rx samplerate %u\n",
                             devstr, ich, bandwidth);
             }
@@ -815,7 +815,7 @@ int lms7002m_streaming_up(lms7002_dev_t *d, unsigned dir,
                             devstr, ich, d->tx_bw[ich].value);
                 bandwidth = d->tx_bw[ich].value;
             } else {
-                bandwidth = d->cgen_clk / d->txcgen_div / d->txtsp_div / d->tx_dsp_inter;
+                bandwidth = d->cgen_clk / d->txcgen_div / d->txtsp_div / d->tx_host_inter;
                 USDR_LOG("XDEV", USDR_LOG_INFO, "%s: No TBB[%d] was set; defaulting to current rx samplerate %u\n",
                             devstr, ich, bandwidth);
             }
@@ -927,8 +927,8 @@ int lms7002m_samplerate(lms7002_dev_t *d,
     unsigned mpy_dac = 4; // Might be 4,2,1
     unsigned rxdiv = 1;
     unsigned txdiv = 1;
-    unsigned tx_dsp_inter = 1; // Off chip extra interpolator
-    unsigned rx_dsp_decim = 1; // Off chip extra decimator
+    unsigned tx_host_inter = 1; // Off chip extra interpolator
+    unsigned rx_host_decim = 1; // Off chip extra decimator
     unsigned tx_host_mul = 1;
     unsigned rx_host_div = 1;
     unsigned txmaster_min = mpy_dac * dacclk;
@@ -991,8 +991,8 @@ int lms7002m_samplerate(lms7002_dev_t *d,
         d->txcgen_div = mpy_dac;
         d->rxtsp_div = rxdiv;
         d->txtsp_div = txdiv;
-        d->tx_dsp_inter = tx_dsp_inter;
-        d->rx_dsp_decim = rx_dsp_decim;
+        d->tx_host_inter = tx_host_inter;
+        d->rx_host_decim = rx_host_decim;
 
         for (unsigned j = 0; j < 4; j++) {
             unsigned clkdiv = (mpy_dac == 1) ? 0 :
@@ -1075,7 +1075,7 @@ int lms7002m_samplerate(lms7002_dev_t *d,
                rxrate / 1e6, txrate / 1e6,
                rxdiv, rx_host_div, txdiv, tx_host_mul,
                cgen_rate / mpy_adc / 1e6, cgen_rate / mpy_dac / 1e6,
-               tx_dsp_inter, rx_dsp_decim, cgen_rate / 1e6,
+               tx_host_inter, rx_host_decim, cgen_rate / 1e6,
                rxtsp_div, txtsp_div, sisoddr_rx, sisoddr_tx,
                d->fref / 1e6);
 
