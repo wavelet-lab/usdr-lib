@@ -1421,7 +1421,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
                 break;
         }
     }
-    usleep(40000);
+    usleep(100000);
 
     //
     //LMK05318 init start
