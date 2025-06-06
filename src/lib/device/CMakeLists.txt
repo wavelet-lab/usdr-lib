@@ -20,7 +20,6 @@ add_subdirectory(ext_pciefe)
 add_subdirectory(ext_supersync)
 add_subdirectory(ext_simplesync)
 add_subdirectory(ext_fe_100_5000)
-add_subdirectory(ext_xmass)
 
 
 add_subdirectory(u3_limesdr)

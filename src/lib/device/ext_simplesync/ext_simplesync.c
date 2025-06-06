@@ -41,16 +41,6 @@ enum {
     I2C_ADDR_LMK = 0x65,
 };
 
-static int simplesync_pd_low_chs(board_ext_simplesync_t* ob)
-{
-    int res = 0;
-    res = res ? res : lmk05318_disable_port(&ob->lmk, 0);
-    res = res ? res : lmk05318_disable_port(&ob->lmk, 1);
-    res = res ? res : lmk05318_disable_port(&ob->lmk, 2);
-    res = res ? res : lmk05318_disable_port(&ob->lmk, 3);
-    return res;
-}
-
 int board_ext_simplesync_init(lldev_t dev,
                               unsigned subdev,
                               unsigned gpio_base,
@@ -87,30 +77,7 @@ int board_ext_simplesync_init(lldev_t dev,
     // Wait for power up
     usleep(50000);
 
-    lmk05318_out_config_t lmk_out[4];
-
-    lmk05318_port_request(&lmk_out[0], 4, 25000000, false, LVCMOS_P_N);
-    lmk05318_port_request(&lmk_out[1], 5, 25000000, false, LVCMOS_P_N);
-    lmk05318_port_request(&lmk_out[2], 6, 25000000, false, LVCMOS_P_N);
-    lmk05318_port_request(&lmk_out[3], 7, 25000000, false, LVCMOS_P_N);
-
-    lmk05318_set_port_affinity(&lmk_out[0], AFF_APLL1);
-    lmk05318_set_port_affinity(&lmk_out[1], AFF_APLL1);
-    lmk05318_set_port_affinity(&lmk_out[2], AFF_APLL1);
-    lmk05318_set_port_affinity(&lmk_out[3], AFF_APLL1);
-
-    res = lmk05318_create(dev, subdev, i2ca, 26000000, XO_CMOS, false, NULL, lmk_out, SIZEOF_ARRAY(lmk_out), &ob->lmk, false /*dry_run*/);
-    if(res)
-        return res;
-
-    res = simplesync_pd_low_chs(ob); //power down chs 0..3
-    res = res ? res : lmk05318_wait_apll1_lock(&ob->lmk, 10000);
-    res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
-    res = res ? res : lmk05318_sync(&ob->lmk);
-
-    unsigned los_msk;
-    lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
-
+    res = lmk05318_create(dev, subdev, i2ca, 0, &ob->lmk);
     if (res)
         return res;
 
@@ -118,40 +85,16 @@ int board_ext_simplesync_init(lldev_t dev,
     return 0;
 }
 
-#define LO_FREQ_CUTOFF  3500000ul // VCO2_MIN / 7 / 256 = 3069196.43 Hz
+
 
 int simplesync_tune_lo(board_ext_simplesync_t* ob, uint32_t meas_lo)
 {
-    int res = 0;
+    unsigned div = 255;
+    int res = lmk05318_tune_apll2(&ob->lmk, meas_lo, &div);
 
-    if(meas_lo < LO_FREQ_CUTOFF)
-    {
-        res = simplesync_pd_low_chs(ob); //power down chs 0..3
-    }
-    else
-    {
-        lmk05318_out_config_t lmk_out[4];
-
-        lmk05318_port_request(&lmk_out[0], 0, meas_lo, false, LVDS);
-        lmk05318_port_request(&lmk_out[1], 1, meas_lo, false, LVDS);
-        lmk05318_port_request(&lmk_out[2], 2, meas_lo, false, LVDS);
-        lmk05318_port_request(&lmk_out[3], 3, meas_lo, false, LVDS);
-
-        lmk05318_set_port_affinity(&lmk_out[0], AFF_APLL2);
-        lmk05318_set_port_affinity(&lmk_out[1], AFF_APLL2);
-        lmk05318_set_port_affinity(&lmk_out[2], AFF_APLL2);
-        lmk05318_set_port_affinity(&lmk_out[3], AFF_APLL2);
-
-        res = res ? res : lmk05318_solver(&ob->lmk, lmk_out, SIZEOF_ARRAY(lmk_out));
-        res = res ? res : lmk05318_reg_wr_from_map(&ob->lmk, false /*dry_run*/);
-        if(res)
-            return res;
-
-        res = res ? res : lmk05318_wait_apll2_lock(&ob->lmk, 10000);
-        res = res ? res : lmk05318_sync(&ob->lmk);
-
-        unsigned los_msk;
-        lmk05318_check_lock(&ob->lmk, &los_msk, false /*silent*/); //just to log state
+    for (unsigned p = 0; p < 4; p++) {
+        res = (res) ? res : lmk05318_set_out_div(&ob->lmk, p, div);
+        res = (res) ? res : lmk05318_set_out_mux(&ob->lmk, p, false, meas_lo < 1e6 ? OUT_OFF : LVDS);
     }
 
     return res;

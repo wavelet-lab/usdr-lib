@@ -17,7 +17,7 @@ class GenH:
         self.o_name = str(os.path.splitext(os.path.basename(filename))[0])
         self.l_name = self.o_name.lower()
         self.h_name = self.o_name.upper()
-
+    
         self.parser = parser
         self.addr_width = parser.addr_width
         self.data_width = parser.data_width
@@ -26,7 +26,7 @@ class GenH:
         self.page_prefix = parser.page_prefix
         self.reg_prefix = "%s_" % parser.reg_prefix.upper() if len(parser.reg_prefix) > 0 else ''
 
-        self.field_prefix_ar = [a.lower() for a in parser.field_prefix_ar]
+        self.field_prefix_ar = [ a.lower() for a in parser.field_prefix_ar ]
 
         # Flat all pages
         self.regs = {}
@@ -36,8 +36,8 @@ class GenH:
                 name = "%s_%s" % (pname, r.name) if self.page_prefix else r.name
 
                 if name in self.regs.keys():
-                    raise (Exception("Rigester `%s` is already in flat map! Rename it" % name))
-
+                    raise(Exception("Rigester `%s` is already in flat map! Rename it" % name))
+                
                 # TODO: parse ucnt
                 if r.ucnt == 1:
                     self.regs[name] = r.addr
@@ -48,11 +48,13 @@ class GenH:
                     for k in range(r.ucnt):
                         self.regs[name + "_BY%d" % (r.ucnt - k - 1)] = r.addr_l + k
 
+
     def regName(self, reg: reg_parser.ParserRegs) -> str:
         if self.page_prefix:
             return "%s_%s" % (reg.page.name.upper(), reg.name)
 
         return reg.name
+
 
     def fieldName(self, field: reg_parser.ParserFields) -> str:
         pfx = []
@@ -64,7 +66,7 @@ class GenH:
             elif i == "regaddr":
                 pfx.append("%02x" % field.reg.addr_l)
             else:
-                raise (Exception("Unknown prefix type '%s'" % i))
+                raise(Exception("Unknown prefix type '%s'" % i))
 
         if len(pfx) > 0:
             pfx.append(field.name)
@@ -72,22 +74,16 @@ class GenH:
 
         return field.name
 
+
     def normalize(self, name: str) -> str:
         return (name.replace('-', '_')
-                .replace('<=', 'LE')
-                .replace('>=', 'GE')
-                .replace('>', 'GT')
-                .replace('<', 'LT')
-                .replace('=', 'EQ')
-                .replace('+', 'PL')
-                .replace("'", 'MARK')
-                .replace('.', '_')
-                .replace(',', '_')
-                .replace(' ', '_')
-                .replace('(', '')
-                .replace('|', 'OR')
-                .replace(')', '')
-                .replace('/', 'DIV'))
+                        .replace('.', '_')
+                        .replace(',', '_')
+                        .replace(' ', '_')
+                        .replace('(', '')
+                        .replace('|', 'OR')
+                        .replace(')', '')
+                        .replace('/', 'DIV'))
 
     def ser_ch_fenum(self, reg: reg_parser.ParserRegs, name: str) -> str:
         vt = False
@@ -100,7 +96,7 @@ class GenH:
         str += "};"
         if vt and len(reg.fields) == 1:
             return ""
-
+        
         return str
 
     def generate_setter_expression(self, f, custom_name) -> str:
@@ -169,13 +165,13 @@ class GenH:
         str = "enum %s_t {\n" % name
         for i, v in en_dict.items():
             str += "%s%s%s = 0x%x,\n" % (GenH.TAB, prefix, i.replace('-', '_')
-                                         .replace('.', '_')
-                                         .replace(',', '_')
-                                         .replace(' ', '_')
-                                         .replace('(', '')
-                                         .replace('|', 'OR')
-                                         .replace(')', '')
-                                         .replace('/', 'DIV'), v)
+                .replace('.', '_')
+                .replace(',', '_')
+                .replace(' ', '_')
+                .replace('(', '')
+                .replace('|', 'OR')
+                .replace(')', '')
+                .replace('/', 'DIV'), v)
         str += "};"
         return str
 
@@ -185,18 +181,10 @@ class GenH:
         print(all_regs)
 
         # Make register define
-        if (self.parser.wr_mask is not None) and (self.parser.rd_mask is not None):
-            raise (Exception("You should specify rd_mask OR wr_mask, but not both!"))
-
         def_macro = "MAKE_%s_REG_WR" % self.h_name
         def_wr_msk = "0x%x | " % self.parser.wr_mask if self.parser.wr_mask is not None else ""
         def_wr = "#define %s(a, v) (%s((a) << %d) | ((v) & 0x%x))" % (def_macro, def_wr_msk, self.data_width, (1 << self.data_width) - 1)
         print(def_wr)
-
-        def_macro_rd = "MAKE_%s_REG_RD" % self.h_name
-        def_rd_msk = "0x%x | " % self.parser.rd_mask if self.parser.rd_mask is not None else ""
-        def_rd = "#define %s(a) (%s((a) << %d))" % (def_macro_rd, def_rd_msk, self.data_width)
-        print(def_rd)
 
         # Predefined universal enums
         for e in self.enums:
@@ -225,12 +213,10 @@ class GenH:
                     print(self.ser_cf_fmacro(r))
 
                 if r.ucnt == 1:
-                    defc = "#define MAKE_%s_%s(%s)" % (
-                    self.h_name, name, reduce(lambda x, y: "%s, %s" % (x, y), [x.name.lower() for x in r.fields]))
-                    # defc += " ((%s << %d) |" % (name, self.data_width)
+                    defc = "#define MAKE_%s_%s(%s)" % (self.h_name, name, reduce(lambda x, y: "%s, %s" % (x, y), [x.name.lower() for x in r.fields]))
+                    #defc += " ((%s << %d) |" % (name, self.data_width)
                     defc += " %s(%s," % (def_macro, name)
-                    defc += reduce(lambda x, y: "%s | %s" % (x, y),
-                                   [" \\\n%s%s" % (self.TAB, self.generate_setter_expression(x, x.name.lower())) for x in r.fields])
+                    defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s%s" % (self.TAB, self.generate_setter_expression(x, x.name.lower())) for x in r.fields ])
                     defc += ")"
                     print(defc)
                 else:
@@ -242,10 +228,8 @@ class GenH:
                     value_msk = reduce(lambda x, y: x | y, [x.mask for x in r.fields])
                     value_off = reduce(lambda x, y: min(x, y), [x.bits_l for x in r.fields])
                     if len(r.fields) > 1:
-                        defc = "#define MAKE_%s_%s_LONG(%s) (" % (
-                        self.h_name, name, reduce(lambda x, y: "%s, %s" % (x, y), [x.name.lower() for x in r.fields]))
-                        defc += reduce(lambda x, y: "%s | %s" % (x, y),
-                                       [" \\\n%s%s" % (self.TAB, self.generate_setter_expression(x, x.name.lower())) for x in r.fields])
+                        defc = "#define MAKE_%s_%s_LONG(%s) (" % (self.h_name, name, reduce(lambda x, y: "%s, %s" % (x, y), [x.name.lower() for x in r.fields]))
+                        defc += reduce(lambda x, y: "%s | %s" % (x, y), [" \\\n%s%s" % (self.TAB, self.generate_setter_expression(x, x.name.lower())) for x in r.fields ])
                         defc += ")"
                         print(defc)
 
@@ -263,9 +247,9 @@ class GenH:
                         else:
                             # defc += " ((%s_BY%d << %d) | (((value) << %d) & 0x%x))" % (name, u, self.data_width, -by_off, by_msk)
                             defc += " (((value) << %d) & 0x%x))" % (-by_off, by_msk)
-                        print(defc)
+                        print(defc)  
 
-                        # if 'c-cache' in self.parser.raw_yaml:
+        # if 'c-cache' in self.parser.raw_yaml:
         #     cc = self.parser.raw_yaml['c-cache']
         #     if 'regs' in cc:
         #         print("\n\n/* Cached operations */")
@@ -300,9 +284,9 @@ class GenH:
                 fn += "p->%s = (p->%s & ~%s_MSK) | ((%s << %s_OFF) & %s_MSK); }" % (regn, regn, FLDN, fname, FLDN, FLDN)
                 print(fn)
 
+
     def write_vh(self, filename):
         pass
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Debug UI options')

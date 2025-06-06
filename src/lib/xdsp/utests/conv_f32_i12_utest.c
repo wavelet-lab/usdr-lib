@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_f32_i12_2.h"
 
-#undef DEBUG_PRINT
+//#define DEBUG_PRINT
 
 #define PACKET_SIZE (8192u)
 #define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
@@ -31,11 +31,9 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    int res = 0;
-    res = res ? res : posix_memalign((void**)&in,         ALIGN_BYTES, PACKET_SIZE * sizeof(float));
-    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
-    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
-    ck_assert_int_eq(res, 0);
+    posix_memalign((void**)&in,         ALIGN_BYTES, PACKET_SIZE * sizeof(float));
+    posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
+    posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
 
     //fill
     srand( time(0) );
@@ -56,7 +54,18 @@ static void teardown()
 
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
-    return generic_get_fn(o, log, conv_get_f32_i12_c, &last_fn_name);
+    const char* fn_name = NULL;
+    conv_function_t fn = conv_get_f32_i12_c(o, &fn_name);
+
+    //ignore dups
+    if(last_fn_name && !strcmp(last_fn_name, fn_name))
+        return NULL;
+
+    if(log)
+        fprintf(stderr, "%-20s\t", fn_name);
+
+    last_fn_name = fn_name;
+    return fn;
 }
 
 static int is_equal()
@@ -150,9 +159,7 @@ START_TEST(conv_f32_i12_check_simd)
 
     //get etalon output data (generic foo)
     (*get_fn(OPT_GENERIC, 0))(&pin, bzin, &pout, bzout);
-#ifdef DEBUG_PRINT
     printer("HEADER:");
-#endif
     memcpy(out_etalon, out, bzout);
 
     while(opt != OPT_GENERIC)
@@ -166,6 +173,7 @@ START_TEST(conv_f32_i12_check_simd)
             printer(NULL);
 #endif
             int res = is_equal();
+            //int res = memcmp(out, out_etalon, bzout);
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
             ck_assert_int_eq( res, 0 );
         }
@@ -209,12 +217,18 @@ END_TEST
 
 Suite * conv_f32_i12_suite(void)
 {
+    Suite *s;
+    TCase *tc_core;
+
     max_opt = cpu_vcap_get();
 
-    Suite* s = suite_create("conv_f32_i12");
+    s = suite_create("conv_f32_i12");
+    tc_core = tcase_create("XDSP");
+    tcase_set_timeout(tc_core, 60);
+    tcase_add_unchecked_fixture(tc_core, setup, teardown);
+    tcase_add_test(tc_core, conv_f32_i12_check_simd);
+    tcase_add_loop_test(tc_core, conv_f32_i12_speed, 0, 3);
 
-    ADD_REGRESS_TEST(s, conv_f32_i12_check_simd);
-    ADD_PERF_LOOP_TEST(s, conv_f32_i12_speed, 60, 0, 3);
-
+    suite_add_tcase(s, tc_core);
     return s;
 }

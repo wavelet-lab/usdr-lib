@@ -49,8 +49,6 @@ struct xsdr_dev
 
     unsigned lms7_lob;
 
-    int tx_override_phase;
-
     bool afe_active;
     bool siso_sdr_active_rx;
     bool siso_sdr_active_tx;
@@ -126,7 +124,6 @@ int xsdr_dtor(xsdr_dev_t *d);
 
 int xsdr_set_extref(xsdr_dev_t *d, bool ext, uint32_t freq);
 
-int xsdr_set_vio(xsdr_dev_t *d, unsigned vio_mv);
 
 // Enable RFIC, no streaming
 int xsdr_pwren(xsdr_dev_t *d, bool on);
@@ -151,14 +148,10 @@ int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int 
 //int (*set_tx_testsig_fs8)(void* param, int channel);
 
 
-int xsdr_phy_tune_rx(xsdr_dev_t *d, unsigned val);
+int xsdr_phy_tune(xsdr_dev_t *d, unsigned val);
 int xsdr_clk_debug_info(xsdr_dev_t *d);
 
 int xsdr_hwchans_cnt(xsdr_dev_t *d, bool rx, unsigned chans);
-
-int xsdr_override_drp(xsdr_dev_t *d, lsopaddr_t ls_op_addr,
-                      size_t meminsz, void* pin, size_t memoutsz,
-                      const void* pout);
 
 enum {
     XSDR_CAL_RXLO = 1,

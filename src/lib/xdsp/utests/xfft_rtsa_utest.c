@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "rtsa_functions.h"
+#include "../rtsa_functions.h"
 
 #undef DEBUG_PRINT
 
@@ -27,8 +27,7 @@ static const unsigned packet_lens[4] = { 512, 1024, 2048, STREAM_SIZE };
 
 #define SPEED_MEASURE_ITERS 256
 
-#define EPSILON MAX_RTSA_PWR / 10000
-#define MAX_ERRS 10
+#define EPSILON MAX_RTSA_PWR / 10
 
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
@@ -53,7 +52,7 @@ static void setup(void)
     int res = 0;
     res = res ? res : posix_memalign((void**)&in,   ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE * AVGS);
     res = res ? res : posix_memalign((void**)&in16, ALIGN_BYTES, sizeof(uint16_t) * STREAM_SIZE * AVGS);
-    ck_assert_int_eq(res, 0);
+    assert(res == 0);
 
     //init input data
     srand( time(0) );
@@ -89,7 +88,7 @@ static void setup(void)
     res = 0;
     res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
     res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
-    ck_assert_int_eq(res, 0);
+    assert(res == 0);
     memset(out       , 0, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
     memset(out_etalon, 0, sizeof(rtsa_pwr_t) * STREAM_SIZE * st->rtsa_depth);
 
@@ -108,13 +107,9 @@ static void teardown(void)
 
 static int32_t is_equal()
 {
-    int errs = 0;
-
     for(unsigned i = 0; i < STREAM_SIZE * rtsa_settings.rtsa_depth; i++)
     {
-        errs += (abs(out[i] - out_etalon[i]) > EPSILON);
-        if(errs > MAX_ERRS)
-            return i;
+        if(abs(out[i] - out_etalon[i]) > EPSILON) return i;
     }
     return -1;
 }
@@ -173,6 +168,8 @@ START_TEST(rtsa_check)
                 fprintf(stderr, "%sTEST  > i:%u in=(%.6f,%.6f) out=%u <---> out_etalon=%u\n",
                         j == res ? ">>>>>>>>> " : "",
                         j, in[j][0], in[j][1], out[j], out_etalon[j]);
+
+            exit(1);
         }
 #endif
         ck_assert_int_eq( res, -1 );
@@ -308,15 +305,24 @@ START_TEST(rtsa_speed_u16)
 END_TEST
 
 
+
+
 Suite * rtsa_suite(void)
 {
+    Suite *s;
+    TCase *tc_core;
+
     max_opt = cpu_vcap_get();
 
-    Suite* s = suite_create("xfft_rtsa_functions");
-
-    ADD_REGRESS_TEST(s, rtsa_check);
-    //ADD_PERF_LOOP_TEST(s, rtsa_speed, 300, 0, 4);
-    ADD_PERF_LOOP_TEST(s, rtsa_speed_u16, 300, 0, 4);
-
+    s = suite_create("xfft_rtsa_functions");
+    tc_core = tcase_create("XFFT");
+    tcase_set_timeout(tc_core, 300);
+    tcase_add_unchecked_fixture(tc_core, setup, teardown);
+    tcase_add_test(tc_core, rtsa_check);
+    //tcase_add_loop_test(tc_core, rtsa_speed, 0, 4);
+    tcase_add_loop_test(tc_core, rtsa_speed_u16, 0, 4);
+    suite_add_tcase(s, tc_core);
     return s;
 }
+
+

@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "conv_4ci16_ci16_2.h"
+#include "../conv_4ci16_ci16_2.h"
 
 #undef DEBUG_PRINT
 
@@ -33,14 +33,12 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    int res = 0;
-    res = res ? res : posix_memalign((void**)&in_0,       ALIGN_BYTES, OUT_BZ / 4);
-    res = res ? res : posix_memalign((void**)&in_1,       ALIGN_BYTES, OUT_BZ / 4);
-    res = res ? res : posix_memalign((void**)&in_2,       ALIGN_BYTES, OUT_BZ / 4);
-    res = res ? res : posix_memalign((void**)&in_3,       ALIGN_BYTES, OUT_BZ / 4);
-    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
-    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
-    ck_assert_int_eq(res, 0);
+    posix_memalign((void**)&in_0,       ALIGN_BYTES, OUT_BZ / 4);
+    posix_memalign((void**)&in_1,       ALIGN_BYTES, OUT_BZ / 4);
+    posix_memalign((void**)&in_2,       ALIGN_BYTES, OUT_BZ / 4);
+    posix_memalign((void**)&in_3,       ALIGN_BYTES, OUT_BZ / 4);
+    posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
+    posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
 
     in[0] = in_0;
     in[1] = in_1;
@@ -81,7 +79,18 @@ static void teardown()
 
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
-    return generic_get_fn(o, log, conv_get_4ci16_ci16_c, &last_fn_name);
+    const char* fn_name = NULL;
+    conv_function_t fn = conv_get_4ci16_ci16_c(o, &fn_name);
+
+    //ignore dups
+    if(last_fn_name && !strcmp(last_fn_name, fn_name))
+        return NULL;
+
+    if(log)
+        fprintf(stderr, "%-20s\t", fn_name);
+
+    last_fn_name = fn_name;
+    return fn;
 }
 
 static void print_data(const char* header)
@@ -123,7 +132,7 @@ START_TEST(conv_4ci16_ci16_check_simd)
     (*get_fn(OPT_GENERIC, 0))(pin, bzin, &pout, bzout);
     memcpy(out_etalon, out, bzout);
 
-#ifdef DEBUG_PRINT
+#if 0
     print_data("ETALON DATA");
 #endif
 
@@ -134,7 +143,7 @@ START_TEST(conv_4ci16_ci16_check_simd)
         {
             memset(out, 0, bzout);
             (*fn)(pin, bzin, &pout, bzout);
-#ifdef DEBUG_PRINT
+#if 0
             print_data(NULL);
 #endif
             int res = memcmp(out, out_etalon, bzout);
@@ -181,12 +190,18 @@ END_TEST
 
 Suite * conv_4ci16_ci16_suite(void)
 {
+    Suite *s;
+    TCase *tc_core;
+
     max_opt = cpu_vcap_get();
 
-    Suite* s = suite_create("conv_4ci16_ci16");
+    s = suite_create("conv_4ci16_ci16");
+    tc_core = tcase_create("XDSP");
+    tcase_set_timeout(tc_core, 60);
+    tcase_add_unchecked_fixture(tc_core, setup, teardown);
+    tcase_add_test(tc_core, conv_4ci16_ci16_check_simd);
+    tcase_add_loop_test(tc_core, conv_4ci16_ci16_speed, 0, 4);
 
-    ADD_REGRESS_TEST(s, conv_4ci16_ci16_check_simd);
-    ADD_PERF_LOOP_TEST(s, conv_4ci16_ci16_speed, 60, 0, 4);
-
+    suite_add_tcase(s, tc_core);
     return s;
 }
