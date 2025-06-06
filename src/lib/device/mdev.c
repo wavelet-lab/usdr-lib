@@ -193,7 +193,7 @@ int _mdev_get_obj(pdevice_t dev, const char* fullpath, pusdr_vfs_obj_t *vfsobj)
     vfso->ops.sai64 = NULL;
     vfso->ops.gai64 = NULL;
     vfso->data.i64 = 0;
-    strncpy(vfso->full_path, fullpath, sizeof(vfso->full_path));
+    snprintf(vfso->full_path, sizeof(vfso->full_path), "%s", fullpath);
 
     *vfsobj = vfso;
     return 0;

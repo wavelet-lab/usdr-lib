@@ -679,7 +679,7 @@ int lms7002m_streaming_up(lms7002_dev_t *d, unsigned dir,
                           lms7002m_mac_mode_t rx_chs_i, unsigned rx_flags,
                           lms7002m_mac_mode_t tx_chs_i, unsigned tx_flags)
 {
-    unsigned rx_chs, tx_chs;
+    unsigned rx_chs = LMS7_CH_NONE, tx_chs = LMS7_CH_NONE;
     bool rxafen_a = d->rx_run[0];
     bool rxafen_b = d->rx_run[1];
 
