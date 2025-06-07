@@ -193,7 +193,7 @@ int _mdev_get_obj(pdevice_t dev, const char* fullpath, pusdr_vfs_obj_t *vfsobj)
     vfso->ops.sai64 = NULL;
     vfso->ops.gai64 = NULL;
     vfso->data.i64 = 0;
-    strncpy(vfso->full_path, fullpath, sizeof(vfso->full_path));
+    snprintf(vfso->full_path, sizeof(vfso->full_path), "%s", fullpath);
 
     *vfsobj = vfso;
     return 0;
@@ -380,10 +380,10 @@ int _mdev_create_stream(device_t* dev, const char* sid, const char* dformat,
         // TODO proper parse with specific chnnel mixing
         for (unsigned k = 0; k < chans_per_dev; k++) {
             if (channels->phys_names) {
-                phys_names[k] = channels->phys_names[chans_per_dev * i + k];
+                phys_names[k] = channels->phys_names[k];
             }
             if (channels->phys_nums) {
-                phys_nums[k] = channels->phys_nums[chans_per_dev * i + k];
+                phys_nums[k] = channels->phys_nums[k];
             }
         }
 
@@ -400,12 +400,15 @@ int _mdev_create_stream(device_t* dev, const char* sid, const char* dformat,
             return -EBUSY;
         }
 
-        USDR_LOG("MDEV", USDR_LOG_ERROR, "Creating stream for dev %d with %d channels\n", i, chans_per_dev);
+        USDR_LOG("MDEV", USDR_LOG_INFO, "Creating stream for dev %d with %d channels\n", i, chans_per_dev);
         pdevice_t child_dev = obj->real[i]->pdev;
         res = child_dev->create_stream(child_dev, sid, dformat, &subdev_info, pktsyms, flags, parameters,
                                        &real_str[i]);
-        if (res)
+        if (res) {
+            USDR_LOG("MDEV", USDR_LOG_ERROR, "Failed to create strem for dev %d: FMT %s, syms %d SI={CNT=%d FLAGS=%d}: Error %d\n",
+                     i, dformat, pktsyms, subdev_info.count, subdev_info.flags, res);
             return res;
+        }
 
         mstr->dev_mask[i] = true;
 

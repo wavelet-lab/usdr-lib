@@ -164,7 +164,7 @@ int usdr_dmd_create_string(const char* connection_string, pdm_dev_t* odev)
             break;
         } else if (strcmp(par.params[k], "bus") == 0) {
             bus_idx = k;
-            strncpy(bus_buffer, par.value[k], sizeof(bus_buffer));
+            snprintf(bus_buffer, sizeof(bus_buffer), "%s", par.value[k]);
 
             unsigned j;
             char *str, *token, *saveptr;

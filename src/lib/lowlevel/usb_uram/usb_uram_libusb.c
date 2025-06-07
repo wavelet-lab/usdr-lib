@@ -62,7 +62,7 @@ enum {
     IN_NTFY_SIZE = 64, //256,
     IN_RB_SIZE = 256,
 
-    MAX_NTFY_REQS = 1,
+    MAX_NTFY_REQS = 32,
     MAX_RB_REQS = 1,
 
     MAX_REQUEST_RB_SIZE = 256,
@@ -83,7 +83,7 @@ enum {
 enum {
     STREAM_MAX_SLOTS = 64,
 
-    MAX_RB_THREADS = 8,
+    MAX_RB_THREADS = MAX_NTFY_REQS,
 };
 
 struct stream_params {
@@ -129,6 +129,7 @@ struct usb_dev
     unsigned rx_buffer_missed[1];
 
     uint32_t rb_valid_idx;
+    uint32_t rb_req_idx;
 
     uint32_t tx_stat_prev[4];
     uint32_t tx_stat_cnt;
@@ -190,6 +191,7 @@ int usb_async_start(usb_dev_t* dev)
     }
 
     dev->rb_valid_idx = 0;
+    dev->rb_req_idx = 0;
     dev->tx_stat_cnt = 0;
     dev->tx_stat_rate = 64; // TX stat update rate
     return libusb_generic_create_thread(&dev->gdev);
@@ -450,8 +452,8 @@ static int usb_read_bus(lldev_t dev, unsigned interrupt_number, UNUSED unsigned 
 {
     int res;
     usb_dev_t* d = (usb_dev_t*)dev;
-
-    res = libusb_to_errno(libusb_submit_transfer(d->transfer_ntfy[0]));
+    unsigned idx = __atomic_fetch_add(&d->rb_req_idx, 1, __ATOMIC_SEQ_CST) & (MAX_NTFY_REQS - 1);
+    res = libusb_to_errno(libusb_submit_transfer(d->transfer_ntfy[idx]));
     if (res)
         return res;
 
@@ -461,11 +463,6 @@ static int usb_read_bus(lldev_t dev, unsigned interrupt_number, UNUSED unsigned 
 
     if (meminsz != 0) {
         *(uint32_t*)pin = d->rbvalue[interrupt_number];
-#if 0
-        res = usb_uram_reg_in(dev, reg, (uint32_t*)pin);
-        if (res)
-            return res;
-#endif
     }
     return res;
 }

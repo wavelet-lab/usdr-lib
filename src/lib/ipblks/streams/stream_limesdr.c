@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <assert.h>
 #include <arpa/inet.h>
 #include <inttypes.h>
@@ -103,7 +104,7 @@ int _limestr_stream_recv(stream_handle_t* str,
     unsigned bidx; //Burst index in the lowlevel buffer
     //unsigned
 
-    uint64_t brst_time;
+    uint64_t brst_time = ~0ULL;
     uint64_t fsym_time = ~0ULL;
 
     do {
@@ -412,7 +413,7 @@ int create_limesdr_stream(device_t* device,
     stream_limesdr_t* strdev;
     stream_t sid;
     char dfmt[256];
-    strncpy(dfmt, dformat, sizeof(dfmt));
+    snprintf(dfmt, sizeof(dfmt), "%s", dformat);
     struct parsed_data_format pfmt;
 
     if (stream_parse_dformat(dfmt, &pfmt)) {

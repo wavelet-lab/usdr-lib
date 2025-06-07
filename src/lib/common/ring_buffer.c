@@ -92,7 +92,7 @@ unsigned ring_buffer_pwait(struct ring_buffer* rb, int usecs)
 
 void ring_buffer_ppost(struct ring_buffer* rb)
 {
-    int res = sem_post(&rb->consumer);
+    __attribute__((unused)) int res = sem_post(&rb->consumer);
     assert(res == 0);
 }
 
@@ -110,7 +110,7 @@ unsigned ring_buffer_cwait(struct ring_buffer* rb, int usecs)
 
 void ring_buffer_cpost(struct ring_buffer* rb)
 {
-    int res = sem_post(&rb->producer);
+    __attribute__((unused)) int res = sem_post(&rb->producer);
     assert(res == 0);
 }
 

@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "xdsp_utest_common.h"
-#include "../fftad_functions.h"
+#include "fftad_functions.h"
 
 #undef DEBUG_PRINT
 
@@ -35,11 +35,14 @@ static void setup(void)
 {
     srand( time(0) );
 
-    posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE);
-    posix_memalign((void**)&f_mant,     ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
-    posix_memalign((void**)&f_pwr,      ALIGN_BYTES, sizeof(int32_t)       * STREAM_SIZE);
-    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    int res = 0;
+
+    res = res ? res : posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE);
+    res = res ? res : posix_memalign((void**)&f_mant,     ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    res = res ? res : posix_memalign((void**)&f_pwr,      ALIGN_BYTES, sizeof(int32_t)       * STREAM_SIZE);
+    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    ck_assert_int_eq(res, 0);
 
     //init input data
     for(unsigned i = 0; i < STREAM_SIZE; ++i)
@@ -198,17 +201,12 @@ END_TEST
 
 Suite * fftad_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("xfft_ftad_functions");
-    tc_core = tcase_create("XFFT");
-    tcase_set_timeout(tc_core, 300);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, fftad_check);
-    tcase_add_loop_test(tc_core, fftad_speed, 0, 3);
-    suite_add_tcase(s, tc_core);
+    Suite* s = suite_create("xfft_ftad_functions");
+
+    ADD_REGRESS_TEST(s, fftad_check);
+    ADD_PERF_LOOP_TEST(s, fftad_speed, 300, 0, 3);
+
     return s;
 }

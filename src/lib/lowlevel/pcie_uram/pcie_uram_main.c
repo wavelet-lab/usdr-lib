@@ -918,7 +918,8 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
 
     dev->ll.ops = &s_pcie_uram_ops;
     dev->fd = fd;
-    strncpy(dev->name, devname, sizeof(dev->name) - 1);
+
+    snprintf(dev->name, sizeof(dev->name), "%s", devname);
 
     // Get UUID
     device_id_t did;
