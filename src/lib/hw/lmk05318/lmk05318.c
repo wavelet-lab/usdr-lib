@@ -520,8 +520,6 @@ static int lmk05318_set_xo_bawdetect_registers(lmk05318_state_t* d)
     {
     case XO12_8:
     {
-        USDR_LOG("5318", USDR_LOG_INFO, "XO=12.8M, applying specific settings...");
-
         static uint32_t regs[] =
         {
             0x00510A,
@@ -550,8 +548,6 @@ static int lmk05318_set_xo_bawdetect_registers(lmk05318_state_t* d)
     }
     case XO25:
     {
-        USDR_LOG("5318", USDR_LOG_INFO, "XO=25M, applying specific settings...");
-
         static uint32_t regs[] =
         {
             0x00510A,   //R81
@@ -579,9 +575,8 @@ static int lmk05318_set_xo_bawdetect_registers(lmk05318_state_t* d)
         break;
     }
     case XO26:
+    case XO52: // both these XOs result in FPD1=52M, so we can use just the same setting
     {
-        USDR_LOG("5318", USDR_LOG_INFO, "XO=26M, applying specific settings...");
-
         static uint32_t regs[] =
         {
             0x00510A,
@@ -608,42 +603,14 @@ static int lmk05318_set_xo_bawdetect_registers(lmk05318_state_t* d)
         res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
         break;
     }
-    case XO52:
-    {
-        USDR_LOG("5318", USDR_LOG_INFO, "XO=52M, applying specific settings...");
-
-        static uint32_t regs[] =
-        {
-            0x00510A,
-            0x005200,
-            0x00530F,
-            0x00543C,
-            0x005540,
-            0x005600,
-            0x00571E,
-            0x005884,
-            0x005980,
-            0x005A00,
-            0x005B14,
-            0x005C00,
-            0x005D0F,
-            0x005E3C,
-            0x005F40,
-            0x006000,
-            0x00611E,
-            0x006284,
-            0x006380,
-        };
-
-        res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
-        break;
-    }
     default:
     {
         USDR_LOG("5318", USDR_LOG_ERROR, "XO=%.2fMHz not supported! Use 12.8, 25, 26 or 52M", (double)d->xo.fref / 1e6);
         return -EINVAL;
     }
     }
+
+    USDR_LOG("5318", USDR_LOG_INFO, "XO=%.2fMHz, applying specific settings...", (double)d->xo.fref / 1e6);
 
     return res;
 }
