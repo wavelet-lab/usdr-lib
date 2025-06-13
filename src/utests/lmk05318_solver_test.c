@@ -415,7 +415,29 @@ START_TEST(lmk05318_solver_test_xmass)
     res = res ? res : lmk05318_set_port_affinity(&cfg[4], AFF_APLL2);
     res = res ? res : lmk05318_solver(&st, cfg, 8);
     res = res ? res : lmk05318_reg_wr_from_map(&st, true);
-    ck_assert_int_eq( res, 0 );}
+    ck_assert_int_eq( res, 0 );
+}
+
+START_TEST(lmk05318_hyper_test1)
+{
+    int res = 0;
+
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, 491520000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 1, 491520000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 2, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 3, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 4, 0, false, OUT_OFF);
+    res = res ? res : lmk05318_port_request(p++, 5, 245760000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 6, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 7, 245760000, false, LVDS);
+    ck_assert_int_eq( res, 0 );
+
+    lmk05318_state_t st;
+    res = lmk05318_create(NULL, 0, 0, 52000000, XO_CMOS, false, NULL, cfg, SIZEOF_ARRAY(cfg), &st, true /*dry_run*/);
+    ck_assert_int_eq( res, 0 );
+}
 
 Suite * lmk05318_solver_suite(void)
 {
@@ -439,6 +461,7 @@ Suite * lmk05318_solver_suite(void)
     tcase_add_test(tc_core, lmk05318_dsdr_test3);
     tcase_add_test(tc_core, lmk05318_simplesync_test1);
     tcase_add_test(tc_core, lmk05318_solver_test_xmass);
+    tcase_add_test(tc_core, lmk05318_hyper_test1);
 
     suite_add_tcase(s, tc_core);
     return s;

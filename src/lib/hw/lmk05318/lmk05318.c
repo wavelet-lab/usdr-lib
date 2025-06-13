@@ -85,6 +85,7 @@ enum
     XO12_8 = 12800000,
     XO25   = 25000000,
     XO26   = 26000000,
+    XO52   = 52000000,
 };
 
 #define DPLL_FDIV_FRAC_MAX 0.9375f
@@ -607,9 +608,39 @@ static int lmk05318_set_xo_bawdetect_registers(lmk05318_state_t* d)
         res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
         break;
     }
+    case XO52:
+    {
+        USDR_LOG("5318", USDR_LOG_INFO, "XO=52M, applying specific settings...");
+
+        static uint32_t regs[] =
+        {
+            0x00510A,
+            0x005200,
+            0x00530F,
+            0x00543C,
+            0x005540,
+            0x005600,
+            0x00571E,
+            0x005884,
+            0x005980,
+            0x005A00,
+            0x005B14,
+            0x005C00,
+            0x005D0F,
+            0x005E3C,
+            0x005F40,
+            0x006000,
+            0x00611E,
+            0x006284,
+            0x006380,
+        };
+
+        res = lmk05318_add_reg_to_map(d, regs, SIZEOF_ARRAY(regs));
+        break;
+    }
     default:
     {
-        USDR_LOG("5318", USDR_LOG_ERROR, "XO=%.2fMHz not supported! Use 12.8, 25 or 26M", (double)d->xo.fref / 1e6);
+        USDR_LOG("5318", USDR_LOG_ERROR, "XO=%.2fMHz not supported! Use 12.8, 25, 26 or 52M", (double)d->xo.fref / 1e6);
         return -EINVAL;
     }
     }
