@@ -50,6 +50,8 @@ struct xsdr_dev
     unsigned lms7_lob;
 
     int tx_override_phase;
+    int tx_override_phase_iq;
+    int rx_override_phase;
 
     bool afe_active;
     bool siso_sdr_active_rx;
@@ -159,6 +161,11 @@ int xsdr_hwchans_cnt(xsdr_dev_t *d, bool rx, unsigned chans);
 int xsdr_override_drp(xsdr_dev_t *d, lsopaddr_t ls_op_addr,
                       size_t meminsz, void* pin, size_t memoutsz,
                       const void* pout);
+
+
+int xsdr_upd_phase(xsdr_dev_t *d);
+
+int xsdr_config_rcvdly(xsdr_dev_t *d, unsigned type, unsigned val);
 
 enum {
     XSDR_CAL_RXLO = 1,

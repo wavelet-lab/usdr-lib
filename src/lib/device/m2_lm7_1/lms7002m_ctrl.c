@@ -1063,9 +1063,9 @@ int lms7002m_samplerate(lms7002_dev_t *d,
         return res;
 
     // Set ADS for bypass mode
-    res = lms7002m_cds_set(&d->lmsstate, rxtsp_div == 1, rxtsp_div == 1);
-    if (res)
-        return res;
+    // res = lms7002m_cds_set(&d->lmsstate, rxtsp_div == 1, rxtsp_div == 1);
+    // if (res)
+    //    return res;
 
     d->lml_mode = cfg;
     USDR_LOG("XDEV", USDR_LOG_INFO, "rxrate=%.3fMHz txrate=%.3fMHz"

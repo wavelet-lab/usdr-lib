@@ -22,6 +22,9 @@ add_executable(usdr_dm_sensors usdr_dm_sensors.c)
 target_link_libraries(usdr_dm_sensors usdr)
 install(TARGETS usdr_dm_sensors RUNTIME)
 
+add_executable(usdr_lml7_test lms7002_dm_limelight.c)
+target_link_libraries(usdr_lml7_test usdr)
+
 list(APPEND WVLT_SCRIPTS
     wvlt_sdr_wrapper.py
 )

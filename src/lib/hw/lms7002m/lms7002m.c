@@ -350,7 +350,7 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
     unsigned rxmux = params.rx_lfsr ? LML_0X002A_RX_MUX_LFSR :
                          params.rx_tx_dig_loopback ? LML_0X002A_RX_MUX_TXFIFO : LML_0X002A_RX_MUX_RXTSP;
 
-    unsigned rdclk = (params.rx_ext_rd_fclk || params.rx_tx_dig_loopback) ?
+    unsigned rdclk = (params.rx_ext_rd_fclk /* || params.rx_tx_dig_loopback */ ) ?
                          ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_FCLK1 : LML_0X002A_RXRDCLK_MUX_FCLK2) :
                          ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_MCLK1 : LML_0X002A_RXRDCLK_MUX_MCLK2);
     uint16_t reg_mac = m->reg_mac;
@@ -395,6 +395,8 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
                                  (params.txdiv > 1) ? 1u : 0,
                                  (params.rxdiv > 1) ? 1u : 0),
         MAKE_LMS7002M_LML_0x002C( params.txdiv / 2u - 1u, params.rxdiv / 2u - 1u ),
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, params.rxdiv == 1 ? 0 : 1, 1, 1),
+        MAKE_LMS7002M_CDS_0x00AE(3, 3, 0, 0, 0, 0, 0, 0),
         MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac),
         MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac)
     };
@@ -402,6 +404,17 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
     return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
 }
 
+/*
+int lms7002m_cds_set(lms7002m_state_t* m, bool rxalml, bool rxblml)
+{
+    uint32_t regs[] = {
+        //   0x80AD03ff ^ ((rxalml ? 1 : 0) << 2) , //^ ((rxblml ? 1 : 0) << 3),
+        0x80AD03ff ^ ((rxalml ? 1 : 0) << 2),
+        0x80AE0C00,
+    };
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+*/
 
 int _lms7002m_fill_pos(lms7002m_lml_map_t l, lms7002m_lml_map_t* o)
 {
@@ -747,15 +760,6 @@ int lms7002m_dc_corr(lms7002m_state_t* m, unsigned p, int16_t v)
 }
 
 
-int lms7002m_cds_set(lms7002m_state_t* m, bool rxalml, bool rxblml)
-{
-    uint32_t regs[] = {
-        //   0x80AD03ff ^ ((rxalml ? 1 : 0) << 2) , //^ ((rxblml ? 1 : 0) << 3),
-        0x80AD03ff ^ ((rxalml ? 1 : 0) << 2),
-        0x80AE0C00,
-    };
-    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
-}
 
 
 // xxTSP
