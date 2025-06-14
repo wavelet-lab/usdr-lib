@@ -1330,9 +1330,9 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         d->type = devid;
         break;
 
-    case 0xff:
-        d->type = DSDR_PCIE_HIPER_R0;
-        break;
+    //case 0xff:
+    //    d->type = DSDR_PCIE_HIPER_R0;
+    //    break;
 
     default:
         USDR_LOG("XDEV", USDR_LOG_ERROR, "Unsupported HWID = %08x, skipping initialization!\n", hwid);
@@ -1403,8 +1403,8 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         return res;
     }
 
-
-    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xf);
+    // Put LMK into PD but enable all LDOs to settle
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xbf);
 
     for (unsigned j = 0; j < 10; j++) {
         usleep(10000);
@@ -1421,7 +1421,9 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
                 break;
         }
     }
-    usleep(100000);
+
+    usleep(200000); //TODO monitor power good signal!!!
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xff);
 
     //
     //LMK05318 init start
@@ -1449,7 +1451,8 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     lmk05318_port_request(&lmk_out[6], 6,           3840000, false, LVDS);
     lmk05318_port_request(&lmk_out[7], 7,   d->dac_rate / 2, false, LVDS);
 
-    res = lmk05318_create(dev, d->subdev, I2C_LMK, 26000000, XO_CMOS, false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->lmk, false /*dry_run*/);
+    res = lmk05318_create(dev, d->subdev, I2C_LMK, (d->type == DSDR_PCIE_HIPER_R0) ? 52000000 : 26000000, XO_CMOS,
+                          false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->lmk, false /*dry_run*/);
     if(res)
         return res;
 
@@ -1462,10 +1465,9 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     }
 
     //wait for lock
-    res = lmk05318_wait_apll1_lock(&d->lmk, 100000);
-    res = res ? res : lmk05318_wait_apll2_lock(&d->lmk, 100000);
-
-    lmk05318_check_lock(&d->lmk, &los, false /*silent*/); //just to log state
+    res = lmk05318_wait_apll1_lock(&d->lmk, 200000);
+    res = res ? res : lmk05318_wait_apll2_lock(&d->lmk, 200000);
+    res = res ? res : lmk05318_check_lock(&d->lmk, &los, false /*silent*/); //just to log state
 
     if(res)
     {
@@ -1475,10 +1477,12 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     //sync to make APLL1/APLL2 & out channels in-phase
     res = lmk05318_sync(&d->lmk);
+    //res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0x7f);
+    //res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xff);
     if(res)
         return res;
 
-    USDR_LOG("DSDR", USDR_LOG_INFO, "LMK03518 outputs synced");
+    USDR_LOG("DSDR", USDR_LOG_INFO, "LMK03518 outputs synced, LOS=%x", los);
     //LMK05318 init end
     //
 
