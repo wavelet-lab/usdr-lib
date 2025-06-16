@@ -264,6 +264,28 @@ static void dev_set_rx_phase(unsigned val)
     }
 }
 
+static void dev_set_rx_lfsr_hw_checker(bool en)
+{
+    int res = !dev ? 0 : usdr_dme_set_uint(dev, "/dm/sdr/0/phy_rx_lfsr", en);
+    if (res) {
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set HW LFSR Checker: errno %d", res);
+        dev_exit();
+    }
+}
+
+static void dev_get_rx_lfsr_hw_checker(unsigned errs[4])
+{
+    uint64_t v = 0;
+    int res = !dev ? 0 : usdr_dme_get_uint(dev, "/dm/sdr/0/phy_rx_lfsr", &v);
+    if (res) {
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get HW LFSR BER: errno %d", res);
+        dev_exit();
+    }
+
+    for (unsigned j = 0; j < 4; j++) {
+        errs[j] = (v >> (j * 16)) & 0xffff;
+    }
+}
 
 static void dev_deinit()
 {
@@ -645,6 +667,47 @@ void do_lfsr_test(lfsr_stream_t str[TOTAL_STREAMS])
 
 #define MAX_TAPS 64
 
+void do_lfsr_hw_test(unsigned str[TOTAL_STREAMS])
+{
+    dev_set_rx_lfsr_hw_checker(true);
+    usleep(1000 * maximum_iterations);
+    dev_get_rx_lfsr_hw_checker(str);
+}
+
+void lfsr_test_hw()
+{
+    mode = LML_MODE_LFSR;
+
+    float rate = specific_rate;
+    dev_set_rate(rate);
+    unsigned str[MAX_TAPS][TOTAL_STREAMS];
+
+    for (unsigned k = 0; k < MAX_TAPS; k++) {
+        dev_init();
+
+        dev_set_rx_phase(k); // CLK
+        dev_set_rate(rate);
+
+        do_lfsr_hw_test(str[k]);
+
+        dev_deinit();
+    }
+
+    for (unsigned j = 0; j < 4; j++) {
+        fprintf(stderr, "CH%d: ", j);
+
+        for (unsigned k = 0; k < MAX_TAPS; k++) {
+            unsigned ecnt = str[k][j];
+
+            fprintf(stderr, "%c", (ecnt == 0) ? ' ' : (ecnt < 1000) ? 'x' : 'X');
+        }
+
+        fprintf(stderr, "\n");
+    }
+
+
+}
+
 void lfsr_tests()
 {
     mode = LML_MODE_LFSR;
@@ -737,11 +800,11 @@ int main(int argc, char** argv)
 
     unsigned statistics = 0;
 
-
+    bool hw_tests = false;
     bool dump_rx = false;
     int opt, res;
 
-    while ((opt = getopt(argc, argv, "Mi:r:j:D:t:l:do")) != -1) {
+    while ((opt = getopt(argc, argv, "Mi:r:j:D:t:l:dow")) != -1) {
         switch (opt) {
         case 'M':
             memcached = true;
@@ -771,6 +834,9 @@ int main(int argc, char** argv)
         case 'o':
             dump_rx = true;
             break;
+        case 'w':
+            hw_tests = true;
+            break;
         default:
             exit(EXIT_FAILURE);
         }
@@ -799,7 +865,11 @@ int main(int argc, char** argv)
 
 
     // Tests
-    lfsr_tests();
+    if (hw_tests) {
+        lfsr_test_hw();
+    } else {
+        lfsr_tests();
+    }
 
     res = dry_run ? 0 : usdr_dmd_close(dev);
     return res;

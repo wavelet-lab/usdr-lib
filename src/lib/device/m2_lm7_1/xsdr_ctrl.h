@@ -153,6 +153,14 @@ int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int 
 //int (*set_tx_testsig_fs8)(void* param, int channel);
 
 
+int xsdr_phy_en_lfsr_mimo(xsdr_dev_t *d, bool en);
+enum lfsr_cntr_types {
+    LFSR_CNTR_SYNC = 0,
+    LFSR_CNTR_LOST = 1,
+    LFSR_CNTR_BER = 2,
+};
+
+int xsdr_phy_lfsr_mimo_state(xsdr_dev_t *d, int type, uint32_t v[4]);
 int xsdr_phy_tune_rx(xsdr_dev_t *d, unsigned val);
 int xsdr_clk_debug_info(xsdr_dev_t *d);
 

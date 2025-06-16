@@ -221,6 +221,9 @@ static int dev_m2_lm7_1_dev_dac_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, ui
 static int dev_m2_lm7_1_phyrxlm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_phy_rx_dly_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_phy_rx_lfsr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_phy_rx_lfsr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
+
 
 static int dev_m2_lm7_1_lms7002rxlml_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_debug_clkinfo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -316,7 +319,8 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
 
     { "/dm/sdr/0/dac_vctcxo",      { dev_m2_lm7_1_dev_dac_vctcxo_set, NULL }},
 
-    { "/dm/sdr/0/phy_rx_dly",      { dev_m2_lm7_1_phy_rx_dly_set, NULL }},
+    { "/dm/sdr/0/phy_rx_dly",       { dev_m2_lm7_1_phy_rx_dly_set, NULL }},
+    { "/dm/sdr/0/phy_rx_lfsr",      { dev_m2_lm7_1_phy_rx_lfsr_set, dev_m2_lm7_1_phy_rx_lfsr_get }},
 
     { "/dm/sdr/0/phyrxlml",         { dev_m2_lm7_1_phyrxlm_set, NULL }},
     { "/debug/hw/lms7002m/0/rxlml", { dev_m2_lm7_1_lms7002rxlml_set, NULL }},
@@ -367,6 +371,30 @@ int dev_m2_lm7_1_phy_rx_dly_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
     unsigned val = (value & 0x1f);
 
     return xsdr_config_rcvdly(&((struct dev_m2_lm7_1_gps *)ud)->xdev, type, val);
+}
+
+int dev_m2_lm7_1_phy_rx_lfsr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return xsdr_phy_en_lfsr_mimo(&((struct dev_m2_lm7_1_gps *)ud)->xdev, value ? true : false);
+}
+
+int dev_m2_lm7_1_phy_rx_lfsr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    uint32_t v[4];
+    uint64_t val = 0;
+    int res = xsdr_phy_lfsr_mimo_state(&((struct dev_m2_lm7_1_gps *)ud)->xdev, LFSR_CNTR_BER, v);
+    if (res)
+        return res;
+
+    for (unsigned i = 0; i < 4; i++) {
+        uint64_t k = v[i];
+        if (k > UINT16_MAX) {
+            k = UINT16_MAX;
+        }
+        val |= k << (16 * i);
+    }
+    *ovalue = val;
+    return 0;
 }
 
 int dev_m2_lm7_1_lms7002rxlml_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
