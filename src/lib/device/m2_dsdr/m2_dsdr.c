@@ -1414,15 +1414,32 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     }
 
     if (d->type == DSDR_M2_R0) {
+        bool pg;
         for (unsigned j = 0; j < 20; j++) {
             usleep(10000);
             res = res ? res : tps6381x_init(dev, d->subdev, I2C_TPS63811, true, true, 3450);
             if (res == 0)
                 break;
         }
+        if (res) {
+            USDR_LOG("XDEV", USDR_LOG_ERROR, "Unable to intialize tps6381x booster!\n");
+            return res;
+        }
+
+        for (unsigned j = 0; j < 20; j++) {
+            res = res ? res : tps6381x_check_pg(dev, d->subdev, I2C_TPS63811, &pg);
+            if (!res || pg) {
+                break;
+            }
+            usleep(20000);
+        }
+        if (!pg) {
+            USDR_LOG("XDEV", USDR_LOG_ERROR, "No PG signal in tps6381x booster!\n");
+            return -EIO;
+        }
     }
 
-    usleep(200000); //TODO monitor power good signal!!!
+    usleep(20000);
     res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xff);
 
     //
