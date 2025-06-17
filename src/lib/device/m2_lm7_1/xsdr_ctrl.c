@@ -224,7 +224,7 @@ int xsdr_override_drp(xsdr_dev_t *d, lsopaddr_t ls_op_addr,
         if (res || (!(rb & (1 << 9))))
             break;
 
-        usleep(1000);
+        usleep(10);
     }
 
     if (res)
@@ -375,7 +375,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, unsigned rxphase)
             return 0;
         }
 
-        usleep(5000);
+        usleep(500);
     }
 
     return -EIO;
@@ -601,6 +601,7 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
 
             // Autocalibration if RX phase wasn't set
             if (d->rx_override_phase == 0) {
+                const unsigned check_to = 10;
 
                 // Boost IO voltage for stable high speed link
                 if (!d->siso_sdr_active_rx && d->new_rev && rxrate > 85e6) {
@@ -608,15 +609,20 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
                 }
 
                 unsigned errs[4] = { UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
-                uint64_t badness;
+
                 uint64_t badness_m = UINT64_MAX;
                 unsigned phase_m = 0;
+                unsigned c;
 
                 res = res ? res : lms7002m_set_lmlrx_mode(&d->base, XSDR_LMLRX_LFSR);
                 res = res ? res : usleep(10);
                 res = res ? res : xsdr_phy_en_lfsr_mimo(d, true);
-                res = res ? res : usleep(5000);
-                res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
+                for (c = 0; c < check_to; c++) {
+                    res = res ? res : usleep(1000);
+                    res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
+                    if (res || !noerrors_v4(errs, &badness_m))
+                        break;
+                }
 
                 USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE=AUTO [%d/%d/%d/%d]\n",
                          errs[0], errs[1], errs[2], errs[3]);
@@ -624,14 +630,24 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
                     goto phase_calibrated;
 
                 for (unsigned ph = 1; ph < 64; ph++) {
+                    unsigned w;
+                    uint64_t badness = UINT64_MAX;
+
                     res = res ? res : usleep(10);
                     res = res ? res : xsdr_configure_lml_mmcm_tx(d, ph);
                     res = res ? res : xsdr_phy_en_lfsr_mimo(d, true);
-                    res = res ? res : usleep(5000);
-                    res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
 
-                    USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE=%d [%d/%d/%d/%d]\n", ph - 1,
-                             errs[0], errs[1], errs[2], errs[3]);
+                    for (w = 0; w < check_to; w++) {
+                        res = res ? res : usleep(1000);
+                        res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
+                        if (res || !noerrors_v4(errs, &badness)) {
+                            break;
+                        }
+                    }
+                    badness *= 1.0 * check_to / (w + 1); // Rescale
+
+                    USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%.3e\n", ph - 1, w,
+                             errs[0], errs[1], errs[2], errs[3], (double)badness);
                     if (res || noerrors_v4(errs, &badness))
                         goto phase_calibrated;
 
