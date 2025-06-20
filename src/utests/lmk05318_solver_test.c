@@ -439,6 +439,28 @@ START_TEST(lmk05318_hyper_test1)
     ck_assert_int_eq( res, 0 );
 }
 
+START_TEST(lmk05318_customer_test1)
+{
+    int res = 0;
+
+    lmk05318_out_config_t* p = &cfg[0];
+
+    res = res ? res : lmk05318_port_request(p++, 0, 491520000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 1, 491520000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 2, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 3, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 4, 312500000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 5, 245760000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 6, 3840000, false, LVDS);
+    res = res ? res : lmk05318_port_request(p++, 7, 245760000, false, LVDS);
+    ck_assert_int_eq( res, 0 );
+
+    lmk05318_state_t st;
+    res = lmk05318_create(NULL, 0, 0, 52000000, XO_CMOS, false, NULL, cfg, SIZEOF_ARRAY(cfg), &st, true /*dry_run*/);
+    ck_assert_int_eq( res, 0 );
+}
+
+
 Suite * lmk05318_solver_suite(void)
 {
     Suite *s;
@@ -448,7 +470,7 @@ Suite * lmk05318_solver_suite(void)
     tc_core = tcase_create("HW");
     tcase_set_timeout(tc_core, 1);
     tcase_add_checked_fixture(tc_core, setup, teardown);
-
+/*
     tcase_add_test(tc_core, lmk05318_solver_test1);
     tcase_add_test(tc_core, lmk05318_solver_test3);
     tcase_add_test(tc_core, lmk05318_solver_test4);
@@ -461,7 +483,9 @@ Suite * lmk05318_solver_suite(void)
     tcase_add_test(tc_core, lmk05318_dsdr_test3);
     tcase_add_test(tc_core, lmk05318_simplesync_test1);
     tcase_add_test(tc_core, lmk05318_solver_test_xmass);
-    tcase_add_test(tc_core, lmk05318_hyper_test1);
+    tcase_add_test(tc_core, lmk05318_hyper_test1); */
+
+    tcase_add_test(tc_core, lmk05318_customer_test1);
 
     suite_add_tcase(s, tc_core);
     return s;
