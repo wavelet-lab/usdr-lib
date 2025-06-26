@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_f32_i16_2.h"
 
-//#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
 #define STREAM_SIZE (8192 + 16 + 8 + 7)
 #define STREAM_SIZE_CHECK STREAM_SIZE
@@ -32,9 +32,11 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
-    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(float)   * STREAM_SIZE_SPEED);
+    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
+    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(int16_t) * STREAM_SIZE_SPEED);
+    ck_assert_int_eq(res, 0);
 
     srand( time(0) );
 
@@ -74,18 +76,7 @@ static int is_equal()
 
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
-    const char* fn_name = NULL;
-    conv_function_t fn = conv_get_f32_i16_c(o, &fn_name);
-
-    //ignore dups
-    if(last_fn_name && !strcmp(last_fn_name, fn_name))
-        return NULL;
-
-    if(log)
-        fprintf(stderr, "%-20s\t", fn_name);
-
-    last_fn_name = fn_name;
-    return fn;
+    return generic_get_fn(o, log, conv_get_f32_i16_c, &last_fn_name);
 }
 
 static void printer(const char* header)
@@ -113,7 +104,9 @@ START_TEST(conv_f32_i16_check)
 
     //get etalon output data (generic foo)
     (*get_fn(OPT_GENERIC, 0))(&pin, bzin, &pout, bzout);
+#ifdef DEBUG_PRINT
     printer("ETALON:");
+#endif
     memcpy(out_etalon, out, bzout);
 
     while(opt != OPT_GENERIC)
@@ -176,17 +169,12 @@ END_TEST
 
 Suite * conv_f32_i16_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_f32_i16");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_f32_i16_check);
-    tcase_add_loop_test(tc_core, conv_f32_i16_speed, 0, 3);
-    suite_add_tcase(s, tc_core);
+    Suite* s = suite_create("conv_f32_i16");
+
+    ADD_REGRESS_TEST(s, conv_f32_i16_check);
+    ADD_PERF_LOOP_TEST(s, conv_f32_i16_speed, 60, 0, 3);
+
     return s;
 }

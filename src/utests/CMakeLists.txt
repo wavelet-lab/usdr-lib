@@ -3,6 +3,7 @@
 
 include_directories(../lib/port)
 include_directories(../lib/lowlevel)
+include_directories(../lib/hw)
 
 add_library(mock_lowlevel STATIC mock_lowlevel.c)
 
@@ -11,6 +12,10 @@ set(TEST_SUIT_SRCS
     ring_buffer_test.c
     trig_test.c
     clockgen_test.c
+    lmk05318_solver_test.c
+    lmx2820_solver_test.c
+    lmx1214_solver_test.c
+    lmx1204_solver_test.c
 )
 
 include_directories(../lib/xdsp)

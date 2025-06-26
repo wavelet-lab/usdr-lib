@@ -1918,3 +1918,76 @@ pages:
       name: PD_XBUF_TX
     - bits: 0
       name: EN_G_XBUF
+- name: CDS
+  regs:
+  - addr: '0x00AD'
+    name: '0x00AD'
+    fields:
+    - bits: '15:14'
+      name: MCLK2
+      desc: MCLK2 clock delay
+    - bits: '13:12'
+      name: MCLK1
+      desc: MCLK1 clock delay
+    - bits: '11:10'
+      name: RESERVED
+    - bits: 9
+      name: NTXBTSP
+      desc: TX TSPB clock inversion control
+    - bits: 8
+      name: NTXATSP
+      desc: TX TSPA clock inversion control
+    - bits: 7
+      name: NRXBTSP
+      desc: RX TSPB clock inversion control
+    - bits: 6
+      name: NRXATSP
+      desc: RX TSPA clock inversion control
+    - bits: 5
+      name: NTXBLML
+      desc: TX LMLB clock inversion control
+    - bits: 4
+      name: NTXALML
+      desc: TX LMLA clock inversion control
+    - bits: 3
+      name: NRXBLML
+      desc: RX LMLB clock inversion control
+    - bits: 2
+      name: NRXALML
+      desc: RX LMLA clock inversion control
+    - bits: 1
+      name: NMCLK2
+      desc: MCLK2 clock inversion control
+    - bits: 0
+      name: NMCLK1
+      desc: MCLK1 clock inversion control
+  - addr: '0x00AE'
+    name: '0x00AE'
+    fields:
+    - bits: '15:14'
+      name: TXBTSP
+      desc: TX TSP B clock delay
+    - bits: '13:12'
+      name: TXATSP
+      desc: TX TSP A clock delay
+    - bits: '11:10'
+      name: RXBTSP
+      desc: RX TSP B clock delay
+    - bits: '9:8'
+      name: RXATSP
+      desc: RX TSP A clock delay
+    - bits: '7:6'
+      name: TXBLML
+      desc: TX LML B clock delay
+    - bits: '5:4'
+      name: TXALML
+      desc: TX LML A clock delay
+    - bits: '3:2'
+      name: RXBLML
+      desc: RX LML B clock delay
+    - bits: '1:0'
+      name: RXALML
+      desc: RX LML A clock delay
+
+
+

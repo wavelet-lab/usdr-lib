@@ -24,6 +24,10 @@
 #define MAX(x,y) (((x) > (y)) ? (x) : (y))
 #endif
 
+enum {
+    DRP_MMCM_PORT_RX = 0,
+    DRP_MMCM_PORT_TX = 1,
+};
 
 //         TXA     RXB
 //         TXB     RXA
@@ -117,6 +121,16 @@ static int _xsdr_checkpwr(xsdr_dev_t *d)
     return 0;
 }
 
+int xsdr_config_rcvdly(xsdr_dev_t *d, unsigned type, unsigned val)
+{
+    lldev_t dev = d->base.lmsstate.dev;
+    unsigned subdev = d->base.lmsstate.subdev;
+
+    uint32_t cmd = (1 << 31) | (((type + 14) & 0x7f) << 24) | (val & 0xffff);
+
+    return lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, cmd);
+}
+
 int xsdr_set_samplerate(xsdr_dev_t *d,
                         unsigned rxrate, unsigned txrate,
                         unsigned adcclk, unsigned dacclk)
@@ -124,7 +138,250 @@ int xsdr_set_samplerate(xsdr_dev_t *d,
     return xsdr_set_samplerate_ex(d, rxrate, txrate, adcclk, dacclk, 0);
 }
 
-int xsdr_configure_lml_mmcm(xsdr_dev_t *d)
+
+enum {
+    PHY_REG_PORT_CTRL    = 0,
+    PHY_REG_MMCM_DRP     = 1,
+    PHY_REG_MMCM_CTRL    = 2,
+    PHY_REG_MMCM_PSINC   = 3,
+    PHY_REG_DLY_VALUE    = 4,
+    PHY_REG_PORT_IQSEL   = 5,
+};
+
+enum {
+    PHY_REG_RXBANK_CTRL = 0,    // Control registers
+    PHY_REG_RXBANK_MMCM = 1,    // MMCM registers
+    PHY_REG_RXBANK_CLKMEAS = 2,
+    PHY_REG_RXBANK_LFSRCHK = 3, // LFSR cntrol
+
+    PHY_REG_RXBANK_CLKDLY = 14, // Clock delay
+    PHY_REG_RXBANK_FRMDLY = 15, // Frame delay
+};
+
+
+int xsdr_phy_rx_reg(xsdr_dev_t *d, bool wr, uint8_t bank, uint8_t addr, uint16_t val)
+{
+    uint32_t reg = (wr ? 0x80000000 : 0) | (((uint32_t)bank & 0x7f) << 24) | ((uint32_t)addr << 16) | val;
+    return lowlevel_reg_wr32(d->base.lmsstate.dev, d->base.lmsstate.subdev, REG_CFG_PHY_0, reg);
+}
+
+int xsdr_phy_en_lfsr_mimo(xsdr_dev_t *d, bool en)
+{
+    int res = 0;
+    if (!en) {
+        return xsdr_phy_rx_reg(d, true, PHY_REG_RXBANK_LFSRCHK, 0, 0x0f);
+    }
+
+    res = res ? res : xsdr_phy_rx_reg(d, true, PHY_REG_RXBANK_LFSRCHK, 0, 0x0f);
+    res = res ? res : xsdr_phy_rx_reg(d, true, PHY_REG_RXBANK_LFSRCHK, 0, 0xf0);
+    return res;
+}
+
+int xsdr_phy_lfsr_mimo_state(xsdr_dev_t *d, int type, uint32_t v[4])
+{
+    int res = 0;
+    // Get BER statistics
+    for (unsigned h = 0; h < 4; h++) {
+        unsigned p = ((type & 0x3) << 2) | (h);
+        res = res ? res : xsdr_phy_rx_reg(d, false, PHY_REG_RXBANK_LFSRCHK, p, 0);
+        res = res ? res : usleep(1);
+        res = res ? res : lowlevel_reg_rd32(d->base.lmsstate.dev, 0, REG_CFG_PHY_0, &v[h]);
+    }
+
+    return res;
+}
+
+int xsdr_phy_tx_reg(xsdr_dev_t *d, uint8_t addr, uint32_t val)
+{
+    return lowlevel_reg_wr32(d->base.lmsstate.dev, d->base.lmsstate.subdev, REG_CFG_PHY_1, (((uint32_t)addr) << 24) | (val & 0xffffff));
+}
+
+int xsdr_override_drp(xsdr_dev_t *d, lsopaddr_t ls_op_addr,
+                      size_t meminsz, void* pin, size_t memoutsz,
+                      const void* pout)
+{
+    int res = 0;
+    lldev_t dev = d->base.lmsstate.dev;
+    unsigned subdev = d->base.lmsstate.subdev;
+    unsigned port = (ls_op_addr >> 16) & 0xff;
+    if (port != DRP_MMCM_PORT_TX)
+        return -ENOENT;
+
+    uint32_t drp_cmd = (ls_op_addr & 0x7f) << 16;
+    if (meminsz == 2 && memoutsz == 0) {
+    } else if (meminsz == 0 && memoutsz == 2) {
+        drp_cmd |= (1 << 23) | (*((uint16_t*)pout));
+    } else {
+        return -EINVAL;
+    }
+
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_DRP, drp_cmd);
+
+    // Wait for transaction to process
+    uint32_t rb;
+    for (unsigned i = 0; i < 1000; i++) {
+        res = res ? res : lowlevel_reg_rd32(dev, subdev, REG_CFG_PHY_1, &rb);
+        if (res || (!(rb & (1 << 9))))
+            break;
+
+        usleep(10);
+    }
+
+    if (res)
+        return res;
+
+    USDR_LOG("XDEV", USDR_LOG_DEBUG, "MMCM DRP_TX CMD=%08x RB=%08x\n", drp_cmd, rb);
+
+    if (meminsz) {
+        *((uint16_t*)pin) = rb >> 16;
+    }
+    return 0;
+}
+
+static struct mmcm_config_raw g_tx_cfg_raw;
+
+
+int xsdr_upd_phase(xsdr_dev_t *d)
+{
+    if (d->tx_override_phase) {
+        unsigned raw = d->tx_override_phase - 1;
+        g_tx_cfg_raw.ports[CLKOUT_PORT_0].phase = raw & 7;
+        g_tx_cfg_raw.ports[CLKOUT_PORT_0].delay = (raw >> 3);
+    }
+
+    USDR_LOG("XDEV", USDR_LOG_ERROR, "MMCM_TX set phase to %d.%d\n", g_tx_cfg_raw.ports[CLKOUT_PORT_0].delay, g_tx_cfg_raw.ports[CLKOUT_PORT_0].phase);
+    mmcm_init_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_TX, &g_tx_cfg_raw);
+
+    // Reset MMCM
+    xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, 1);
+    usleep(1);
+    xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, 0);
+    return 0;
+}
+
+int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, unsigned rxphase)
+{
+    bool nomul = d->base.lml_mode.txsisoddr || (d->base.txtsp_div > 1);
+    unsigned tx_mclk = d->base.cgen_clk / d->base.txcgen_div / d->base.lml_mode.txdiv;
+    unsigned io_clk  = (nomul) ? tx_mclk : tx_mclk * 2;
+    unsigned vco_div_io_m = (MMCM_VCO_MAX  + io_clk - 1) / io_clk;
+    if (vco_div_io_m > 63)
+        vco_div_io_m = 63;
+
+    unsigned vco_div_io = vco_div_io_m & 0xfc; //Multiply of 4
+    int res = 0;
+    struct mmcm_config_raw cfg_raw;
+    memset(&cfg_raw, 0, sizeof(cfg_raw));
+
+    if (vco_div_io * io_clk < MMCM_VCO_MIN) {
+        if ((vco_div_io + 2) * io_clk > MMCM_VCO_MAX) {
+            vco_div_io += 1;
+        } else {
+            vco_div_io += 2;
+        }
+    }
+
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, 0);
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : 0b1100);
+
+    // 0 - IO_TX_IQSEL (individual phase delay)
+    // 1 - IO_TX
+    // 2 - IO_RX
+    // 3 - LOGIC_TX
+    // 4 - n/a
+    // 5 - FCLK_RX
+    // 6 - FCLK_TX
+
+    cfg_raw.type = MT_7SERIES_MMCM;
+    cfg_raw.ports[CLKOUT_PORT_0].period_l = (vco_div_io + 1) / 2;
+    cfg_raw.ports[CLKOUT_PORT_0].period_h = vco_div_io / 2;
+    cfg_raw.ports[CLKOUT_PORT_1].period_l = (vco_div_io + 1) / 2;
+    cfg_raw.ports[CLKOUT_PORT_1].period_h = vco_div_io / 2;
+
+    cfg_raw.ports[CLKOUT_PORT_2].period_l = (vco_div_io + 1) / 2;
+    cfg_raw.ports[CLKOUT_PORT_2].period_h = vco_div_io / 2;
+    cfg_raw.ports[CLKOUT_PORT_3].period_l = vco_div_io;
+    cfg_raw.ports[CLKOUT_PORT_3].period_h = vco_div_io;
+
+    cfg_raw.ports[CLKOUT_PORT_4].period_l = vco_div_io;
+    cfg_raw.ports[CLKOUT_PORT_4].period_h = vco_div_io;
+    cfg_raw.ports[CLKOUT_PORT_5].period_l = (vco_div_io + 1) / 2;
+    cfg_raw.ports[CLKOUT_PORT_5].period_h = vco_div_io / 2;
+    cfg_raw.ports[CLKOUT_PORT_6].period_l = (vco_div_io + 1) / 2;
+    cfg_raw.ports[CLKOUT_PORT_6].period_h = vco_div_io / 2;
+
+    unsigned total_budget = 8 * vco_div_io;
+    unsigned phase = (((tx_mclk < 2*35e6) || (tx_mclk > 2*60e6)) ? 4 : 5) * total_budget / 6;
+    unsigned phase_iq = 4;
+
+    cfg_raw.ports[CLKOUT_PORT_6].phase = phase % 8;
+    cfg_raw.ports[CLKOUT_PORT_6].delay = phase / 8;
+    cfg_raw.ports[CLKOUT_PORT_0].phase = phase_iq % 8;
+    cfg_raw.ports[CLKOUT_PORT_0].delay = phase_iq / 8;
+
+    if (d->tx_override_phase_iq) {
+        unsigned raw = d->tx_override_phase_iq - 1;
+        cfg_raw.ports[CLKOUT_PORT_0].phase = raw % 8;
+        cfg_raw.ports[CLKOUT_PORT_0].delay = raw / 8;
+    }
+
+    if (d->tx_override_phase) {
+        unsigned raw = d->tx_override_phase - 1;
+        cfg_raw.ports[CLKOUT_PORT_6].phase = raw % 8;
+        cfg_raw.ports[CLKOUT_PORT_6].delay = raw / 8;
+    }
+
+    if (d->rx_override_phase || rxphase) {
+        unsigned raw = (rxphase != 0) ? rxphase - 1 : d->rx_override_phase - 1;
+        cfg_raw.ports[CLKOUT_PORT_2].phase = raw % 8;
+        cfg_raw.ports[CLKOUT_PORT_2].delay = raw / 8;
+    }
+
+    if (nomul) {
+        cfg_raw.ports[CLKOUT_PORT_FB].period_l =(vco_div_io + 1) / 2;
+        cfg_raw.ports[CLKOUT_PORT_FB].period_h = vco_div_io / 2;
+    } else {
+        cfg_raw.ports[CLKOUT_PORT_FB].period_l = vco_div_io;
+        cfg_raw.ports[CLKOUT_PORT_FB].period_h = vco_div_io;
+    }
+    USDR_LOG("XDEV", USDR_LOG_ERROR, "MMCM_TX set to MCLK = %.3f IOCLK = %.3f Mhz IODIV = %d FWDCLK_DELAY%s = %d (VCO %d) SISO_DDR=%d VCO=%.3f MHZ\n",
+             tx_mclk / (1.0e6), io_clk / (1.0e6), vco_div_io,
+             (d->tx_override_phase) ? "_OVR" : "",
+             cfg_raw.ports[CLKOUT_PORT_0].delay, cfg_raw.ports[CLKOUT_PORT_0].phase,
+             d->base.lml_mode.txsisoddr,
+             tx_mclk * (cfg_raw.ports[CLKOUT_PORT_FB].period_l + cfg_raw.ports[CLKOUT_PORT_FB].period_h) / 1.0e6);
+
+    res = res ? res : mmcm_init_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_TX, &cfg_raw);
+
+    // Reset MMCM
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, 1);
+    usleep(10);
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, 0);
+    if (res)
+        return res;
+
+    for (unsigned k = 0; k < 10; k++) {
+        uint32_t rb;
+
+        // Wait for lock
+        res = res ? res : lowlevel_reg_rd32(d->base.lmsstate.dev, d->base.lmsstate.subdev,
+                                            REG_CFG_PHY_1, &rb);
+        if (res)
+            break;
+
+        USDR_LOG("XDEV", USDR_LOG_DEBUG, "MMCM FLAGS:%08x\n", rb);
+        if (rb & (1 << 8)) {
+             g_tx_cfg_raw = cfg_raw;
+            return 0;
+        }
+
+        usleep(500);
+    }
+
+    return -EIO;
+}
+
+int xsdr_configure_lml_mmcm_rx(xsdr_dev_t *d)
 {
     bool nomul = d->base.lml_mode.rxsisoddr || (d->base.rxtsp_div > 1);
     unsigned rx_mclk = d->base.cgen_clk / d->base.rxcgen_div / d->base.lml_mode.rxdiv;
@@ -165,7 +422,7 @@ int xsdr_configure_lml_mmcm(xsdr_dev_t *d)
         cfg_raw.ports[CLKOUT_PORT_FB].period_l = vco_div_io;
         cfg_raw.ports[CLKOUT_PORT_FB].period_h = vco_div_io;
     }
-    USDR_LOG("XDEV", USDR_LOG_ERROR, "MMCM set to MCLK = %.3f IOCLK = %.3f Mhz IODIV = %d\n",
+    USDR_LOG("XDEV", USDR_LOG_ERROR, "MMCM_RX set to MCLK = %.3f IOCLK = %.3f Mhz IODIV = %d\n",
              rx_mclk / (1.0e6), io_clk / (1.0e6), vco_div_io);
 
     res = (res) ? res : lowlevel_reg_wr32(d->base.lmsstate.dev, d->base.lmsstate.subdev, REG_CFG_PHY_0,
@@ -181,7 +438,7 @@ int xsdr_configure_lml_mmcm(xsdr_dev_t *d)
         return res;
 
     usleep(1000);
-    res = mmcm_init_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, 0, &cfg_raw);
+    res = mmcm_init_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_RX, &cfg_raw);
     if (res)
         return res;
 
@@ -198,7 +455,8 @@ int xsdr_configure_lml_mmcm(xsdr_dev_t *d)
         // Wait for lock
         res = lowlevel_reg_rd32(d->base.lmsstate.dev, d->base.lmsstate.subdev,
                                 REG_CFG_PHY_0, &rb);
-
+        if (res)
+            break;
 
         USDR_LOG("XDEV", USDR_LOG_INFO, "MMCM FLAGS:%08x\n", rb);
         if (rb & (1 << 16))
@@ -206,43 +464,13 @@ int xsdr_configure_lml_mmcm(xsdr_dev_t *d)
 
         usleep(5000);
     }
-    return 0;
 
-    return -ERANGE;
-#if 0
-    res = lowlevel_reg_wr32(d->base.base.dev, d->base.subdev, REG_CFG_PHY_0,
-                      0x80000000 | 0x10000 | 0x1);
-    if (res)
-        return res;
-    res = lowlevel_reg_wr32(d->base.base.dev, d->base.subdev, REG_CFG_PHY_0,
-                      0x80000000 | 0x10000 | 0x0);
-    if (res)
-        return res;
-
-
-
-    ////////////////////
-
-    res = (res) ? res : lowlevel_reg_wr32(d->base.base.dev, d->base.subdev, REG_CFG_PHY_0,
-                                          0x80000000 | 0x10000 | 0x1);
-    usleep(1000);
-    res = (res) ? res : lowlevel_reg_wr32(d->base.base.dev, d->base.subdev, REG_CFG_PHY_0,
-                                          0x80000000 | 0x10000 | 0x0);
-
-    res = (res) ? res : lowlevel_reg_wr32(d->base.base.dev, d->base.subdev, REG_CFG_PHY_0,
-                                           0x01000000);
-    for (unsigned k = 0; k < 10; k++) {
-        // Wait for lock
-        res = lowlevel_reg_rd32(d->base.base.dev, d->base.subdev,
-                                REG_CFG_PHY_0, &rb);
-    }
-#endif
     return res;
 }
 
-int xsdr_phy_tune(xsdr_dev_t *d, unsigned val)
+int xsdr_phy_tune_rx(xsdr_dev_t *d, unsigned val)
 {
-    int res = mmcm_set_phdigdelay_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, 0, CLKOUT_PORT_0, val);
+    int res = mmcm_set_phdigdelay_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_RX, CLKOUT_PORT_0, val);
     return res;
 }
 
@@ -263,21 +491,40 @@ int xsdr_hwchans_cnt(xsdr_dev_t *d, bool rx, unsigned chans)
     return 0;
 }
 
+enum {
+    PHY_CFG_VALID_MSK = 0x80,
+    PHY_CFG_LML2_IS_RX = 0x40,
+    PHY_CFG_TX_MMCM = 0x20,
+    PHY_CFG_RX_MMCM = 0x10,
+};
+
+static bool noerrors_v4(unsigned errs[4], uint64_t* badness)
+{
+    if (badness) {
+        *badness = (errs[0]*errs[0]) + (errs[1]*errs[1]) + (errs[2]*errs[2])  + (errs[3]*errs[3]);
+    }
+    return errs[0] == 0 && errs[1] == 0 && errs[2] == 0 && errs[3] == 0;
+}
+
 int xsdr_set_samplerate_ex(xsdr_dev_t *d,
                            unsigned rxrate, unsigned txrate,
                            unsigned adcclk, unsigned dacclk,
                            unsigned flags)
 {
-    const unsigned l1_pid = (d->hwid) & 0x7;
-    const unsigned l2_pid = (d->hwid >> 4) & 0x7;
-    const bool lml1_rx_valid = (l1_pid == 3 || l1_pid == 4 || l1_pid == 5 || l1_pid == 6)     || l1_pid == 7;
-    const bool lml2_rx_valid = (l2_pid == 3 || l2_pid == 4 || l2_pid == 5 || l2_pid == 6)     || l2_pid == 7;
-    const unsigned rx_port = (lml2_rx_valid && !lml1_rx_valid) ? 2 : 1;
-    const unsigned rx_port_1 = (rx_port == 1);
+    const uint8_t phycfg_id = (d->hwid) & 0xff;
+    const bool rx_port_is_1 = ((phycfg_id & PHY_CFG_LML2_IS_RX) != PHY_CFG_LML2_IS_RX);
+    const bool tx_mmcm = ((phycfg_id & PHY_CFG_TX_MMCM) == PHY_CFG_TX_MMCM);
+    const bool rx_mmcm = ((phycfg_id & PHY_CFG_RX_MMCM) == PHY_CFG_RX_MMCM);
+
     lldev_t dev = d->base.lmsstate.dev;
     subdev_t subdev = d->base.lmsstate.subdev;
     unsigned sisosdrflag;
     int res;
+
+    if (!(phycfg_id & PHY_CFG_VALID_MSK)) {
+        USDR_LOG("XDEV", USDR_LOG_ERROR, "Incompatible firmware, please update to 20250501 at least!\n");
+        return -ENOTSUP;
+    }
 
     res = _xsdr_checkpwr(d);
     if (res)
@@ -287,12 +534,10 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
         rxrate = 1e6;
     }
 
-    // TODO: Check if MMCM is present
-    bool mmcmrx = false;
     unsigned m_flags = flags | ((d->siso_sdr_active_rx && d->hwchans_rx == 1) ? XSDR_LML_SISO_DDR_RX : 0)
                        | ((d->siso_sdr_active_tx && d->hwchans_tx == 1) ? XSDR_LML_SISO_DDR_TX : 0);
 
-    res = lms7002m_samplerate(&d->base, rxrate, txrate, adcclk, dacclk, m_flags, rx_port_1);
+    res = lms7002m_samplerate(&d->base, rxrate, txrate, adcclk, dacclk, m_flags, rx_port_is_1);
     if (res)
         return res;
 
@@ -312,47 +557,124 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
         d->afe_active = true;
     }
 
-    if (mmcmrx) {
-        res = xsdr_configure_lml_mmcm(d);
-        if (res)
-            return res;
+    if (rxrate) {
+        if (rx_mmcm) {
+            res = res ? res : xsdr_configure_lml_mmcm_rx(d);
+        }
+
+        sisosdrflag = d->base.lml_mode.rxsisoddr ? 8 : 0;
+        res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000007 | sisosdrflag);
+        usleep(100);
+        res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000000 | sisosdrflag);
+
+
+        if (rx_mmcm) {
+            // Configure PHY (reset)
+            // TODO phase search
+
+            for (unsigned h = 0; h < 16; h++) {
+                res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000007 | sisosdrflag);
+                usleep(100);
+                res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000000 | sisosdrflag);
+
+
+                USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE=%d\n", h);
+                res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x00000000);
+                unsigned tmp; //, tmp2;
+                for (unsigned k = 0; k < 100; k++) {
+                    res = res ? res : lowlevel_reg_rd32(dev, subdev, REG_CFG_PHY_0, &tmp);
+                }
+
+                res = res ? res : mmcm_set_digdelay_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_RX, CLKOUT_PORT_0, h);
+            }
+        }
+
+        // Switch to clock meas
+        res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x02000000);
     }
 
-    sisosdrflag = d->base.lml_mode.rxsisoddr ? 8 : 0;
-    res = lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000007 | sisosdrflag);
-    usleep(100);
-    res = lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000000 | sisosdrflag);
+    if (txrate) {
+        res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_CTRL, 1);
 
+        if (tx_mmcm) {
+            res = res ? res : xsdr_configure_lml_mmcm_tx(d, 0);
 
-    if (mmcmrx) {
-        // Configure PHY (reset)
-        // TODO phase search
-        for (unsigned h = 0; h < 16; h++) {
-            res = lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000007 | sisosdrflag);
-            usleep(100);
-            res = lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000000 | sisosdrflag);
+            // Autocalibration if RX phase wasn't set
+            if (d->rx_override_phase == 0) {
+                const unsigned check_to = 10;
 
+                // Boost IO voltage for stable high speed link
+                if (!d->siso_sdr_active_rx && d->new_rev && rxrate > 85e6) {
+                    res = res ? res : xsdr_set_vio(d, 1910);
+                }
 
-            USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE=%d\n", h);
-            res = lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x00000000);
-            unsigned tmp; //, tmp2;
-            for (unsigned k = 0; k < 100; k++) {
-                res = lowlevel_reg_rd32(dev, subdev, REG_CFG_PHY_0, &tmp);
+                unsigned errs[4] = { UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
+
+                uint64_t badness_m = UINT64_MAX;
+                unsigned phase_m = 0;
+                unsigned c;
+
+                res = res ? res : lms7002m_set_lmlrx_mode(&d->base, XSDR_LMLRX_LFSR);
+                res = res ? res : usleep(10);
+                res = res ? res : xsdr_phy_en_lfsr_mimo(d, true);
+                for (c = 0; c < check_to; c++) {
+                    res = res ? res : usleep(1000);
+                    res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
+                    if (res || !noerrors_v4(errs, &badness_m))
+                        break;
+                }
+
+                USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE=AUTO [%d/%d/%d/%d]\n",
+                         errs[0], errs[1], errs[2], errs[3]);
+                if (res || noerrors_v4(errs, &badness_m))
+                    goto phase_calibrated;
+
+                for (unsigned ph = 1; ph < 64; ph++) {
+                    unsigned w;
+                    uint64_t badness = UINT64_MAX;
+
+                    res = res ? res : usleep(10);
+                    res = res ? res : xsdr_configure_lml_mmcm_tx(d, ph);
+                    res = res ? res : xsdr_phy_en_lfsr_mimo(d, true);
+
+                    for (w = 0; w < check_to; w++) {
+                        res = res ? res : usleep(1000);
+                        res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
+                        if (res || !noerrors_v4(errs, &badness)) {
+                            break;
+                        }
+                    }
+                    badness *= 1.0 * check_to / (w + 1); // Rescale
+
+                    USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%.3e\n", ph - 1, w,
+                             errs[0], errs[1], errs[2], errs[3], (double)badness);
+                    if (res || noerrors_v4(errs, &badness))
+                        goto phase_calibrated;
+
+                    if (badness < badness_m) {
+                        badness = badness_m;
+                        phase_m = ph;
+                    }
+                }
+
+                USDR_LOG("XDEV", USDR_LOG_WARNING, "Restoring pahse to %d (bandness=%" PRId64 ")\n",
+                         phase_m, badness_m);
+
+                // Try our best at least
+                res = res ? res : xsdr_configure_lml_mmcm_tx(d, phase_m);
+phase_calibrated:
+                res = res ? res : xsdr_phy_en_lfsr_mimo(d, false);
+                res = res ? res : lms7002m_set_lmlrx_mode(&d->base, XSDR_LMLRX_NORMAL);
+                ;
             }
+        } else {
 
-            mmcm_set_digdelay_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, 0, CLKOUT_PORT_0, h);
+            unsigned dly = (d->tx_override_phase) ? (d->tx_override_phase - 1) : 3;
+            res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_DLY_VALUE, dly);
         }
     }
 
-    // Switch to clock meas
-    res = lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x02000000);
-
-    // uint32_t m;
-    // res = lowlevel_reg_rd32(dev, subdev, REG_CFG_PHY_0, &m);
-    // USDR_LOG("XDEV", USDR_LOG_INFO, "MEAS=%08x\n", m);
-
     return res;
-
 }
 
 
@@ -363,16 +685,32 @@ int xsdr_clk_debug_info(xsdr_dev_t *d)
     unsigned crx, ctx, caux;
     int res = 0;
 
+    uint32_t dump[12];
+
     res = res ? res : dev_gpi_get32(dev, IGPI_MEAS_RXCLK, &crx);
     res = res ? res : dev_gpi_get32(dev, IGPI_MEAS_TXCLK, &ctx);
     res = res ? res : dev_gpi_get32(dev, IGPI_CLK1PPS, &caux);
     if (res)
         return res;
 
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "PHY - RX %08x (%d) / TX %08x (%d) / AUX %08x (%d)\n",
+
+    for (unsigned h = 0; h < 12; h++) {
+        unsigned p = ((h & 0x3) << 2) | (h >> 2);
+        res = res ? res : xsdr_phy_rx_reg(d, false, PHY_REG_RXBANK_LFSRCHK, p, 0);
+        res = res ? res : xsdr_phy_rx_reg(d, false, PHY_REG_RXBANK_LFSRCHK, p, 0);
+        res = res ? res : xsdr_phy_rx_reg(d, false, PHY_REG_RXBANK_LFSRCHK, p, 0);
+        res = res ? res : xsdr_phy_rx_reg(d, false, PHY_REG_RXBANK_LFSRCHK, p, 0);
+
+        res = res ? res : lowlevel_reg_rd32(dev, 0, REG_CFG_PHY_0, &dump[h]);
+    }
+
+
+    USDR_LOG("XDEV", USDR_LOG_WARNING, "PHY - RX %08x (%d) / TX %08x (%d) / AUX %08x (%d) %d/%d/%d/%d  %d/%d/%d/%d  %d/%d/%d/%d \n",
              crx, crx & 0xfffffff,
              ctx, ctx & 0xfffffff,
-             caux, caux & 0xfffffff);
+             caux, caux & 0xfffffff,
+             dump[0], dump[1], dump[2], dump[3],  dump[4], dump[5], dump[6], dump[7],   dump[8], dump[9], dump[10], dump[11]
+             );
     return res;
 }
 
@@ -717,7 +1055,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
 {
     lldev_t dev = d->base.lmsstate.dev;
     unsigned subdev = 0;
-    int res;
+    int res = 0;
     bool pg = false;
 
     enum tx_switch_cfg {
@@ -778,7 +1116,8 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
         d->base.cfg_auto_rx[1].swlb = 1;
     }
 
-    res = dev_gpo_set(dev, IGPO_LMS_PWR, 0);
+    res = res ? res : dev_gpo_set(dev, IGPO_LMS_PWR, 0x80);
+    res = res ? res : dev_gpo_set(dev, IGPO_LMS_PWR, 0x00);
     if (res)
         return res;
 
@@ -802,7 +1141,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
     }
 
     // LMS Vcore boost to 1.25V
-    res = res ? res : lp8758_vout_set(dev, subdev, I2C_BUS_LP8758_FPGA, 2, 1260);
+    res = res ? res : lp8758_vout_set(dev, subdev, I2C_BUS_LP8758_FPGA, 2, 1280);
     res = res ? res : lp8758_vout_set(dev, subdev, I2C_BUS_LP8758_FPGA, 3, 1850);
 
     res = res ? res : lp8758_vout_ctrl(dev, subdev, I2C_BUS_LP8758_FPGA, 0, 1, 1); //1v0 -- less affected
@@ -916,6 +1255,10 @@ int _xsdr_init_revo(xsdr_dev_t *d)
     d->base.cfg_auto_tx[1].swlb = 0;
     strncpy(d->base.cfg_auto_tx[1].name0, "H", sizeof(d->base.cfg_auto_tx[1].name0));
     strncpy(d->base.cfg_auto_tx[1].name1, "B1", sizeof(d->base.cfg_auto_tx[1].name1));
+
+
+    // Reset
+    res = res ? res : dev_gpo_set(dev, IGPO_LMS_PWR, 0x80);
 
     // Set external GPIOs to 3.3V
     res = res ? res : dev_gpo_set(dev, IGPO_IOVCCSEL, 1);
@@ -1073,6 +1416,27 @@ static
 int _xsdr_pwren_revo(xsdr_dev_t *d, bool on)
 {
     return 0;
+}
+
+int xsdr_set_vio(xsdr_dev_t *d, unsigned vio_mv)
+{
+    if (!d->new_rev) {
+        if (vio_mv > 3300)
+            vio_mv = 3300;
+        else if (vio_mv < 1600)
+            vio_mv = 1600;
+
+        USDR_LOG("XDEV", USDR_LOG_WARNING, "VIO set to %d mV\n", vio_mv);
+        return lp8758_vout_set(d->base.lmsstate.dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA, 1, vio_mv);
+    }
+
+    if (vio_mv > 2100)
+        vio_mv = 2100;
+    else if (vio_mv < 1600)
+        vio_mv = 1600;
+
+    USDR_LOG("XDEV", USDR_LOG_WARNING, "VIO set to %d mV\n", vio_mv);
+    return lp8758_vout_set(d->base.lmsstate.dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA, 3, vio_mv);
 }
 
 int xsdr_pwren(xsdr_dev_t *d, bool on)

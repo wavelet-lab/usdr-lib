@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <assert.h>
 #include <inttypes.h>
 
@@ -620,7 +621,7 @@ int parse_sfetrx4(const char* dformat, const channel_info_t *channels, unsigned 
     bool bifurcation = true;
     struct parsed_data_format pfmt;
 
-    strncpy(out->dfmt, dformat, sizeof(out->dfmt));
+    snprintf(out->dfmt, sizeof(out->dfmt), "%s", dformat);
     if (stream_parse_dformat(out->dfmt, &pfmt)) {
         return -EINVAL;
     }
@@ -1149,7 +1150,7 @@ int create_sfetrx4_stream(device_t* device,
     fecfg.cfg_base = fe_base;
     fecfg.cfg_fifomaxbytes = fe_fifobsz;
 
-    strncpy(dfmt, dformat, sizeof(dfmt));
+    snprintf(dfmt, sizeof(dfmt), "%s", dformat);
     struct parsed_data_format pfmt;
     if (stream_parse_dformat(dfmt, &pfmt)) {
         return -EINVAL;

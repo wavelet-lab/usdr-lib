@@ -239,6 +239,15 @@ int main(int argc, char** argv)
             fprintf(stderr, "Looks like you're using latest firmware already\n");
             return 9;
         }
+        if (image.usr_access2 == file.usr_access2 && golden && !force) {
+            fprintf(stderr, "Looks like GOLD image %08x is already flashed!\n", file.usr_access2);
+            return 9;
+        }
+        if (image_master.usr_access2 == file.usr_access2 && !golden && !force) {
+            fprintf(stderr, "Looks like MASTER image %08x is already flashed!\n", file.usr_access2);
+            return 9;
+        }
+
         if (corrupt) {
             memset(outa + 512*1024, -1, 512*1024);
             fprintf(stderr, "CORRUPTING IMAGE!!!\n\n");

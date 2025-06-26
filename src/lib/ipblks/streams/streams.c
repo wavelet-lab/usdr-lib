@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "streams.h"
-#include <string.h>
+#include <stdio.h>
 
 struct bitsfmt get_bits_fmt(const char* fmt)
 {
@@ -17,7 +17,7 @@ struct bitsfmt get_bits_fmt(const char* fmt)
     else if (strcasecmp(fmt, "i16") == 0)
         bmft.bits = 16;
     else
-        strncpy((char*)bmft.func, fmt, sizeof(bmft.func));
+        snprintf((char*)bmft.func, sizeof(bmft.func), "%s", fmt);
 
     return bmft;
 }

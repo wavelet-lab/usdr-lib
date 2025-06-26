@@ -1105,7 +1105,7 @@ int _debug_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
         return 0;
     }
 
-    if (value & 0x800000) {
+    if (!(value & 0x800000)) {
         res = lmk05318_reg_wr(&o->lmk, addr, data);
 
         USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK05318 WR REG %04x => %04x\n",
@@ -1330,9 +1330,9 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         d->type = devid;
         break;
 
-    case 0xff:
-        d->type = DSDR_PCIE_HIPER_R0;
-        break;
+    //case 0xff:
+    //    d->type = DSDR_PCIE_HIPER_R0;
+    //    break;
 
     default:
         USDR_LOG("XDEV", USDR_LOG_ERROR, "Unsupported HWID = %08x, skipping initialization!\n", hwid);
@@ -1403,8 +1403,8 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         return res;
     }
 
-
-    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xf);
+    // Put LMK into PD but enable all LDOs to settle
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xbf);
 
     for (unsigned j = 0; j < 10; j++) {
         usleep(10000);
@@ -1414,35 +1414,94 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     }
 
     if (d->type == DSDR_M2_R0) {
+        bool pg;
         for (unsigned j = 0; j < 20; j++) {
             usleep(10000);
             res = res ? res : tps6381x_init(dev, d->subdev, I2C_TPS63811, true, true, 3450);
             if (res == 0)
                 break;
         }
-    }
-    usleep(40000);
+        if (res) {
+            USDR_LOG("XDEV", USDR_LOG_ERROR, "Unable to intialize tps6381x booster!\n");
+            return res;
+        }
 
-
-    for (unsigned j = 0; j < 25; j++) {
-        usleep(40000);
-        res = res ? res : lmk05318_create(dev, d->subdev, I2C_LMK,
-                                          (d->type == DSDR_PCIE_HIPER_R0) ? 2 : 1 /* TODO FIXME!!! */, &d->lmk);
-        if (res == 0)
-            break;
-    }
-    // Update deviders for 245/491MSPS rate
-    if (d->jesdv == DSDR_JESD204C_6664_491) {
-        // GT should be 245.76
-        // FPGA SYSCLK should be 245.76
-
-        res = res ? res : lmk05318_set_out_div(&d->lmk, LMK_FPGA_GT_AFEREF, 4);
-        res = res ? res : lmk05318_set_out_div(&d->lmk, LMK_FPGA_1PPS, 4);
+        for (unsigned j = 0; j < 20; j++) {
+            res = res ? res : tps6381x_check_pg(dev, d->subdev, I2C_TPS63811, &pg);
+            if (!res || pg) {
+                break;
+            }
+            usleep(20000);
+        }
+        if (!pg) {
+            USDR_LOG("XDEV", USDR_LOG_ERROR, "No PG signal in tps6381x booster!\n");
+            return -EIO;
+        }
     }
 
-    usleep(1000);
+    usleep(20000);
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xff);
 
-    res = res ? res : lmk05318_check_lock(&d->lmk, &los);
+    //
+    //LMK05318 init start
+
+    //set true to enable IN_REF1 40M
+    bool enable_in_ref = false;
+
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+    dpll.enabled = enable_in_ref;
+    dpll.en[LMK05318_PRIREF] = true;
+    dpll.fref[LMK05318_PRIREF] = 40000000;
+    dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
+    dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
+    dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
+
+    lmk05318_out_config_t lmk_out[8];
+
+    lmk05318_port_request(&lmk_out[0], 0,         491520000, false, OUT_OFF);
+    lmk05318_port_request(&lmk_out[1], 1,         491520000, false, LVDS);
+    lmk05318_port_request(&lmk_out[2], 2,           3840000, false, LVDS);
+    lmk05318_port_request(&lmk_out[3], 3,           3840000, false, OUT_OFF);
+    lmk05318_port_request(&lmk_out[4], 4,                 0, false, OUT_OFF);
+    lmk05318_port_request(&lmk_out[5], 5,   d->dac_rate / 2, false, LVDS);
+    lmk05318_port_request(&lmk_out[6], 6,           3840000, false, LVDS);
+    lmk05318_port_request(&lmk_out[7], 7,   d->dac_rate / 2, false, LVDS);
+
+    res = lmk05318_create(dev, d->subdev, I2C_LMK, (d->type == DSDR_PCIE_HIPER_R0) ? 52000000 : 26000000, XO_CMOS,
+                          false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->lmk, false /*dry_run*/);
+    if(res)
+        return res;
+
+    //wait for PRIREF/SECREF validation
+    res = lmk05318_wait_dpll_ref_stat(&d->lmk, 100000);
+    if(res)
+    {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "LMK03518 DPLL input reference freqs are not validated during specified timeout");
+        return res;
+    }
+
+    //wait for lock
+    res = lmk05318_wait_apll1_lock(&d->lmk, 200000);
+    res = res ? res : lmk05318_wait_apll2_lock(&d->lmk, 200000);
+    res = res ? res : lmk05318_check_lock(&d->lmk, &los, false /*silent*/); //just to log state
+
+    if(res)
+    {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "LMK03518 PLLs not locked during specified timeout");
+        return res;
+    }
+
+    //sync to make APLL1/APLL2 & out channels in-phase
+    res = lmk05318_sync(&d->lmk);
+    //res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0x7f);
+    //res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xff);
+    if(res)
+        return res;
+
+    USDR_LOG("DSDR", USDR_LOG_INFO, "LMK03518 outputs synced, LOS=%x", los);
+    //LMK05318 init end
+    //
 
     for (int i = 0; i < 5; i++) {
         uint32_t clk = 0;
@@ -1451,9 +1510,6 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         USDR_LOG("DSDR", USDR_LOG_ERROR, "Clk %d: %d\n", clk >> 28, clk & 0xfffffff);
         usleep(0.5 * 1e6);
     }
-
-    res = res ? res : lmk05318_check_lock(&d->lmk, &los);
-    // res = res ? res : lmk05318_set_out_mux(&d->lmk, LMK_FPGA_SYSREF, false, LVDS);
 
     usleep(1000);
     res = res ? res : dev_gpi_get32(dev, IGPI_PGOOD, &pg);

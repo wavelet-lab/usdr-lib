@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_4cf32_ci12_2.h"
 
-//#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
 #define PACKET_SIZE (8192u)
 #define OUT_BZ (PACKET_SIZE * sizeof(float) * 3 / 8)
@@ -36,12 +36,14 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in_0,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 2);
-    posix_memalign((void**)&in_1,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
-    posix_memalign((void**)&in_2,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
-    posix_memalign((void**)&in_3,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
-    posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in_0,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
+    res = res ? res : posix_memalign((void**)&in_1,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
+    res = res ? res : posix_memalign((void**)&in_2,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
+    res = res ? res : posix_memalign((void**)&in_3,       ALIGN_BYTES, PACKET_SIZE * sizeof(float) / 4);
+    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
+    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
+    ck_assert_int_eq(res, 0);
 
     in[0] = in_0;
     in[1] = in_1;
@@ -77,18 +79,7 @@ static void teardown()
 
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
-    const char* fn_name = NULL;
-    conv_function_t fn = conv_get_4cf32_ci12_c(o, &fn_name);
-
-    //ignore dups
-    if(last_fn_name && !strcmp(last_fn_name, fn_name))
-        return NULL;
-
-    if(log)
-        fprintf(stderr, "%-20s\t", fn_name);
-
-    last_fn_name = fn_name;
-    return fn;
+    return generic_get_fn(o, log, conv_get_4cf32_ci12_c, &last_fn_name);
 }
 
 static int is_equal()
@@ -185,7 +176,9 @@ START_TEST(conv_4cf32_ci12_check_simd)
 
     //get etalon output data (generic foo)
     (*get_fn(OPT_GENERIC, 0))(pin, bzin, &pout, bzout);
+#ifdef DEBUG_PRINT
     printer("ETALON:");
+#endif
     memcpy(out_etalon, out, bzout);
 
     while(opt != OPT_GENERIC)
@@ -197,8 +190,7 @@ START_TEST(conv_4cf32_ci12_check_simd)
             (*fn)(pin, bzin, &pout, bzout);
 #ifdef DEBUG_PRINT
             printer(NULL);
-#endif \
-    //int res = memcmp(out, out_etalon, bzout);
+#endif
             int res = is_equal();
             res ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
             ck_assert_int_eq( res, 0 );
@@ -243,18 +235,12 @@ END_TEST
 
 Suite * conv_4cf32_ci12_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_4cf32_ci12");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_4cf32_ci12_check_simd);
-    tcase_add_loop_test(tc_core, conv_4cf32_ci12_speed, 0, 3);
+    Suite* s = suite_create("conv_4cf32_ci12");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, conv_4cf32_ci12_check_simd);
+    ADD_PERF_LOOP_TEST(s, conv_4cf32_ci12_speed, 60, 0, 3);
+
     return s;
 }

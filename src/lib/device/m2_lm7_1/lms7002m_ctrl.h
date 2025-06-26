@@ -87,8 +87,8 @@ struct lms7002_dev
     uint8_t txcgen_div;
     uint8_t rxtsp_div;
     uint8_t txtsp_div;
-    uint8_t tx_host_inter;
-    uint8_t rx_host_decim;
+    uint8_t tx_dsp_inter;
+    uint8_t rx_dsp_decim;
 
     uint8_t rx_no_siso_map;
     uint8_t tx_no_siso_map;

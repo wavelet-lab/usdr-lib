@@ -156,7 +156,7 @@ enum dc_param {
 int lms7002m_dc_corr(lms7002m_state_t* m, unsigned p, int16_t v);
 
 // CDS
-int lms7002m_cds_set(lms7002m_state_t* m, bool rxalml, bool rxblml);
+// int lms7002m_cds_set(lms7002m_state_t* m, bool rxalml, bool rxblml);
 
 // This functions is sensible to A/B channel selection
 enum lms7002m_xxtsp {
