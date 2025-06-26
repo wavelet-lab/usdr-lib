@@ -1,5 +1,5 @@
-usdr (0.9.9~bookworm0) stable; urgency=low
+usdr (0.9.10b~bookworm0) stable; urgency=low
 
   * Fixes and improvements
 
- -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Sun, 30 Jan 2025 00:00:00 +0000
+ -- Ivan Kolesnikov <ivan.kolesnikov@wavelet-lab.com>  Thu, 26 Jun 2025 00:00:00 +0000
