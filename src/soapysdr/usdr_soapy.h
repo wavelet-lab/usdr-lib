@@ -70,7 +70,13 @@ public:
      * Channels API
      ******************************************************************/
 
+    void setFrontendMapping(const int direction, const std::string &mapping);
+
+    std::string getFrontendMapping(const int direction) const;
+
     size_t getNumChannels(const int direction) const;
+
+    SoapySDR::Kwargs getChannelInfo(const int direction, const size_t channel) const;
 
     bool getFullDuplex(const int direction, const size_t channel) const;
 
@@ -128,6 +134,39 @@ public:
         const long timeoutUs = 100000);
 
     /*******************************************************************
+     * Direct buffer access API
+     ******************************************************************/
+
+    size_t getNumDirectAccessBuffers(SoapySDR::Stream *stream);
+
+    int getDirectAccessBufferAddrs(SoapySDR::Stream *stream, const size_t handle, void **buffs);
+
+    int acquireReadBuffer(
+        SoapySDR::Stream *stream,
+        size_t &handle,
+        const void **buffs,
+        int &flags,
+        long long &timeNs,
+        const long timeoutUs = 100000);
+
+    void releaseReadBuffer(
+        SoapySDR::Stream *stream,
+        const size_t handle);
+
+    int acquireWriteBuffer(
+        SoapySDR::Stream *stream,
+        size_t &handle,
+        void **buffs,
+        const long timeoutUs = 100000);
+
+    void releaseWriteBuffer(
+        SoapySDR::Stream *stream,
+        const size_t handle,
+        const size_t numElems,
+        int &flags,
+        const long long timeNs = 0);
+
+    /*******************************************************************
      * Antenna API
      ******************************************************************/
 
@@ -159,15 +198,35 @@ public:
 
     std::complex<double> getIQBalance(const int direction, const size_t channel) const;
 
+    bool hasIQBalanceMode(const int direction, const size_t channel) const;
+
+    void setIQBalanceMode(const int direction, const size_t channel, const bool automatic);
+
+    bool getIQBalanceMode(const int direction, const size_t channel) const;
+
+    bool hasFrequencyCorrection(const int direction, const size_t channel) const;
+
+    void setFrequencyCorrection(const int direction, const size_t channel, const double value);
+
+    double getFrequencyCorrection(const int direction, const size_t channel) const;
+
     /*******************************************************************
      * Gain API
      ******************************************************************/
 
     std::vector<std::string> listGains(const int direction, const size_t channel) const;
 
+    bool hasGainMode(const int direction, const size_t channel) const;
+
+    void setGainMode(const int direction, const size_t channel, const bool automatic);
+
+    bool getGainMode(const int direction, const size_t channel) const;
+
     void setGain(const int direction, const size_t channel, const double value);
 
     void setGain(const int direction, const size_t channel, const std::string &name, const double value);
+
+    double getGain(const int direction, const size_t channel) const;
 
     double getGain(const int direction, const size_t channel, const std::string &name) const;
 
@@ -181,7 +240,11 @@ public:
 
     SoapySDR::ArgInfoList getFrequencyArgsInfo(const int direction, const size_t channel) const;
 
+    void setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
+
     void setFrequency(const int direction, const size_t channel, const std::string &name, const double frequency, const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
+
+    double getFrequency(const int direction, const size_t channel) const;
 
     double getFrequency(const int direction, const size_t channel, const std::string &name) const;
 
@@ -215,6 +278,8 @@ public:
 
     SoapySDR::RangeList getBandwidthRange(const int direction, const size_t channel) const;
 
+    std::vector<double> listBandwidths(const int direction, const size_t channel) const;
+
     /*******************************************************************
      * Clocking API
      ******************************************************************/
@@ -224,6 +289,12 @@ public:
     double getMasterClockRate(void) const;
 
     SoapySDR::RangeList getMasterClockRates(void) const;
+
+    void setReferenceClockRate(const double rate);
+
+    double getReferenceClockRate(void) const;
+
+    SoapySDR::RangeList getReferenceClockRates(void) const;
 
     std::vector<std::string> listClockSources(void) const;
 
@@ -235,11 +306,19 @@ public:
      * Time API
      ******************************************************************/
 
+    std::vector<std::string> listTimeSources(void) const;
+
+    void setTimeSource(const std::string &source);
+
+    std::string getTimeSource(void) const;
+
     bool hasHardwareTime(const std::string &what = "") const;
 
     long long getHardwareTime(const std::string &what = "") const;
 
     void setHardwareTime(const long long timeNs, const std::string &what = "");
+
+    void setCommandTime(const long long timeNs, const std::string &what = "");
 
     /*******************************************************************
      * Sensor API
@@ -261,6 +340,16 @@ public:
      * Register API
      ******************************************************************/
 
+    std::vector<std::string> listRegisterInterfaces(void) const;
+
+    void writeRegister(const std::string &name, const unsigned addr, const unsigned value);
+
+    unsigned readRegister(const std::string &name, const unsigned addr) const;
+
+    void writeRegisters(const std::string &name, const unsigned addr, const std::vector<unsigned> &value);
+
+    std::vector<unsigned> readRegisters(const std::string &name, const unsigned addr, const size_t length) const;
+
     void writeRegister(const unsigned addr, const unsigned value);
 
     unsigned readRegister(const unsigned addr) const;
@@ -273,9 +362,31 @@ public:
 
     void writeSetting(const std::string &key, const std::string &value);
 
+    std::string readSetting(const std::string &key) const;
+
     SoapySDR::ArgInfoList getSettingInfo(const int direction, const size_t channel) const;
 
     void writeSetting(const int direction, const size_t channel, const std::string &key, const std::string &value);
+
+    std::string readSetting(const int direction, const size_t channel, const std::string &key) const;
+
+    /*******************************************************************
+     * GPIO API
+     ******************************************************************/
+
+    std::vector<std::string> listGPIOBanks(void) const;
+
+    void writeGPIO(const std::string &bank, const unsigned value);
+
+    void writeGPIO(const std::string &bank, const unsigned value, const unsigned mask);
+
+    unsigned readGPIO(const std::string &bank) const;
+
+    void writeGPIODir(const std::string &bank, const unsigned dir);
+
+    void writeGPIODir(const std::string &bank, const unsigned dir, const unsigned mask);
+
+    unsigned readGPIODir(const std::string &bank) const;
 
     /*******************************************************************
      * I2C API
@@ -290,6 +401,23 @@ public:
      ******************************************************************/
 
     unsigned transactSPI(const int addr, const unsigned data, const size_t numBits);
+
+    /*******************************************************************
+     * UART API
+     ******************************************************************/
+
+    std::vector<std::string> listUARTs(void) const;
+
+    void writeUART(const std::string &which, const std::string &data);
+
+    std::string readUART(const std::string &which, const long timeoutUs = 100000) const;
+
+    /*******************************************************************
+     * Native Access API
+     ******************************************************************/
+
+    void* getNativeDeviceHandle(void) const;
+
 protected:
     void setUParam(const int direction, const char* param, const char* sub, unsigned pval);
     SoapySDRLogLevel callLogLvl() const { return _dump_calls ? SOAPY_SDR_ERROR : SOAPY_SDR_INFO; }
@@ -312,12 +440,12 @@ private:
         std::vector<ring_circbuf_t*> rxcbuf;
     };
 
-    const char* get_sdr_param(int sdridx, const char* dir, const char* par, const char* subpar);
+    const char* get_sdr_param(int sdridx, const char* dir, const char* par, const char* subpar) const;
 
     enum { MAX_CHANNELS = 2 };
 
     std::shared_ptr<usdr_handle> _dev;
-    char _param_name[128];
+    mutable char _param_name[128];
 
     unsigned _rx_log_chans = 0;
     unsigned _tx_log_chans = 0;
@@ -353,5 +481,8 @@ private:
     int _txcorr = 0;
 
     std::string _clk_source = "internal";
-};
+    std::string _time_source = "internal";
 
+    // Frontend mapping
+    std::string _frontend_mapping[2];
+};
