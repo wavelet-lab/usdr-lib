@@ -403,7 +403,7 @@ int _sfetrx4_stream_send(stream_handle_t* str,
         stream->stats.pktok ++;
 
         USDR_LOG("UDMS", USDR_LOG_DEBUG, "Send stat %d -- %08x.%08x.%08x.%08x -- HOST:%d WIRE:%d\n"
-                                        "    Buff (Pstd/Reqd/Cpld/Aired) %2d/%2d/%2d/%2d  DropFE:%"PRId64" DropDMA:%"PRId64" TAGS:%d FIFO:%d\n",
+                                        "    Buff (Pstd/Reqd/Cpld/Aired) %2d/%2d/%2d/%2d  DropFE:%" PRId64 " DropDMA:%" PRId64 " TAGS:%d FIFO:%d\n",
                  stat_sz, stat[0], stat[1], stat[2], stat[3], host_bytes, wire_bytes,
                  st.usrbuf_posted, st.usrbuf_requested, st.usrbuf_completed, st.usrbuf_aired,
                  stream->stats.fe_drop, stream->stats.dma_drop, st.pcietags, st.fifo_used);
@@ -432,11 +432,11 @@ int _sfetrx4_stream_send(stream_handle_t* str,
         for (unsigned b = 0; b < bursts; b++) {
             stream->tf_data(nstreams, host_bytes, &dma_buffer, wire_bytes);
             for (unsigned i = 0; i < stream->channels; i++) {
-                nstreams[i] += host_off;
+                nstreams[i] = (char*)nstreams[i] + host_off;
             }
-            dma_buffer += (wire_bytes + brst_align) & ~brst_align;
+            dma_buffer = (char*)dma_buffer + ((wire_bytes + brst_align) & ~brst_align);
         }
-        wire_len = dma_buffer - buffer;
+        wire_len = (char*)dma_buffer - (char*)buffer;
     } else {
         wire_len = wire_bytes * bursts;
         stream->tf_data((const void**)stream_buffs, host_bytes * bursts, &buffer, wire_len);
@@ -472,7 +472,7 @@ static int _sfetrx4_op(stream_handle_t* str,
         start = true;
         break;
     default:
-        USDR_LOG("UDMS", USDR_LOG_INFO, "Stream[%d] STOP; STATS bytes = %" PRIu64 ", samples = %" PRIu64 ", dropped_fe/dropped_dma/rcvd = %"PRIu64"/%"PRIu64"/%"PRIu64"\n",
+        USDR_LOG("UDMS", USDR_LOG_INFO, "Stream[%d] STOP; STATS bytes = %" PRIu64 ", samples = %" PRIu64 ", dropped_fe/dropped_dma/rcvd = %" PRIu64 "/%" PRIu64 "/%" PRIu64 "\n",
                 stream->ll_streamo, stream->stats.wirebytes, stream->stats.symbols, stream->stats.fe_drop, stream->stats.dma_drop, stream->stats.pktok);
         start = false;
     }

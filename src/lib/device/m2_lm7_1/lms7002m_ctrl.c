@@ -257,7 +257,6 @@ int lms7002m_set_gain(lms7002_dev_t *d,
         res = lms7002m_rbb_pga(&d->lmsstate, gain * 10);
         break;
     case RFIC_LMS7_RX_LB_GAIN:
-
         res = lms7002m_rfe_gain(&d->lmsstate, RFE_GAIN_RFB, gain * 10, &aret);
         actual = aret / 10;
 
@@ -270,6 +269,7 @@ int lms7002m_set_gain(lms7002_dev_t *d,
         if (gain > 0)
             gain = 0;
         actual = gain;
+
         res = lms7002m_trf_gain(&d->lmsstate, TRF_GAIN_PAD, -10 * gain, &aret);
         if (channel & LMS7_CH_A)
             d->tx_loss[0] = aret / -10;
@@ -284,13 +284,10 @@ int lms7002m_set_gain(lms7002_dev_t *d,
         d->trf_lb_atten = -gain;
         d->trf_lb_loss = 0;
         //res = lms7002m_trf_gain(&d->lmsstate, d->trf_lb_atten, d->trf_lb_loss);
-        res = lms7002m_trf_gain(&d->lmsstate, TRF_GAIN_PAD, -10 * gain, &aret);
+        res = lms7002m_trf_gain(&d->lmsstate, TRF_GAIN_LB, -10 * gain, &aret);
         break;
     case RFIC_LMS7_TX_PGA_GAIN:
-        if (gain > 63)
-            gain = 63;
-        else if (gain < -62)
-            gain = -62;
+        gain = clamp(gain, -62, 63);
         actual = 0;
 
         res = lms7002m_tbb_gain(&d->lmsstate, gain);

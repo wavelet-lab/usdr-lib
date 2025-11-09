@@ -639,6 +639,8 @@ static int _lms8001_center_vtune(lms8001_state_t* m, uint64_t fvco, int fref, ui
     int swvdd_list[4] = { 3, 2, 1, 0 };
     int amp_list[4] = { 3, 2, 1, 0 };
 
+    bool continue_vtune = true;
+
     for (int i = 0; i < 4; i++) {
         int vdiv_swvdd = swvdd_list[i];
         if (vdiv_swvdd_init != vdiv_swvdd) {
@@ -646,71 +648,76 @@ static int _lms8001_center_vtune(lms8001_state_t* m, uint64_t fvco, int fref, ui
             res = _lms8001_change_pll_vco_cfg(m, fvco, fref, flags, &vco_settings);
             if (res == 1) {
                 USDR_LOG("8001", USDR_LOG_INFO, "VTUNE voltage centered successfuly by changing VDIV_SWVDD value = %d\n", vdiv_swvdd);
-                goto restore_autotune;
+                continue_vtune = false;
+                break;
             } else if (res) {
                 return res;
             }
         }
     }
 
-    // Set back VDIV_SWVDD<1:0> and FREQ<7:0> to inital values
-    SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VDIV_SWVDD_n(curr->VCO_CFG, vdiv_swvdd_init);
-    SET_LMS8001_PLL_PROFILE_0_PLL_VCO_FREQ_N_VCO_FREQ_n(curr->VCO_FREQ, freq_init);
-    uint32_t lms_init2[] = {
-        _mk_pav(m, PLL_PROFILE_0_PLL_VCO_CFG_n, curr->VCO_CFG),
-        _mk_pav(m, PLL_PROFILE_0_PLL_VCO_FREQ_n, curr->VCO_FREQ),
-    };
-    res = lms8001_spi_post(m, lms_init2, SIZEOF_ARRAY(lms_init2));
-    if (res) {
-        return res;
-    }
+    if (continue_vtune) {
+        // Set back VDIV_SWVDD<1:0> and FREQ<7:0> to inital values
+        SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VDIV_SWVDD_n(curr->VCO_CFG, vdiv_swvdd_init);
+        SET_LMS8001_PLL_PROFILE_0_PLL_VCO_FREQ_N_VCO_FREQ_n(curr->VCO_FREQ, freq_init);
+        uint32_t lms_init2[] = {
+            _mk_pav(m, PLL_PROFILE_0_PLL_VCO_CFG_n, curr->VCO_CFG),
+            _mk_pav(m, PLL_PROFILE_0_PLL_VCO_FREQ_n, curr->VCO_FREQ),
+        };
+        res = lms8001_spi_post(m, lms_init2, SIZEOF_ARRAY(lms_init2));
+        if (res) {
+            return res;
+        }
 
-    for (int i = 0; i < 4; i++) {
-        int amp = amp_list[i];
-        if (amp_init != amp) {
-            SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AMP_n(curr->VCO_CFG, amp);
-            SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AAC_EN_n(curr->VCO_CFG, 1);
-            res = _lms8001_change_pll_vco_cfg(m, fvco, fref, flags, &vco_settings);
-            if (res == 1) {
-                USDR_LOG("8001", USDR_LOG_INFO, "VTUNE voltage centered successfuly by changing VCO_AMP value = %d\n", amp);
-                goto restore_autotune;
-            } else if (res) {
-                return res;
+        for (int i = 0; i < 4; i++) {
+            int amp = amp_list[i];
+            if (amp_init != amp) {
+                SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AMP_n(curr->VCO_CFG, amp);
+                SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AAC_EN_n(curr->VCO_CFG, 1);
+                res = _lms8001_change_pll_vco_cfg(m, fvco, fref, flags, &vco_settings);
+                if (res == 1) {
+                    USDR_LOG("8001", USDR_LOG_INFO, "VTUNE voltage centered successfuly by changing VCO_AMP value = %d\n", amp);
+                    continue_vtune = false;
+                    break;
+                } else if (res) {
+                    return res;
+                }
             }
         }
     }
 
-    // Set back VCO_AMP, VCO_AAC_EN, and FREQ<7:0> to inital values
-    SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AMP_n(curr->VCO_CFG, amp_init);
-    SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AAC_EN_n(curr->VCO_CFG, aac_en_init);
-    SET_LMS8001_PLL_PROFILE_0_PLL_VCO_FREQ_N_VCO_FREQ_n(curr->VCO_FREQ, freq_init);
+    if (continue_vtune) {
+        // Set back VCO_AMP, VCO_AAC_EN, and FREQ<7:0> to inital values
+        SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AMP_n(curr->VCO_CFG, amp_init);
+        SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AAC_EN_n(curr->VCO_CFG, aac_en_init);
+        SET_LMS8001_PLL_PROFILE_0_PLL_VCO_FREQ_N_VCO_FREQ_n(curr->VCO_FREQ, freq_init);
 
 
-    uint32_t lms_init3[] = {
-        _mk_pav(m, PLL_PROFILE_0_PLL_VCO_CFG_n, curr->VCO_CFG),
-        _mk_pav(m, PLL_PROFILE_0_PLL_VCO_FREQ_n, curr->VCO_FREQ),
-    };
-    res = lms8001_spi_post(m, lms_init3, SIZEOF_ARRAY(lms_init3));
-    if (res) {
-        return res;
+        uint32_t lms_init3[] = {
+            _mk_pav(m, PLL_PROFILE_0_PLL_VCO_CFG_n, curr->VCO_CFG),
+            _mk_pav(m, PLL_PROFILE_0_PLL_VCO_FREQ_n, curr->VCO_FREQ),
+        };
+        res = lms8001_spi_post(m, lms_init3, SIZEOF_ARRAY(lms_init3));
+        if (res) {
+            return res;
+        }
+
+        // FIXME: somehow it helps!
+        // Last resort check
+        usleep(5000);
+        res = _lms8001_lock_status(m, &vtune_high, &vtune_low, &pll_lock);
+        if (res)
+            return res;
+
+        if ((vtune_high == 0) && (vtune_low == 0)) {
+            USDR_LOG("8001", USDR_LOG_INFO, "Centering of VTUNE back to origianl\n");
+            return 0;
+        }
+
+        USDR_LOG("8001", USDR_LOG_ERROR, "Centering VTUNE using VDIV_SWVDD and VCO_AMP failed!\n");
+        return -ERANGE;
     }
 
-    // FIXME: somehow it helps!
-    // Last resort check
-    usleep(5000);
-    res = _lms8001_lock_status(m, &vtune_high, &vtune_low, &pll_lock);
-    if (res)
-        return res;
-
-    if ((vtune_high == 0) && (vtune_low == 0)) {
-        USDR_LOG("8001", USDR_LOG_INFO, "Centering of VTUNE back to origianl\n");
-        return 0;
-    }
-
-    USDR_LOG("8001", USDR_LOG_ERROR, "Centering VTUNE using VDIV_SWVDD and VCO_AMP failed!\n");
-    return -ERANGE;
-
-restore_autotune:
     // Set back PLL_CAL_AUTO1 to starting values
     SET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO1_VCO_SEL_FORCE(m->pll.PLL_CAL_AUTO1, vco_sel_force_init);
     SET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO1_VCO_SEL_INIT(m->pll.PLL_CAL_AUTO1, vco_sel_init);

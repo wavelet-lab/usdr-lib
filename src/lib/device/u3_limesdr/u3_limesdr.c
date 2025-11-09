@@ -62,6 +62,9 @@ static int dev_limesdr_sdr_rx_gainvga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uin
 static int dev_limesdr_sdr_rx_gainlna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_limesdr_sdr_rx_gainlb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
+static int dev_limesdr_sdr_rx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_limesdr_sdr_tx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int dev_mp_lm7_1_gps_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_mp_lm7_1_gps_sdr_tx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -87,6 +90,9 @@ const usdr_dev_param_func_t s_fparams_u3_limesdr_0[] = {
     { "/dm/sdr/0/rx/gain",      { dev_limesdr_sdr_rx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain",      { dev_limesdr_sdr_tx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain/lb",   { dev_limesdr_sdr_tx_gainlb_set, NULL }},
+
+    { "/dm/sdr/0/rx/path",      { dev_limesdr_sdr_rx_path_set, NULL }},
+    { "/dm/sdr/0/tx/path",      { dev_limesdr_sdr_tx_path_set, NULL }},
 
     { "/dm/sdr/0/rx/gain/pga",  { dev_limesdr_sdr_rx_gainpga_set, NULL }},
     { "/dm/sdr/0/rx/gain/vga",  { dev_limesdr_sdr_rx_gainvga_set, NULL }},
@@ -223,6 +229,16 @@ int dev_limesdr_sdr_rx_gainlb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t va
 {
     struct dev_limesdr *d = (struct dev_limesdr *)ud;
     return lms7002m_set_gain(&d->limedev.base, LMS7_CH_AB, RFIC_LMS7_RX_LB_GAIN, value, NULL);
+}
+
+int dev_limesdr_sdr_rx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return 0;
+}
+
+int dev_limesdr_sdr_tx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return 0;
 }
 
 int dev_mp_lm7_1_gps_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
