@@ -295,6 +295,7 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
     res = usdr_dme_get_uint(_dev->dev(), "/ll/device/name", &val);
     if (res == 0) {
         const char* device = reinterpret_cast<const char*>(val);
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() Device name is \"%s\"", device);
         if (strcmp(device, "usdr") == 0)
             device_type = DEVICE_USDR;
         else if (strcmp(device, "xsdr") == 0)
@@ -1206,6 +1207,14 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     _streams[direction].chmsk = chmsk;
     _streams[direction].stream = direction == SOAPY_SDR_RX ? "/ll/srx/0" : "/ll/stx/0";
 
+    if (_actual_rx_rate == 0) {
+        const device_ranges *dev_ranges = get_ranges(device_type);
+        if (dev_ranges)
+            setSampleRate(SOAPY_SDR_RX, 0, dev_ranges->samplerate_range.minimum());
+        else
+            setSampleRate(SOAPY_SDR_RX, 0, 5e6);
+    }
+
     if (direction == SOAPY_SDR_RX) {
         // We need a better way to calculate packet size
         unsigned defbufsz =
@@ -1237,10 +1246,6 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setupStream(%s) %d Samples per packet, burst size %d * %d chs; res = %d",
                    ustr->stream, numElems, ustr->nfo.pktsyms, ustr->nfo.channels, res);
-
-    if (_actual_rx_rate == 0) {
-        setSampleRate(SOAPY_SDR_RX, 0, 1.92e6);
-    }
 
     res = usdr_dms_sync(_dev->dev(), "off", 1, &ustr->strm);
     if (res) {
