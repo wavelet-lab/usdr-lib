@@ -114,7 +114,7 @@ static const device_ranges xsdr_ranges {
 };
 
 static const device_ranges ssdr_ranges {
-    .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
+    .frequency_range = SoapySDR::Range(0.1e6, 12500e6),
     .samplerate_range = SoapySDR::Range(4e6, 125e6),
     .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
 };
@@ -138,9 +138,9 @@ static const device_ranges limesdr_mini_ranges {
 };
 
 static const device_ranges unk_ranges {
-    .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
-    .samplerate_range = SoapySDR::Range(1e6, 85e6),
-    .bandwidth_range = SoapySDR::Range(0.5e6, 85e6),
+    .frequency_range = SoapySDR::Range(30e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(1e6, 40e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
 };
 
 static inline const device_ranges* get_ranges(device_type_t t) {
