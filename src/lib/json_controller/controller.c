@@ -387,6 +387,10 @@ int generic_rpc_call(pdm_dev_t dmdev,
     {
         int gain = (pcall->params.parameters_type[SDRC_GAIN] == SDRC_PARAM_TYPE_INT) ?
                        pcall->params.parameters_uint[SDRC_GAIN] : 0;
+        if (sdrtype == SDR_LIME && pcall->call_type == SDR_TX_GAIN) {
+            //LimeSDR TX gain correction
+            gain = -32 - gain;
+        }
         uint64_t actual;
 
         res = set_endpoint_uint_param(dmdev,
@@ -492,7 +496,8 @@ int generic_rpc_call(pdm_dev_t dmdev,
             if(mode & (i+1))
                 res = res ? res : usdr_dms_op(usds[i], stream_start ? USDR_DMS_START : USDR_DMS_STOP, 0);
 
-        res = res ? res : set_throttle(dmdev, throttleon, samplerate);
+	if (!(mode & 2))
+        	res = res ? res : set_throttle(dmdev, throttleon, samplerate);
         res = res ? res : usdr_dms_sync(dmdev, stypes, streams_num, streams);
 
         if(res)
