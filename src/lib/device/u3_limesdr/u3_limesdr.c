@@ -42,6 +42,7 @@ const usdr_dev_param_constant_t s_params_u3_limesdr_0[] = {
 
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"lms7002m" },
+    { "/ll/device/name",  (uintptr_t)"limemini"},
 
 };
 

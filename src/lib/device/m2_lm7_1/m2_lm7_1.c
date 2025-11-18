@@ -141,6 +141,8 @@ const usdr_dev_param_constant_t s_params_m2_lm7_1_rev000[] = {
     { "/ll/dsp/atcrbs/0/base", M2PCI_REG_WR_LBDSP },
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"lms7002m" },
+    { "/ll/device/name",  (uintptr_t)"xsdr"},
+
     { "/ll/sdr/max_hw_rx_chans",  2 },
     { "/ll/sdr/max_hw_tx_chans",  2 },
 
@@ -1169,6 +1171,17 @@ xsdr_dev_t* get_xsdr_dev(pdevice_t udev)
     return &d->xdev;
 }
 
+static int usdr_device_m2_lm7_1_update_entity(pdevice_t udev, const char *entity, uint64_t value)
+{
+    USDR_LOG("UDEV", USDR_LOG_WARNING, "Update `%s` to %" PRIu64 "\n", entity, value);
+    pusdr_vfs_obj_t obj;
+    int res = 0;
+
+    res = res ? res : udev->dev->pdev->vfs_get_single_object(udev->dev->pdev, entity, &obj);
+    res = res ? res : obj->ops.si64(obj, value);
+    return res;
+}
+
 static
 int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char** devparam, const char** devval)
 {
@@ -1199,6 +1212,10 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
     res = xsdr_init(&d->xdev);
     if (res)
         return res;
+
+    if (d->xdev.ssdr) {
+        usdr_device_m2_lm7_1_update_entity(udev, "/ll/device/name", (uintptr_t)"ssdr");
+    }
 
     d->xdev.dpump = d->double_pump;
 

@@ -260,6 +260,8 @@ const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
     { "/ll/sync/0/base",   M2PCI_REG_WR_SYNC_CTRL},
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"afe79xx" },
+    { "/ll/device/name",  (uintptr_t)"dsdr"},
+
     // { "/ll/sdr/max_hw_rx_chans",  4 },
     // { "/ll/sdr/max_hw_tx_chans",  4 },
 

@@ -388,7 +388,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
        // CLKIN_2_CLK_SEL, 1,
 
         IMUX_SEL, ext_in2 ? IMUX_IN_2 : IMUX_XOSC,
-        CLKIN_2_CLK_SEL, ext_in2 ? IMUX_INX_CMOS_AC : IMUX_INX_DISABLED,
+        CLKIN_2_CLK_SEL, ext_in2 ? IMUX_INX_DIFF /*IMUX_INX_CMOS_AC*/ : IMUX_INX_DISABLED,
         CLKIN_3_CLK_SEL, 0,
 
         0x3C, 0,
@@ -497,10 +497,12 @@ int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, b
     {
         USYS_CTRL, 0x01, //READY
         IMUX_SEL, set_flag ? IMUX_IN_2 : IMUX_XOSC,
-        CLKIN_2_CLK_SEL, set_flag ? IMUX_INX_CMOS_AC : IMUX_INX_DISABLED,
+        CLKIN_2_CLK_SEL, set_flag ? IMUX_INX_DIFF /* IMUX_INX_CMOS_AC */ : IMUX_INX_DISABLED,
         0xB9, set_flag ? (B9_XOSC_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/) : (B9_IBUF0_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/),
         USYS_CTRL, 0x02, //ACTIVE
     };
+
+    USDR_LOG("5332", USDR_LOG_INFO, "Si5332 ExtClock=%d\n", set_flag);
 
     int res = 0;
 

@@ -26,6 +26,16 @@ enum rfic_type_t {
     RFIC_UNKNOWN
 };
 
+enum device_type_t {
+    DEVICE_USDR,
+    DEVICE_XSDR,
+    DEVICE_SSDR,
+    DEVICE_DSDR,
+    DEVICE_LSDR,
+    DEVICE_LIMESDR_MINI,
+    DEVICE_UNKNOWN,
+};
+
 class usdr_handle
 {
 public:
@@ -241,6 +251,8 @@ public:
 
     void setHardwareTime(const long long timeNs, const std::string &what = "");
 
+    std::vector<std::string> listTimeSources(void) const;
+
     /*******************************************************************
      * Sensor API
      ******************************************************************/
@@ -345,12 +357,16 @@ private:
     FILE* rd;
 
     rfic_type_t type = RFIC_UNKNOWN;
+    device_type_t device_type = DEVICE_UNKNOWN;
+
     double _actual_bandwidth[2] = { 0, 0 };
     double _actual_frequency[2] = { 0, 0 };
 
     double _actual_gains[10] = { 0, };
 
     int _txcorr = 0;
+
+    int64_t calc_ts = 0LL;
 
     std::string _clk_source = "internal";
 };
