@@ -104,7 +104,7 @@ struct device_ranges
 static const device_ranges usdr_ranges {
     .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
     .samplerate_range = SoapySDR::Range(1e6, 85e6),
-    .bandwidth_range = SoapySDR::Range(0.5, 40e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
 };
 
 static const device_ranges xsdr_ranges {
