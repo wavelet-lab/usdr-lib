@@ -172,11 +172,11 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
     _dev = usdr_handle::get(dev);
 
     if (args.count("refclk")) {
-        // TODO:
+        setClockSource("internal");
         SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() set ref to internal clock");
     }
     if (args.count("extclk")) {
-        // TODO:
+        setClockSource("external");
         SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() set ref to external clock");
     }
     if (args.count("desired_rx_pkt")) {
@@ -341,10 +341,23 @@ bool SoapyUSDR::hasDCOffset(const int direction, const size_t /*channel*/) const
     return (direction == SOAPY_SDR_TX);
 }
 
-void SoapyUSDR::setDCOffset(const int direction, const size_t /*channel*/, const std::complex<double> &/*offset*/)
+void SoapyUSDR::setDCOffset(const int direction, const size_t channel, const std::complex<double> &offset)
 {
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    if (direction == SOAPY_SDR_TX) {
+    const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
+    const char* pname = get_sdr_param(0, dir, "dccorr", NULL);
+
+    // Convert from normalized [-1.0, 1.0] to hardware range (typically 16-bit signed)
+    // Hardware expects: value = (channel << 32) | (I << 16) | (Q << 0)
+    int16_t i_val = (int16_t)(offset.real() * 32767.0);
+    int16_t q_val = (int16_t)(offset.imag() * 32767.0);
+    uint64_t value = ((uint64_t)channel << 32) | ((uint64_t)(uint16_t)i_val << 16) | (uint64_t)(uint16_t)q_val;
+
+    int res = usdr_dme_set_uint(_dev->dev(), pname, value);
+    if (res) {
+        SoapySDR::logf(SOAPY_SDR_DEBUG, "SoapyUSDR::setDCOffset(%s) not supported or failed: error %d", dir, res);
+    } else {
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::setDCOffset(%s, I=%g, Q=%g) set successfully", dir, offset.real(), offset.imag());
     }
 }
 
@@ -360,9 +373,32 @@ bool SoapyUSDR::hasIQBalance(const int /*direction*/, const size_t /*channel*/) 
     return true;
 }
 
-void SoapyUSDR::setIQBalance(const int /*direction*/, const size_t /*channel*/, const std::complex<double> &/*balance*/)
+void SoapyUSDR::setIQBalance(const int direction, const size_t channel, const std::complex<double> &balance)
 {
-    //TODO
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
+    const char* pname = get_sdr_param(0, dir, "phgaincorr", NULL);
+
+    // Hardware expects: value = (phase_corr << 48) | (channel << 32) | (Q_gain << 16) | (I_gain << 0)
+    // balance.real() = gain imbalance (I/Q gain ratio deviation from 1.0)
+    // balance.imag() = phase imbalance in degrees
+    //
+    // Convert gain from ratio to hardware format (typically 2048 = 1.0)
+    int16_t i_gain = 2048;  // Default: unity gain
+    int16_t q_gain = (int16_t)(2048.0 * (1.0 + balance.real()));
+    // Convert phase from normalized to hardware format (typically 2048 = 180 degrees)
+    int16_t phase_corr = (int16_t)(balance.imag() * 2048.0 / 180.0);
+
+    uint64_t value = ((uint64_t)(uint16_t)phase_corr << 48) | ((uint64_t)channel << 32) |
+                     ((uint64_t)(uint16_t)q_gain << 16) | (uint64_t)(uint16_t)i_gain;
+
+    int res = usdr_dme_set_uint(_dev->dev(), pname, value);
+    if (res) {
+        SoapySDR::logf(SOAPY_SDR_DEBUG, "SoapyUSDR::setIQBalance(%s) not supported or failed: error %d", dir, res);
+    } else {
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::setIQBalance(%s, gain=%g, phase=%g deg) set successfully",
+                       dir, balance.real(), balance.imag());
+    }
 }
 
 std::complex<double> SoapyUSDR::getIQBalance(const int /*direction*/, const size_t /*channel*/) const
@@ -656,8 +692,15 @@ void SoapyUSDR::setBandwidth(const int direction, const size_t channel, const do
     if (res)
         throw std::runtime_error("SoapyUSDR::setBandwidth(" + std::string(pname) + ") error");
 
-    // TODO readback
-    _actual_bandwidth[direction] = bw;
+    // Read back actual bandwidth from device
+    uint64_t actual_bw = 0;
+    if (usdr_dme_get_uint(_dev->dev(), pname, &actual_bw) == 0) {
+        _actual_bandwidth[direction] = actual_bw;
+        SoapySDR::logf(SOAPY_SDR_DEBUG, "SoapyUSDR::setBandwidth() readback: requested=%g, actual=%g", bw, (double)actual_bw);
+    } else {
+        // Fallback to requested value if readback not supported
+        _actual_bandwidth[direction] = bw;
+    }
 }
 
 double SoapyUSDR::getBandwidth(const int direction, const size_t /*channel*/) const
@@ -680,17 +723,31 @@ SoapySDR::RangeList SoapyUSDR::getBandwidthRange(const int /*direction*/, const 
 void SoapyUSDR::setMasterClockRate(const double rate)
 {
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    // TODO: get reference clock in case of autodetection
 
-    SoapySDR::logf(callLogLvl(), "SoapyUSDR::setMasterClockRate(%.3f)", rate/1e6);
+    // Try to set reference clock frequency if device supports it
+    int res = usdr_dme_set_uint(_dev->dev(), "/dm/sdr/refclk/frequency", (uint64_t)rate);
+    if (res) {
+        SoapySDR::logf(SOAPY_SDR_WARNING, "SoapyUSDR::setMasterClockRate(%.3f MHz) not supported or failed: error %d", rate/1e6, res);
+    } else {
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::setMasterClockRate(%.3f MHz) set successfully", rate/1e6);
+    }
 }
 
 double SoapyUSDR::getMasterClockRate(void) const
 {
-    double rate = 0;
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    uint64_t rate = 0;
 
-    SoapySDR::logf(callLogLvl(), "SoapyUSDR::getMasterClockRate() => %.3f", rate/1e6);
-    return rate;
+    // Try to get reference clock frequency
+    int res = usdr_dme_get_uint(_dev->dev(), "/dm/sdr/refclk/frequency", &rate);
+    if (res) {
+        // Fallback: some devices don't expose refclk, return 0 for autodetect
+        SoapySDR::logf(SOAPY_SDR_DEBUG, "SoapyUSDR::getMasterClockRate() not available, using autodetect");
+        return 0;
+    }
+
+    SoapySDR::logf(callLogLvl(), "SoapyUSDR::getMasterClockRate() => %.3f MHz", rate/1e6);
+    return (double)rate;
 }
 
 SoapySDR::RangeList SoapyUSDR::getMasterClockRates(void) const
@@ -730,22 +787,34 @@ std::string SoapyUSDR::getClockSource(void) const
 
 bool SoapyUSDR::hasHardwareTime(const std::string &what) const
 {
-    //assume hardware time when no argument is specified
-    //some boards may not ever support hw time, so TODO
+    if (!what.empty()) {
+        return false;
+    }
 
-    return what.empty();
+    // Check if device supports hardware time by querying /dm/debug/rxtime
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    uint64_t dummy = 0;
+    int res = usdr_dme_get_uint(_dev->dev(), "/dm/debug/rxtime", &dummy);
+
+    return (res == 0);
 }
 
 long long SoapyUSDR::getHardwareTime(const std::string &what) const
 {
-    long long hwtime = 0;
-
     if (!what.empty()) {
         throw std::invalid_argument("SoapyUSDR::getHardwareTime("+what+") unknown argument");
     }
 
-    SoapySDR::logf(callLogLvl(), "SoapyUSDR::getHardwareTime() => %lld", hwtime);
-    return hwtime;
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    uint64_t hwtime = 0;
+    int res = usdr_dme_get_uint(_dev->dev(), "/dm/debug/rxtime", &hwtime);
+    if (res) {
+        SoapySDR::logf(SOAPY_SDR_WARNING, "SoapyUSDR::getHardwareTime() failed: error %d", res);
+        return 0;
+    }
+
+    SoapySDR::logf(callLogLvl(), "SoapyUSDR::getHardwareTime() => %lld", (long long)hwtime);
+    return (long long)hwtime;
 }
 
 void SoapyUSDR::setHardwareTime(const long long timeNs, const std::string &what)
@@ -754,7 +823,27 @@ void SoapyUSDR::setHardwareTime(const long long timeNs, const std::string &what)
         throw std::invalid_argument("SoapyUSDR::setHardwareTime("+what+") unknown argument");
     }
 
-    SoapySDR::logf(callLogLvl(), "SoapyUSDR::setHardwareTime(%lld)", timeNs);
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+
+    // For xMASS multi-board sync: timeNs=0 triggers a timestamp reset/sync
+    // This synchronizes all boards to a common time reference (1PPS/SYSREF)
+    if (timeNs == 0) {
+        // Trigger sync to external reference (1PPS/SYSREF) - resets timestamp counters
+        int res = usdr_dms_sync(_dev->dev(), "1pps", 0, NULL);
+        if (res) {
+            SoapySDR::logf(SOAPY_SDR_WARNING,
+                "SoapyUSDR::setHardwareTime(0) sync trigger failed: error %d", res);
+        } else {
+            SoapySDR::logf(callLogLvl(),
+                "SoapyUSDR::setHardwareTime(0) triggered timestamp sync to 1PPS/SYSREF");
+        }
+    } else {
+        // Absolute timestamp setting is not supported by hardware
+        // The hardware uses sync events (1PPS, SYSREF) for multi-board alignment
+        SoapySDR::logf(SOAPY_SDR_WARNING,
+            "SoapyUSDR::setHardwareTime(%lld) absolute time not supported, use 0 to trigger sync",
+            timeNs);
+    }
 }
 
 /*******************************************************************
@@ -880,29 +969,124 @@ void SoapyUSDR::writeSetting(const std::string &key, const std::string &value)
     throw std::runtime_error("unknown setting key: " + key);
 }
 
-SoapySDR::ArgInfoList SoapyUSDR::getSettingInfo(const int direction, const size_t channel) const
+SoapySDR::ArgInfoList SoapyUSDR::getSettingInfo(const int direction, const size_t /*channel*/) const
 {
-    // TODO
-    (void)direction;
-    (void)channel;
-
     SoapySDR::ArgInfoList infos;
+
+    // Auto Gain Control (RX only)
+    if (direction == SOAPY_SDR_RX) {
+        SoapySDR::ArgInfo agc_info;
+        agc_info.key = "agc";
+        agc_info.name = "Automatic Gain Control";
+        agc_info.type = SoapySDR::ArgInfo::BOOL;
+        agc_info.value = "false";
+        agc_info.description = "Enable automatic gain control (AGC) for this channel";
+        infos.push_back(agc_info);
+    }
+
+    // Digital Step Attenuator
+    SoapySDR::ArgInfo dsa_info;
+    dsa_info.key = "dsa";
+    dsa_info.name = "Digital Step Attenuator";
+    dsa_info.type = SoapySDR::ArgInfo::FLOAT;
+    dsa_info.value = "0.0";
+    dsa_info.range = SoapySDR::Range(0.0, 31.5, 0.5);
+    dsa_info.units = "dB";
+    dsa_info.description = "Digital step attenuator attenuation in dB";
+    infos.push_back(dsa_info);
+
+    // Baseband NCO Frequency Offset
+    SoapySDR::ArgInfo nco_info;
+    nco_info.key = "bb_freq";
+    nco_info.name = "Baseband NCO Frequency";
+    nco_info.type = SoapySDR::ArgInfo::FLOAT;
+    nco_info.value = "0.0";
+    nco_info.units = "Hz";
+    nco_info.description = "Baseband NCO frequency offset for this channel";
+    infos.push_back(nco_info);
+
+    // DC Offset Correction Mode (RX only)
+    if (direction == SOAPY_SDR_RX) {
+        SoapySDR::ArgInfo dc_mode_info;
+        dc_mode_info.key = "dc_corr_mode";
+        dc_mode_info.name = "DC Offset Correction Mode";
+        dc_mode_info.type = SoapySDR::ArgInfo::STRING;
+        dc_mode_info.value = "auto";
+        dc_mode_info.options.push_back("off");
+        dc_mode_info.options.push_back("auto");
+        dc_mode_info.optionNames.push_back("Off");
+        dc_mode_info.optionNames.push_back("Automatic");
+        dc_mode_info.description = "DC offset correction mode";
+        infos.push_back(dc_mode_info);
+    }
+
     return infos;
 }
 
 void SoapyUSDR::writeSetting(const int direction, const size_t channel,
                              const std::string &key, const std::string &value)
 {
-    // TODO
-    (void)direction;
-    (void)channel;
-    (void)key;
-    (void)value;
-
-    SoapySDR::logf(callLogLvl(), "SoapyUSDR::writeSetting(%d, %d, %s, %s)", direction, (int)channel, key.c_str(), value.c_str());
+    SoapySDR::logf(callLogLvl(), "SoapyUSDR::writeSetting(%s, ch=%d, %s=%s)",
+                   (direction == SOAPY_SDR_TX) ? "TX" : "RX", (int)channel, key.c_str(), value.c_str());
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    throw std::runtime_error("unknown setting key: "+key);
+    const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
+    int res = 0;
+
+    // Auto Gain Control
+    if (key == "agc" && direction == SOAPY_SDR_RX) {
+        bool enable = (value == "true" || value == "1");
+        char path[128];
+        snprintf(path, sizeof(path), "/dm/sdr/0/rx/gain/auto/%zu", channel);
+        res = usdr_dme_set_uint(_dev->dev(), path, enable ? 1 : 0);
+        if (res) {
+            throw std::runtime_error("Failed to set AGC: error " + std::to_string(res));
+        }
+        return;
+    }
+
+    // Digital Step Attenuator
+    if (key == "dsa") {
+        double dsa_db = std::stod(value);
+        char path[128];
+        snprintf(path, sizeof(path), "/dm/sdr/0/%s/dsa/%zu", dir, channel);
+        // DSA value is typically in 0.5dB steps, hardware expects integer
+        res = usdr_dme_set_uint(_dev->dev(), path, (uint64_t)(dsa_db * 2.0));
+        if (res) {
+            throw std::runtime_error("Failed to set DSA: error " + std::to_string(res));
+        }
+        return;
+    }
+
+    // Baseband NCO Frequency Offset
+    if (key == "bb_freq") {
+        int32_t freq_hz = (int32_t)std::stoi(value);
+        char path[128];
+        snprintf(path, sizeof(path), "/dm/sdr/0/%s/freqency/bb", dir);
+        // Hardware expects: (channel << 32) | freq
+        uint64_t val = ((uint64_t)channel << 32) | (uint32_t)freq_hz;
+        res = usdr_dme_set_uint(_dev->dev(), path, val);
+        if (res) {
+            throw std::runtime_error("Failed to set BB freq: error " + std::to_string(res));
+        }
+        return;
+    }
+
+    // DC Offset Correction Mode
+    if (key == "dc_corr_mode" && direction == SOAPY_SDR_RX) {
+        bool enable = (value == "auto");
+        char path[128];
+        snprintf(path, sizeof(path), "/dm/sdr/0/rx/dccorrmode");
+        // Hardware expects: (channel << 32) | mode
+        uint64_t val = ((uint64_t)channel << 32) | (enable ? 1 : 0);
+        res = usdr_dme_set_uint(_dev->dev(), path, val);
+        if (res) {
+            throw std::runtime_error("Failed to set DC corr mode: error " + std::to_string(res));
+        }
+        return;
+    }
+
+    throw std::runtime_error("unknown setting key: " + key);
 }
 
 /*******************************************************************

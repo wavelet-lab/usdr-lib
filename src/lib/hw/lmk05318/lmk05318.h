@@ -29,7 +29,19 @@ enum lmk05318_type {
 
 typedef struct lmk05318_state lmk05318_state_t;
 
-int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned flags, lmk05318_state_t* out);
+typedef enum {
+    LMK05318_PROFILE_DEFAULT = 0,
+    LMK05318_PROFILE_JESD491_INTXO = 1,
+    LMK05318_PROFILE_PCIE_XMASS_EXTXO = 2,
+
+    LMK05318_PROFILE_COUNT,
+} lmk05318_profile_t;
+
+int lmk05318_create(lldev_t dev,
+                    unsigned subdev,
+                    unsigned lsaddr,
+                    lmk05318_profile_t profile,
+                    lmk05318_state_t* out);
 
 int lmk05318_tune_apll2(lmk05318_state_t* d, uint32_t freq, unsigned *last_div);
 int lmk05318_set_out_div(lmk05318_state_t* d, unsigned port, unsigned div);

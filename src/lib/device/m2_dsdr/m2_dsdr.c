@@ -47,6 +47,20 @@ enum dsdr_jesdv {
     DSDR_JESD204C_6664_491 = 3,
 };
 
+static lmk05318_profile_t dsdr_select_lmk_profile(unsigned type, unsigned jesdv)
+{
+    if (type == DSDR_PCIE_HIPER_R0) {
+        // PCIe/xMass boards route the XO externally and rely on the JESD491 table
+        return LMK05318_PROFILE_PCIE_XMASS_EXTXO;
+    }
+    if (jesdv == DSDR_JESD204C_6664_491) {
+        // JESD204C 491.52/122.88 MSPS needs the alternate LMK divider table
+        return LMK05318_PROFILE_JESD491_INTXO;
+    }
+
+    return LMK05318_PROFILE_DEFAULT;
+}
+
 // I2C buses
 // I2C3      () -- TCA6424AR ( 0 & 1), TMP114
 // REF/I2C5  () -- TCA6424AR ( 0 ), DAC80501MD, LG77LIC, TMP114
@@ -528,6 +542,7 @@ struct dev_m2_dsdr {
     device_t base;
 
     lmk05318_state_t lmk;
+    lmk05318_profile_t lmk_profile;
 
     subdev_t subdev;
 
@@ -1367,6 +1382,9 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     }
 
     d->jesdv = jesdv;
+    d->lmk_profile = dsdr_select_lmk_profile(d->type, d->jesdv);
+    USDR_LOG("XDEV", USDR_LOG_INFO, "LMK profile %d selected for board type %02x JESD %02x\n",
+             d->lmk_profile, d->type, d->jesdv);
     USDR_LOG("XDEV", USDR_LOG_WARNING, "AFE type JESD204%c CH_TX=%02x CH_RX=%02x\n", (jesdv == DSDR_JESD204B_810_245) ? 'B' : 'C', d->hw_mask_tx, d->hw_mask_rx);
 
     if (getenv("SKIPAFE")) {
@@ -1426,8 +1444,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     for (unsigned j = 0; j < 25; j++) {
         usleep(40000);
-        res = res ? res : lmk05318_create(dev, d->subdev, I2C_LMK,
-                                          (d->type == DSDR_PCIE_HIPER_R0) ? 2 : 1 /* TODO FIXME!!! */, &d->lmk);
+        res = res ? res : lmk05318_create(dev, d->subdev, I2C_LMK, d->lmk_profile, &d->lmk);
         if (res == 0)
             break;
     }
@@ -1943,6 +1960,8 @@ int usdr_device_m2_dsdr_create(lldev_t dev, device_id_t devid)
 
     d->hw_fpga_jesd_rx_en = 0;
     d->hw_fpga_jesd_tx_en = 0;
+
+    d->lmk_profile = LMK05318_PROFILE_DEFAULT;
 
     memset(d->rx_logic_to_hw, 0xff, sizeof(d->rx_logic_to_hw));
     memset(d->tx_hw_to_logic, 0xff, sizeof(d->tx_hw_to_logic));

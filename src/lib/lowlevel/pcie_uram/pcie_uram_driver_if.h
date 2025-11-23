@@ -138,6 +138,13 @@ struct pcie_driver_woa_oob {
     void* oobdata;
 };
 
+struct pcie_driver_pci_location {
+    unsigned domain;
+    unsigned bus;
+    unsigned device;
+    unsigned function;
+};
+
 // Driver functions
 
 #define PCIE_DRIVER_MAGIC          0xDD
@@ -176,6 +183,9 @@ struct pcie_driver_woa_oob {
 
 #define PCIE_DRIVER_DMA_RELEASE       _IOW(PCIE_DRIVER_MAGIC, 24, uint32_t)
 #define PCIE_DRIVER_DMA_POST          _IOW(PCIE_DRIVER_MAGIC, 25, uint32_t)
+
+// Get PCI location (domain:bus:device.function) for stable device selection
+#define PCIE_DRIVER_GET_PCI_LOCATION  _IOR(PCIE_DRIVER_MAGIC, 26, struct pcie_driver_pci_location)
 
 
 #endif

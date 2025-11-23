@@ -144,6 +144,7 @@ const usdr_dev_param_constant_t s_params_m2_lm7_1_rev000[] = {
 static int dev_m2_lm7_1_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_debug_all_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dev_m2_lm7_1_debug_rxtime_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 static int dev_m2_lm7_1_pwren_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_sdr_tdd_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -231,6 +232,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/rate/rxtxadcdac",    { dev_m2_lm7_1_rate_m_set, NULL }},
 
     { "/dm/debug/all",          { NULL, dev_m2_lm7_1_debug_all_get }},
+    { "/dm/debug/rxtime",       { NULL, dev_m2_lm7_1_debug_rxtime_get }},
     { "/dm/power/en",           { dev_m2_lm7_1_pwren_set, NULL }},
 
     { "/dm/sdr/channels",       { NULL, NULL }},
@@ -739,6 +741,30 @@ int dev_m2_lm7_1_debug_all_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* oval
     *ovalue   = data.i64[1];
 
     return res;
+}
+
+// Read hardware timestamp counter for xMASS multi-board synchronization
+// Returns 64-bit timestamp from TX DMA status registers 30-31
+int dev_m2_lm7_1_debug_rxtime_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    union {
+        uint32_t i32[2];
+        uint64_t i64;
+    } ts;
+    int res;
+
+    // Read timestamp from M2PCI_REG_RD_TXDMA_STATTS (reg 30) and reg 31
+    res = lowlevel_reg_rd32(d->base.dev, 0, M2PCI_REG_RD_TXDMA_STATTS, &ts.i32[0]);
+    if (res)
+        return res;
+
+    res = lowlevel_reg_rd32(d->base.dev, 0, M2PCI_REG_RD_TXDMA_STAT_CPL, &ts.i32[1]);
+    if (res)
+        return res;
+
+    *ovalue = ts.i64;
+    return 0;
 }
 
 int dev_m2_lm7_1_sdr_tdd_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)

@@ -24,6 +24,30 @@ enum {
     OUT_FREQ_MAX = 800000000ull,
 };
 
+struct lmk05318_profile_cfg {
+    const uint32_t* rom;
+    unsigned rom_sz;
+    bool use_external_xo;
+};
+
+static const struct lmk05318_profile_cfg s_lmk_profiles[LMK05318_PROFILE_COUNT] = {
+    [LMK05318_PROFILE_DEFAULT] = {
+        .rom = lmk05318_rom,
+        .rom_sz = SIZEOF_ARRAY(lmk05318_rom),
+        .use_external_xo = false,
+    },
+    [LMK05318_PROFILE_JESD491_INTXO] = {
+        .rom = lmk05318_rom_49152_12288_384,
+        .rom_sz = SIZEOF_ARRAY(lmk05318_rom_49152_12288_384),
+        .use_external_xo = false,
+    },
+    [LMK05318_PROFILE_PCIE_XMASS_EXTXO] = {
+        .rom = lmk05318_rom_49152_12288_384,
+        .rom_sz = SIZEOF_ARRAY(lmk05318_rom_49152_12288_384),
+        .use_external_xo = true,
+    },
+};
+
 
 int lmk05318_reg_wr(lmk05318_state_t* d, uint16_t reg, uint8_t out)
 {
@@ -65,13 +89,19 @@ int lmk05318_reg_wr_n(lmk05318_state_t* d, const uint32_t* regs, unsigned count)
     return 0;
 }
 
-int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int flags, lmk05318_state_t* out)
+int lmk05318_create(lldev_t dev,
+                    unsigned subdev,
+                    unsigned lsaddr,
+                    lmk05318_profile_t profile,
+                    lmk05318_state_t* out)
 {
     int res;
     uint8_t dummy[4];
 
-    const uint32_t* lmk_init = flags ? lmk05318_rom_49152_12288_384 : lmk05318_rom;
-    unsigned lmk_init_sz = flags ? SIZEOF_ARRAY(lmk05318_rom_49152_12288_384) : SIZEOF_ARRAY(lmk05318_rom);
+    if (profile >= LMK05318_PROFILE_COUNT)
+        return -EINVAL;
+
+    const struct lmk05318_profile_cfg* cfg = &s_lmk_profiles[profile];
 
     out->dev = dev;
     out->subdev = subdev;
@@ -88,7 +118,7 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int 
     }
 
     // Do the initialization
-    res = lmk05318_reg_wr_n(out, lmk_init, lmk_init_sz);
+    res = lmk05318_reg_wr_n(out, cfg->rom, cfg->rom_sz);
     if (res)
         return res;
 
@@ -97,7 +127,7 @@ int lmk05318_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int 
         lmk05318_rom[0] | (1 << RESET_SW_OFF),
         lmk05318_rom[0] | (0 << RESET_SW_OFF),
 
-        MAKE_LMK05318_XO_CONFIG(flags > 1 ? 1 : 0),
+        MAKE_LMK05318_XO_CONFIG(cfg->use_external_xo ? 1 : 0),
 
         MAKE_LMK05318_PLL1_CTRL0(0),
         MAKE_LMK05318_PLL1_CTRL0(1),

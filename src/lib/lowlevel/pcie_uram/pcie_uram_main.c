@@ -757,12 +757,20 @@ const char* pcie_uram_plugin_info_str(unsigned iparam) {
 
 struct pci_filtering_params {
     const char* dev;
+    int pci_domain;   // -1 = not specified
+    int pci_bus;      // -1 = not specified
+    int pci_device;   // -1 = not specified
+    int pci_function; // -1 = not specified
 };
 
 static int pcie_filtering_params_parse(unsigned pcount, const char** filterparams,
                                        const char** filtervals, struct pci_filtering_params* pp)
 {
     pp->dev = NULL;
+    pp->pci_domain = -1;
+    pp->pci_bus = -1;
+    pp->pci_device = -1;
+    pp->pci_function = -1;
 
     for (unsigned k = 0; k < pcount; k++) {
         const char* val = filtervals[k];
@@ -791,6 +799,33 @@ static int pcie_filtering_params_parse(unsigned pcount, const char** filterparam
 
         } else if (strcmp(filterparams[k], "dev") == 0 || strcmp(filterparams[k], "device") == 0) {
             pp->dev = filtervals[k];
+        } else if (strcmp(filterparams[k], "pci_domain") == 0) {
+            pp->pci_domain = atoi(val);
+        } else if (strcmp(filterparams[k], "pci_bus") == 0) {
+            pp->pci_bus = atoi(val);
+        } else if (strcmp(filterparams[k], "pci_device") == 0) {
+            pp->pci_device = atoi(val);
+        } else if (strcmp(filterparams[k], "pci_function") == 0) {
+            pp->pci_function = atoi(val);
+        } else if (strcmp(filterparams[k], "pci_slot") == 0) {
+            // Support domain:bus:device.function format
+            int domain, bus, device, function;
+            if (sscanf(val, "%x:%x:%x.%x", &domain, &bus, &device, &function) == 4) {
+                // Validate PCI ranges: bus 0-255, device 0-31, function 0-7
+                if (bus >= 0 && bus <= 255 && device >= 0 && device <= 31 && function >= 0 && function <= 7) {
+                    pp->pci_domain = domain;
+                    pp->pci_bus = bus;
+                    pp->pci_device = device;
+                    pp->pci_function = function;
+                }
+            } else if (sscanf(val, "%x:%x.%x", &bus, &device, &function) == 3) {
+                // Validate PCI ranges: bus 0-255, device 0-31, function 0-7
+                if (bus >= 0 && bus <= 255 && device >= 0 && device <= 31 && function >= 0 && function <= 7) {
+                    pp->pci_bus = bus;
+                    pp->pci_device = device;
+                    pp->pci_function = function;
+                }
+            }
         }
     }
 
@@ -907,6 +942,36 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
                  "Unable to open device %s, error: %d\n",
                  devname, err);
         return -err;
+    }
+
+    // Check PCI location filter if specified (for stable multi-board selection)
+    if (pf.pci_domain >= 0 || pf.pci_bus >= 0 || pf.pci_device >= 0 || pf.pci_function >= 0) {
+        struct pcie_driver_pci_location actual_loc;
+        err = ioctl(fd, PCIE_DRIVER_GET_PCI_LOCATION, &actual_loc);
+        if (err) {
+            err = -errno;
+            USDR_LOG("PCIE", USDR_LOG_ERROR,
+                     "Unable to get PCI location for %s, error %d\n", devname, err);
+            close(fd);
+            return err;
+        }
+
+        // Check if this device matches the requested PCI slot
+        if ((pf.pci_domain >= 0 && (unsigned)pf.pci_domain != actual_loc.domain) ||
+            (pf.pci_bus >= 0 && (unsigned)pf.pci_bus != actual_loc.bus) ||
+            (pf.pci_device >= 0 && (unsigned)pf.pci_device != actual_loc.device) ||
+            (pf.pci_function >= 0 && (unsigned)pf.pci_function != actual_loc.function)) {
+
+            USDR_LOG("PCIE", USDR_LOG_NOTE,
+                     "Device %s at %04x:%02x:%02x.%x doesn't match requested PCI slot, skipping\n",
+                     devname, actual_loc.domain, actual_loc.bus, actual_loc.device, actual_loc.function);
+            close(fd);
+            return -ENODEV;
+        }
+
+        USDR_LOG("PCIE", USDR_LOG_INFO,
+                 "Matched device %s at PCI slot %04x:%02x:%02x.%x\n",
+                 devname, actual_loc.domain, actual_loc.bus, actual_loc.device, actual_loc.function);
     }
 
     pcie_uram_dev_t* dev;

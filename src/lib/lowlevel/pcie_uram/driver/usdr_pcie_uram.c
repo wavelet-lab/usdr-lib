@@ -155,9 +155,10 @@ struct usdr_dev {
 	struct pci_dev* pdev;
 
 	spinlock_t slock;
-	
+	struct mutex i2c_lut_lock;  // Protects i2cc and i2clut arrays
+
 	void __iomem *bar_addr;
-	
+
 	unsigned devno;
     unsigned dev_mask;
 
@@ -188,6 +189,7 @@ static struct usdr_dev *usdr_list = NULL;
 static int devices = 0;
 static dev_t dev_first;
 static struct class* usdr_class  = NULL;
+static DEFINE_MUTEX(usdr_list_lock);  // Protects usdr_list and devices count
 
 // #define EXTRA_DEBUG
 
@@ -417,10 +419,24 @@ static void deinit_bucket(struct usdr_dev *dev)
     unsigned i;
     for (i = 0; i < dev->dl.bucket_count; i++) {
         struct notification_bucket* b = &dev->buckets[i];
-        
-        //TODO block interrupt queue
-        if(b->db.kvirt)
+
+        // Mask and drain bucket IRQ before freeing DMA buffer
+        // to prevent use-after-free if interrupt fires during teardown
+        if (b->irq > 0) {
+            // Disable IRQ line first
+            disable_irq(b->irq);
+            // Synchronize to ensure no handler is currently executing
+            synchronize_irq(b->irq);
+            // Free the IRQ (safe because already synchronized)
+            free_irq(b->irq, dev);
+            b->irq = 0;
+        }
+
+        // Now safe to free DMA buffer - no more interrupt handlers can access it
+        if(b->db.kvirt) {
             dma_free_coherent(&dev->pdev->dev, PAGE_SIZE, b->db.kvirt, b->db.phys);
+            b->db.kvirt = NULL;
+        }
     }
 }
 
@@ -1073,7 +1089,10 @@ static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long sno
     	*oob_length = oobcnt * 16;
     }
 
-    // flush_cache_range(vma, start, end);
+    // Explicit cache maintenance for RX (DMA_FROM_DEVICE) on non-coherent platforms
+    // This ensures CPU can safely read DMA buffers filled by the device.
+    // On x86 and other cache-coherent platforms, DEV_NO_DMA_SYNC is set to skip overhead.
+    // For ARM and platforms behind PCIe switches (ASM2806), explicit sync is required.
     if (op_wait && ((usdrdev->dev_mask & DEV_NO_DMA_SYNC) == 0)) {
         for (i = 0; i < cnt; i++) {
             u64 bno = usdrdev->streams[sno]->abuffer_no + i;
@@ -1086,10 +1105,6 @@ static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long sno
         }
         usdrdev->streams[sno]->abuffer_no += cnt;
     }
-
-    //dma_sync_single_for_cpu()
-    // TODO FLUSH CACHE on non-coherent devices
-    // TODO: this works only on non-muxed interrupts!!!
     //BUG_ON(cnt > 0xff);
     //bptr = usdrdev->streams[sno]->cores.rxbrst.bufptr;
     //res = cnt | (bptr << 12);
@@ -1109,6 +1124,9 @@ static int usdr_stream_release_or_post(struct usdr_dev *usdrdev, unsigned long s
     if (res)
         return res;
 
+    // Explicit cache maintenance for TX (DMA_TO_DEVICE) on non-coherent platforms
+    // This ensures CPU-written data is flushed to memory before device DMA reads it.
+    // Critical for ARM and ASM2806-connected boards where cache isn't hardware-coherent.
     if (op_release && ((usdrdev->dev_mask & DEV_NO_DMA_SYNC) == 0)) {
 	    u64 bno = usdrdev->streams[sno]->bbuffer_no++;
 	    unsigned idx = bno % usdrdev->streams[sno]->dma_buffs;
@@ -1329,11 +1347,15 @@ static long usdrfd_ioctl(struct file *filp,
         base = usdrdev->dl.i2c_base[i2cinst];
         irq = usdrdev->dl.i2c_int_number[i2cinst];
 
-        // TODO: Protect i2cc structure
+        // Protect LUT cache state from concurrent I2C transactions
+        // Critical with ASM2806 where multiple boards share PCI infrastructure
+        mutex_lock(&usdrdev->i2c_lut_lock);
+
         idx = si2c_update_lut_idx(&usdrdev->i2cc[4 * i2cinst], i2caddr, i2cbus);
         lut = si2c_get_lut(&usdrdev->i2cc[4 * i2cinst]);
         res = si2c_make_ctrl_reg(idx, si2c.wrb, si2c.wcnt, si2c.rcnt, &cmd);
         if (res) {
+            mutex_unlock(&usdrdev->i2c_lut_lock);
             return res;
         }
 
@@ -1345,6 +1367,8 @@ static long usdrfd_ioctl(struct file *filp,
             usdr_reg_wr64(usdrdev, base - 1, cmd_lut);
             usdrdev->i2clut[i2cinst] = lut;
         }
+
+        mutex_unlock(&usdrdev->i2c_lut_lock);
 
         DEBUG_DEV_OUT(&usdrdev->pdev->dev, "I2C[%d.%d.%02x] W:%d,R:%d,CMD:%08x,LUT:%08x\n",
                       i2cinst, i2cbus, i2caddr, si2c.wcnt, si2c.rcnt, cmd, lut);
@@ -1433,6 +1457,20 @@ static long usdrfd_ioctl(struct file *filp,
     case PCIE_DRIVER_DMA_RELEASE:
     case PCIE_DRIVER_DMA_POST:
         return usdr_stream_release_or_post(usdrdev, ioctl_param, ioctl_num == PCIE_DRIVER_DMA_RELEASE);
+    case PCIE_DRIVER_GET_PCI_LOCATION: {
+        struct pcie_driver_pci_location loc;
+        // Extract PCI location from pci_dev for stable device identification
+        // Enables userspace to target specific physical slots in multi-board ASM2806 setups
+        loc.domain = pci_domain_nr(usdrdev->pdev->bus);
+        loc.bus = usdrdev->pdev->bus->number;
+        loc.device = PCI_SLOT(usdrdev->pdev->devfn);
+        loc.function = PCI_FUNC(usdrdev->pdev->devfn);
+
+        if (copy_to_user(uptr, &loc, sizeof(loc)))
+            return -EFAULT;
+
+        return 0;
+    }
     }
     return -EINVAL;
 }
@@ -1633,8 +1671,9 @@ static int usdr_probe(struct pci_dev *pdev,
         usdrdev->devno = usdr_no;
         usdrdev->pdev = pdev;
         usdrdev->dev_mask = 0;
-	
+
         spin_lock_init(&usdrdev->slock);
+        mutex_init(&usdrdev->i2c_lut_lock);
 
         usdrdev->dev_mask = DEV_VALID;
         usdrdev->cdevice = device_create(usdr_class,
@@ -1667,9 +1706,13 @@ static int usdr_probe(struct pci_dev *pdev,
     }
 
 
-	devices++;
+        // Add to global device list with proper locking
+        mutex_lock(&usdr_list_lock);
         usdrdev->next = usdr_list;
         usdr_list = usdrdev;
+        devices++;
+        mutex_unlock(&usdr_list_lock);
+
 	return 0;
 
         //cdev_del(&usdrdev->cdev);
@@ -1695,53 +1738,77 @@ err_disable_pdev:
 static void usdr_remove(struct pci_dev *pdev)
 {
     unsigned i;
-        struct usdr_dev* usdrdev = pci_get_drvdata(pdev);
-	printk(KERN_INFO PFX "Removing device %s\n", pci_name(pdev));
+    struct usdr_dev* usdrdev = pci_get_drvdata(pdev);
+    struct usdr_dev **pprev;
 
-        if (usdrdev->dev_mask & DEV_INITIALIZED) {
-            
-            // Disable notification of all events
-            for (i = 0; i < 32; i++) {
-                // Dispatch ID == 0xf means to ignore this event
-                usdr_reg_wr32(usdrdev, usdrdev->dl.interrupt_base, i | (0 << 8) | (0xf << 16) | (0 << 20));
-            }
+    printk(KERN_INFO PFX "Removing device %s\n", pci_name(pdev));
 
-            for (i = 0; i < usdrdev->irq_configured; i++) {
-                if (usdrdev->irq_funcs[i] != NULL) {
-                    free_irq(pci_irq_vector(pdev, i), //pdev->irq + i,
-                             usdrdev); //usdrdev->irq_param[i]);
+    if (usdrdev->dev_mask & DEV_INITIALIZED) {
+
+        // Disable notification of all events
+        for (i = 0; i < 32; i++) {
+            // Dispatch ID == 0xf means to ignore this event
+            usdr_reg_wr32(usdrdev, usdrdev->dl.interrupt_base, i | (0 << 8) | (0xf << 16) | (0 << 20));
+        }
+
+        // Free non-bucket IRQs (bucket IRQs freed in deinit_bucket)
+        for (i = 0; i < usdrdev->irq_configured; i++) {
+            if (usdrdev->irq_funcs[i] != NULL) {
+                // Check if this is not a bucket IRQ (those are handled in deinit_bucket)
+                unsigned j, is_bucket_irq = 0;
+                int irq_vec = pci_irq_vector(pdev, i);
+                for (j = 0; j < usdrdev->dl.bucket_count; j++) {
+                    if (usdrdev->buckets[j].irq == irq_vec) {
+                        is_bucket_irq = 1;
+                        break;
+                    }
                 }
-            }
-
-            pci_disable_msi(pdev);
-            
-#ifndef OLD_IRQ
-            // Remove bucket memory
-            deinit_bucket(usdrdev);
-#endif
-
-            for (i = 0; i < usdrdev->dl.streams_count; i++) {
-                usdr_stream_free(usdrdev, i);
+                if (!is_bucket_irq) {
+                    free_irq(irq_vec, usdrdev);
+                }
             }
         }
 
-        cdev_del(&usdrdev->cdev);
-        device_destroy(usdr_class, MKDEV(MAJOR(dev_first), MINOR(usdrdev->devno)));
-	
-        usdrdev->dev_mask = 0;
+        pci_disable_msi(pdev);
 
-        pci_iounmap(pdev, usdrdev->bar_addr);
-	pci_release_regions(pdev);
+#ifndef OLD_IRQ
+        // Remove bucket memory (also frees bucket IRQs)
+        deinit_bucket(usdrdev);
+#endif
 
-	pci_clear_master(pdev);
-	pci_disable_device(pdev);
-	pci_set_drvdata(pdev, NULL);
-	
+        for (i = 0; i < usdrdev->dl.streams_count; i++) {
+            usdr_stream_free(usdrdev, i);
+        }
+    }
 
-        //usdr_freedma(usdrdev, usdrdev->rxdma, usdrdev->rxdma_bufsize);
+    cdev_del(&usdrdev->cdev);
+    device_destroy(usdr_class, MKDEV(MAJOR(dev_first), MINOR(usdrdev->devno)));
 
-	devices--;
-	// TODO: Unchain from list and free the memory
+    usdrdev->dev_mask = 0;
+
+    pci_iounmap(pdev, usdrdev->bar_addr);
+    pci_release_regions(pdev);
+
+    pci_clear_master(pdev);
+    pci_disable_device(pdev);
+    pci_set_drvdata(pdev, NULL);
+
+    // Unlink from global list and free device structure
+    mutex_lock(&usdr_list_lock);
+    for (pprev = &usdr_list; *pprev; pprev = &(*pprev)->next) {
+        if (*pprev == usdrdev) {
+            *pprev = usdrdev->next;
+            break;
+        }
+    }
+    devices--;
+    mutex_unlock(&usdr_list_lock);
+
+    // Destroy synchronization primitives before freeing
+    mutex_destroy(&usdrdev->i2c_lut_lock);
+
+    // Free the device structure (fixes memory leak on unbind/rebind)
+    kfree(usdrdev);
 }
 
 static struct pci_device_id usdr_pci_table[] = {
