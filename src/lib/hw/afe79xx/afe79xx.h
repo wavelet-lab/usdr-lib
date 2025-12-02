@@ -30,7 +30,7 @@ struct afe79xx_state {
 typedef struct afe79xx_state afe79xx_state_t;
 
 
-int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_t* out);
+int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipType, afe79xx_state_t* out);
 int afe79xx_init(afe79xx_state_t* afe, const char *configuration);
 
 

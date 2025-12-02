@@ -1,0 +1,249 @@
+# Copyright (c) 2023-2024 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         M2_FE_4CH_BOARD
+desc:         sSDR/dSDR M.2 external FE board
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: VIRTUAL
+    usdr_path: /debug/hw/exfe10_4ch_exp/0/reg
+    wr_mask: 0x80000000
+addr_width:   8
+data_width:   24
+# page_prefix:  True
+field_prefix: [ RegName ]
+field_macros: True
+
+x-rx-filt-in-opts: &rx-filt-in-opts
+    0b000: MUTE0
+    0b011: 400_1000M
+    0b010: 1000_2000M
+    0b001: 2000_3500M
+    0b101: 2500_5000M
+    0b100: 3500_7100M
+    0b110: MUTE1
+    0b111: MUTE2
+
+
+x-rx-filt-out-opts: &rx-filt-out-opts
+    0b000: MUTE0
+    0b011: 400_1000M
+    0b100: 1000_2000M
+    0b101: 2000_3500M
+    0b001: 2500_5000M
+    0b010: 3500_7100M
+    0b110: MUTE1
+    0b111: MUTE2
+
+
+
+pages:
+  - name: V0
+    regs:
+#
+      - addr: 0x30
+        name: SW_RX_FILTER
+        fields:
+#
+#       RX filters switching
+#       ---IN---    ---OUT--
+#       V3 V2 V1    V3 V2 V1
+#       --+--+--    --+--+--
+#        0  1  1     0  1  1  = 0.4 - 1.0 GHz
+#        0  1  0     1  0  0  = 1.0 - 2.0 GHz
+#        0  0  1     1  0  1  = 2.0 - 3.5 GHz
+#        1  0  1     0  0  1  = 2.5 - 5.0 GHz
+#        1  0  0     0  1  0  = 3.5 - 7.0 GHz
+#
+          - bits: "8,23,22"
+            name: IN_CHA
+            desc: RX IN filters switch for Channel A
+            opts: *rx-filt-in-opts
+#
+          - bits: "15,6,7"
+            name: OUT_CHA
+            desc: RX OUT filters switch for Channel A
+            opts: *rx-filt-out-opts
+#
+          - bits: "9,21,20"
+            name: IN_CHB
+            desc: RX IN filters switch for Channel B
+            opts: *rx-filt-in-opts
+#
+          - bits: "14,4,5"
+            name: OUT_CHB
+            desc: RX OUT filters switch for Channel B
+            opts: *rx-filt-out-opts
+#
+          - bits: "10,19,18"
+            name: IN_CHC
+            desc: RX IN filters switch for Channel C
+            opts: *rx-filt-in-opts
+#
+          - bits: "13,3,2"
+            name: OUT_CHC
+            desc: RX OUT filters switch for Channel C
+            opts: *rx-filt-out-opts
+#
+          - bits: "11,17,16"
+            name: IN_CHD
+            desc: RX IN filters switch for Channel D
+            opts: *rx-filt-in-opts
+#
+          - bits: "12,0,1"
+            name: OUT_CHD
+            desc: RX OUT filters switch for Channel D
+            opts: *rx-filt-out-opts
+#
+      - addr: 0x31
+        name: ENABLE
+        fields:
+          - bits: "3"
+            name: IF_VBYP
+            desc: IF Bypass
+          - bits: "2"
+            name: REF_GPS
+            desc: Enable GPS module
+          - bits: "1"
+            name: P8V_TX
+            desc: Enable +8v power supply for TX amps
+          - bits: "0"
+            name: P6V_RX
+            desc: Enable +6v power supply for RX amps
+          - bits: "7"
+            name: PA_BYPASS_CHD
+            desc: Stage-2 PA bypass, channel D
+          - bits: "6"
+            name: PA_BYPASS_CHC
+            desc: Stage-2 PA bypass, channel C
+          - bits: "5"
+            name: PA_BYPASS_CHB
+            desc: Stage-2 PA bypass, channel B
+          - bits: "4"
+            name: PA_BYPASS_CHA
+            desc: Stage-2 PA bypass, channel A
+#
+      - addr: 0x32
+        name: LED_TRX_CTRL
+        fields:
+          - bits: "1:0"
+            name: LED_CHA
+            desc: LED CHA
+          - bits: "3:2"
+            name: LED_CHB
+            desc: LED CHB
+          - bits: "5:4"
+            name: LED_CHC
+            desc: LED CHC
+          - bits: "7:6"
+            name: LED_CHD
+            desc: LED CHD
+#
+      - addr: 0x33
+        name: LEDRX_CH_CTRL
+        fields:
+          - bits: "0"
+            name: EN_CHA
+            desc: Enable CHA
+          - bits: "1"
+            name: EN_CHB
+            desc: Enable CHB
+          - bits: "2"
+            name: EN_CHC
+            desc: Enable CHC
+          - bits: "3"
+            name: EN_CHD
+            desc: Enable CHD
+          - bits: "4"
+            name: LED_CHA
+            desc: LED CHA
+          - bits: "5"
+            name: LED_CHB
+            desc: LED CHB
+          - bits: "6"
+            name: LED_CHC
+            desc: LED CHC
+          - bits: "7"
+            name: LED_CHD
+            desc: LED CHD
+#
+      - addr: 0x34
+        name: P_A_EN_AB
+        fields:
+          - bits: "6"
+            name: B
+            desc: Enable CHB
+          - bits: "7"
+            name: A
+            desc: Enable CHA
+      - addr: 0x35
+        name: ATTN_RX_CH_AB
+        fields:
+          - bits: "3:0"
+            name: B
+            desc: Attenuator CHB
+          - bits: "7:4"
+            name: A
+            desc: Attenuator CHA
+      - addr: 0x36
+        name: SW_AB
+        fields:
+          - bits: "4,1"
+            name: TDDFDD_A
+          - bits: "7,0"
+            name: TDDFDD_B
+          - bits: "2"
+            name: PA_ON_A
+          - bits: "5"
+            name: PA_ON_B
+          - bits: "3"
+            name: RXTX_A
+          - bits: "6"
+            name: RXTX_B
+#
+      - addr: 0x37
+        name: P_A_EN_CD
+        fields:
+          - bits: "6"
+            name: D
+            desc: Enable CHD
+          - bits: "7"
+            name: C
+            desc: Enable CHC
+      - addr: 0x38
+        name: ATTN_RX_CH_CD
+        fields:
+          - bits: "3:0"
+            name: D
+            desc: Attenuator CHD
+          - bits: "7:4"
+            name: C
+            desc: Attenuator CHC
+      - addr: 0x39
+        name: SW_CD
+        fields:
+          - bits: "4,1"
+            name: TDDFDD_C
+          - bits: "7,0"
+            name: TDDFDD_D
+          - bits: "2"
+            name: PA_ON_C
+          - bits: "5"
+            name: PA_ON_D
+          - bits: "3"
+            name: RXTX_C
+          - bits: "6"
+            name: RXTX_D
+
+
+
+
+
+
+
+
+
+
+

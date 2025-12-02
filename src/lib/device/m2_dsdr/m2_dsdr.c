@@ -36,8 +36,9 @@
 //
 
 enum dsdr_type {
-    DSDR_KCU116_EVM = 0xce,
+    DSDR_KCU116_EVM = 0xc0,
     DSDR_M2_R0 = 0xc2,
+    DSDR_M2_R1 = 0xce,
     DSDR_PCIE_HIPER_R0 = 0xcf,
 };
 
@@ -155,6 +156,13 @@ enum {
     IGPO_TX_MAP = 37,
 
     //IGPO_RX_IQS = 38,
+
+    IGPO_TX_CHEN = 39,
+    IGPO_RX_CHEN = 40,
+
+    IGPO_TX_AFETDD = 41,
+    IGPO_RX_AFETDD = 42,
+
 };
 
 enum {
@@ -256,15 +264,20 @@ const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
     { "/ll/sync/0/base",   M2PCI_REG_WR_SYNC_CTRL},
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"afe79xx" },
-    { "/ll/sdr/max_hw_rx_chans",  4 },
-    { "/ll/sdr/max_hw_tx_chans",  4 },
+    { "/ll/device/name",  (uintptr_t)"dsdr"},
 
-    { "/ll/sdr/max_sw_rx_chans",  4 },
-    { "/ll/sdr/max_sw_tx_chans",  4 },
+    // { "/ll/sdr/max_hw_rx_chans",  4 },
+    // { "/ll/sdr/max_hw_tx_chans",  4 },
+
+    // { "/ll/sdr/max_sw_rx_chans",  4 },
+    // { "/ll/sdr/max_sw_tx_chans",  4 },
 };
 
 static int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_dsdr_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
+static int dev_m2_dsdr_rx_enchan(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_tx_enchan(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_dsdr_gain_tx_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -398,10 +411,21 @@ static int device_path_to_chmsk(const char* full_path, const char* basename, chm
 }
 #endif
 
+static int dev_m2_dsdr_numchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+
 static
 const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
+    { "/ll/sdr/max_hw_rx_chans",  { NULL, dev_m2_dsdr_numchans_get } },
+    { "/ll/sdr/max_hw_tx_chans",  { NULL, dev_m2_dsdr_numchans_get } },
+
+    { "/ll/sdr/max_sw_rx_chans",  { NULL, dev_m2_dsdr_numchans_get } },
+    { "/ll/sdr/max_sw_tx_chans",  { NULL, dev_m2_dsdr_numchans_get } },
+
     { "/dm/rate/master",          { dev_m2_dsdr_rate_set, NULL }},
     { "/dm/rate/rxtxadcdac",      { dev_m2_dsdr_rate_m_set, NULL }},
+
+    { "/dm/sdr/0/rx_enchan",      { dev_m2_dsdr_rx_enchan, NULL }},
+    { "/dm/sdr/0/tx_enchan",      { dev_m2_dsdr_tx_enchan, NULL }},
 
     { "/dm/sdr/0/rx/remap",       { dev_m2_dsdr_sdr_rx_remap_set, dev_m2_dsdr_sdr_rx_remap_get }},
     { "/dm/sdr/0/tx/remap",       { dev_m2_dsdr_sdr_tx_remap_set, dev_m2_dsdr_sdr_tx_remap_get }},
@@ -524,6 +548,11 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
 static const uint8_t s_chanmap_hw_to_fe[4] = { 2, 3, 1, 0 };
 static const uint8_t s_chanmap_fe_to_hw[4] = { 3, 2, 0, 1 };
 
+enum DSDR_STATE {
+    STATE_IDLE = 0,
+    STATE_AFE_INIT = 1,
+};
+
 struct dev_m2_dsdr {
     device_t base;
 
@@ -540,6 +569,11 @@ struct dev_m2_dsdr {
     afe79xx_state_t st;
     dsdr_hiper_fe_t hiper;
 
+    uint32_t dsdr_state;
+    uint32_t cfg_afe_type;
+    uint32_t cfg_rx_lanemap;
+    uint32_t cfg_tx_lanemap;
+
     uint32_t debug_lmk05318_last;
 
     const char* afecongiguration;
@@ -554,6 +588,9 @@ struct dev_m2_dsdr {
 
     unsigned hw_fpga_jesd_rx_en; // Physical lanes enabled bitmask 0: X0Y4, 1: X0Y5, ... 3: X0Y7
     unsigned hw_fpga_jesd_tx_en; // Physical lanes enabled bitmask 0: X0Y4, 1: X0Y5, ... 3: X0Y7
+
+    uint8_t hw_rxch_route[8];
+    uint8_t hw_txch_route[8];
 
     uint32_t adc_rate;
     unsigned rxbb_rate;
@@ -606,6 +643,30 @@ static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
 bool dev_m2_dsdr_has_hiper(dev_m2_dsdr_t* d)
 {
     return d->type == DSDR_PCIE_HIPER_R0;
+}
+
+
+int dev_m2_dsdr_numchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
+    if (d->cfg_afe_type == 7903)
+        *ovalue = 2;
+    else
+        *ovalue = 4;
+
+    return 0;
+}
+
+int dev_m2_dsdr_rx_enchan(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
+    return dev_gpo_set(d->base.dev, IGPO_RX_CHEN, value);
+
+}
+int dev_m2_dsdr_tx_enchan(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
+    return dev_gpo_set(d->base.dev, IGPO_TX_CHEN, value);
 }
 
 static int dsdr_update_rx_remap(dev_m2_dsdr_t* d)
@@ -686,7 +747,7 @@ static int dsdr_iterate_chans(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val, c
 
     for (unsigned i = 0; i < DSDR_CHANS_HW; i++) {
         if (chmsk_is_set(&hw_msk, i)) {
-            ph.full_path[1] = i;
+            ph.full_path[1] = rxchans ? d->hw_rxch_route[i] :d->hw_txch_route[i]; // i;
             res = res ? res : obj->ops.si64(&ph, val);
         }
     }
@@ -701,7 +762,7 @@ static int dsdr_iterate_chans(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val, c
                     continue;
                 }
 
-                ph.full_path[1] = i;
+                ph.full_path[1] = rxchans ? d->hw_rxch_route[i] :d->hw_txch_route[i]; //i;
                 res = res ? res : obj->ops.si64(&ph, val);
             } else {
                 // One logical TX channel can be mapped to many physical
@@ -710,7 +771,7 @@ static int dsdr_iterate_chans(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val, c
                     if (d->tx_hw_to_logic[j] != i)
                         continue;
 
-                    ph.full_path[1] = i;
+                    ph.full_path[1] = rxchans ? d->hw_rxch_route[i] :d->hw_txch_route[i]; //i;
                     res = res ? res : obj->ops.si64(&ph, val);
                 }
             }
@@ -1105,7 +1166,7 @@ int _debug_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
         return 0;
     }
 
-    if (value & 0x800000) {
+    if (!(value & 0x800000)) {
         res = lmk05318_reg_wr(&o->lmk, addr, data);
 
         USDR_LOG("XDEV", USDR_LOG_WARNING, "LMK05318 WR REG %04x => %04x\n",
@@ -1138,7 +1199,7 @@ int dev_m2_dsdr_debug_clk_info_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
     int res = 0;
-    uint32_t clk;
+    uint32_t clk = 0;
 
     res = res ? res : dev_gpi_get32(d->base.dev, 20, &clk);
     *value = clk & 0xfffffff;
@@ -1233,11 +1294,17 @@ static int usdr_jesd204b_bringup_pre(struct dev_m2_dsdr *dd)
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_BUFFER_RELDLY_0, 0); // 0 means autodetect and adjust
 
-    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_0, 0x10);
-    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_1, 0x32);
+    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_0, 0x10);
+    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_1, 0x32);
 
-    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_0, 0x10);
-    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_1, 0x32);
+    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_0, 0x10);
+    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_1, 0x32);
+
+    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_0, dd->cfg_rx_lanemap & 0xff);
+    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_1, (dd->cfg_rx_lanemap >> 8) & 0xff);
+
+    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_0, dd->cfg_tx_lanemap & 0xff);
+    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_1, (dd->cfg_tx_lanemap >> 8) & 0xff);
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_POLARITY, 0x0);
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_POLARITY, 0x0);
@@ -1264,6 +1331,8 @@ static int usdr_jesd204b_bringup_pre(struct dev_m2_dsdr *dd)
         USDR_LOG("DSDR", USDR_LOG_ERROR, "FPGA GTH/GTY PLLs are not locked! giving up!\n");
         return -EIO;
     }
+
+    usleep(10000);
 
     // TODO wait for PLL to lock..
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_SYNC_RESET, 0);
@@ -1298,8 +1367,10 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     lldev_t dev = d->base.dev;
     int res = 0;
     uint32_t hwid, usr2, pg, los, devid, jesdv;
+    unsigned afeType = 0;
 
     d->subdev = 0;
+    d->dsdr_state = STATE_IDLE;
     d->hw_mask_fb = 0;
     d->hw_mask_rx = 0xf; // RX_3 RX_2 RX_1 RX_0
     d->hw_mask_tx = 0xf; // TX_3 TX_2 TX_1 TX_0
@@ -1312,13 +1383,22 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         return res;
     }
 
+    res = res ? res : dev_gpo_set(dev, IGPO_AFE_RST, 0x0);
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x0);
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0x0);
+    res = res ? res : dev_gpo_set(dev, IGPO_RX_CHEN, 0x0);
+    res = res ? res : dev_gpo_set(dev, IGPO_TX_CHEN, 0x0);
+    res = res ? res : dev_gpo_set(dev, IGPO_TX_AFETDD, 0x0);
+    res = res ? res : dev_gpo_set(dev, IGPO_RX_AFETDD, 0x0);
+
+
     // TODO check for AFE7903
     if (getenv("DSDR_AFE7903")) {
         d->hw_mask_rx = 0x5; // RX_3 RX_1
         d->hw_mask_tx = 0xA; // TX_4 TX_2
 
-        d->hw_fpga_jesd_rx_en = 0xc;
-        d->hw_fpga_jesd_tx_en = 0xc;
+       // d->hw_fpga_jesd_rx_en = 0xc;
+       // d->hw_fpga_jesd_tx_en = 0xc;
     }
 
     devid = (hwid >> 16) & 0xff;
@@ -1326,19 +1406,34 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     switch (devid) {
     case DSDR_KCU116_EVM:
     case DSDR_M2_R0:
+    case DSDR_M2_R1:
     case DSDR_PCIE_HIPER_R0:
         d->type = devid;
         break;
 
-    case 0xff:
-        d->type = DSDR_PCIE_HIPER_R0;
-        break;
+    //case 0xff:
+    //    d->type = DSDR_PCIE_HIPER_R0;
+    //    break;
 
     default:
         USDR_LOG("XDEV", USDR_LOG_ERROR, "Unsupported HWID = %08x, skipping initialization!\n", hwid);
         return -EIO;
     }
 
+    //
+    if (getenv("DSDR_M2_R0")) {
+        d->type = DSDR_M2_R0;
+    }
+
+    d->cfg_rx_lanemap = 0x76543210;
+    d->cfg_tx_lanemap = 0x76543210;
+
+    for (unsigned h = 0; h < 8; h++) {
+        d->hw_rxch_route[h] = h;
+        d->hw_txch_route[h] = h;
+    }
+
+    afeType = 7901;
     switch (jesdv) {
     case DSDR_JESD204B_810_245:
         d->max_rate = 260e6;
@@ -1353,11 +1448,38 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         break;
 
     case DSDR_JESD204C_6664_491:
+        d->cfg_rx_lanemap = 0x75643210;
+        d->cfg_tx_lanemap = 0x75643210;
+
         d->max_rate = 520e6;
         d->dac_rate = d->adc_rate = 491520000;
         d->afecongiguration =  "Afe79xxPg1_6664_491.txt";
+
         if (d->hw_mask_rx == 0x5 && d->hw_mask_tx == 0xA) {
-            d->afecongiguration =  "Afe79xxPg1_dsdr_491_7903.txt";
+            // RX C/A
+            // TX D/B
+            // d->afecongiguration = "Afe79xxPg1_dsdr_491_7903.txt";
+            afeType = 7903;
+
+            d->cfg_rx_lanemap = 0x75643120;
+            d->cfg_tx_lanemap = 0x75642031;
+            //d->hw_fpga_jesd_rx_en = 0x3;
+            //d->hw_fpga_jesd_tx_en = 0xc;
+
+            d->hw_rxch_route[0] = 0;
+            d->hw_rxch_route[1] = 2;
+            d->hw_rxch_route[2] = 1;
+            d->hw_rxch_route[3] = 3;
+            d->hw_txch_route[0] = 1;
+            d->hw_txch_route[1] = 3;
+            d->hw_txch_route[2] = 0;
+            d->hw_txch_route[3] = 2;
+        }
+
+        if (getenv("DSDR_M2_7950")) {
+            // AFE7950
+            d->afecongiguration = "Afe79xxPg1_6664_491_7950.txt";
+            afeType = 7950;
         }
         break;
 
@@ -1366,13 +1488,14 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         return -EIO;
     }
 
+    d->cfg_afe_type = afeType;
     d->jesdv = jesdv;
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "AFE type JESD204%c CH_TX=%02x CH_RX=%02x\n", (jesdv == DSDR_JESD204B_810_245) ? 'B' : 'C', d->hw_mask_tx, d->hw_mask_rx);
+    USDR_LOG("XDEV", USDR_LOG_ERROR, "Configuration: %s, Type: %d, AFE: %d, JESD204%c, CH_TX=%02x, CH_RX=%02x",
+             d->afecongiguration, d->type, d->cfg_afe_type, (jesdv == DSDR_JESD204B_810_245) ? 'B' : 'C', d->hw_mask_tx, d->hw_mask_rx);
 
     if (getenv("SKIPAFE")) {
         d->type = DSDR_KCU116_EVM;
     }
-
     if (d->type == DSDR_KCU116_EVM) {
         USDR_LOG("XDEV", USDR_LOG_ERROR, "Skipping AFE initialization! SR=%.2f\n", d->adc_rate / 1e6);
         res = res ? res : afe79xx_create_dummy(&d->st);
@@ -1403,8 +1526,8 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         return res;
     }
 
-
-    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xf);
+    // Put LMK into PD but enable all LDOs to settle
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xbf);
 
     for (unsigned j = 0; j < 10; j++) {
         usleep(10000);
@@ -1413,49 +1536,110 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
             break;
     }
 
-    if (d->type == DSDR_M2_R0) {
+    if (d->type == DSDR_M2_R0 || d->type == DSDR_M2_R1) {
+        bool pg;
         for (unsigned j = 0; j < 20; j++) {
             usleep(10000);
             res = res ? res : tps6381x_init(dev, d->subdev, I2C_TPS63811, true, true, 3450);
             if (res == 0)
                 break;
         }
-    }
-    usleep(40000);
+        if (res) {
+            USDR_LOG("XDEV", USDR_LOG_ERROR, "Unable to intialize tps6381x booster!\n");
+            return res;
+        }
 
-
-    for (unsigned j = 0; j < 25; j++) {
-        usleep(40000);
-        res = res ? res : lmk05318_create(dev, d->subdev, I2C_LMK,
-                                          (d->type == DSDR_PCIE_HIPER_R0) ? 2 : 1 /* TODO FIXME!!! */, &d->lmk);
-        if (res == 0)
-            break;
-    }
-    // Update deviders for 245/491MSPS rate
-    if (d->jesdv == DSDR_JESD204C_6664_491) {
-        // GT should be 245.76
-        // FPGA SYSCLK should be 245.76
-
-        res = res ? res : lmk05318_set_out_div(&d->lmk, LMK_FPGA_GT_AFEREF, 4);
-        res = res ? res : lmk05318_set_out_div(&d->lmk, LMK_FPGA_1PPS, 4);
+        for (unsigned j = 0; j < 20; j++) {
+            res = res ? res : tps6381x_check_pg(dev, d->subdev, I2C_TPS63811, &pg);
+            if (!res || pg) {
+                break;
+            }
+            usleep(20000);
+        }
+        if (!pg) {
+            USDR_LOG("XDEV", USDR_LOG_ERROR, "No PG signal in tps6381x booster!\n");
+            return -EIO;
+        }
     }
 
-    usleep(1000);
+    usleep(20000);
+    res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xff);
+    usleep(200000);
 
-    res = res ? res : lmk05318_check_lock(&d->lmk, &los);
+    //
+    //LMK05318 init start
+
+    //set true to enable IN_REF1 40M
+    bool enable_in_ref = false;
+
+    lmk05318_dpll_settings_t dpll;
+    memset(&dpll, 0, sizeof(dpll));
+    dpll.enabled = enable_in_ref;
+    dpll.en[LMK05318_PRIREF] = true;
+    dpll.fref[LMK05318_PRIREF] = 40000000;
+    dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
+    dpll.dc_mode[LMK05318_PRIREF] = DPLL_REF_DC_COUPLED_INT;
+    dpll.buf_mode[LMK05318_PRIREF] = DPLL_REF_AC_BUF_HYST50_DC_EN;
+
+    lmk05318_out_config_t lmk_out[8];
+
+    lmk05318_port_request(&lmk_out[0], 0,         491520000, false, OUT_OFF);
+    lmk05318_port_request(&lmk_out[1], 1,         491520000, false, LVDS);
+    lmk05318_port_request(&lmk_out[2], 2,           3840000, false, LVDS);
+    lmk05318_port_request(&lmk_out[3], 3,           3840000, false, OUT_OFF);
+    lmk05318_port_request(&lmk_out[4], 4,                 0, false, OUT_OFF);
+    lmk05318_port_request(&lmk_out[5], 5,   d->dac_rate / 2, false, LVDS);
+    lmk05318_port_request(&lmk_out[6], 6,           3840000, false, LVDS);
+    lmk05318_port_request(&lmk_out[7], 7,   d->dac_rate / 2, false, LVDS);
+
+    res = lmk05318_create(dev, d->subdev, I2C_LMK, (d->type == DSDR_PCIE_HIPER_R0) ? 52000000 : 26000000, XO_CMOS,
+                          false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->lmk, false /*dry_run*/);
+    if(res)
+        return res;
+
+    // wait for PRIREF/SECREF validation
+    res = lmk05318_wait_dpll_ref_stat(&d->lmk, 100000);
+    if (res) {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "LMK03518 DPLL input reference freqs are not validated during specified timeout");
+        return res;
+    }
+
+    //res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0x7f);
+
+    //wait for lock
+    res = lmk05318_wait_apll1_lock(&d->lmk, 200000);
+    res = res ? res : lmk05318_wait_apll2_lock(&d->lmk, 200000);
+    res = res ? res : lmk05318_check_lock(&d->lmk, &los, false /*silent*/); //just to log state
+
+    if(res)
+    {
+        USDR_LOG("DSDR", USDR_LOG_ERROR, "LMK03518 PLLs not locked during specified timeout");
+        return res;
+    }
+
+    //sync to make APLL1/APLL2 & out channels in-phase
+    res = lmk05318_sync(&d->lmk);
+    //usleep(1000);
+
+    //res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0x7f);
+    //usleep(1000);
+    //res = res ? res : dev_gpo_set(dev, IGPO_PWR_LMK, 0xff);
+    //if(res)
+    //    return res;
+
+    USDR_LOG("DSDR", USDR_LOG_INFO, "LMK03518 outputs synced, LOS=%x", los);
+    //LMK05318 init end
+    //
 
     for (int i = 0; i < 5; i++) {
         uint32_t clk = 0;
         res = res ? res : dev_gpi_get32(d->base.dev, 20, &clk);
 
         USDR_LOG("DSDR", USDR_LOG_ERROR, "Clk %d: %d\n", clk >> 28, clk & 0xfffffff);
-        usleep(0.5 * 1e6);
+        res = res ? res : usleep(0.5 * 1e6);
     }
 
-    res = res ? res : lmk05318_check_lock(&d->lmk, &los);
-    // res = res ? res : lmk05318_set_out_mux(&d->lmk, LMK_FPGA_SYSREF, false, LVDS);
-
-    usleep(1000);
+    res = res ? res : usleep(1000);
     res = res ? res : dev_gpi_get32(dev, IGPI_PGOOD, &pg);
 
     USDR_LOG("DSDR", USDR_LOG_ERROR, "Configuration: OK [%08x, %08x] res=%d   PG=%08x\n", usr2, hwid, res, pg);
@@ -1470,10 +1654,10 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     // Initialize AFEPWR
     res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x1); // Enable VIOSYS, hold RESET
-    usleep(10000);
+    res = res ? res : usleep(10000);
     //res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x3); // Enable VIOSYS, hold RESET
     res = res ? res : lp875484_init(dev, d->subdev, I2C_AFE_PMIC);
-    res = res ? res : lp875484_set_vout(dev, d->subdev, I2C_AFE_PMIC, 900);
+    res = res ? res : lp875484_set_vout(dev, d->subdev, I2C_AFE_PMIC, 930); // Recomended 925mV
     res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x3); // Enable VIOSYS, release RESET
     if (res)
         return res;
@@ -1494,11 +1678,13 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         return -EIO;
     }
 
+    res = res ? res : usleep(100000);
+
     res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x7); // Enable DCDC 1.2V;
     // We don't have PG_1v2 routed in this rev
     // We don't have EN_1v8 routed in this rev
 
-    if (d->type == DSDR_PCIE_HIPER_R0) {
+    if (d->type == DSDR_PCIE_HIPER_R0 || d->type == DSDR_M2_R1) {
         usleep(25000);
         res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0xf);
     }
@@ -1509,12 +1695,14 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         if (pgdat & (1 << 6))
             break;
 
-        usleep(1000);
+        res = res ? res : usleep(1000);
     }
     if (!(pgdat & (1 << 6))) {
         USDR_LOG("DSDR", USDR_LOG_ERROR, "DCDC 1.8V isn't good, giving up!\n");
         return -EIO;
     }
+
+    res = res ? res : usleep(100000);
 
     res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x1f);
     if (res)
@@ -1523,20 +1711,24 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     // Test AFE chip
     USDR_LOG("DSDR", USDR_LOG_ERROR, "AFE is powered up!\n");
 
-    usleep(100000);
+    res = res ? res : usleep(100000);
 
     res = res ? res : dev_gpo_set(dev, IGPO_AFE_RST, 0x0);
+    res = res ? res : usleep(100000);
     res = res ? res : dev_gpo_set(dev, IGPO_AFE_RST, 0x1);
 
-    usleep(100000);
+    res = res ? res : usleep(100000);
+
+    res = res ? res : dev_gpo_set(dev, IGPO_TX_AFETDD, 0x0f);
+    res = res ? res : dev_gpo_set(dev, IGPO_RX_AFETDD, 0x0f);
 
 
-    res = res ? res : afe79xx_create(dev, d->subdev, 0, &d->st);
+    res = res ? res : afe79xx_create(dev, d->subdev, 0, afeType, &d->st);
     if (res == 0) {
         res = res ? res : usdr_jesd204b_bringup_pre(d);
 
         // sleep(1);
-        usleep(10000);
+        res = res ? res : usleep(10000);
 
         char afeconfig_path[1024];
         char *afecfgpath = getenv("AFECFG_PATH");
@@ -1549,18 +1741,45 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     }
 
     if (d->type == DSDR_PCIE_HIPER_R0) {
-        res = res ? res : dsdr_hiper_fe_create(dev, SPI_BUS_HIPER_FE, &d->hiper);
+        unsigned override = 0;
+        unsigned* poverride = NULL;
+        const char* env_over;
+        if ((env_over = getenv("LMS8_MPW2024_MASK"))) {
+            bool ok = (strlen(env_over) == 6);
+            if (ok) {
+                for (unsigned i = 0; i < 6; i++) {
+                    if (env_over[i] == '0') {
+                    } else if (env_over[i] == '1') {
+                        override |= 1 << (5 - i);
+                    } else {
+                        ok = false;
+                    }
+                }
+            }
+
+            if (ok) {
+                poverride = &override;
+                USDR_LOG("DSDR", USDR_LOG_ERROR, "Applying external MPW mask for LMS8 chips: %d%d%d%d%d%d",
+                         (override >> 5) & 1, (override >> 4) & 1, (override >> 3) & 1,
+                         (override >> 2) & 1, (override >> 1) & 1, (override >> 0) & 1);
+            } else {
+                USDR_LOG("DSDR", USDR_LOG_ERROR, "Incorrect LMS8_MPW2024_MASK format!!! Should be like `LMS8_MPW_MASK=010101`\n");
+            }
+        }
+
+        res = res ? res : dsdr_hiper_fe_create(dev, SPI_BUS_HIPER_FE, poverride, &d->hiper);
     }
+
+    res = res ? res : usleep(100000);
 
     // check state
     res = res ? res : dev_m2_dsdr_afe_health_get(udev, NULL, NULL);
-    USDR_LOG("DSDR", USDR_LOG_ERROR, "Initializing AFE done\n");
+    if (res)
+        return res;
 
-
-    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_SYNC_RESET, 1);
-    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_SYNC_RESET, 0);
-
-    return res;
+    USDR_LOG("DSDR", USDR_LOG_WARNING, "Initializing AFE done!\n");
+    d->dsdr_state = STATE_AFE_INIT;
+    return 0;
 }
 
 
@@ -1726,6 +1945,10 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
     unsigned hwchs;
     channel_info_t lchans;
 
+    if (d->dsdr_state != STATE_AFE_INIT) {
+        return -EFAULT;
+    }
+
     res = dsdr_map_channels(channels, &lchans);
     if (res) {
         return res;
@@ -1803,6 +2026,10 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
             }
         }
 
+        // TODO: set actual antenna mask
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_RX_CHEN, 0xf);
+        //res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_RX_CHEN, 0x0);
+
         *out_handle = d->rx;
     } else if (strstr(sid, "tx") != NULL) {
         if (d->tx) {
@@ -1868,6 +2095,9 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
             }
         }
 
+        // TODO: set actual antenna mask
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_TX_CHEN, 0xf);
+        //res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_TX_CHEN, 0x0);
         *out_handle = d->tx;
     }
 
@@ -1888,6 +2118,8 @@ int usdr_device_m2_dsdr_unregister_stream(device_t* dev, stream_handle_t* stream
         if (dev_m2_dsdr_has_hiper(d)) {
             res = dsdr_hiper_fe_rx_chan_en(&d->hiper, 0);
         }
+
+        dev_gpo_set(d->base.dev, IGPO_RX_CHEN, 0);
     } else if (stream == d->tx) {
         d->tx = NULL;
         d->hw_enabled_rx = 0;
@@ -1896,6 +2128,8 @@ int usdr_device_m2_dsdr_unregister_stream(device_t* dev, stream_handle_t* stream
         if (dev_m2_dsdr_has_hiper(d)) {
             res = dsdr_hiper_fe_tx_chan_en(&d->hiper, 0);
         }
+
+        dev_gpo_set(d->base.dev, IGPO_TX_CHEN, 0);
     } else {
         return -EINVAL;
     }

@@ -35,7 +35,7 @@ int vfs_folder_init(vfs_object_t* o, const char* path, void* user)
     if (o->data.obj == NULL)
         return -ENOMEM;
 
-    strncpy(o->full_path, path, sizeof(o->full_path));
+    snprintf(o->full_path, sizeof(o->full_path), "%s", path);
 
     return 0;
 }
@@ -90,7 +90,7 @@ static int _vfs_alloc_object(vfs_object_t* root, vfs_object_t** newobj, uint8_t 
     memset(obj, 0, sizeof(vfs_object_t));
 
     obj->type = type;
-    strncpy(obj->full_path, path, sizeof(obj->full_path));
+    snprintf(obj->full_path, sizeof(obj->full_path), "%s", path);
 
     *newobj = obj;
     return 0;

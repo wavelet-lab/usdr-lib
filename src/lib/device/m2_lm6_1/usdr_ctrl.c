@@ -764,7 +764,7 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
             lms6002d_tune_pll(&d->lms, 0, freq);
         }
         // LDO may not be ready, check again
-        usleep(1000);
+        usleep(5000);
         res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
     }
     if (res == -ENOLCK) {

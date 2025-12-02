@@ -88,10 +88,11 @@ int afe79xx_create_dummy(afe79xx_state_t* out)
     return 0;
 }
 
-int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_t* out)
+int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipType, afe79xx_state_t* out)
 {
     int res;
     const char* afe79xxlib = "liblibcapi79xx.so";
+    unsigned g;
 
     out->dev = dev;
     out->subdev = subdev;
@@ -148,7 +149,7 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_
     }
 
     // TODO: version check
-    return out->libcapi79xx_create(&out->capi, AFE7903);
+    return out->libcapi79xx_create(&out->capi, (enum afe79xx_chip_type)chipType);
 }
 
 int afe79xx_init(afe79xx_state_t* afe, const char* configuration)

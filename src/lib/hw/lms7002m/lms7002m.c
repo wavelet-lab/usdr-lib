@@ -341,6 +341,66 @@ int lms7002m_limelight_reset(lms7002m_state_t* m)
     return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
 }
 
+int lms7002m_limelight_fifo_reset(lms7002m_state_t* m, bool rx, bool tx)
+{
+    uint16_t reg_mac_rst = m->reg_mac;
+    if (rx)
+        SET_LMS7002M_LML_0X0020_SRST_RXFIFO(reg_mac_rst, 1);
+    if (tx)
+        SET_LMS7002M_LML_0X0020_SRST_TXFIFO(reg_mac_rst, 1);
+
+    uint32_t regs[] = {
+        // Reset LML FIFO
+        MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac_rst),
+        MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac),
+    };
+
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms7002m_limelight_l_reset(lms7002m_state_t* m, bool rx, bool tx)
+{
+    uint16_t reg_mac_rst = m->reg_mac;
+    if (rx) {
+        SET_LMS7002M_LML_0X0020_LRST_RX_B(reg_mac_rst, 1);
+        SET_LMS7002M_LML_0X0020_LRST_RX_A(reg_mac_rst, 1);
+    }
+    if (tx) {
+        SET_LMS7002M_LML_0X0020_LRST_TX_B(reg_mac_rst, 1);
+        SET_LMS7002M_LML_0X0020_LRST_TX_A(reg_mac_rst, 1);
+    }
+
+    uint32_t regs[] = {
+        // Reset LML FIFO
+        MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac_rst),
+        //MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac),
+    };
+
+     lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+
+
+     usleep(1000);
+
+    uint32_t regs2[] = {
+        // Reset LML FIFO
+        //MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac_rst),
+        MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac),
+    };
+
+
+    return lms7002m_spi_post(m, regs2, SIZEOF_ARRAY(regs2));
+
+}
+
+int lms7002m_limelight_toggle_ntx(lms7002m_state_t* m)
+{
+    uint32_t regs[] = {
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1),
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1),
+    };
+
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
 
 int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t params)
 {
@@ -350,7 +410,7 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
     unsigned rxmux = params.rx_lfsr ? LML_0X002A_RX_MUX_LFSR :
                          params.rx_tx_dig_loopback ? LML_0X002A_RX_MUX_TXFIFO : LML_0X002A_RX_MUX_RXTSP;
 
-    unsigned rdclk = (params.rx_ext_rd_fclk || params.rx_tx_dig_loopback) ?
+    unsigned rdclk = (params.rx_ext_rd_fclk /* || params.rx_tx_dig_loopback */ ) ?
                          ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_FCLK1 : LML_0X002A_RXRDCLK_MUX_FCLK2) :
                          ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_MCLK1 : LML_0X002A_RXRDCLK_MUX_MCLK2);
     uint16_t reg_mac = m->reg_mac;
@@ -395,12 +455,15 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
                                  (params.txdiv > 1) ? 1u : 0,
                                  (params.rxdiv > 1) ? 1u : 0),
         MAKE_LMS7002M_LML_0x002C( params.txdiv / 2u - 1u, params.rxdiv / 2u - 1u ),
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, params.rxsisoddr && params.rxdiv == 1 ? 0 : 1, 1, 1),
+        MAKE_LMS7002M_CDS_0x00AE(3, 3, 0, 0, 0, 0, 0, 0),
         MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac),
         MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac)
     };
 
     return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
 }
+
 
 
 int _lms7002m_fill_pos(lms7002m_lml_map_t l, lms7002m_lml_map_t* o)
@@ -747,16 +810,41 @@ int lms7002m_dc_corr(lms7002m_state_t* m, unsigned p, int16_t v)
 }
 
 
-int lms7002m_cds_set(lms7002m_state_t* m, bool rxalml, bool rxblml)
+int lms7002m_xxtsp_bst(lms7002m_state_t* m, lms7002m_xxtsp_t tsp)
 {
-    uint32_t regs[] = {
-        //   0x80AD03ff ^ ((rxalml ? 1 : 0) << 2) , //^ ((rxblml ? 1 : 0) << 3),
-        0x80AD03ff ^ ((rxalml ? 1 : 0) << 2),
-        0x80AE0C00,
-    };
-    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
-}
+    uint32_t reg_rxmod = MAKE_LMS7002M_RXTSP_0x0400(0,
+                                                    RXTSP_0X0400_CAPSEL_RSSI, //CAPSEL
+                                                    RXTSP_0X0400_CAPSEL_ADC_RXTSP_INPUT, //CAPSEL_ADC
+                                                    RXTSP_0X0400_TSGFC_NEG6DB, //TSGFC,
+                                                    RXTSP_0X0400_TSGFCW_DIV8, //TSGFCW,
+                                                    0, //TSGDCLDQ
+                                                    0, //TSGDCLDI
+                                                    0, //TSGSWAPIQ,
+                                                    RXTSP_0X0400_TSGMODE_DC, //TSGMODE,
+                                                    RXTSP_0X0400_INSEL_LML, //INSEL,
+                                                    0, //BSTART,
+                                                    1);
+    uint32_t reg_rxmod_s = reg_rxmod;
+    SET_LMS7002M_RXTSP_0X0400_BSTART(reg_rxmod_s, 1);
 
+    uint32_t reg_txmod = MAKE_LMS7002M_TXTSP_0x0200(TXTSP_0X0200_TSGFC_NEG6DB, //TSGFC,
+                                                    TXTSP_0X0200_TSGFCW_DIV8, //TSGFCW,
+                                                    0, //TSGDCLDQ
+                                                    0, //TSGDCLDI
+                                                    0, //TSGSWAPIQ,
+                                                    TXTSP_0X0200_TSGMODE_DC, //TSGMODE,
+                                                    TXTSP_0X0200_INSEL_LML, //INSEL,
+                                                    0, //BSTART,
+                                                    1u);
+    uint32_t reg_txmod_s = reg_txmod;
+    SET_LMS7002M_TXTSP_0X0200_BSTART(reg_txmod_s, 1);
+
+    uint32_t xxtsp_regs[] = {
+        (tsp == LMS_RXTSP) ? reg_rxmod : reg_txmod,
+        (tsp == LMS_RXTSP) ? reg_rxmod_s : reg_txmod_s,
+    };
+    return lms7002m_spi_post(m, xxtsp_regs, SIZEOF_ARRAY(xxtsp_regs));
+}
 
 // xxTSP
 int lms7002m_xxtsp_enable(lms7002m_state_t* m, lms7002m_xxtsp_t tsp, bool enable)

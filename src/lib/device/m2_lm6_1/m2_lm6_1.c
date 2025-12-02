@@ -111,6 +111,7 @@ const usdr_dev_param_constant_t s_params_m2_lm6_1_rev000[] = {
     { "/ll/dsp/atcrbs/0/base", M2PCI_REG_WR_LBDSP },
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"lms6002d" },
+    { "/ll/device/name",  (uintptr_t)"usdr"},
 
     { "/ll/sdr/max_hw_rx_chans",  1 },
     { "/ll/sdr/max_hw_tx_chans",  1 },
@@ -191,6 +192,7 @@ static int dev_m2_lm6_1_sdr_tx_bbloopbackm_set(pdevice_t ud, pusdr_vfs_obj_t obj
 
 static int dev_m2_lm6_1_sdr_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 
+static int dev_m2_lm6_1_sdr_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm6_1_sdr_clkmeas_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_clkmeas_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
@@ -257,7 +259,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/core/atcrbs/reg", { dev_m2_lm6_1_sdr_atcrbs_set, dev_m2_lm6_1_sdr_atcrbs_get }},
     { "/dm/sdr/0/tx/bbloopbackm",  { dev_m2_lm6_1_sdr_tx_bbloopbackm_set, NULL }},
 
-
+    { "/dm/sdr/0/dac_vctcxo",      { dev_m2_lm6_1_sdr_vctcxo_set, NULL }},
     { "/dm/sdr/0/clkmeas", { dev_m2_lm6_1_sdr_clkmeas_set, dev_m2_lm6_1_sdr_clkmeas_get }},
 
     { "/dm/revision", { NULL, dev_m2_lm6_1_sdr_revision_get }},
@@ -883,6 +885,21 @@ usdr_dev_t* get_usdr_dev(pdevice_t udev)
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)udev;
     return &d->d;
 }
+
+int dev_m2_lm6_1_sdr_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    board_ext_pciefe_t* board_fe = device_fe_to(d->fe, "pciefe");
+    board_exm2pe_t* board = device_fe_to(d->fe, "exm2pe");
+    if (board_fe) {
+        return board_ext_pciefe_set_dac(board_fe, value);
+    } else if (board) {
+        return board_exm2pe_set_dac(board, value);
+    }
+
+    return -EINVAL;
+}
+
 
 static
 int usdr_device_m2_lm6_1_initialize(pdevice_t udev, unsigned pcount, const char** devparam, const char** devval)

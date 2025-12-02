@@ -10,7 +10,7 @@ int sfe_rx4_check_format(const struct stream_config* psc);
 
 int sfe_rx4_configure(const sfe_cfg_t *fe,
                       const struct stream_config* psc,
-                      struct fifo_config* pfc);
+                      struct fifo_config* pfc, uint64_t *pwr_ch_mask);
 
 int sfe_rx4_throttle(const sfe_cfg_t* fe, bool enable, uint8_t send, uint8_t skip);
 

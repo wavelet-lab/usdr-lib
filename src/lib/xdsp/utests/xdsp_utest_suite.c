@@ -15,6 +15,7 @@ Suite * conv_2ci16_ci16_suite(void);
 Suite * fftad_suite(void);
 Suite * rtsa_suite(void);
 Suite * fft_window_cf32_suite(void);
+Suite * fft_window_ci16_cf32_suite(void);
 Suite * conv_i12_f32_suite(void);
 Suite * conv_ci12_2cf32_suite(void);
 Suite * conv_f32_i12_suite(void);
@@ -41,7 +42,7 @@ int main(int argc, char** argv)
 
     int number_failed;
     SRunner *sr;
-#if 1
+#if 0
     sr = srunner_create(  fftad_suite());
     srunner_add_suite(sr, rtsa_suite());
     srunner_add_suite(sr, fft_window_cf32_suite());
@@ -77,8 +78,9 @@ int main(int argc, char** argv)
     srunner_add_suite(sr, conv_ci12_4cf32_suite());
     //
 #else
-    sr = srunner_create(wvlt_sincos_i16_suite());
-    //srunner_add_suite(sr, conv_2ci16_ci16_suite());
+    //sr = srunner_create(conv_i16_f32_suite());
+    sr = srunner_create(fft_window_ci16_cf32_suite());
+    //srunner_add_suite(sr, fft_window_cf32_suite());
     //srunner_add_suite(sr, conv_f32_i12_suite());
     //srunner_add_suite(sr, conv_2cf32_ci12_suite());
 #endif

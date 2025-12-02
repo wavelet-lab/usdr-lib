@@ -125,6 +125,8 @@ const usdr_dev_param_constant_t s_params_m2_da09_4_ad45_2_rev000[] = {
     { "/ll/rfe/0/base",    CSR_RFE4_BASE },
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"ad45lb49" },
+    { "/ll/device/name",  (uintptr_t)"lsdr"},
+
     { "/ll/sdr/max_hw_rx_chans",  1 },
     { "/ll/sdr/max_hw_tx_chans",  0 },
 

@@ -38,6 +38,27 @@ VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/fftad_norm_hwi16_generic.t"
 DECLARE_TR_FUNC_FFTAD_NORM_HWI16(fftad_norm_hwi16_generic)
 
+
+#ifdef WVLT_AVX512BW
+
+#define TEMPLATE_FUNC_NAME fftad_init_avx512bw
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx512bw"))
+#include "templates/fftad_init_avx512bw.t"
+DECLARE_TR_FUNC_FFTAD_INIT(fftad_init_avx512bw)
+
+#define TEMPLATE_FUNC_NAME fftad_add_avx512bw
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx512bw,avx512dq"))
+#include "templates/fftad_add_avx512bw.t"
+DECLARE_TR_FUNC_FFTAD_ADD(fftad_add_avx512bw)
+
+#define TEMPLATE_FUNC_NAME fftad_norm_avx512bw
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx512bw,avx512dq,fma"))
+#include "templates/fftad_norm_avx512bw.t"
+DECLARE_TR_FUNC_FFTAD_NORM(fftad_norm_avx512bw)
+
+#endif //WVLT_AVX512BW
+
+
 #ifdef WVLT_AVX2
 
 #define TEMPLATE_FUNC_NAME fftad_init_avx2
@@ -116,6 +137,7 @@ fftad_init_function_t fftad_init_c(generic_opts_t cpu_cap, const char** sfunc)
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_init_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_fftad_init_avx2, cpu_cap);
+    SELECT_AVX512BW_FN(fn, fname, tr_fftad_init_avx512bw, cpu_cap);
     SELECT_NEON_FN(fn, fname, tr_fftad_init_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
@@ -129,6 +151,7 @@ fftad_add_function_t fftad_add_c(generic_opts_t cpu_cap, const char** sfunc)
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_add_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_fftad_add_avx2, cpu_cap);
+    SELECT_AVX512BW_FN(fn, fname, tr_fftad_add_avx512bw, cpu_cap);
     SELECT_NEON_FN(fn, fname, tr_fftad_add_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;
@@ -142,6 +165,7 @@ fftad_norm_function_t fftad_norm_c(generic_opts_t cpu_cap, const char** sfunc)
 
     SELECT_GENERIC_FN(fn, fname, tr_fftad_norm_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_fftad_norm_avx2, cpu_cap);
+    SELECT_AVX512BW_FN(fn, fname, tr_fftad_norm_avx512bw, cpu_cap);
     SELECT_NEON_FN(fn, fname, tr_fftad_norm_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;

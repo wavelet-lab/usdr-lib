@@ -162,7 +162,13 @@ static void* usdr_dif_thread(void* param)
             pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 
             if (replen > 0) {
-                write(data_socket, reply, replen);
+                int wres = write(data_socket, reply, replen);
+                if(wres < 0)
+                {
+                    wres = errno;
+                    USDR_LOG("DBGS", USDR_LOG_ERROR, "write() error:%d!", wres);
+                    goto connection_closed;
+                }
             }
 
             ssize_t ech = end - (p + buffer);

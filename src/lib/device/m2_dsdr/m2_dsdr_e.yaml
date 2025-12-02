@@ -3,7 +3,7 @@
 
 # Register desc and visual map
 name:         M2_DSDR
-desc:         DSDR M2 board
+desc:         Hiper board control
 revision:     "0.0.1"
 processors:   [ c ]
 bus:
@@ -43,6 +43,21 @@ x-if-lna-opts: &if-lna-opts
     0b01: Disable
     0b10: BYPASS
     0b11: BYPASS2
+
+
+x-r2rx-in-opts: &r2rx-in-opts
+    0b00: DISABLE
+    0b01: RX_HI
+    0b10: RX_LOW
+    0b11: RX_BYPASS
+
+
+x-r2rx-out-opts: &r2rx-out-opts
+    0b00: DISABLE
+    0b01: RX_LOW
+    0b10: RX_HI
+    0b11: RX_BYPASS
+
 
 pages:
   - name: V0
@@ -130,16 +145,16 @@ pages:
         fields:
 #
           - bits: "6"
-            name: RX_H_CHA
+            name: RX_H_CHA_R2D_V1
             desc: Channel A RX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "7"
-            name: RX_H_CHB
+            name: RX_H_CHB_R2D_V2
             desc: Channel B RX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "4"
-            name: RX_H_CHC
+            name: RX_H_CHC_R2C_V1
             desc: Channel C RX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "5"
-            name: RX_H_CHD
+            name: RX_H_CHD_R2C_V2
             desc: Channel D RX OUT selection, 2.5-7.1 GHz (1) or 0.4-3.5 GHz (0)
           - bits: "3"
             name: TX_L_CHA
@@ -159,16 +174,16 @@ pages:
         fields:
 #
           - bits: "0"
-            name: RX_L_CHA
+            name: RX_L_CHA_R2B_V1
             desc: Channel A RX IN selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "1"
-            name: RX_L_CHB
+            name: RX_L_CHB_R2B_V2
             desc: Channel B RX IN selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "2"
-            name: RX_L_CHC
+            name: RX_L_CHC_R2A_V1
             desc: Channel C RX IN selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "3"
-            name: RX_L_CHD
+            name: RX_L_CHD_R2A_V2
             desc: Channel D RX IN selection, 2.5-7.1 GHz (0) or 0.4-3.5 GHz (1)
           - bits: "4"
             name: TX_H_CHA
@@ -186,6 +201,18 @@ pages:
       - addr: 0x24
         name: ENABLE
         fields:
+          - bits: "7"
+            name: REV2_P5V
+            desc: Rev2 Enable +5v power for (IF Amplifier)
+          - bits: "6"
+            name: REV2_P5V_EXTLO
+            desc: Rev2 Eanble +5v power for EXT_LO clock distributor
+          - bits: "5"
+            name: REV2_PG_6P0
+            desc: PG signal for 6P0 line
+          - bits: "4"
+            name: REV2_PG_8P0
+            desc: PG signal for 8P0 line
           - bits: "3"
             name: REF_OSC
             desc: Enable 25MHz reference clock oscillator
@@ -197,7 +224,7 @@ pages:
             desc: Enable +8v power supply for TX amps
           - bits: "0"
             name: P5V_RX
-            desc: Enable +5v power supply for RX amps
+            desc: Enable +5v power supply for RX amps, Rev2 Enable 6V rail
 #
       - addr: 0x25
         name: LMS8001_RESET
@@ -220,9 +247,13 @@ pages:
           - bits: "1"
             name: TX_CHCD
             desc: TX circuit LMS8001B reset (channels C and D, 2.5-7.1 GHz (HIGH) mode)
+          - bits: "0"
+            name: REV2_DCDC
+            desc: Reset pin for DCDC module
+
 #
       - addr: 0x26
-        name: GPIO6
+        name: AUX_CTRL
         fields:
           - bits: "7"
             name: ABSLNA_PA_CHD
@@ -237,14 +268,78 @@ pages:
             name: ABSLNA_PA_CHA
             desc: 50 ohm absorptive LNA to PA switch selection, channel A
           - bits: "3"
-            name: FAN_PWM0
-            desc: FAN0 PWM input
+            name: PA_BYPASS_D
+            desc: Rev0 FAN0 PWM input
           - bits: "2"
-            name: FAN_TACH0
-            desc: FAN0 tachometer output
+            name: PA_BYPASS_C
+            desc: Rev0 FAN0 tachometer output
           - bits: "1"
-            name: FAN_PWM1
-            desc: FAN1 PWM input
+            name: PA_BYPASS_B
+            desc: Rev0 FAN1 PWM input
           - bits: "0"
-            name: FAN_TACH1
-            desc: FAN1 tachometer output
+            name: PA_BYPASS_A
+            desc: Rev0 FAN1 tachometer output
+#
+      - addr: 0x27
+        name: SW_IN_RX
+        fields:
+          - bits: "1:0"
+            name: CHA
+            desc: CHA
+            opts: *r2rx-in-opts
+          - bits: "3:2"
+            name: CHB
+            desc: CHB
+            opts: *r2rx-in-opts
+          - bits: "5:4"
+            name: CHC
+            desc: CHC
+            opts: *r2rx-in-opts
+          - bits: "7:6"
+            name: CHD
+            desc: CHD
+            opts: *r2rx-in-opts
+#
+      - addr: 0x28
+        name: LED_TRX_CTRL
+        fields:
+          - bits: "1:0"
+            name: LED_CHA
+            desc: LED CHA
+          - bits: "3:2"
+            name: LED_CHB
+            desc: LED CHB
+          - bits: "5:4"
+            name: LED_CHC
+            desc: LED CHC
+          - bits: "7:6"
+            name: LED_CHD
+            desc: LED CHD
+#
+      - addr: 0x29
+        name: LEDRX_CH_CTRL
+        fields:
+          - bits: "0"
+            name: EN_CHA
+            desc: Enable CHA
+          - bits: "1"
+            name: EN_CHB
+            desc: Enable CHB
+          - bits: "2"
+            name: EN_CHC
+            desc: Enable CHC
+          - bits: "3"
+            name: EN_CHD
+            desc: Enable CHD
+          - bits: "4"
+            name: LED_CHA
+            desc: LED CHA
+          - bits: "5"
+            name: LED_CHB
+            desc: LED CHB
+          - bits: "6"
+            name: LED_CHC
+            desc: LED CHC
+          - bits: "7"
+            name: LED_CHD
+            desc: LED CHD

@@ -355,7 +355,8 @@ static int _configure_simple_fe_generic(const sfe_cfg_t* fe,
 
 int sfe_rx4_configure(const sfe_cfg_t* fe,
                       const struct stream_config* psc,
-                      struct fifo_config* pfc)
+                      struct fifo_config* pfc,
+                      uint64_t *pwr_ch_mask)
 {
     struct bitsfmt bfmt = get_bits_fmt(psc->sfmt);
     if (strcmp((const char*)bfmt.func, &DSPFUNC_CFFT_LPWR_I16[1]) == 0) {
@@ -430,8 +431,19 @@ int sfe_rx4_configure(const sfe_cfg_t* fe,
         return -EINVAL;
     }
 
+    switch (chfmt) {
+    case IFMT_CH_3210: *pwr_ch_mask = 0b1111; break;
+    case IFMT_CH_xx10: *pwr_ch_mask = 0b0011; break;
+    case IFMT_CH_xxx0: *pwr_ch_mask = 0b0001; break;
+    case IFMT_CH_xx1x: *pwr_ch_mask = 0b0010; break;
+    case IFMT_CH_x2x0: *pwr_ch_mask = 0b0101; break;
+    case IFMT_CH_32xx: *pwr_ch_mask = 0b1100; break;
+    case IFMT_CH_x2xx: *pwr_ch_mask = 0b0100; break;
+    case IFMT_CH_3xxx: *pwr_ch_mask = 0b1000; break;
+    }
+
     unsigned fe_format = ((bfmt.bits == 8) ? IFMT_8BIT : (bfmt.bits == 12) ? IFMT_12BIT : IFMT_16BIT);
-    return _configure_simple_fe_generic(fe, psc, bfmt.bits, 1, fe_format,chfmt, chns, pfc);
+    return _configure_simple_fe_generic(fe, psc, bfmt.bits, 1, fe_format, chfmt, chns, pfc);
 }
 
 

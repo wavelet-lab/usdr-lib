@@ -77,11 +77,13 @@ int mmcm_init_raw_clkout(lldev_t dev, subdev_t subdev,
     if (res)
         return res;
 
-    USDR_LOG("MMCM", USDR_LOG_ERROR, " CLKREG %02x OLD: PHASE=%d HIGH=%d LOW=%d | MX=%d EDGE=%d NO_CNT=%d DELAY=%d\n",
-               clkout_reg,
-               (clk1_reg_old >> 13) & 0x7, (clk1_reg_old >> 6) & 0x3f, clk1_reg_old & 0x3f,
-               (clk2_reg_old >> 8) & 0x3, (clk2_reg_old >> 7) & 1, (clk2_reg_old >> 6) & 1,
-               (clk2_reg_old & 0x3f));
+    USDR_LOG("MMCM", USDR_LOG_NOTE, " CLKREG %02x OLD: PHASE=%d HIGH=%d LOW=%d MX=%d EDGE=%d NO_CNT=%d DELAY=%2d | NEW: PHASE=%d HIGH=%d LOW=%d MX=%d EDGE=%d NO_CNT=%d DELAY=%2d\n",
+             clkout_reg,
+             (clk1_reg_old >> 13) & 0x7, (clk1_reg_old >> 6) & 0x3f, clk1_reg_old & 0x3f,
+             (clk2_reg_old >> 8) & 0x3, (clk2_reg_old >> 7) & 1, (clk2_reg_old >> 6) & 1, (clk2_reg_old & 0x3f),
+             (clk1_reg_out >> 13) & 0x7, (clk1_reg_out >> 6) & 0x3f, clk1_reg_out & 0x3f,
+             (clk2_reg_out >> 8) & 0x3, (clk2_reg_out >> 7) & 1, (clk2_reg_out >> 6) & 1, (clk2_reg_out & 0x3f)
+             );
     return 0;
 }
 

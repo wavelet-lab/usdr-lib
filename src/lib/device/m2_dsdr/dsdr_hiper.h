@@ -29,8 +29,11 @@ enum antenna_cfg {
 enum if_band {
     IFBAND_400_3500,
     IFBAND_2200_7200,
+    IFBAND_R2RX_1580_2760,
+    IFBAND_R2RX_OFF,
 
     IFBAND_AUTO = 2,
+    IFBAND_RX_AUTO = 4,
 };
 
 struct fe_chan_config {
@@ -52,6 +55,8 @@ struct fe_chan_config {
     uint64_t tx_freq;
     uint64_t tx_nco;
 
+    uint8_t pa_2stage_bypass; // For Rev.2 PA second stage bypass
+
     uint8_t lms8_pa_gain;
     uint8_t lms8_lna_gain;
     uint8_t lms8_rx_hlmix_gain;
@@ -60,11 +65,18 @@ struct fe_chan_config {
 typedef struct fe_chan_config fe_chan_config_t;
 
 #define FE_GPO_REGS 9
-#define FE_CTRL_REGS 7
+#define FE_CTRL_REGS 10
+
+enum {
+    HIPER_REV0,
+    HIPER_REV2,
+};
 
 struct dsdr_hiper_fe {
     lldev_t dev;
     subdev_t subdev;
+
+    unsigned rev;
 
     lms8001_state_t lms8[6];
     uint64_t lo_lms8_freq[6];
@@ -101,7 +113,7 @@ struct dsdr_hiper_fe {
 typedef struct dsdr_hiper_fe dsdr_hiper_fe_t;
 
 
-int dsdr_hiper_fe_create(lldev_t dev, unsigned spix_num, dsdr_hiper_fe_t* dfe);
+int dsdr_hiper_fe_create(lldev_t dev, unsigned spix_num, unsigned int *lms8_mpw_mask, dsdr_hiper_fe_t* dfe);
 int dsdr_hiper_fe_destroy(dsdr_hiper_fe_t* dfe);
 
 int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool *p_swap_rxiq);

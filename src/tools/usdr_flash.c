@@ -48,6 +48,7 @@ int main(int argc, char** argv)
     bool force = false;
     bool golden = false;
     bool corrupt = false;
+    bool verbose = false;
     uint32_t curfwid;
     bool no_device = false;
     uint64_t master_offset = MASTER_IMAGE_OFF;
@@ -59,7 +60,7 @@ int main(int argc, char** argv)
     usdrlog_setlevel(NULL, USDR_LOG_WARNING);
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGC")) != -1) {
+    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCv")) != -1) {
         switch (opt) {
         case 'U':
             busname = optarg;
@@ -87,6 +88,9 @@ int main(int argc, char** argv)
             break;
         case 'C':
             corrupt = true;
+            break;
+        case 'v':
+            verbose = true;
             break;
         default:
             fprintf(stderr, "Usage: %s [-U device_bus] [-l loglevel] [-r filename | -w filename | -i filename] [-G]\n",
@@ -130,8 +134,12 @@ int main(int argc, char** argv)
     }
 
     if (!(no_device)) {
-        usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/master_off", &master_offset);
-        usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/base", &qspi_base);
+        res = res ? res : usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/master_off", &master_offset);
+        res = res ? res : usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/base", &qspi_base);
+
+        if (res) {
+            fprintf(stderr, "Unable to get board memory configuration, assuming MASTER_OFF=%x!\n", (unsigned)master_offset);
+        }
     }
 
     usleep(1000);
@@ -212,6 +220,13 @@ int main(int argc, char** argv)
             fprintf(stderr, "It looks like the file is corrupted! res=%d\n", res);
             return 4;
         }
+        if (verbose) {
+            fprintf(stderr, "- GOLDEN: WBSTART=%08x IPROG=%d\n", image.wbstar, image.iprog);
+            fprintf(stderr, "- MASTER: WBSTART=%08x IPROG=%d\n", image_master.wbstar, image_master.iprog);
+            fprintf(stderr, "- FILE:   WBSTART=%08x IPROG=%d\n", file.wbstar, file.iprog);
+            fprintf(stderr, "- DEVICE: OFFSET= %08x\n", (unsigned)master_offset);
+        }
+
         res = (no_device) ? 0 : xlnx_btstrm_iprgcheck(&image, &file, master_offset, golden);
         if (res) {
             fprintf(stderr, "Image check failed! res=%d, file revision=%12ld\n", res, get_xilinx_rev_h(file.usr_access2));
@@ -239,6 +254,15 @@ int main(int argc, char** argv)
             fprintf(stderr, "Looks like you're using latest firmware already\n");
             return 9;
         }
+        if (image.usr_access2 == file.usr_access2 && golden && !force) {
+            fprintf(stderr, "Looks like GOLD image %08x is already flashed!\n", file.usr_access2);
+            return 9;
+        }
+        if (image_master.usr_access2 == file.usr_access2 && !golden && !force) {
+            fprintf(stderr, "Looks like MASTER image %08x is already flashed!\n", file.usr_access2);
+            return 9;
+        }
+
         if (corrupt) {
             memset(outa + 512*1024, -1, 512*1024);
             fprintf(stderr, "CORRUPTING IMAGE!!!\n\n");

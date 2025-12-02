@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "usdr_port.h"
 #include "vbase.h"
 
 #define I16RND(x) (int16_t)(x)
@@ -59,6 +60,13 @@ typedef void (*filter_function_t)(const int16_t *__restrict data,
                        void *__restrict *__restrict outdata, \
                        unsigned outdatabsz) \
    { conv_fn(*indata, indatabsz, outdata[0], outdata[1], outdata[2], outdata[3], outdatabsz); }
+
+#define DECLARE_TR_FUNC_1_8(conv_fn) \
+void tr_##conv_fn (const void *__restrict *__restrict indata, \
+                  unsigned indatabsz, \
+                  void *__restrict *__restrict outdata, \
+                  unsigned outdatabsz) \
+{ conv_fn(*indata, indatabsz, outdata[0], outdata[1], outdata[2], outdata[3], outdata[4], outdata[5], outdata[6], outdata[7], outdatabsz); }
 
 #define DECLARE_TR_FUNC_2_1(conv_fn) \
     void tr_##conv_fn (const void *__restrict *__restrict indata, \
@@ -122,6 +130,7 @@ struct fft_accumulate_data {
 typedef struct fft_accumulate_data fft_acc_t;
 
 typedef float wvlt_fftwf_complex[2];
+typedef int16_t wvlt_fftwi16_complex[2];
 
 typedef void (*fftad_init_function_t)
     (fft_acc_t* __restrict p,  unsigned fftsz);
@@ -235,6 +244,14 @@ typedef void (*fft_window_cf32_function_t)
 #define DECLARE_TR_FUNC_FFT_WINDOW_CF32(conv_fn) \
 void tr_##conv_fn (wvlt_fftwf_complex* __restrict in, unsigned fftsz, float* __restrict wnd, \
                    wvlt_fftwf_complex* __restrict out) \
+{ conv_fn(in, fftsz, wnd, out); }
+
+typedef void (*fft_window_ci16_cf32_function_t)
+    (wvlt_fftwi16_complex* __restrict in, unsigned fftsz, float* __restrict wnd, wvlt_fftwf_complex* __restrict out);
+
+#define DECLARE_TR_FUNC_FFT_WINDOW_CI16_CF32(conv_fn) \
+void tr_##conv_fn (wvlt_fftwi16_complex* __restrict in, unsigned fftsz, float* __restrict wnd, \
+                  wvlt_fftwf_complex* __restrict out) \
 { conv_fn(in, fftsz, wnd, out); }
 
 #endif

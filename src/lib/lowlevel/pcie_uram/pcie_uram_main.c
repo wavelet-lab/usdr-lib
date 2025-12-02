@@ -577,6 +577,11 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
                 pcie_reg_op_iommap(d, 4, &stat[0], 12, NULL, 0);
                 USDR_LOG("PCIE", USDR_LOG_NOTE, "STR[%d]: PCIe recv dma buffer alloc timed out stat=%08x:%08x:%08x %08x!\n",
                          channel, stat[0], stat[1], stat[2], stat[3]);
+
+                uint32_t* oob32 = (uint32_t*)oob_ptr;
+                oob32[0] = stat[0];
+                oob32[1] = stat[1];
+                oob32[2] = stat[2];
             } else {
                 unsigned stat[4];
                 // TODO: Remove hardcoded address to upper layer
@@ -918,7 +923,8 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
 
     dev->ll.ops = &s_pcie_uram_ops;
     dev->fd = fd;
-    strncpy(dev->name, devname, sizeof(dev->name) - 1);
+
+    snprintf(dev->name, sizeof(dev->name), "%s", devname);
 
     // Get UUID
     device_id_t did;

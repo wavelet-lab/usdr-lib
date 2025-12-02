@@ -60,10 +60,18 @@ enum {
     LMS8001_PROFILES = 8,
 };
 
+enum lms8_stepping {
+    LMS8_MPW2015 = 0,
+    LMS8_MPW2024 = 1,
+};
+
 struct lms8001_state {
     lldev_t dev;
     unsigned subdev;
     unsigned lsaddr;
+
+    // Chip stepping
+    unsigned stepping;
 
     // Enabled channel masks
     unsigned chan_mask;
@@ -78,7 +86,7 @@ struct lms8001_state {
 typedef struct lms8001_state lms8001_state_t;
 
 
-int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms8001_state_t *out);
+int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned stepping, lms8001_state_t *out);
 int lms8001_destroy(lms8001_state_t* m);
 
 int lms8001_core_enable(lms8001_state_t* state, bool enable);

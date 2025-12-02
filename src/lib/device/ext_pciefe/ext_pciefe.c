@@ -741,3 +741,11 @@ int board_ext_pciefe_best_path_set(board_ext_pciefe_t* ob,
 
     return -EINVAL;
 }
+
+int board_ext_pciefe_set_dac(board_ext_pciefe_t* brd, unsigned value)
+{
+    unsigned i2ca_dac = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(brd->i2c_loc), LSOP_I2C_BUSNO(brd->i2c_loc), I2C_ADDR_DAC);
+
+    brd->dac = value;
+    return dac80501_dac_set(brd->dev, brd->subdev, i2ca_dac, brd->dac);
+}

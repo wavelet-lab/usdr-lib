@@ -154,7 +154,7 @@ int libusb_generic_plugin_discovery(unsigned pcount, const char** filterparams,
 
     for (i = 0, off = 0; i < fcnt; i++) {
         int cap = maxbuf - off;
-        int l = snprintf(outarray + off, cap, "bus\t%s@%s\n", busname, md[i].devid_s);
+        int l = snprintf(outarray + off, cap, "bus=%s@%s\n", busname, md[i].devid_s);
         if (l < 0 || l > cap) {
             outarray[off] = 0;
             res = i;

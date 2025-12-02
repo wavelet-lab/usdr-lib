@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <assert.h>
 #include <inttypes.h>
 
@@ -86,6 +87,8 @@ struct stream_sfetrx_dma32 {
     } storage;
 
     extxcfg_cache_t cstx4;
+
+    uint64_t hw_pwr_mask; // Powered chans (hw)
 };
 typedef struct stream_sfetrx_dma32 stream_sfetrx_dma32_t;
 
@@ -158,23 +161,60 @@ int _sfetrx4_stream_recv(stream_handle_t* str,
     res = ops->recv_dma_wait(dev, 0,
                              stream->ll_streamo,
                              (void**)&dma_buf, &oob_data, &oob_size, timeout);
-    if (res < 0)
+    if (res == -ETIMEDOUT) {
+    } else if (res < 0)
         return res;
+
+    uint32_t dma_stat = oob_data[1];
+    unsigned dbno_inram;     // BUF# filled in FIFO RAM
+    unsigned dbno_xfred;     // BUF# transferred to host
+    unsigned dbno_ntfysent;  // BUF# notification sent
+    unsigned dbno_confirmed; // BUF# confirmed by user (can reuse again)
+    unsigned fe_stat;        // BUF# in FE
+    bool srdy = dma_stat >> 31;
+    fe_stat = (((dma_stat >> 22) & 3) << 4) |
+              (((dma_stat >> 14) & 3) << 2) |
+              (((dma_stat >> 6) & 3) << 0);
+    dbno_confirmed = (dma_stat >> 0) & 0x3f;
+    dbno_xfred = (dma_stat >> 8) & 0x3f;
+    dbno_inram = (dma_stat >> 16) & 0x3f;
+    dbno_ntfysent = (dma_stat >> 24) & 0x3f;
+
+#if DEBUG_DMA_BUFFERS
+    bool santify_fail = false;
+    {
+        unsigned a = dbno_inram, b = dbno_xfred, c = dbno_ntfysent;
+        unsigned d1 = (a - b) & 0x3f;
+        unsigned d2 = (b - c) & 0x3f;
+        if ((d1 >= 32) || (d2 >= 32)) {
+            santify_fail = true;
+        }
+    }
+#else
+#define santify_fail false
+#endif
+
+    if (res == -ETIMEDOUT) {
+        USDR_LOG("UDMS", santify_fail ? USDR_LOG_ERROR : USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " TIMEDOUT:%d buf=%p seq=%16" PRIu64 " %d.%2d/%2d/%2d/%2d/%2d\n", oob_data[0], oob_data[1], res, dma_buf,
+                 stream->rcnt, srdy, fe_stat, dbno_inram, dbno_xfred, dbno_ntfysent, dbno_confirmed);
+        return res;
+    }
 
     if (oob_data[0] & 0xffffff) {
         unsigned pkt_lost = oob_data[0] & 0xffffff;
-        USDR_LOG("UDMS", USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " EXTRA:%d buf=%p seq=%16" PRIu64 "\n", oob_data[0], oob_data[1], res, dma_buf,
-                 stream->rcnt);
+        USDR_LOG("UDMS", santify_fail ? USDR_LOG_ERROR : USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " EXTRA:%d buf=%p seq=%16" PRIu64 " %d.%2d/%2d/%2d/%2d/%2d\n", oob_data[0], oob_data[1], res, dma_buf,
+                 stream->rcnt, srdy, fe_stat, dbno_inram, dbno_xfred, dbno_ntfysent, dbno_confirmed);
 
         stream->stats.fe_drop += pkt_lost;
         stream->r_ts += stream->pkt_symbs * pkt_lost;
     } else if ((oob_data[0] >> 32) != stream->burst_mask) {
-        USDR_LOG("UDMS", USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " [%08x] EXTRA:%d buf=%p seq=%16" PRIu64 "\n", oob_data[0], oob_data[1], stream->burst_mask, res, dma_buf,
-                stream->rcnt);
+        USDR_LOG("UDMS", santify_fail ? USDR_LOG_ERROR : USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " [%08x] EXTRA:%d buf=%p seq=%16" PRIu64 " %d.%2d/%2d/%2d/%2d/%2d\n", oob_data[0], oob_data[1], stream->burst_mask, res, dma_buf,
+                stream->rcnt, srdy, fe_stat, dbno_inram, dbno_xfred, dbno_ntfysent, dbno_confirmed);
 
     } else {
-        USDR_LOG("UDMS", USDR_LOG_DEBUG, "Recv %016" PRIx64 ".%016" PRIx64 " EXTRA:- buf=%p seq=%16" PRIu64 "\n", oob_data[0], oob_data[1], dma_buf,
-                 stream->rcnt);
+        USDR_LOG("UDMS",
+                 santify_fail ? USDR_LOG_ERROR : USDR_LOG_DEBUG, "Recv %016" PRIx64 ".%016" PRIx64 " EXTRA:- buf=%p seq=%16" PRIu64 " %d.%2d/%2d/%2d/%2d/%2d\n", oob_data[0], oob_data[1], dma_buf,
+                 stream->rcnt, srdy, fe_stat, dbno_inram, dbno_xfred, dbno_ntfysent, dbno_confirmed);
     }
 
     stream->stats.pktok ++;
@@ -620,7 +660,7 @@ int parse_sfetrx4(const char* dformat, const channel_info_t *channels, unsigned 
     bool bifurcation = true;
     struct parsed_data_format pfmt;
 
-    strncpy(out->dfmt, dformat, sizeof(out->dfmt));
+    snprintf(out->dfmt, sizeof(out->dfmt), "%s", dformat);
     if (stream_parse_dformat(out->dfmt, &pfmt)) {
         return -EINVAL;
     }
@@ -677,6 +717,7 @@ static int initialize_stream_rx_32(device_t* device,
 {
     int res;
     stream_sfetrx_dma32_t* strdev;
+    uint64_t hw_chan_msk = 0;
 
     res = dma_rx32_reset(device->dev, 0, sx_base);
     if (res)
@@ -708,6 +749,7 @@ static int initialize_stream_rx_32(device_t* device,
         // Wire format not supported, need transform function
         // suppose i16 but maintain complex / real format
         sc.sfmt = (*pfmt.host_fmt == 'C' || *pfmt.host_fmt == 'c') ? "ci16" : "i16";
+        res = 0;
     }
 
     //Find transform function
@@ -752,7 +794,7 @@ static int initialize_stream_rx_32(device_t* device,
     // TODO obtain exfe configuration constants
     res = (fecfg->cfg_fecore_id == CORE_EXFERX_DMA32_R0) ?
         exfe_rx4_configure(fecfg, &sc, &fc) :
-        sfe_rx4_configure(fecfg, &sc, &fc);
+        sfe_rx4_configure(fecfg, &sc, &fc, &hw_chan_msk);
     if (res)
         return res;
 
@@ -828,8 +870,10 @@ static int initialize_stream_rx_32(device_t* device,
     strdev->fe_complex = bfmt.complex;
     strdev->storage.srx4 = *fecfg;
 
-    USDR_LOG("DSTR", USDR_LOG_INFO, "RX: Samples=%d Bps=%d WireBytes=%d HostBytes=%d Bursts=%d\n",
-             strdev->pkt_symbs, strdev->wire_bps, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count);
+    strdev->hw_pwr_mask = hw_chan_msk;
+
+    USDR_LOG("DSTR", USDR_LOG_INFO, "RX: Samples=%d Bps=%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%"PRIx64"\n",
+             strdev->pkt_symbs, strdev->wire_bps, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask);
 
     *outu = strdev;
     return 0;
@@ -881,7 +925,7 @@ static int initialize_stream_tx_32(device_t* device,
 {
     int res;
     stream_sfetrx_dma32_t* strdev;
-
+    uint64_t pwr_hw_mask = 0;
     struct stream_config sc;
     unsigned logicchs = chcount;
 
@@ -925,6 +969,7 @@ static int initialize_stream_tx_32(device_t* device,
         // Wire format not supported, need transform function
         // suppose i16 but maintain complex / real format
         sc.sfmt = (*pfmt.host_fmt == 'C' || *pfmt.host_fmt == 'c') ? "ci16" : "i16";
+        res = 0;
     }
 
     //Find transform function
@@ -974,6 +1019,7 @@ static int initialize_stream_tx_32(device_t* device,
         }
 
         fe_old_tx_mute = (sc.chcnt == 1) ? (fe_old_tx_swap ? 1 : 2) : 0;
+        pwr_hw_mask = (sc.chcnt == 2) ? 0b1111 : (fe_old_tx_swap ? 0b1100 : 0b0011);
     } else {
         if (sc.chcnt > (fecfg->cfg_raw_chans / (bfmt.complex ? 2 : 1)))
             return -EINVAL;
@@ -1110,8 +1156,9 @@ static int initialize_stream_tx_32(device_t* device,
     strdev->storage.srx4 = *fecfg;
     extxcfg_cache_init(&strdev->cstx4);
 
-    USDR_LOG("DSTR", USDR_LOG_INFO, "TX: Samples=%d Bps=%d WireBytes=%d HostBytes=%d Bursts=%d\n",
-             strdev->pkt_symbs, strdev->wire_bps, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count);
+    strdev->hw_pwr_mask = pwr_hw_mask;
+    USDR_LOG("DSTR", USDR_LOG_INFO, "TX: Samples=%d Bps=%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%"PRIx64"\n",
+             strdev->pkt_symbs, strdev->wire_bps, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask);
     *outu = strdev;
     return 0;
 
@@ -1149,7 +1196,7 @@ int create_sfetrx4_stream(device_t* device,
     fecfg.cfg_base = fe_base;
     fecfg.cfg_fifomaxbytes = fe_fifobsz;
 
-    strncpy(dfmt, dformat, sizeof(dfmt));
+    snprintf(dfmt, sizeof(dfmt), "%s", dformat);
     struct parsed_data_format pfmt;
     if (stream_parse_dformat(dfmt, &pfmt)) {
         return -EINVAL;

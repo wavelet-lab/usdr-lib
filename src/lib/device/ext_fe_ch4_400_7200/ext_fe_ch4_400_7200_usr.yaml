@@ -1,0 +1,144 @@
+# Copyright (c) 2023-2025 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+# Register desc and visual map
+name:         M2_FE_4CH_BOARD_USER
+desc:         sSDR/dSDR M.2 external FE board user friendly control
+revision:     "0.0.1"
+processors:   [ c ]
+bus:
+    type: VIRTUAL
+    usdr_path: /debug/hw/exfe10_4ch_usr/0/reg
+    wr_mask: 0x80000000
+addr_width:   8
+data_width:   24
+# page_prefix:  True
+field_prefix: [ RegName ]
+field_macros: True
+
+x-rx-filt-opts: &rx-filt-opts
+    0b0000: FILT_400_1000M
+    0b0001: FILT_1000_2000M
+    0b0010: FILT_2000_3500M
+    0b0011: FILT_2500_5000M
+    0b0100: FILT_3500_7100M
+    0b1000: AUTO_400_1000M
+    0b1001: AUTO_1000_2000M
+    0b1010: AUTO_2000_3500M
+    0b1011: AUTO_2500_5000M
+    0b1100: AUTO_3500_7100M
+
+x-ant-opts: &x-ant-opts
+    0b000: RX_TO_RX_AND_TX_TO_TRX
+    0b001: RX_TO_TRX_AND_TX_TERM
+    0b010: RX_TO_RX_AND_TX_TERM
+    0b011: RX_TX_LOOPBACK
+    0b100: TDD_DRIVEN_AUTO
+
+pages:
+  - name: FEUSR
+    regs:
+#
+      - addr: 0x50
+        name: RX_FILTER_BANK
+        fields:
+          - bits: "3:0"
+            name: A
+            desc: Filter bank selector
+            opts: *rx-filt-opts
+          - bits: "7:4"
+            name: B
+            desc: Filter bank selector
+            opts: *rx-filt-opts
+          - bits: "11:8"
+            name: C
+            desc: Filter bank selector
+            opts: *rx-filt-opts
+          - bits: "15:12"
+            name: D
+            desc: Filter bank selector
+            opts: *rx-filt-opts
+#
+      - addr: 0x51
+        name: RX_ATTN
+        fields:
+          - bits: "3:0"
+            name: A
+            desc: RX attenuator settings in dB
+          - bits: "7:4"
+            name: B
+            desc: RX attenuator settings in dB
+          - bits: "11:8"
+            name: C
+            desc: RX attenuator settings in dB
+          - bits: "15:12"
+            name: D
+            desc: RX attenuator settings in dB
+#
+      - addr: 0x52
+        name: ANT_SEL
+        fields:
+          - bits: "2:0"
+            name: A
+            desc: Antenna path selector
+            opts: *x-ant-opts
+          - bits: "6:4"
+            name: B
+            desc: Antenna path selector
+            opts: *x-ant-opts
+          - bits: "10:8"
+            name: C
+            desc: Antenna path selector
+            opts: *x-ant-opts 
+          - bits: "14:12"
+            name: D
+            desc: Antenna path selector
+            opts: *x-ant-opts
+#
+      - addr: 0x53
+        name: RX_CHEN
+        fields:
+          - bits: "0"
+            name: A
+            desc: FE Chan enabled
+          - bits: "1"
+            name: B
+            desc: FE Chan enabled
+          - bits: "2"
+            name: C
+            desc: FE Chan enabled
+          - bits: "3"
+            name: D
+            desc: FE Chan enabled
+#
+      - addr: 0x54
+        name: TX_CHEN
+        fields:
+          - bits: "0"
+            name: A
+            desc: FE Chan enabled
+          - bits: "1"
+            name: B
+            desc: FE Chan enabled
+          - bits: "2"
+            name: C
+            desc: FE Chan enabled
+          - bits: "3"
+            name: D
+            desc: FE Chan enabled
+#
+      - addr: 0x55
+        name: TX_2STAGE
+        fields:
+          - bits: "0"
+            name: A
+            desc: FE Chan 2nd stage enabled
+          - bits: "1"
+            name: B
+            desc: FE Chan 2nd stage enabled
+          - bits: "2"
+            name: C
+            desc: FE Chan 2nd stage enabled
+          - bits: "3"
+            name: D
+            desc: FE Chan 2nd stage enabled
