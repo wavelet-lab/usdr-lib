@@ -15,10 +15,10 @@
 #define WORD_COUNT (4096u + 80u)
 #define IN_STREAM_SIZE_BZ (WORD_COUNT * sizeof(int16_t))
 
-#define SPEED_WORD_COUNT (32768u)
+#define SPEED_WORD_COUNT (65536u)
 #define SPEED_SIZE_BZ (SPEED_WORD_COUNT * sizeof(int16_t))
 
-static const unsigned packet_lens[3] = { 1024, 16384, SPEED_SIZE_BZ };
+static const unsigned packet_lens[4] = { 1024, 16384, 32768, SPEED_SIZE_BZ };
 
 #define SPEED_MEASURE_ITERS 1000000
 
@@ -240,7 +240,7 @@ Suite * conv_ci16_8cf32_suite(void)
     Suite* s = suite_create("conv_ci16_8cf32");
 
     ADD_REGRESS_TEST(s, conv_ci16_8cf32_check_simd);
-    ADD_PERF_LOOP_TEST(s, conv_ci16_8cf32_speed, 60, 0, 3);
+    ADD_PERF_LOOP_TEST(s, conv_ci16_8cf32_speed, 60, 0, 4);
 
     return s;
 }

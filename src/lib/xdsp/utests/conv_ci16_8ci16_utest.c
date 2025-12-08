@@ -10,7 +10,7 @@
 #include "xdsp_utest_common.h"
 #include "conv_ci16_8ci16_2.h"
 
-#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
 #define CHECK_WORD_COUNT (4096u + 80u) //must be a multiple of 4
 #define CHECK_SIZE_BZ (CHECK_WORD_COUNT * sizeof(int16_t))

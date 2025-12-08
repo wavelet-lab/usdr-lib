@@ -26,6 +26,8 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
     float* outdata_6 = (float*)outdata_6_p;
     float* outdata_7 = (float*)outdata_7_p;
 
+#define USE_SSE_STORES
+
     //AVX2
     {
         const __m256  scale = _mm256_set1_ps(CONV_SCALE);
@@ -33,7 +35,9 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
         __m256i in0, in1, in2, in3;
         __m256d f0a, f0b, f1a, f1b, f2a, f2b, f3a, f3b;
         __m256d x0a, x0b, x1a, x1b, x2a, x2b, x3a, x3b;
+#ifndef USE_SSE_STORES
         __m256d out0, out1, out2, out3, out4, out5, out6, out7;
+#endif
 
         for (; i >= 32 * 4; i -= 32 * 4)
         {
@@ -60,24 +64,53 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
             x2b = _mm256_shuffle_pd(f2b, f3b, 0b0000);
             x3b = _mm256_shuffle_pd(f2b, f3b, 0b1111);
 
+#ifdef USE_SSE_STORES
+
+//#define _MM_STORE_FN _mm_store_pd
+#define _MM_STORE_FN _mm_storeu_pd
+
+            _MM_STORE_FN((double*)outdata_0, _mm256_castpd256_pd128(x0a));
+            _MM_STORE_FN((double*)outdata_1, _mm256_castpd256_pd128(x1a));
+            _MM_STORE_FN((double*)outdata_2, _mm256_extractf128_pd(x0a, 1));
+            _MM_STORE_FN((double*)outdata_3, _mm256_extractf128_pd(x1a, 1));
+            _MM_STORE_FN((double*)outdata_4, _mm256_castpd256_pd128(x0b));
+            _MM_STORE_FN((double*)outdata_5, _mm256_castpd256_pd128(x1b));
+            _MM_STORE_FN((double*)outdata_6, _mm256_extractf128_pd(x0b, 1));
+            _MM_STORE_FN((double*)outdata_7, _mm256_extractf128_pd(x1b, 1));
+
+            _MM_STORE_FN((double*)(outdata_0 + 4), _mm256_castpd256_pd128(x2a));
+            _MM_STORE_FN((double*)(outdata_1 + 4), _mm256_castpd256_pd128(x3a));
+            _MM_STORE_FN((double*)(outdata_2 + 4), _mm256_extractf128_pd(x2a, 1));
+            _MM_STORE_FN((double*)(outdata_3 + 4), _mm256_extractf128_pd(x3a, 1));
+            _MM_STORE_FN((double*)(outdata_4 + 4), _mm256_castpd256_pd128(x2b));
+            _MM_STORE_FN((double*)(outdata_5 + 4), _mm256_castpd256_pd128(x3b));
+            _MM_STORE_FN((double*)(outdata_6 + 4), _mm256_extractf128_pd(x2b, 1));
+            _MM_STORE_FN((double*)(outdata_7 + 4), _mm256_extractf128_pd(x3b, 1));
+#else
+
+//#define _MM256_STORE_FN _mm256_store_pd
+#define _MM256_STORE_FN _mm256_storeu_pd
+
             out0 = _mm256_permute2f128_pd(x0a, x2a, 0b00100000);
             out2 = _mm256_permute2f128_pd(x0a, x2a, 0b00110001);
             out1 = _mm256_permute2f128_pd(x1a, x3a, 0b00100000);
             out3 = _mm256_permute2f128_pd(x1a, x3a, 0b00110001);
+
+            _MM256_STORE_FN((double*)outdata_0, out0);
+            _MM256_STORE_FN((double*)outdata_1, out1);
+            _MM256_STORE_FN((double*)outdata_2, out2);
+            _MM256_STORE_FN((double*)outdata_3, out3);
+
             out4 = _mm256_permute2f128_pd(x0b, x2b, 0b00100000);
             out6 = _mm256_permute2f128_pd(x0b, x2b, 0b00110001);
             out5 = _mm256_permute2f128_pd(x1b, x3b, 0b00100000);
             out7 = _mm256_permute2f128_pd(x1b, x3b, 0b00110001);
 
-            _mm256_store_pd((double*)outdata_0, out0);
-            _mm256_store_pd((double*)outdata_1, out1);
-            _mm256_store_pd((double*)outdata_2, out2);
-            _mm256_store_pd((double*)outdata_3, out3);
-            _mm256_store_pd((double*)outdata_4, out4);
-            _mm256_store_pd((double*)outdata_5, out5);
-            _mm256_store_pd((double*)outdata_6, out6);
-            _mm256_store_pd((double*)outdata_7, out7);
-
+            _MM256_STORE_FN((double*)outdata_4, out4);
+            _MM256_STORE_FN((double*)outdata_5, out5);
+            _MM256_STORE_FN((double*)outdata_6, out6);
+            _MM256_STORE_FN((double*)outdata_7, out7);
+#endif
             outdata_0 += 8;
             outdata_1 += 8;
             outdata_2 += 8;
