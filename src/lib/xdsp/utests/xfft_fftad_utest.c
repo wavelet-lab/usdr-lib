@@ -17,7 +17,8 @@
 static_assert( STREAM_SIZE >= 4096, "STREAM_SIZE should be >= 4096!" );
 static const unsigned packet_lens[3] = { 256, 4096, STREAM_SIZE };
 
-#define SPEED_MEASURE_ITERS 1000000
+#define SPEED_MEASURE_ITERS 10000
+#define AVGS 256
 
 #define EPSILON 1E-4
 
@@ -151,7 +152,7 @@ END_TEST
 
 START_TEST(fftad_speed)
 {
-    fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
+    fprintf(stderr, "\n**** Compare SIMD implementations speed (%d adds + 1 norm within 1 iteration) ***\n", AVGS);
 
     const char* fn_name = NULL;
     fftad_init_function_t fn_init = NULL;
@@ -187,8 +188,11 @@ START_TEST(fftad_speed)
         //measuring
         uint64_t tk = clock_get_time();
         (*fn_init)(&acc, size);
-        for(unsigned i = 0; i < SPEED_MEASURE_ITERS; ++i) (*fn_add)(&acc, in, size);
-        (*fn_norm)(&acc, size, 1.0, 0.0, out);
+        for(unsigned i = 0; i < SPEED_MEASURE_ITERS; ++i)
+        {
+            for(unsigned j = 0; j < AVGS; ++j) (*fn_add)(&acc, in, size);
+            (*fn_norm)(&acc, size, 1.0, 0.0, out);
+        }
         uint64_t tk1 = clock_get_time() - tk;
 
         fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 cycle, ave speed = %" PRIu64 " cycles/s \n",

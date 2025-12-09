@@ -3,6 +3,7 @@
 
 #include "../device.h"
 #include "../hw/lms8001/lms8001.h"
+#include "../dev_param.h"
 
 #define HIPER_MAX_HW_CHANS 4
 
@@ -107,13 +108,16 @@ struct dsdr_hiper_fe {
     uint32_t lms8st_int_mod;
     uint32_t lms8st_enabled;
 
+    // Cached LO values
+    opt_u64_t lms8_lo[6];
+
     // High level control
     fe_chan_config_t ucfg[HIPER_MAX_HW_CHANS];
 };
 typedef struct dsdr_hiper_fe dsdr_hiper_fe_t;
 
 
-int dsdr_hiper_fe_create(lldev_t dev, unsigned spix_num, unsigned lms8_chip, dsdr_hiper_fe_t* dfe);
+int dsdr_hiper_fe_create(lldev_t dev, unsigned spix_num, unsigned int *lms8_mpw_mask, dsdr_hiper_fe_t* dfe);
 int dsdr_hiper_fe_destroy(dsdr_hiper_fe_t* dfe);
 
 int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool *p_swap_rxiq);

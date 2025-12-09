@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2024 Wavelet Lab
+// Copyright (c) 2023-2025 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
 #include "usdr_soapy.h"
@@ -55,7 +55,7 @@ struct rfic_gain_descriptor
     const char* property_name;
 };
 
-const rfic_gain_descriptor lms7_gains[] {
+static const rfic_gain_descriptor lms7_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(0.0, 30.0),   "LNA", nullptr, nullptr, "/dm/sdr/0/rx/gain/lna" },
     { SOAPY_SDR_RX, SoapySDR::Range(0.0, 12.0),   "TIA", "VGA",   "VGA1",  "/dm/sdr/0/rx/gain/vga" },
     { SOAPY_SDR_RX, SoapySDR::Range(-12.0, 19.0), "PGA", "VGA2",  nullptr, "/dm/sdr/0/rx/gain/pga" },
@@ -63,7 +63,7 @@ const rfic_gain_descriptor lms7_gains[] {
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
-const rfic_gain_descriptor lms6_gains[] {
+static const rfic_gain_descriptor lms6_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(0.0, 6.0),    "LNA",  nullptr, nullptr, "/dm/sdr/0/rx/gain/lna" },
     { SOAPY_SDR_RX, SoapySDR::Range(5, 31),       "VGA1", "TIA",   nullptr, "/dm/sdr/0/rx/gain/vga" },
     { SOAPY_SDR_RX, SoapySDR::Range(0, 60.0),     "VGA2", "PGA",   nullptr, "/dm/sdr/0/rx/gain/pga" },
@@ -72,14 +72,14 @@ const rfic_gain_descriptor lms6_gains[] {
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
-const rfic_gain_descriptor ad45lb49_gains[] {
+static const rfic_gain_descriptor ad45lb49_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(0, 4),        "LNA",  "SEL",   nullptr, "/dm/sdr/0/rx/gain/lna" },
     { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "VGA",  "ATTN",  nullptr, "/dm/sdr/0/rx/gain/vga" },
     { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "PGA",  nullptr, nullptr, "/dm/sdr/0/rx/gain/pga" },
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
-const rfic_gain_descriptor unk_gains[] {
+static const rfic_gain_descriptor unk_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(-99, 99),   "GRX", nullptr, nullptr, "/dm/sdr/0/rx/gain" },
     { SOAPY_SDR_TX, SoapySDR::Range(-99, 99),   "GTX", nullptr, nullptr, "/dm/sdr/0/tx/gain" },
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
@@ -91,6 +91,67 @@ static inline const rfic_gain_descriptor* get_gains(rfic_type_t t) {
     case RFIC_LMS7002M: return lms7_gains;
     case RFIC_AD45LB49: return ad45lb49_gains;
     default: return unk_gains;
+    }
+}
+
+struct device_ranges
+{
+    SoapySDR::Range frequency_range;
+    SoapySDR::Range samplerate_range;
+    SoapySDR::Range bandwidth_range;
+};
+
+static const device_ranges usdr_ranges {
+    .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(1e6, 85e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
+};
+
+static const device_ranges xsdr_ranges {
+    .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(1e6, 125e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
+};
+
+static const device_ranges ssdr_ranges {
+    .frequency_range = SoapySDR::Range(0.1e6, 12500e6),
+    .samplerate_range = SoapySDR::Range(4e6, 125e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
+};
+
+static const device_ranges dsdr_ranges {
+    .frequency_range = SoapySDR::Range(5e6, 12500e6),
+    .samplerate_range = SoapySDR::Range(4e6, 500e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 500e6),
+};
+
+static const device_ranges lsdr_ranges {
+    .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(2e6, 125e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
+};
+
+static const device_ranges limesdr_mini_ranges {
+    .frequency_range = SoapySDR::Range(30e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(0.1e6, 40e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
+};
+
+static const device_ranges unk_ranges {
+    .frequency_range = SoapySDR::Range(30e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(1e6, 40e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
+};
+
+static inline const device_ranges* get_ranges(device_type_t t) {
+    switch (t) {
+    case DEVICE_USDR: return &usdr_ranges;
+    case DEVICE_XSDR: return &xsdr_ranges;
+    case DEVICE_SSDR: return &ssdr_ranges;
+    case DEVICE_DSDR: return &dsdr_ranges;
+    case DEVICE_LSDR: return &lsdr_ranges;
+    case DEVICE_LIMESDR_MINI: return &limesdr_mini_ranges;
+    default: return &unk_ranges;
     }
 }
 
@@ -136,25 +197,43 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
     const SoapySDR::Kwargs &args = (env_str.length() > 0) ? env_args : args_orig;
 
 
-    std::string dev = (args.count("dev")) ? args.at("dev") : "";
-
     if (args.count("loglevel")) {
         loglevel = std::stoi(args.at("loglevel"));
     }
-    if (args.count("fe")) {
-        if (dev.length() != 0) {
-            dev += ",";
-        }
-        dev += "fe=";
-        dev += args.at("fe").c_str();
-    }
+
+    SoapySDR::Kwargs dev_args = SoapySDR::
+        KwargsFromString((args.count("dev")) ? args.at("dev") : "");
+
     if (args.count("bus")) {
-        if (dev.length() > 0) {
-            dev += ",";
-        }
-        dev += "bus=";
-        dev += args.at("bus").c_str();
+        dev_args["bus"] = args.at("bus");
     }
+
+    if (args.count("device")) {
+        dev_args["device"] = args.at("device");
+    }
+
+    if (args.count("fe")) {
+        dev_args["fe"] = args.at("fe");
+    }
+
+    if (args.count("extclk")) {
+        dev_args["extclk"] = args.at("extclk");
+    }
+
+    if (args.count("extref")) {
+        dev_args["extref"] = args.at("extref");
+    }
+
+    bool first = true;
+    std::string dev = "";
+    for (const auto &dev_arg : dev_args) {
+        if (first)
+            first = false;
+        else
+            dev += ",";
+        dev += dev_arg.first + "=" + dev_arg.second;
+    }
+
     if (args.count("txcorr")) {
         _txcorr = atoi(args.at("txcorr").c_str());
     }
@@ -164,11 +243,11 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
 
     usdrlog_setlevel(NULL, loglevel);
 
-
-    SoapySDR::logf(callLogLvl(), "Make connection: '%s'", args.count("dev") ? args.at("dev").c_str() : "*");
+    SoapySDR::logf(SOAPY_SDR_DEBUG, "Make connection: '%s'", args.count("dev") ? args.at("dev").c_str() : "*");
     for (auto& i: args) {
-        SoapySDR::logf(callLogLvl(), "Param %s => %s", i.first.c_str(), i.second.c_str());
+        SoapySDR::logf(SOAPY_SDR_DEBUG, "Param %s => %s", i.first.c_str(), i.second.c_str());
     }
+
     _dev = usdr_handle::get(dev);
 
     if (args.count("refclk")) {
@@ -198,7 +277,9 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
     }
 
     uint64_t val;
-    int res = usdr_dme_get_uint(_dev->dev(), "/ll/sdr/0/rfic/0", &val);
+    int res;
+
+    res = usdr_dme_get_uint(_dev->dev(), "/ll/sdr/0/rfic/0", &val);
     if (res == 0) {
         const char* rfic = reinterpret_cast<const char*>(val);
         if (strcmp(rfic, "lms6002d") == 0)
@@ -209,6 +290,24 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
             type = RFIC_AD45LB49;
         else if (strcmp(rfic, "afe79xx") == 0)
             type = RFIC_AFE79XX;
+    }
+
+    res = usdr_dme_get_uint(_dev->dev(), "/ll/device/name", &val);
+    if (res == 0) {
+        const char* device = reinterpret_cast<const char*>(val);
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() Device name is \"%s\"", device);
+        if (strcmp(device, "usdr") == 0)
+            device_type = DEVICE_USDR;
+        else if (strcmp(device, "xsdr") == 0)
+            device_type = DEVICE_XSDR;
+        else if (strcmp(device, "ssdr") == 0)
+            device_type = DEVICE_SSDR;
+        else if (strcmp(device, "dsdr") == 0)
+            device_type = DEVICE_DSDR;
+        else if (strcmp(device, "lsdr") == 0)
+            device_type = DEVICE_LSDR;
+        else if (strcmp(device, "limemini") == 0)
+            device_type = DEVICE_LIMESDR_MINI;
     }
 
     if (args.count("rx_bw")) {
@@ -528,11 +627,10 @@ SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const 
     SoapySDR::RangeList ranges;
     if (name == "RF")
     {
-        if (type == RFIC_AFE79XX) {
-            ranges.push_back(SoapySDR::Range(5e6, 12.5e9));
-        } else {
-            ranges.push_back(SoapySDR::Range(1e5, 3.8e9));
-        }
+        const device_ranges *dev_ranges = get_ranges(device_type);
+        if (!dev_ranges)
+            return ranges;
+        ranges.push_back(dev_ranges->frequency_range);
     }
     else if (name == "BB")
     {
@@ -613,17 +711,24 @@ double SoapyUSDR::getSampleRate(const int direction, const size_t /*channel*/) c
 SoapySDR::RangeList SoapyUSDR::getSampleRateRange(const int /*direction*/, const size_t /*channel*/) const
 {
     SoapySDR::RangeList ranges;
-    ranges.push_back(SoapySDR::Range((type == RFIC_AFE79XX) ? 1.92e6 : 0.1e6,
-                                     (type == RFIC_AFE79XX) ? 500e6 : (type == RFIC_AD45LB49) ? 130e6 : 80e6));
+    const device_ranges *dev_ranges = get_ranges(device_type);
+    if (!dev_ranges)
+        return ranges;
+    ranges.push_back(dev_ranges->samplerate_range);
     return ranges;
 }
 
 std::vector<double> SoapyUSDR::listSampleRates(const int /*direction*/, const size_t /*channel*/) const
 {
     std::vector<double> rates;
-    for (int i = 2; i < 57; i++)
+    const device_ranges *dev_ranges = get_ranges(device_type);
+    if (!dev_ranges)
+        return rates;
+    const int min_sr = (int) (dev_ranges->bandwidth_range.minimum() / 1e6);
+    const int max_sr = (int) (dev_ranges->bandwidth_range.maximum() / 1e6);
+    for (int i = min_sr; i < max_sr; ++i)
     {
-        rates.push_back(i*1e6);
+        rates.push_back(i * 1e6);
     }
     return rates;
 }
@@ -669,7 +774,10 @@ double SoapyUSDR::getBandwidth(const int direction, const size_t /*channel*/) co
 SoapySDR::RangeList SoapyUSDR::getBandwidthRange(const int /*direction*/, const size_t /*channel*/) const
 {
     SoapySDR::RangeList bws;
-    bws.push_back(SoapySDR::Range(0.5e6, 80e6));
+    const device_ranges *dev_ranges = get_ranges(device_type);
+    if (!dev_ranges)
+        return bws;
+    bws.push_back(dev_ranges->bandwidth_range);
     return bws;
 }
 
@@ -757,6 +865,11 @@ void SoapyUSDR::setHardwareTime(const long long timeNs, const std::string &what)
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setHardwareTime(%lld)", timeNs);
 }
 
+std::vector<std::string> SoapyUSDR::listTimeSources(void) const
+{
+    return { "internal", "external" };
+}
+
 /*******************************************************************
  * Sensor API
  ******************************************************************/
@@ -765,6 +878,7 @@ std::vector<std::string> SoapyUSDR::listSensors(void) const
 {
     std::vector<std::string> sensors;
     sensors.push_back("clock_locked");
+    sensors.push_back("ref_locked");
     sensors.push_back("board_temp");
     return sensors;
 }
@@ -779,6 +893,14 @@ SoapySDR::ArgInfo SoapyUSDR::getSensorInfo(const std::string &name) const
         info.type = SoapySDR::ArgInfo::BOOL;
         info.value = "false";
         info.description = "CGEN clock is locked, good VCO selection.";
+    }
+    else if (name == "ref_locked")
+    {
+        info.key = "ref_locked";
+        info.name = "Reference Locked";
+        info.type = SoapySDR::ArgInfo::BOOL;
+        info.value = "false";
+        info.description = "Reference clock is locked.";
     }
     else if (name == "board_temp")
     {
@@ -796,6 +918,10 @@ std::string SoapyUSDR::readSensor(const std::string &name) const
 {
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     if (name == "clock_locked")
+    {
+        return "true";
+    }
+    else if (name == "ref_locked")
     {
         return "true";
     }
@@ -832,6 +958,7 @@ SoapySDR::ArgInfo SoapyUSDR::getSensorInfo(const int /*direction*/, const size_t
         info.value = "false";
         info.description = "LO synthesizer is locked, good VCO selection.";
     }
+
     return info;
 }
 
@@ -1080,6 +1207,14 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     _streams[direction].chmsk = chmsk;
     _streams[direction].stream = direction == SOAPY_SDR_RX ? "/ll/srx/0" : "/ll/stx/0";
 
+    if (_actual_rx_rate == 0) {
+        const device_ranges *dev_ranges = get_ranges(device_type);
+        if (dev_ranges)
+            setSampleRate(SOAPY_SDR_RX, 0, dev_ranges->samplerate_range.minimum());
+        else
+            setSampleRate(SOAPY_SDR_RX, 0, 5e6);
+    }
+
     if (direction == SOAPY_SDR_RX) {
         // We need a better way to calculate packet size
         unsigned defbufsz =
@@ -1111,10 +1246,6 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setupStream(%s) %d Samples per packet, burst size %d * %d chs; res = %d",
                    ustr->stream, numElems, ustr->nfo.pktsyms, ustr->nfo.channels, res);
-
-    if (_actual_rx_rate == 0) {
-        setSampleRate(SOAPY_SDR_RX, 0, 1.92e6);
-    }
 
     res = usdr_dms_sync(_dev->dev(), "off", 1, &ustr->strm);
     if (res) {
@@ -1296,17 +1427,21 @@ int SoapyUSDR::readStream(
     }
 }
 
-int SoapyUSDR::writeStream(
-        SoapySDR::Stream *stream,
-        const void * const *buffs,
-        const size_t numElems,
-        int &flags,
-        const long long timeNs,
-        const long timeoutUs)
+int SoapyUSDR::writeStream(SoapySDR::Stream *stream,
+    const void *const *buffs,
+    const size_t numElems,
+    int &flags,
+    const long long timeNs,
+    const long timeoutUs)
 {
-    USDRStream* ustr = (USDRStream*)(stream);
-    long long ts = (flags & SOAPY_SDR_HAS_TIME) ?
-                    SoapySDR::timeNsToTicks(timeNs, _actual_tx_rate) + _txcorr : -1;
+    USDRStream *ustr = (USDRStream *) (stream);
+    long long ts;
+    if (flags & SOAPY_SDR_HAS_TIME) {
+        ts = SoapySDR::timeNsToTicks(timeNs, _actual_tx_rate) + _txcorr;
+        this->calc_ts = ts;
+    } else {
+        ts = this->calc_ts;
+    }
 
     int64_t lag = ts - last_recv_pkt_time;
     if (tx_pkts == 0) {
@@ -1319,7 +1454,8 @@ int SoapyUSDR::writeStream(
     SoapySDR::logf(SOAPY_SDR_DEBUG, "writeStream::writeStream(%s) @ %lld num %d should be %d\n", ustr->stream, ts, numElems, ustr->nfo.pktsyms);
 
     unsigned toSend = numElems;
-    int res = usdr_dms_send(ustr->strm, (const void **)buffs, numElems, ts, timeoutUs / 1000);
+    int res = usdr_dms_send(ustr->strm, (const void **) buffs, numElems, ts, timeoutUs / 1000);
+    this->calc_ts += numElems;
 
     if (tx_pkts % 1000 == 0) {
         SoapySDR::logf(_dump_calls ? SOAPY_SDR_ERROR : SOAPY_SDR_TRACE,

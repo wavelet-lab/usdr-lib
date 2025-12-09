@@ -31,6 +31,8 @@
 #include "conv_ci16_6ci16_2.h"
 #include "conv_ci16_6cf32_2.h"
 
+#include "conv_ci16_8cf32_2.h"
+
 #include <strings.h>
 #include <string.h>
 
@@ -128,6 +130,15 @@ transform_info_t get_transform_fn(const char* from,
                                   unsigned inveccnt,
                                   unsigned outveccnt)
 {
+    if(inveccnt == 1 && outveccnt == 8)
+    {
+        if(isCI16(from) && isCF32(to))
+        {
+            transform_info_t l_conv_ci16_8cf32 = { conv_get_ci16_8cf32(), tr_conv_i16_f32_sz };
+            return l_conv_ci16_8cf32;
+        }
+    }
+
     /* Interleave 1 -> 6 */
     if(inveccnt == 1 && outveccnt == 6)
     {

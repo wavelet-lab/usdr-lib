@@ -111,6 +111,7 @@ const usdr_dev_param_constant_t s_params_m2_lm6_1_rev000[] = {
     { "/ll/dsp/atcrbs/0/base", M2PCI_REG_WR_LBDSP },
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"lms6002d" },
+    { "/ll/device/name",  (uintptr_t)"usdr"},
 
     { "/ll/sdr/max_hw_rx_chans",  1 },
     { "/ll/sdr/max_hw_tx_chans",  1 },

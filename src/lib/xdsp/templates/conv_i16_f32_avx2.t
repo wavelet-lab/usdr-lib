@@ -23,16 +23,16 @@ void TEMPLATE_FUNC_NAME(const int16_t *__restrict indata,
         f0 = _mm256_mul_ps(f0, scale);  \
         f1 = _mm256_mul_ps(f1, scale);  \
         \
-        _mm256_storeu_ps(outdata, f0); outdata += 8;    \
-        _mm256_storeu_ps(outdata, f1); outdata += 8;    \
+        _mm256_store_ps(outdata, f0); outdata += 8;    \
+        _mm256_store_ps(outdata, f1); outdata += 8;    \
     }
 // CONVERT_I16_F32_BLOCK end
 
   for(; i >= 96; i -= 96)
   {
-     t0 = _mm256_loadu_si256(vp++);
-     t1 = _mm256_loadu_si256(vp++);
-     t2 = _mm256_loadu_si256(vp++);
+     t0 = _mm256_load_si256(vp++);
+     t1 = _mm256_load_si256(vp++);
+     t2 = _mm256_load_si256(vp++);
 
      CONVERT_I16_F32_BLOCK(t0);
      CONVERT_I16_F32_BLOCK(t1);
@@ -41,8 +41,8 @@ void TEMPLATE_FUNC_NAME(const int16_t *__restrict indata,
 
   for(; i >= 64; i -= 64)
   {
-     t0 = _mm256_loadu_si256(vp++);
-     t1 = _mm256_loadu_si256(vp++);
+     t0 = _mm256_load_si256(vp++);
+     t1 = _mm256_load_si256(vp++);
 
      CONVERT_I16_F32_BLOCK(t0);
      CONVERT_I16_F32_BLOCK(t1);
@@ -50,17 +50,15 @@ void TEMPLATE_FUNC_NAME(const int16_t *__restrict indata,
 
   for(; i >= 32; i -= 32)
   {
-     t0 = _mm256_loadu_si256(vp++);
+     t0 = _mm256_load_si256(vp++);
      CONVERT_I16_F32_BLOCK(t0);
   }
 
 #undef CONVERT_I16_F32_BLOCK
 
-  if (i > 0) {
-      const int16_t *ldw = (const int16_t *)vp;
-      for (; i >= 2; i -= 2) {
-          *(outdata++) = *(ldw++) * inscale;
-      }
+  const int16_t *ldw = (const int16_t *)vp;
+  for (; i >= 2; i -= 2) {
+      *(outdata++) = *(ldw++) * CONV_SCALE;
   }
 }
 

@@ -2,7 +2,7 @@ for (; i >= 12; i -= 12) {
     /* read 12 bytes -> 2*48 bits -> 4*2 floats -> 4cf32 */
 
     uint64_t v0 = *(const uint64_t *)(indata + 0);
-    uint64_t v1 = *(const uint64_t *)(indata + 6);
+    uint64_t v1 = ((uint64_t)((*(const uint32_t *)(indata + 8))) << 16) | (v0 >> 48);
     indata += 12;
 
     float i0 = (int16_t)(v0 << 4);

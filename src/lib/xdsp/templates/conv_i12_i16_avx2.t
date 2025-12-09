@@ -60,6 +60,9 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
     }
 
 #undef CONVERT_I12_I16_BLOCK
+#undef CONVERT_I12_2I32_SEPARATED    
+#undef CONVERT_CI12_2CI32_BLOCK_OPT
+#undef CONVERT_CI12_4CI32_BLOCK_OPT
 
     const uint8_t* indata = (const uint8_t*)in;
     #include "conv_i12_i16_generic.inc"

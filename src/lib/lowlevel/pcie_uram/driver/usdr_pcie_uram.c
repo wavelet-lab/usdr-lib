@@ -65,6 +65,24 @@ static int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
 }
 #endif
 
+
+// vm_flags_set introduced in 6.3.0, however enterprise-like kernels heavily backport new API to
+// old base kernel version, notably RHEL, resulting in newer API in 5.x.x. So version like checks
+// will fail here
+#ifndef HAVE_VM_FLAGS_SET
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+#define HAVE_VM_FLAGS_SET 1
+#endif
+#endif
+
+
+#ifndef HAVE_CLASS_CREATE_ONE_ARG
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+#define HAVE_CLASS_CREATE_ONE_ARG 1
+#endif
+#endif
+
+
 // Change anytime when extra parameter or meaning is changed in pcie_uram_driver_if.h
 #define USDR_DRIVER_ABI_VERSION 3
 
@@ -140,9 +158,12 @@ struct usdr_dev;
 
 typedef void (*bucket_func_t)(struct usdr_dev* dev, unsigned event, void* slot);
 
+enum {
+	STAT_MAX_SZ = 64,
+};
 
 struct event_data_log {
-	uint32_t stat_data[4 * 64];
+	uint32_t stat_data[4 * STAT_MAX_SZ];
         uint64_t stat_wptr;
         uint64_t stat_rptr;
 };
@@ -465,18 +486,18 @@ irq_found:
         if (i % 32 == 31) {
             do_cnf = (i << 1) & 0x3ff;
         }
-        
+
         DEBUG_DEV_OUT(&d->pdev->dev, "BUCKET %d IRQ %d: Event %d Flag: %d; RPTR %d; Data: %08x_%08x_%08x_%08x\n",
                    i, irq, event_no, flags, b->rptr, data[3], data[2], data[1], data[0]);
         
         
         // TODO: based on event handler process data
         if (event_no == 0 || event_no == 1) {
-            unsigned k = (d->streaming[event_no].stat_wptr * 4) & 0x3f;
-            d->streaming[event_no].stat_data[k + 0] = data[1]; // 0
-            d->streaming[event_no].stat_data[k + 1] = data[2]; // 1
-            d->streaming[event_no].stat_data[k + 2] = data[3]; // 2
-            d->streaming[event_no].stat_data[k + 3] =
+            unsigned k = (d->streaming[event_no].stat_wptr) & (STAT_MAX_SZ - 1);
+            d->streaming[event_no].stat_data[4 * k + 0] = data[1]; // 0
+            d->streaming[event_no].stat_data[4 * k + 1] = data[2]; // 1
+            d->streaming[event_no].stat_data[4 * k + 2] = data[3]; // 2
+            d->streaming[event_no].stat_data[4 * k + 3] =
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
                  ets.tv64;     // Timestamp
 #else
@@ -484,7 +505,7 @@ irq_found:
 #endif
 
             d->streaming[event_no].stat_wptr++;
-            
+
             //dev_notice(&d->pdev->dev, "BUCKET %d IRQ %d: Event %d Flag: %d; RPTR %d; Data: %08x_%08x_%08x_%08x %016llx\n",
             //       i, irq, event_no, flags, b->rptr, data[3], data[2], data[1], data[0], ets);
         } else {
@@ -609,8 +630,13 @@ static int usdr_stream_free(struct usdr_dev *usdrdev, unsigned sno)
         return 0;
 
     // Release DMA buffers
-    // Check that mapping is invalid
+    if (usdrdev->dl.stream_core[sno] == USDR_MAKE_COREID(USDR_CS_STREAM, USDR_SC_TXDMA_OLD)) {
+        usdr_reg_wr32(usdrdev, usdrdev->dl.stream_cfg_base[sno] + s->dma_buffs, 0);
+    } else {
+        usdr_reg_wr32(usdrdev, usdrdev->dl.stream_cfg_base[sno] + 7 * s->dma_buffs, 0);
+    }
 
+    // Destroy buffers
     for (i = s->dma_buffs; i > 0; i--) {
         dma_free_attrs(&usdrdev->pdev->dev,
                        s->dma_buff_size,
@@ -910,8 +936,8 @@ static int usdr_stream_initialize(struct usdr_dev *usdrdev,
                     goto failed_alloc;
             }
             s->dmab[i].uvirt = NULL;
-            //dev_notice(&usdrdev->pdev->dev, "buf[%d]=%lx [virt %p]\n", i,
-            //           (unsigned long)s->dmab[i].phys, s->dmab[i].kvirt);
+            //dev_notice(&usdrdev->pdev->dev, "buf[%d]=%lx len=%d [virt %px]\n", i,
+            //           (unsigned long)s->dmab[i].phys, s->dma_buff_size, s->dmab[i].kvirt);
     }
 
     // Initialize dma buffer pointer in the dev
@@ -928,14 +954,14 @@ static int usdr_stream_initialize(struct usdr_dev *usdrdev,
                 usdrdev->dl.stream_core[sno]);
         goto failed_alloc;
     }
-    
+
     usdrdev->streams[sno] = s;
 exit_success:
     //s->cntr_last = 0;
 
     sdma->out_vma_length = s->dma_buff_size * s->dma_buffs;
     sdma->out_vma_off = ((off_t)(sdma->sno + 1)) << VMA_STREAM_IDX_SHIFT;
-    
+
     // Flush non-read events
     usdrdev->streaming[sno].stat_rptr = usdrdev->streaming[sno].stat_wptr;
     usdrdev->streams[sno]->abuffer_no = 0;
@@ -953,6 +979,11 @@ exit_success:
     } else {
     	// Clear spurious interrupts
     	atomic_xchg(&usdrdev->irq_ev_cnt[usdrdev->dl.stream_int_number[sno]], 0);
+
+        usdr_reg_wr32(usdrdev,
+                      usdrdev->dl.stream_cfg_base[sno] + 7 * sdma->dma_bufs,
+                      sdma->dma_buf_sz - 1);
+        dev_notice(&usdrdev->pdev->dev, "RX stream is limited to %d bytes\n", sdma->dma_buf_sz);
     }
     return 0;
 
@@ -1031,23 +1062,23 @@ static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long sno
             BUG_ON(cnt == 0);
         }
     }
-    
+
     max = usdrdev->streaming[sno].stat_wptr;
     if (max > usdrdev->streaming[sno].stat_rptr + cnt) {
-    	max = usdrdev->streaming[sno].stat_rptr + cnt;
+	max = usdrdev->streaming[sno].stat_rptr + cnt;
     }
-    
+
     for (i = usdrdev->streaming[sno].stat_rptr; i < max; i++, ooidx++) {
         unsigned k, nreg[3], ktm;
-        k = (usdrdev->streaming[sno].stat_rptr * 4) & 0x3f;
-        nreg[0] = usdrdev->streaming[sno].stat_data[k + 0];
-        nreg[1] = usdrdev->streaming[sno].stat_data[k + 1];
-        nreg[2] = usdrdev->streaming[sno].stat_data[k + 2];
-        ktm = usdrdev->streaming[sno].stat_data[k + 3];
-        
+        k = (usdrdev->streaming[sno].stat_rptr) & (STAT_MAX_SZ - 1);
+        nreg[0] = usdrdev->streaming[sno].stat_data[4 * k + 0];
+        nreg[1] = usdrdev->streaming[sno].stat_data[4 * k + 1];
+        nreg[2] = usdrdev->streaming[sno].stat_data[4 * k + 2];
+        ktm = usdrdev->streaming[sno].stat_data[4 * k + 3];
+
         //sr = ((uint64_t)nreg[1] << 32) | nreg[0];
         usdrdev->streaming[sno].stat_rptr++;
-        
+
         //cntr_last = (stat >> 8) & 0x3f;
         //dcnt = (cntr_last - usdrdev->streams[sno]->cntr_last) & 0x3f;
         //BUG_ON(dcnt == 0);
@@ -1061,14 +1092,14 @@ static int usdr_stream_wait_or_alloc(struct usdr_dev *usdrdev, unsigned long sno
             oob_out_u64[2 * ooidx + 0] = (((uint64_t)nreg[1]) << 32) | nreg[0];
             oob_out_u64[2 * ooidx + 1] = (((uint64_t)ktm) << 32) | nreg[2];
             oobcnt++;
-            
+
             // dw0 - evnt[1] - reg[0]
             // dw1 - evnt[2] - reg[1]
             // dw2 - evnt[0] - reg[2]
             // dw3 - timestamp
         }
     }
-    
+
     if (oob_length) {
     	*oob_length = oobcnt * 16;
     }
@@ -1461,7 +1492,7 @@ static int usdrfd_mmap_io(struct usdr_dev *usdrdev, struct vm_area_struct *vma)
         return -EINVAL;
 
     vma->vm_page_prot = pgprot_device(vma->vm_page_prot);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
+#ifndef HAVE_VM_FLAGS_SET
     vma->vm_flags |= VM_IO;
 #else
     vm_flags_set(vma, VM_IO);
@@ -1588,7 +1619,7 @@ static int usdr_probe(struct pci_dev *pdev,
 
 	/* Reconfigure MaxReadReq to 4KB */
 	pcie_capability_clear_and_set_word(pdev, PCI_EXP_DEVCTL,
-					   PCI_EXP_DEVCTL_READRQ, PCI_EXP_DEVCTL_READRQ_2048B);
+					   PCI_EXP_DEVCTL_READRQ, PCI_EXP_DEVCTL_READRQ_1024B);
 
     //dma_set_mask_and_coherent
 	if (dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32))) {
@@ -1786,7 +1817,7 @@ static int __init usdr_init(void)
 		printk(KERN_NOTICE PFX "Unable to allocate chrdev region: %d\n", err);
 		goto failed_chrdev;
 	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+#ifndef HAVE_CLASS_CREATE_ONE_ARG
         usdr_class = class_create(THIS_MODULE, CLASS_NAME);
 #else
         usdr_class = class_create(CLASS_NAME);

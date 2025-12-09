@@ -13,8 +13,9 @@ static const unsigned packet_lens[3] = { 4096, 16384, FFT_SIZE };
 
 #define SPEED_MEASURE_ITERS 1000000
 #define EPSILON 1E-4
+#define CONV_SCALE (1.0f/32767)
 
-static wvlt_fftwf_complex* in = NULL;
+static wvlt_fftwi16_complex* in = NULL;
 static wvlt_fftwf_complex* out = NULL;
 static wvlt_fftwf_complex* out_etalon = NULL;
 static float* wnd = NULL;
@@ -26,14 +27,14 @@ static void recalcWnd(unsigned fft_size)
 {
     for(unsigned i = 0; i < fft_size; i++)
     {
-        wnd[i] = (1 - cos(2 * M_PI * i / fft_size)) / 2;
+        wnd[i] = CONV_SCALE * (1 - cos(2 * M_PI * i / fft_size)) / 2;
     }
 }
 
 static void setup()
 {
     int res = 0;
-    res = res ? res : posix_memalign((void**)&in,          ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
+    res = res ? res : posix_memalign((void**)&in,          ALIGN_BYTES, sizeof(wvlt_fftwi16_complex) * FFT_SIZE);
     res = res ? res : posix_memalign((void**)&out,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
     res = res ? res : posix_memalign((void**)&out_etalon,  ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * FFT_SIZE);
     res = res ? res : posix_memalign((void**)&wnd,         ALIGN_BYTES, sizeof(float) * FFT_SIZE);
@@ -41,8 +42,8 @@ static void setup()
 
     for(unsigned i = 0; i < FFT_SIZE; ++i)
     {
-        in[i][0] =  1.0f * (float)(rand()) / (float)RAND_MAX;
-        in[i][1] = -1.0f * (float)(rand()) / (float)RAND_MAX;
+        in[i][0] =  32767 * (float)(rand()) / (float)RAND_MAX;
+        in[i][1] = -32768 * (float)(rand()) / (float)RAND_MAX;
     }
 
     recalcWnd(FFT_SIZE);
@@ -71,14 +72,14 @@ START_TEST(wnd_check)
     generic_opts_t opt = max_opt;
     fprintf(stderr,"\n**** Check SIMD implementations ***\n");
 
-    fft_window_cf32_c(OPT_GENERIC, NULL)(in, FFT_SIZE, wnd, out_etalon);
+    fft_window_ci16_cf32_c(OPT_GENERIC, NULL)(in, FFT_SIZE, wnd, out_etalon);
     last_fn_name = NULL;
     const char* fn_name = NULL;
-    fft_window_cf32_function_t fn = NULL;
+    fft_window_ci16_cf32_function_t fn = NULL;
 
     while(opt != OPT_GENERIC)
     {
-        fn = fft_window_cf32_c(opt, &fn_name);
+        fn = fft_window_ci16_cf32_c(opt, &fn_name);
 
         if(last_fn_name && !strcmp(last_fn_name, fn_name))
         {
@@ -96,7 +97,7 @@ START_TEST(wnd_check)
         if(res >= 0)
         {
             unsigned i = res;
-            fprintf(stderr, "TEST  > i:%u in=(%.6f,%.6f) out=(%.6f,%.6f) <---> out_etalon=(%.6f,%.6f)\n",
+            fprintf(stderr, "TEST  > i:%u in=(%d,%d) out=(%.6f,%.6f) <---> out_etalon=(%.6f,%.6f)\n",
                     i, in[i][0], in[i][1], out[i][0], out[i][1], out_etalon[i][0], out_etalon[i][1]);
         }
 #endif
@@ -110,7 +111,7 @@ START_TEST(wnd_speed)
 {
     fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
     const char* fn_name = NULL;
-    fft_window_cf32_function_t fn = NULL;
+    fft_window_ci16_cf32_function_t fn = NULL;
 
     unsigned size = packet_lens[_i];
 
@@ -121,7 +122,7 @@ START_TEST(wnd_speed)
 
     while(opt != OPT_GENERIC)
     {
-        fn = fft_window_cf32_c(opt, &fn_name);
+        fn = fft_window_ci16_cf32_c(opt, &fn_name);
         if(last_fn_name && !strcmp(last_fn_name, fn_name))
         {
             --opt;
@@ -146,11 +147,11 @@ START_TEST(wnd_speed)
 }
 END_TEST
 
-Suite * fft_window_cf32_suite(void)
+Suite * fft_window_ci16_cf32_suite(void)
 {
     max_opt = cpu_vcap_get();
 
-    Suite* s = suite_create("fft_window_cf32_functions");
+    Suite* s = suite_create("fft_window_ci16_cf32_functions");
 
     ADD_REGRESS_TEST(s, wnd_check);
     ADD_PERF_LOOP_TEST(s, wnd_speed, 300, 0, 3);

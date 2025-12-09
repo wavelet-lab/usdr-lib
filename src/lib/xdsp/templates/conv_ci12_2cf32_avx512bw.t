@@ -22,28 +22,33 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
         __m512i y0, y1;
         __m512 res0, res1, res2, res3;
 
-        const __m512i idx0 = _mm512_set_epi64(14,12,10,8,6,4,2,0);
-        const __m512i idx1 = _mm512_set_epi64(15,13,11,9,7,5,3,1);
-
         for(; i >= 96; i -= 96)
         {
             y0 = _mm512_maskz_loadu_epi64(0b00111111, (const long long*)(in + 0));
             y1 = _mm512_maskz_loadu_epi64(0b00111111, (const long long*)(in + 6));
             in += 12;
-
-            CONVERT_I12_F32_BLOCK(y0, res0, res1);
-            CONVERT_I12_F32_BLOCK(y1, res2, res3);
-
-            _mm512_storeu_pd(outdata_0 +  0, _mm512_permutex2var_pd(_mm512_castps_pd(res0), idx0, _mm512_castps_pd(res1)));
-            _mm512_storeu_pd(outdata_1 +  0, _mm512_permutex2var_pd(_mm512_castps_pd(res0), idx1, _mm512_castps_pd(res1)));
-            _mm512_storeu_pd(outdata_0 + 16, _mm512_permutex2var_pd(_mm512_castps_pd(res2), idx0, _mm512_castps_pd(res3)));
-            _mm512_storeu_pd(outdata_1 + 16, _mm512_permutex2var_pd(_mm512_castps_pd(res2), idx1, _mm512_castps_pd(res3)));
+            
+            CONVERT_CI12_2CF32_BLOCK_OPT(y0, res0, res1);
+            _mm512_store_ps(outdata_0 + 0, res0);
+            _mm512_store_ps(outdata_1 + 0, res1);
+            
+            CONVERT_CI12_2CF32_BLOCK_OPT(y1, res2, res3);
+            _mm512_store_ps(outdata_0 + 16, res2);
+            _mm512_store_ps(outdata_1 + 16, res3);
+            
             outdata_0 += 32;
             outdata_1 += 32;
         }
 
-        #undef CONVERT_I12_F32_BLOCK
         #undef CONVERT_I12_I16_BLOCK
+        #undef CONVERT_I12_2I32_SEPARATED    
+        #undef CONVERT_CI12_2CI32_BLOCK_OPT
+        #undef CONVERT_CI12_4CI32_BLOCK_OPT
+        
+        #undef CONVERT_I12_F32_BLOCK
+        #undef CONVERT_I12_F32_BLOCK_STORE1
+        #undef CONVERT_CI12_2CF32_BLOCK_OPT
+        #undef CONVERT_CI12_4CF32_BLOCK_OPT
     }
 
     //AVX2 block
@@ -60,23 +65,27 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
 
             __m256 res0, res1, res2, res3;
 
-            CONVERT_I12_F32_BLOCK(y0, res0, res1);
-            CONVERT_I12_F32_BLOCK(y1, res2, res3);
+            CONVERT_CI12_2CF32_BLOCK_OPT(y0, res0, res1);
+            _mm256_store_ps(outdata_0 + 0, res0);
+            _mm256_store_ps(outdata_1 + 0, res1);
+            
+            CONVERT_CI12_2CF32_BLOCK_OPT(y1, res2, res3);
+            _mm256_store_ps(outdata_0 + 8, res2);
+            _mm256_store_ps(outdata_1 + 8, res3);
 
-            const __m256i idx0 = _mm256_set_epi64x(6,4,2,0);
-            const __m256i idx1 = _mm256_set_epi64x(7,5,3,1);
-
-            _mm256_storeu_pd((double*)(outdata_0 + 0), _mm256_permutex2var_pd(_mm256_castps_pd(res0), idx0, _mm256_castps_pd(res1)));
-            _mm256_storeu_pd((double*)(outdata_1 + 0), _mm256_permutex2var_pd(_mm256_castps_pd(res0), idx1, _mm256_castps_pd(res1)));
-            _mm256_storeu_pd((double*)(outdata_0 + 8), _mm256_permutex2var_pd(_mm256_castps_pd(res2), idx0, _mm256_castps_pd(res3)));
-            _mm256_storeu_pd((double*)(outdata_1 + 8), _mm256_permutex2var_pd(_mm256_castps_pd(res2), idx1, _mm256_castps_pd(res3)));
             outdata_0 += 16;
             outdata_1 += 16;
         }
 
+        #undef CONVERT_I12_I16_BLOCK
+        #undef CONVERT_I12_2I32_SEPARATED    
+        #undef CONVERT_CI12_2CI32_BLOCK_OPT
+        #undef CONVERT_CI12_4CI32_BLOCK_OPT
+        
         #undef CONVERT_I12_F32_BLOCK
         #undef CONVERT_I12_F32_BLOCK_STORE1
-        #undef CONVERT_I12_I16_BLOCK
+        #undef CONVERT_CI12_2CF32_BLOCK_OPT
+        #undef CONVERT_CI12_4CF32_BLOCK_OPT
     }
 
     //Generic block

@@ -19,6 +19,7 @@ enum generic_opts {
     OPT_AVX,
     OPT_AVX2,
     OPT_AVX512BW,
+    OPT_AVX512VBMI,
 
     //ARM-specific
     OPT_NEON = 2000,
@@ -40,6 +41,7 @@ typedef enum generic_opts generic_opts_t;
 #include <immintrin.h>
 
 #ifndef __EMSCRIPTEN__
+#define WVLT_AVX512VBMI
 #define WVLT_AVX512BW
 #define WVLT_AVX2
 #define WVLT_AVX
@@ -59,6 +61,13 @@ typedef enum generic_opts generic_opts_t;
 #define WVLT_NEON
 
 #endif  //WVLT_SIMD_INTEL
+
+#ifdef WVLT_AVX512VBMI
+#define SELECT_AVX512VBMI_FN(a, b, fn, cap) do { \
+if (cap >= OPT_AVX512VBMI) {a = &fn; b = VB_STRINGIFY(fn);} } while(0)
+#else
+#define SELECT_AVX512VBMI_FN(a, b, fn, cap)
+#endif
 
 #ifdef WVLT_AVX512BW
 #define SELECT_AVX512BW_FN(a, b, fn, cap) do { \

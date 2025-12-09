@@ -5,6 +5,7 @@
 #include "attribute_switch.h"
 
 #define CONV_SCALE (1.0f/32767)
+#define SCALE2    (CONV_SCALE / 65536)
 
 #define TEMPLATE_FUNC_NAME conv_ci12_4cf32_generic
 VWLT_ATTRIBUTE(optimize("-O3"))

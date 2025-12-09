@@ -18,8 +18,8 @@ field_macros: True
 
 x-tdd-fdd-opts: &tdd-fdd-opts
     0b00: REV0_LNA_TO_RX_____REV2_SHUTDOWN
-    0b01: REV0_LNA_TO_TDDSW__REV2_LNA_TO_LB
-    0b10: REV0_LNA_TO_RX_____REV2_LNA_TO_TDDSW
+    0b01: REV0_LNA_TO_TDDSW__REV2_LNA_TO_TDDSW
+    0b10: REV0_LNA_TO_RX_____REV2_LNA_TO_LB
     0b11: REV0_LNA_TO_TDDSW__REV2_LNA_TO_RX
 
 

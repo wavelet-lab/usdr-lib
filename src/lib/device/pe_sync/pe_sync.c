@@ -108,6 +108,8 @@ const usdr_dev_param_constant_t s_params_pe_sync_rev000[] = {
     { "/ll/qspi_flash/base", REG_WR_FLASHSPI_CMD },
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"none" },
+    { "/ll/device/name",  (uintptr_t)"none"},
+
     { "/ll/sdr/max_hw_rx_chans",  0 },
     { "/ll/sdr/max_hw_tx_chans",  0 },
     { "/ll/sdr/max_sw_rx_chans",  0 },

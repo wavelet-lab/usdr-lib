@@ -811,25 +811,30 @@ static int _lms8001_optim_pll_loopbw(lms8001_state_t* m, double PM_deg, double f
         return -EINVAL;
     }
 
-    double KVCO_avg;
+    double KVCO_avg = 0;
+    const static double s_kvco_s_mpw2015[4] = {0, 44.404e6, 33.924e6, 41.455e6};
+    const static double s_kvco_s_mpw2024[4] = {0, 6.2842e7, 6.4853e7, 9.1550e7};
 
     if (!fitKVCO) {
-        if (vco_sel == 1)
-            KVCO_avg = 44.404e6;
-        else if (vco_sel == 2)
-            KVCO_avg = 33.924e6;
-        else if (vco_sel == 3)
-            KVCO_avg = 41.455e6;
-    }
-    else {
-        // Use Fitted Values for KVCO in Calculations
+        KVCO_avg = (m->stepping == LMS8_MPW2015) ? s_kvco_s_mpw2015[vco_sel] : s_kvco_s_mpw2024[vco_sel];
+    } else if (m->stepping == LMS8_MPW2015) {
+        // Use Fitted Values for KVCO in Calculations for mpw 2015
         int CBANK = vco_freq;
         if (vco_sel == 1)
-            KVCO_avg = 24.71e6 * (2.09e-10*pow(CBANK, 4) + 2.77e-09*pow(CBANK, 3) + 1.13e-05*pow(CBANK, 2) + 3.73e-03*CBANK + 1.01e+00);
+            KVCO_avg = 24.71e6 * (2.09e-10 * pow(CBANK, 4) + 2.77e-09 * pow(CBANK, 3) + 1.13e-05 * pow(CBANK, 2) + 3.73e-03 * CBANK + 1.01e+00);
         else if (vco_sel == 2)
-            KVCO_avg = 21.05e6 * (-9.88e-11*pow(CBANK, 4) + 1.46e-07*pow(CBANK, 3) + (-2.14e-05)*pow(CBANK, 2) + 5.08e-03*CBANK + 9.99e-01);
+            KVCO_avg = 21.05e6 * (-9.88e-11 * pow(CBANK, 4) + 1.46e-07 * pow(CBANK, 3) + (-2.14e-05) * pow(CBANK, 2) + 5.08e-03 * CBANK + 9.99e-01);
         else if (vco_sel == 3)
-            KVCO_avg = 32.00e6 * (-1.04e-10*pow(CBANK, 4) + 8.72e-08*pow(CBANK, 3) + (-4.68e-06)*pow(CBANK, 2) + 3.68e-03*CBANK + 1.00e+00);
+            KVCO_avg = 32.00e6 * (-1.04e-10 * pow(CBANK, 4) + 8.72e-08 * pow(CBANK, 3) + (-4.68e-06) * pow(CBANK, 2) + 3.68e-03 * CBANK + 1.00e+00);
+    } else {
+        // Use Fitted Values for KVCO in Calculations for mpw 2024
+        int CBANK = vco_freq;
+        if (vco_sel == 1)
+            KVCO_avg = 3.8492e7 * (2.1005e-10 * pow(CBANK, 4) - 3.6267e-08 * pow(CBANK, 3) + 1.3634e-05 *pow(CBANK, 2) + 3.0541e-03 * CBANK + 1.0011e+00);
+        else if (vco_sel == 2)
+            KVCO_avg = 4.4058e7 * (6.4250e-11 * pow(CBANK, 4) + 2.1831e-10 * pow(CBANK, 3) + 5.7102e-06 *pow(CBANK, 2) + 2.6286e-03 * CBANK + 1.0011e+00);
+        else if (vco_sel == 3)
+            KVCO_avg = 6.2508e7 * (3.7053e-11 * pow(CBANK, 4) + 6.3153e-09 * pow(CBANK, 3) + 5.6397e-06 *pow(CBANK, 2) + 2.5792e-03 * CBANK + 9.9837e-01);
     }
 
     double Kvco = 2 * M_PI * KVCO_avg;
@@ -1053,8 +1058,8 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
         return res;
     }
 
-    // Step 2 - Center VCO Tuning Voltage if needed
-    res =  _lms8001_center_vtune(m, fvco, fref, tune_flags);
+    // Step 2 - Center VCO Tuning Voltage if needed only for MPW2015
+    res = (m->stepping == LMS8_MPW2024) ? res : _lms8001_center_vtune(m, fvco, fref, tune_flags);
     if (res) {
         return res;
     }

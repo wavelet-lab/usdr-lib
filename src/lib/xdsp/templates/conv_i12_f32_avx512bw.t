@@ -35,9 +35,16 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
             _mm512_storeu_ps(outdata + 48, res3);
             outdata += 64;
         }
+
+        #undef CONVERT_I12_I16_BLOCK
+        #undef CONVERT_I12_2I32_SEPARATED    
+        #undef CONVERT_CI12_2CI32_BLOCK_OPT
+        #undef CONVERT_CI12_4CI32_BLOCK_OPT
         
         #undef CONVERT_I12_F32_BLOCK
-        #undef CONVERT_I12_I16_BLOCK
+        #undef CONVERT_I12_F32_BLOCK_STORE1
+        #undef CONVERT_CI12_2CF32_BLOCK_OPT
+        #undef CONVERT_CI12_4CF32_BLOCK_OPT
     }
     
     //AVX2 block
@@ -56,9 +63,15 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_p,
             CONVERT_I12_F32_BLOCK_STORE1(y1);
         }
         
+        #undef CONVERT_I12_I16_BLOCK
+        #undef CONVERT_I12_2I32_SEPARATED    
+        #undef CONVERT_CI12_2CI32_BLOCK_OPT
+        #undef CONVERT_CI12_4CI32_BLOCK_OPT
+        
         #undef CONVERT_I12_F32_BLOCK
         #undef CONVERT_I12_F32_BLOCK_STORE1
-        #undef CONVERT_I12_I16_BLOCK
+        #undef CONVERT_CI12_2CF32_BLOCK_OPT
+        #undef CONVERT_CI12_4CF32_BLOCK_OPT
     }
 
     //Generic block
