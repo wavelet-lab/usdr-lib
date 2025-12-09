@@ -799,7 +799,7 @@ int dev_m2_d09_4_ad45_2_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
     USDR_LOG("LSDR", USDR_LOG_ERROR, "Decimation set to %d, ADC %d\n", d->rxbb_decim, d->adc_rate);
 
     res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_BANK_ADC_CHMSK, 0x0f);
-    res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim);
+    res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_BANK_ADC_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim, DSP_7SERIES);
     if (res) {
         USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize FIR gearbox, error = %d!\n", res);
         return res;

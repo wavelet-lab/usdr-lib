@@ -1304,7 +1304,7 @@ static int dsdr_set_rates(dev_m2_dsdr_t* d, uint32_t rx_rate, uint32_t tx_rate)
              rx_rate / 1.0e6, d->rxbb_rate / 1.0e6, d->rxbb_decim,
              tx_rate / 1.0e6, d->txbb_rate / 1.0e6, d->txbb_inter);
 
-    res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim);
+    res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim, DSP_USSERIES);
     if (res) {
         USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize decimation FIR gearbox, error = %d!\n", res);
         return res;
@@ -1313,7 +1313,7 @@ static int dsdr_set_rates(dev_m2_dsdr_t* d, uint32_t rx_rate, uint32_t tx_rate)
     if (d->txbb_inter > 0) {
         d->txbb_rate = d->dac_rate / d->txbb_inter;
 
-        res = (res) ? res : fgearbox_load_fir_i(d->base.dev, IGPO_DSPCHAIN_TX_PRG, (fgearbox_firs_t)d->txbb_inter);
+        res = (res) ? res : fgearbox_load_fir_i(d->base.dev, IGPO_DSPCHAIN_TX_PRG, (fgearbox_firs_t)d->txbb_inter, DSP_USSERIES);
         if (res) {
             USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize interpolation FIR gearbox, error = %d!\n", res);
             return res;

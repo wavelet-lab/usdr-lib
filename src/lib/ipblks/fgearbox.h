@@ -17,6 +17,8 @@ enum fgearbox_firs {
     FGBOX_X6 = 6,
 
     FGBOX_X8 = 8,
+    FGBOX_X10 = 10,
+
     FGBOX_X12 = 12,
     FGBOX_X16 = 16,
     FGBOX_X24 = 24,
@@ -29,10 +31,13 @@ enum fgearbox_firs {
 };
 
 typedef enum fgearbox_firs fgearbox_firs_t;
+typedef enum dspfamily {
+    DSP_7SERIES,
+    DSP_USSERIES,
+} dspfamily_t;
 
 
-int fgearbox_load_fir(lldev_t dev, unsigned gport, fgearbox_firs_t fir);
-
-int fgearbox_load_fir_i(lldev_t dev, unsigned gport, fgearbox_firs_t fir);
+int fgearbox_load_fir(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam);
+int fgearbox_load_fir_i(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam);
 
 #endif
