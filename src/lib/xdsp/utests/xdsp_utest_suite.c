@@ -33,6 +33,8 @@ Suite * conv_ci12_2ci16_suite(void);
 Suite * conv_ci12_4ci16_suite(void);
 Suite * conv_2ci16_ci12_suite(void);
 Suite * conv_4ci16_ci12_suite(void);
+Suite * conv_ci16_8cf32_suite(void);
+Suite * conv_ci16_8ci16_suite(void);
 
 int main(int argc, char** argv)
 {
@@ -79,7 +81,10 @@ int main(int argc, char** argv)
     //
 #else
     //sr = srunner_create(conv_i16_f32_suite());
-    sr = srunner_create(fft_window_ci16_cf32_suite());
+    //sr = srunner_create(fft_window_ci16_cf32_suite());
+    sr = srunner_create(conv_ci16_8cf32_suite());
+    srunner_add_suite(sr, conv_ci16_8ci16_suite());
+
     //srunner_add_suite(sr, fft_window_cf32_suite());
     //srunner_add_suite(sr, conv_f32_i12_suite());
     //srunner_add_suite(sr, conv_2cf32_ci12_suite());
