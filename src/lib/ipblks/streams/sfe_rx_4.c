@@ -526,7 +526,7 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
         USDR_LOG("STRM", USDR_LOG_ERROR, "EXFERX: Unsupported channel count %d!\n", chns);
         return -EINVAL;
     }
-    if (fe->cfg_raw_chans >= MAX_EX_CHANS) {
+    if (fe->cfg_raw_chans > MAX_EX_CHANS) {
         USDR_LOG("STRM", USDR_LOG_ERROR, "EXFERX: Maximum channel count supported by the core is 16, requested %d!", fe->cfg_raw_chans);
         return -EINVAL;
     }
