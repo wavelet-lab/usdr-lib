@@ -17,7 +17,6 @@
 #include "../device_ids.h"
 #include "../dev_param.h"
 
-#include "../ipblks/streams/sfe_rx_4.h"
 #include "../ipblks/streams/stream_sfetrx4_dma32.h"
 #include "../ipblks/fgearbox.h"
 
@@ -46,6 +45,12 @@ enum dsdr_jesdv {
     DSDR_JESD204B_810_245 = 1,
     DSDR_JESD204C_6664_245 = 7,
     DSDR_JESD204C_6664_491 = 3,
+};
+
+enum dsdr_jesd_config {
+    JESD_MODE_4X_4X_491 = 0,
+    JESD_MODE_8X_8X_369 = 1,
+    JESD_MODE_8X_4X_491 = 8,
 };
 
 // I2C buses
@@ -265,12 +270,6 @@ const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"afe79xx" },
     { "/ll/device/name",  (uintptr_t)"dsdr"},
-
-    // { "/ll/sdr/max_hw_rx_chans",  4 },
-    // { "/ll/sdr/max_hw_tx_chans",  4 },
-
-    // { "/ll/sdr/max_sw_rx_chans",  4 },
-    // { "/ll/sdr/max_sw_tx_chans",  4 },
 };
 
 static int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -335,91 +334,20 @@ void chmsk_set_all(chmsk_t* msk) {
     *msk = ~((uint64_t)0);
 }
 
-static int device_path_to_chmsk(const char* full_path, const char* basename, chmsk_t *hw_mask, chmsk_t *lg_mask);
+static int device_path_to_chmsk(const char* full_path, const char* basename, const channel_map_info_t* map, const unsigned max_lchan, chmsk_t *hw_mask, chmsk_t *lg_mask);
 
-
-#if 0
-static int device_path_to_chmsk(const char* full_path, const char* basename, chmsk_t *hw_mask, chmsk_t *lg_mask)
-{
-    const char* delim = ":_-";
-    *hw_mask = 0;
-    *lg_mask = 0;
-
-    size_t len = strlen(basename);
-    if (strncmp(full_path, basename, len)) {
-        return -ENOENT;
-    }
-    const char* lst = full_path + len;
-    if (*lst != '/') {
-        chmsk_set_all(lg_mask);
-        return -ENAVAIL;
-    }
-
-    lst++;
-
-    char chanlist[64*4];
-    SAFE_STRCPY(chanlist, lst);
-
-    char* saveptr;
-    char* str1;
-    unsigned t;
-    for (t = 0, str1 = chanlist; ; str1 = NULL, t++) {
-        const char* token = strtok_r(str1, delim, &saveptr);
-        if (token == NULL) {
-            break;
-        }
-
-        if (isdigit(*token)) {
-            unsigned chn = atoi(token);
-            if (chn >= MAX_CHANNEL_NUMBER) {
-                USDR_LOG("UDEV", USDR_LOG_ERROR, "Channel mask parsing for %s: incorrect channel number: %d, token# %d `%s`\n", full_path, chn, t, token);
-                return -EINVAL;
-            }
-            uint64_t chmsh = 1ull << chn;
-            if (chmsh & *lg_mask) {
-                USDR_LOG("UDEV", USDR_LOG_WARNING, "Channel mask parsing for %s: channel %d duplication, token# %d `%s`!\n", full_path, chn, t, token);
-            }
-
-            *lg_mask |= chmsh;
-        } else if (isalpha(*token)) {
-            int chA = tolower(*token) - 'a';
-            int chB = isalpha(*(token + 1)) ? tolower(*(token + 1)) - 'a' : -1;
-
-            unsigned chn = (chB < 0) ? chA : ((chA + 1) * 26 + chB);
-            if (chn >= MAX_CHANNEL_NUMBER) {
-                USDR_LOG("UDEV", USDR_LOG_ERROR, "Channel mask parsing for %s: incorrect channel number: %d, token# %d `%s`\n", full_path, chn, t, token);
-                return -EINVAL;
-            }
-            uint64_t chmsh = 1ull << chn;
-            if (chmsh & *hw_mask) {
-                USDR_LOG("UDEV", USDR_LOG_WARNING, "Channel mask parsing for %s: channel %d duplication, token# %d `%s`!\n", full_path, chn, t, token);
-            }
-
-            *hw_mask |= chmsh;
-        } else {
-            USDR_LOG("UDEV", USDR_LOG_ERROR, "Channel mask parsing for %s: incorrect token# %d `%s`\n", full_path, t, token);
-            return -EINVAL;
-        }
-    }
-
-    if (*hw_mask && *lg_mask) {
-        USDR_LOG("UDEV", USDR_LOG_ERROR, "Hardware and logical channel types mixing for %s: HW_MSK=%" PRIu64 " LG_MSK=%" PRIu64 "\n", full_path, *hw_mask, *lg_mask);
-        return -EINVAL;
-    }
-
-    return 0;
-}
-#endif
-
-static int dev_m2_dsdr_numchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dev_m2_dsdr_hrxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dev_m2_dsdr_htxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dev_m2_dsdr_lrxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dev_m2_dsdr_ltxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 static
 const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
-    { "/ll/sdr/max_hw_rx_chans",  { NULL, dev_m2_dsdr_numchans_get } },
-    { "/ll/sdr/max_hw_tx_chans",  { NULL, dev_m2_dsdr_numchans_get } },
+    { "/ll/sdr/max_hw_rx_chans",  { NULL, dev_m2_dsdr_hrxnumchans_get } },
+    { "/ll/sdr/max_hw_tx_chans",  { NULL, dev_m2_dsdr_htxnumchans_get } },
 
-    { "/ll/sdr/max_sw_rx_chans",  { NULL, dev_m2_dsdr_numchans_get } },
-    { "/ll/sdr/max_sw_tx_chans",  { NULL, dev_m2_dsdr_numchans_get } },
+    { "/ll/sdr/max_sw_rx_chans",  { NULL, dev_m2_dsdr_lrxnumchans_get } },
+    { "/ll/sdr/max_sw_tx_chans",  { NULL, dev_m2_dsdr_ltxnumchans_get } },
 
     { "/dm/rate/master",          { dev_m2_dsdr_rate_set, NULL }},
     { "/dm/rate/rxtxadcdac",      { dev_m2_dsdr_rate_m_set, NULL }},
@@ -435,90 +363,90 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/sdr/0/rx/gain/1",      { dev_m2_dsdr_gain_rx_set, NULL }},
     { "/dm/sdr/0/rx/gain/2",      { dev_m2_dsdr_gain_rx_set, NULL }},
     { "/dm/sdr/0/rx/gain/3",      { dev_m2_dsdr_gain_rx_set, NULL }},
-    { "/dm/sdr/0/rx/gain/a",      { dev_m2_dsdr_gain_rx_set, NULL }},
-    { "/dm/sdr/0/rx/gain/b",      { dev_m2_dsdr_gain_rx_set, NULL }},
-    { "/dm/sdr/0/rx/gain/c",      { dev_m2_dsdr_gain_rx_set, NULL }},
-    { "/dm/sdr/0/rx/gain/d",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/4",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/5",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/6",      { dev_m2_dsdr_gain_rx_set, NULL }},
+    { "/dm/sdr/0/rx/gain/7",      { dev_m2_dsdr_gain_rx_set, NULL }},
 
     { "/dm/sdr/0/rx/gain/auto",   { dev_m2_dsdr_gain_rx_auto_set, NULL }},
     { "/dm/sdr/0/rx/gain/auto/0", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
     { "/dm/sdr/0/rx/gain/auto/1", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
     { "/dm/sdr/0/rx/gain/auto/2", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
     { "/dm/sdr/0/rx/gain/auto/3", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/a", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/b", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/c", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
-    { "/dm/sdr/0/rx/gain/auto/d", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/4", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/5", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/6", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto/7", { dev_m2_dsdr_gain_rx_auto_set, NULL }},
 
     { "/dm/sdr/0/rx/gain/lna",    { dev_m2_dsdr_gain_rx_lna_set, NULL }},
     { "/dm/sdr/0/rx/gain/lna/0",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
     { "/dm/sdr/0/rx/gain/lna/1",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
     { "/dm/sdr/0/rx/gain/lna/2",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
     { "/dm/sdr/0/rx/gain/lna/3",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/a",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/b",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/c",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
-    { "/dm/sdr/0/rx/gain/lna/d",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/4",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/5",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/6",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
+    { "/dm/sdr/0/rx/gain/lna/7",  { dev_m2_dsdr_gain_rx_lna_set, NULL }},
 
     { "/dm/sdr/0/rx/gain/pga",    { dev_m2_dsdr_gain_rx_pga_set, NULL }},
     { "/dm/sdr/0/rx/gain/pga/0",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
     { "/dm/sdr/0/rx/gain/pga/1",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
     { "/dm/sdr/0/rx/gain/pga/2",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
     { "/dm/sdr/0/rx/gain/pga/3",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/a",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/b",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/c",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
-    { "/dm/sdr/0/rx/gain/pga/d",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/4",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/5",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/6",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
+    { "/dm/sdr/0/rx/gain/pga/7",  { dev_m2_dsdr_gain_rx_pga_set, NULL }},
 
     { "/dm/sdr/0/tx/gain",        { dev_m2_dsdr_gain_tx_set, NULL }},
     { "/dm/sdr/0/tx/gain/0",      { dev_m2_dsdr_gain_tx_set, NULL }},
     { "/dm/sdr/0/tx/gain/1",      { dev_m2_dsdr_gain_tx_set, NULL }},
     { "/dm/sdr/0/tx/gain/2",      { dev_m2_dsdr_gain_tx_set, NULL }},
     { "/dm/sdr/0/tx/gain/3",      { dev_m2_dsdr_gain_tx_set, NULL }},
-    { "/dm/sdr/0/tx/gain/a",      { dev_m2_dsdr_gain_tx_set, NULL }},
-    { "/dm/sdr/0/tx/gain/b",      { dev_m2_dsdr_gain_tx_set, NULL }},
-    { "/dm/sdr/0/tx/gain/c",      { dev_m2_dsdr_gain_tx_set, NULL }},
-    { "/dm/sdr/0/tx/gain/d",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/4",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/5",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/6",      { dev_m2_dsdr_gain_tx_set, NULL }},
+    { "/dm/sdr/0/tx/gain/7",      { dev_m2_dsdr_gain_tx_set, NULL }},
 
     { "/dm/sdr/0/rx/freqency",    { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/freqency/0",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/freqency/1",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/freqency/2",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/freqency/3",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
-    { "/dm/sdr/0/rx/freqency/a",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
-    { "/dm/sdr/0/rx/freqency/b",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
-    { "/dm/sdr/0/rx/freqency/c",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
-    { "/dm/sdr/0/rx/freqency/d",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/freqency/4",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/freqency/5",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/freqency/6",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/freqency/7",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
 
     { "/dm/sdr/0/rx/dsa",         { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
     { "/dm/sdr/0/rx/dsa/0",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
     { "/dm/sdr/0/rx/dsa/1",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
     { "/dm/sdr/0/rx/dsa/2",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
     { "/dm/sdr/0/rx/dsa/3",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
-    { "/dm/sdr/0/rx/dsa/a",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
-    { "/dm/sdr/0/rx/dsa/b",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
-    { "/dm/sdr/0/rx/dsa/c",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
-    { "/dm/sdr/0/rx/dsa/d",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
+    { "/dm/sdr/0/rx/dsa/4",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
+    { "/dm/sdr/0/rx/dsa/5",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
+    { "/dm/sdr/0/rx/dsa/6",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
+    { "/dm/sdr/0/rx/dsa/7",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
 
     { "/dm/sdr/0/tx/freqency",    { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency/0",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency/1",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency/2",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency/3",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
-    { "/dm/sdr/0/tx/freqency/a",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
-    { "/dm/sdr/0/tx/freqency/b",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
-    { "/dm/sdr/0/tx/freqency/c",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
-    { "/dm/sdr/0/tx/freqency/d",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/freqency/4",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/freqency/5",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/freqency/6",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/freqency/7",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
 
     { "/dm/sdr/0/tx/dsa",         { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
     { "/dm/sdr/0/tx/dsa/0",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
     { "/dm/sdr/0/tx/dsa/1",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
     { "/dm/sdr/0/tx/dsa/2",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
     { "/dm/sdr/0/tx/dsa/3",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
-    { "/dm/sdr/0/tx/dsa/a",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
-    { "/dm/sdr/0/tx/dsa/b",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
-    { "/dm/sdr/0/tx/dsa/c",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
-    { "/dm/sdr/0/tx/dsa/d",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
+    { "/dm/sdr/0/tx/dsa/4",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
+    { "/dm/sdr/0/tx/dsa/5",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
+    { "/dm/sdr/0/tx/dsa/6",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
+    { "/dm/sdr/0/tx/dsa/7",       { dev_m2_dsdr_sdr_tx_dsa_set, NULL }},
 
 
     { "/dm/sdr/0/rx/bandwidth",   { dev_m2_dsdr_dummy, NULL }},
@@ -543,14 +471,80 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
 
 };
 
+// Maximum supported simultanious logical channels (inc. multiband configurations)
+#define MAX_LOGIC_CHANS      8
+#define MAX_HIPER_FE_PORT    4
+#define MAX_PORT_BANDS       2
 
 // HIPER FE channel map table
-static const uint8_t s_chanmap_hw_to_fe[4] = { 2, 3, 1, 0 };
-static const uint8_t s_chanmap_fe_to_hw[4] = { 3, 2, 0, 1 };
+static const uint8_t s_chanmap_hw_to_fe[MAX_HIPER_FE_PORT] = { 2, 3, 1, 0 };
+static const uint8_t s_chanmap_fe_to_hw[MAX_HIPER_FE_PORT] = { 3, 2, 0, 1 };
 
 enum DSDR_STATE {
     STATE_IDLE = 0,
     STATE_AFE_INIT = 1,
+};
+
+struct channel_logic_dsp_wire {
+    uint8_t dsp_type;
+    uint8_t hwport;
+    uint8_t band;
+};
+typedef struct channel_logic_dsp_wire channel_logic_dsp_wire_t;
+
+
+static const channel_logic_dsp_wire_t s_dsdr_lmap_s_nco[] = {
+    {  NCO_RX, 0, 0 },
+    {  NCO_RX, 1, 0 },
+    {  NCO_RX, 2, 0 },
+    {  NCO_RX, 3, 0 },
+};
+static const channel_map_info_t s_dsdr_chmap_s_nco[] = {
+    { "a", 0 },
+    { "b", 1 },
+    { "c", 2 },
+    { "d", 3 },
+    { NULL, CH_NULL },
+};
+
+static const channel_logic_dsp_wire_t s_dsdr_lmap_d_nco[] = {
+    {  NCO_RX, 0, 0 },
+    {  NCO_RX, 1, 0 },
+    {  NCO_RX, 2, 0 },
+    {  NCO_RX, 3, 0 },
+    {  NCO_RX, 0, 1 },
+    {  NCO_RX, 1, 1 },
+    {  NCO_RX, 2, 1 },
+    {  NCO_RX, 3, 1 },
+};
+static const channel_map_info_t s_dsdr_chmap_d_nco[] = {
+    { "a0", 0 },
+    { "b0", 1 },
+    { "c0", 2 },
+    { "d0", 3 },
+    { "a1", 4 },
+    { "b1", 5 },
+    { "c1", 6 },
+    { "d1", 7 },
+    { NULL, CH_NULL },
+};
+
+static const channel_logic_dsp_wire_t s_dsdr_lmap_s_nco_fb[] = {
+    {  NCO_RX, 0, 0 },
+    {  NCO_RX, 1, 0 },
+    {  NCO_RX, 2, 0 },
+    {  NCO_RX, 3, 0 },
+    {  NCO_FB, 4, 0 },
+    {  NCO_FB, 5, 0 },
+};
+static const channel_map_info_t s_dsdr_chmap_s_nco_fb[] = {
+    { "a", 0 },
+    { "b", 1 },
+    { "c", 2 },
+    { "d", 3 },
+    { "f0", 4 },
+    { "f1", 5 },
+    { NULL, CH_NULL },
 };
 
 struct dev_m2_dsdr {
@@ -562,6 +556,7 @@ struct dev_m2_dsdr {
 
     unsigned type;
     unsigned jesdv;
+    unsigned jesd_x8;
 
     stream_handle_t* rx;
     stream_handle_t* tx;
@@ -579,18 +574,29 @@ struct dev_m2_dsdr {
     const char* afecongiguration;
     uint32_t max_rate; // Maximum I/Q rate supported by HW
 
+    const channel_map_info_t *rx_chmap_info;
+    const channel_map_info_t *tx_chmap_info;
+    const channel_logic_dsp_wire_t *rx_lmap_info;
+    const channel_logic_dsp_wire_t *tx_lmap_info;
+
     unsigned hw_enabled_tx; // HW Enabled channels
     unsigned hw_enabled_rx; // HW Enabled channels
+    unsigned logic_enabled_tx; // Logic Enabled channels
+    unsigned logic_enabled_rx; // Logic Enabled channels
 
     unsigned hw_mask_tx; // Physically wired TX channels
     unsigned hw_mask_rx; // Physically wired RX channels
-    unsigned hw_mask_fb; // Physically wired FB channels
+
+    unsigned hw_chcnt_rx;
+    unsigned hw_chcnt_tx;
+    unsigned logic_chcnt_rx;
+    unsigned logic_chcnt_tx;
 
     unsigned hw_fpga_jesd_rx_en; // Physical lanes enabled bitmask 0: X0Y4, 1: X0Y5, ... 3: X0Y7
     unsigned hw_fpga_jesd_tx_en; // Physical lanes enabled bitmask 0: X0Y4, 1: X0Y5, ... 3: X0Y7
 
-    uint8_t hw_rxch_route[8];
-    uint8_t hw_txch_route[8];
+    uint8_t hw_rxch_route[MAX_LOGIC_CHANS]; // Physical channel reroute dueto absent physical channels (like in AFE7903)
+    uint8_t hw_txch_route[MAX_LOGIC_CHANS]; // Physical channel reroute dueto absent physical channels (like in AFE7903)
 
     uint32_t adc_rate;
     unsigned rxbb_rate;
@@ -604,12 +610,19 @@ struct dev_m2_dsdr {
     uint8_t rx_activated;
 
     // 0xff means channel not wired
-    uint8_t rx_logic_to_hw[8]; // logic <- hw, index is logic chnum
-    uint8_t tx_hw_to_logic[8]; // hw -> logic, index is hw chnum
+    uint8_t rx_ordinal_to_logic[MAX_LOGIC_CHANS];
+    uint8_t tx_ordinal_to_logic[MAX_LOGIC_CHANS];
+    //uint8_t tx_hw_to_logic[MAX_LOGIC_CHANS]; // hw -> logic, index is hw chnum
 
     // Configuration parameters
-    opt_u64_t rx_freqs[8];
-    opt_u64_t tx_freqs[8];
+    opt_u64_t rx_ord_freqs[MAX_LOGIC_CHANS];
+    opt_u64_t tx_ord_freqs[MAX_LOGIC_CHANS];
+
+    // For proper FE configuration in dual-band DSP configuration indexed by hwidx, band_no
+    opt_u64_t rx_bxfc[MAX_HIPER_FE_PORT][MAX_PORT_BANDS];
+    opt_u64_t tx_bxfc[MAX_HIPER_FE_PORT][MAX_PORT_BANDS];
+    opt_u64_t rx_raw_nco[MAX_HIPER_FE_PORT][MAX_PORT_BANDS];
+    opt_u64_t tx_raw_nco[MAX_HIPER_FE_PORT][MAX_PORT_BANDS];
 
     channel_info_t rx_chans;
     channel_info_t tx_chans;
@@ -646,15 +659,28 @@ bool dev_m2_dsdr_has_hiper(dev_m2_dsdr_t* d)
 }
 
 
-int dev_m2_dsdr_numchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+int dev_m2_dsdr_lrxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
-    if (d->cfg_afe_type == 7903)
-        *ovalue = 2;
-    else
-        *ovalue = 4;
+    return d->logic_chcnt_rx;
+}
 
-    return 0;
+int dev_m2_dsdr_ltxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
+    return d->logic_chcnt_tx;
+}
+
+int dev_m2_dsdr_htxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
+    return d->hw_chcnt_tx;
+}
+
+int dev_m2_dsdr_hrxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
+    return d->hw_chcnt_rx;
 }
 
 int dev_m2_dsdr_rx_enchan(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -673,14 +699,17 @@ static int dsdr_update_rx_remap(dev_m2_dsdr_t* d)
 {
     // Mark corresponding RX chanel
     uint64_t hiper_cfg_msk = 0;
-    unsigned rx_remap  = 0;
+    //unsigned rx_remap  = 0;
     int res = 0;
 
-    for (unsigned i = 0; i < 4; i++) {
-        if (d->rx_logic_to_hw[i] != 0xff) {
-            rx_remap |= (d->rx_logic_to_hw[i] & 0x3) << (2 * i);
+    for (unsigned i = 0; i < MAX_LOGIC_CHANS; i++) {
+        if (d->rx_ordinal_to_logic[i] != 0xff) {
+            //rx_remap |= (d->rx_ordinal_to_logic[i] & 0x3) << (2 * i);
 
-            hiper_cfg_msk |= (1u << s_chanmap_hw_to_fe[d->rx_logic_to_hw[i]]);
+            unsigned hw_chan = d->rx_lmap_info[d->rx_ordinal_to_logic[i]].hwport;
+            if (hw_chan < MAX_HIPER_FE_PORT) {
+                hiper_cfg_msk |= (1u << s_chanmap_hw_to_fe[hw_chan]);
+            }
         }
     }
 
@@ -697,14 +726,27 @@ static int dsdr_update_tx_remap(dev_m2_dsdr_t* d)
 {
     // Mark corresponding TX chanel
     uint64_t hiper_cfg_msk = 0;
-    unsigned tx_remap  = 0;
+    //unsigned tx_remap  = 0;
     int res = 0;
 
     for (unsigned i = 0; i < 4; i++) {
-        if (d->tx_hw_to_logic[i] != 0xff) {
-            tx_remap |= (d->tx_hw_to_logic[i] & 0x3) << (2 * i);
+        //if (d->tx_hw_to_logic[i] != 0xff) {
+            //tx_remap |= (d->tx_hw_to_logic[i] & 0x3) << (2 * i);
 
-            hiper_cfg_msk |= (1u << s_chanmap_hw_to_fe[i]);
+            //unsigned hw_chan = d->tx_lmap_info[d->rx_ordinal_to_logic[i]].hwport;
+            //if (hw_chan < MAX_ANT_PORT) {
+            //
+            //}
+        //    hiper_cfg_msk |= (1u << s_chanmap_hw_to_fe[i]);
+        //}
+
+        if (d->tx_ordinal_to_logic[i] != 0xff) {
+            //tx_remap |= (d->rx_ordinal_to_logic[i] & 0x3) << (2 * i);
+
+            unsigned hw_chan = d->tx_lmap_info[d->tx_ordinal_to_logic[i]].hwport;
+            if (hw_chan < MAX_HIPER_FE_PORT) {
+                hiper_cfg_msk |= (1u << s_chanmap_hw_to_fe[hw_chan]);
+            }
         }
     }
 
@@ -716,25 +758,48 @@ static int dsdr_update_tx_remap(dev_m2_dsdr_t* d)
     return res;
 }
 
-static int dsdr_iterate_chans(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val, const char* basename, bool rxchans)
+// Function tries to parse and match names to logical channels and iterate with ordinal index
+static int dsdr_iterate_ordinal_chans(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val, const char* basename, bool rxchans)
 {
     dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
     vfs_object_t ph;
     chmsk_t logic_msk;
-    chmsk_t hw_msk;
-    int res = device_path_to_chmsk(obj->full_path, basename, &hw_msk, &logic_msk);
+    chmsk_t logic_enabled;
+    chmsk_t ordinal_msk;
+    chmsk_t ordinal_enabled;
+    int res = device_path_to_chmsk(obj->full_path, basename,
+                                   rxchans ? d->rx_chmap_info : d->tx_chmap_info,
+                                   rxchans ? d->logic_chcnt_rx : d->logic_chcnt_tx,
+                                   &logic_msk, &ordinal_msk);
     if (res == -ENAVAIL) {
         // No channel information were specified, apply settings to all HW enabled channels or cache the value
-        if (rxchans) {
-            hw_msk = d->rx_activated ? d->hw_enabled_rx : 0xf;
-        } else {
-            hw_msk = d->tx_activated ? d->hw_enabled_tx : 0xf;
-        }
+        ordinal_msk = 0;
         logic_msk = 0;
         res = 0;
     } else if (res != 0) {
         return res;
     }
+
+    if (rxchans) {
+        logic_enabled = d->rx_activated ? d->logic_enabled_rx : 0xf;
+    } else {
+        logic_enabled = d->tx_activated ? d->logic_enabled_tx : 0xf;
+    }
+
+    ordinal_enabled = 0;
+    if (logic_msk != 0) {
+        logic_enabled &= logic_msk;
+    }
+
+    for (unsigned i = 0; i < (rxchans ? d->logic_chcnt_rx : d->logic_chcnt_tx); i++) {
+        if (chmsk_is_set(&logic_enabled,  rxchans ? d->rx_ordinal_to_logic[i] : d->tx_ordinal_to_logic[i])) {
+            ordinal_enabled |= (1 << i);
+        }
+    }
+    if (ordinal_msk != 0) {
+        ordinal_enabled &= ordinal_msk;
+    }
+
 
     ph.type = obj->type;
     ph.object = obj->object;
@@ -742,88 +807,253 @@ static int dsdr_iterate_chans(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val, c
     ph.ops = obj->ops;
     ph.full_path[0] = 0;
 
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "Setting parameter `%s` to LOGIC: %08x HW: %08x chans\n",
-             obj->full_path, (unsigned)logic_msk, (unsigned)hw_msk);
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "Setting parameter `%s` to LOGIC: %08x ORD: %08x chans\n",
+             obj->full_path, (unsigned)logic_msk, (unsigned)ordinal_enabled);
 
-    for (unsigned i = 0; i < DSDR_CHANS_HW; i++) {
-        if (chmsk_is_set(&hw_msk, i)) {
-            ph.full_path[1] = rxchans ? d->hw_rxch_route[i] :d->hw_txch_route[i]; // i;
+    // We rely on ordinal numbers for API simplification
+    for (unsigned i = 0; i < (rxchans ? d->logic_chcnt_rx : d->logic_chcnt_tx); i++) {
+        if (chmsk_is_set(&ordinal_enabled, i)) {
+            ph.full_path[1] = i;
             res = res ? res : obj->ops.si64(&ph, val);
         }
     }
 
-    for (unsigned i = 0; i < DSDR_CHANS_LOGIC; i++) {
-        if (chmsk_is_set(&logic_msk, i)) {
-
-            if (rxchans) {
-                uint8_t map = d->rx_logic_to_hw[i];
-                if (map == 0xff) {
-                    // Channel disabled
-                    continue;
-                }
-
-                ph.full_path[1] = rxchans ? d->hw_rxch_route[i] :d->hw_txch_route[i]; //i;
-                res = res ? res : obj->ops.si64(&ph, val);
-            } else {
-                // One logical TX channel can be mapped to many physical
-
-                for (unsigned j = 0; j < DSDR_CHANS_HW; j++) {
-                    if (d->tx_hw_to_logic[j] != i)
-                        continue;
-
-                    ph.full_path[1] = rxchans ? d->hw_rxch_route[i] :d->hw_txch_route[i]; //i;
-                    res = res ? res : obj->ops.si64(&ph, val);
-                }
-            }
+#if 0
+    for (unsigned i = 0; i < DSDR_CHANS_HW; i++) {
+        if (chmsk_is_set(&hw_msk, i)) {
+            ph.full_path[1] = rxchans ? d->hw_rxch_route[i] : d->hw_txch_route[i]; // i;
+            res = res ? res : obj->ops.si64(&ph, val);
         }
     }
 
+
+    for (unsigned i = 0; i < DSDR_CHANS_LOGIC; i++) {
+        if (chmsk_is_set(&logic_msk, i)) {
+
+            uint8_t map = (rxchans) ? d->rx_ordinal_to_logic[i] :  d->tx_ordinal_to_logic[i];
+            if (map == 0xff) {
+                // Channel disabled
+                continue;
+            }
+
+            ph.full_path[1] = rxchans ? d->hw_rxch_route[i] : d->hw_txch_route[i]; //i;
+            res = res ? res : obj->ops.si64(&ph, val);
+
+        }
+    }
+#endif
     return res;
 }
 
-static int dsdr_set_rx_frequency_chan(dev_m2_dsdr_t* d, uint64_t freq, unsigned chno)
+static const channel_logic_dsp_wire_t *get_chmapnfo_from_ordinal(dev_m2_dsdr_t* d, bool rx, unsigned ordinal)
+{
+    if (ordinal >= (rx ? d->logic_chcnt_rx : d->logic_chcnt_tx)) {
+        return NULL;
+    }
+    uint8_t logic_num = (rx ? d->rx_ordinal_to_logic[ordinal] : d->tx_ordinal_to_logic[ordinal]);
+    if (logic_num == 0xff) {
+        return NULL;
+    }
+    return rx ? &d->rx_lmap_info[logic_num] : &d->tx_lmap_info[logic_num];
+}
+
+static int dsdr_set_rx_frequency_chan(dev_m2_dsdr_t* d, uint64_t freq, unsigned ord)
 {
     int res = 0;
-    opt_u64_set_val(& d->rx_freqs[chno], freq);
+    opt_u64_set_val(&d->rx_ord_freqs[ord], freq);
     if (!d->rx_activated) {
         return 0;
     }
 
+    // Ordinal to logic converter
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, true, ord);
+    if (!w) {
+        return -EINVAL;
+    }
+    unsigned hwidx = d->hw_rxch_route[w->hwport];
+
     uint64_t ncoval = freq;
-    if (dev_m2_dsdr_has_hiper(d)) {
+    if (dev_m2_dsdr_has_hiper(d) && (hwidx < MAX_HIPER_FE_PORT)) {
         bool ch_rxiq;
         bool mod = false;
-        unsigned fe_chan = s_chanmap_hw_to_fe[chno];
-        int res = dsdr_hiper_fe_rx_freq_set(&d->hiper, fe_chan, freq, &ncoval, &ch_rxiq);
+        const uint8_t iter_shared_lo_chans[2][2] = { { 0, 1 }, { 2, 3 } };
+        const uint8_t iter_shared_selector[4] = { 0, 0, 1, 1 };
+        uint64_t chan_mid = 0;
+        unsigned cnt = 0;
+        int res = 0;
+        const bool shared_lo_cfg_mode = true;
+
+        opt_u64_set_val(&d->rx_bxfc[hwidx][w->band], freq);
+
+        for (unsigned s = 0; s < (shared_lo_cfg_mode ? 2 : 1); s++) {
+            unsigned iter_hwid = shared_lo_cfg_mode ? iter_shared_lo_chans[iter_shared_selector[hwidx]][s] : hwidx;
+            for (unsigned j = 0; j < MAX_PORT_BANDS; j++) {
+                if (d->rx_bxfc[iter_hwid][j].set) {
+                    chan_mid += d->rx_bxfc[iter_hwid][j].value;
+                    cnt++;
+                }
+            }
+        }
+        chan_mid /= cnt;
+
+        for (unsigned s = 0; s < (shared_lo_cfg_mode ? 2 : 1); s++) {
+            unsigned iter_hwid = shared_lo_cfg_mode ? iter_shared_lo_chans[iter_shared_selector[hwidx]][s] : hwidx;
+            res = res ? res : dsdr_hiper_fe_rx_freq_set(&d->hiper, s_chanmap_hw_to_fe[iter_hwid], chan_mid, &ncoval, &ch_rxiq);
+        }
+
         if (res)
             return res;
 
-        for (unsigned k = 0; k < DSDR_CHANS_HW; k++) {
-            if ((d->rx_chans.ch_map[k] & ~CH_SWAP_IQ_FLAG) == chno) {
-                uint8_t nchan = (ch_rxiq) ? d->rx_chans.ch_map[k] | CH_SWAP_IQ_FLAG : d->rx_chans.ch_map[k] & ~CH_SWAP_IQ_FLAG;
-                if (nchan != d->rx_chans.ch_map[k]) {
-                    d->rx_chans.ch_map[k] = nchan;
-                    mod = true;
+        for (unsigned k = 0; k < d->logic_chcnt_rx; k++) {
+            uint8_t logic_ch = d->rx_ordinal_to_logic[k];
+            if (logic_ch == 0xff)
+                continue;
+
+            unsigned hw_iter = d->hw_rxch_route[d->rx_lmap_info[logic_ch].hwport];
+            for (unsigned s = 0; s < (shared_lo_cfg_mode ? 2 : 1); s++) {
+                unsigned iter_hwid = shared_lo_cfg_mode ? iter_shared_lo_chans[iter_shared_selector[hwidx]][s] : hwidx;
+
+                if (iter_hwid == hw_iter) {
+                    uint8_t nchan = (ch_rxiq) ? d->rx_chans.ch_map[k] | CH_SWAP_IQ_FLAG : d->rx_chans.ch_map[k] & ~CH_SWAP_IQ_FLAG;
+                    if (nchan != d->rx_chans.ch_map[k]) {
+                        d->rx_chans.ch_map[k] = nchan;
+                        mod = true;
+                    }
                 }
             }
         }
         if (mod) {
             res = res ? res : d->rx->ops->option_set(d->rx, "chmap", (uintptr_t)&d->rx_chans);
         }
+
+        for (unsigned s = 0; s < (shared_lo_cfg_mode ? 2 : 1); s++) {
+            unsigned iter_hwid = shared_lo_cfg_mode ? iter_shared_lo_chans[iter_shared_selector[hwidx]][s] : hwidx;
+
+            for (unsigned j = 0; j < MAX_PORT_BANDS; j++) {
+                if (!d->rx_bxfc[iter_hwid][j].set)
+                    continue;
+
+                uint64_t freq_req = d->rx_bxfc[iter_hwid][j].value;
+                int64_t nco_offset = freq_req - chan_mid;
+                uint64_t freq_mod = ch_rxiq ? (ncoval - nco_offset) : (ncoval + nco_offset);
+
+                if (d->rx_raw_nco[iter_hwid][j].set && d->rx_raw_nco[iter_hwid][j].value == freq_mod)
+                    continue;
+
+                res = res ? res : d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_RX, iter_hwid, freq_mod / 1000, 0, j);
+                USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d => %c Band%d] F=%.3f RX_NCO=%.3f MID_F=%.3f\n",
+                         ord, iter_hwid + 'A', j, freq_req / 1.0e6, freq_mod / 1.0e6, chan_mid / 1.0e6);
+
+                opt_u64_set_val(&d->rx_raw_nco[iter_hwid][j], freq_mod);
+            }
+        }
+
+        return res;
     }
 
-    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] F=%.3f RX_NCO=%.3f\n", chno, freq / 1.0e6, ncoval / 1.0e6);
-    res = res ? res : d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_RX, chno, ncoval / 1000, 0, 0);
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d => %c Band%d] F=%.3f RX_NCO=%.3f\n", ord, hwidx + 'A', w->band, freq / 1.0e6, ncoval / 1.0e6);
+    res = res ? res : d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_RX, hwidx, ncoval / 1000, 0, w->band);
     return res;
 }
 
-static int dsdr_set_tx_frequency_chan(dev_m2_dsdr_t* d, uint64_t freq, unsigned chno)
+static int dsdr_set_tx_frequency_chan(dev_m2_dsdr_t* d, uint64_t freq, unsigned ord)
 {
-    opt_u64_set_val(& d->tx_freqs[chno], freq);
+    int res = 0;
+    opt_u64_set_val(& d->tx_ord_freqs[ord], freq);
     if (!d->tx_activated) {
         return 0;
     }
 
+    // Ordinal to logic converter
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, true, ord);
+    if (!w) {
+        return -EINVAL;
+    }
+    unsigned hwidx = d->hw_txch_route[w->hwport];
+
+    uint64_t ncoval = freq;
+    if (dev_m2_dsdr_has_hiper(d) && (hwidx < MAX_HIPER_FE_PORT)) {
+        bool ch_txiq;
+        bool mod = false;
+        const uint8_t iter_shared_lo_chans[2][2] = { { 0, 1 }, { 2, 3 } };
+        const uint8_t iter_shared_selector[4] = { 0, 0, 1, 1 };
+        uint64_t chan_mid = 0;
+        unsigned cnt = 0;
+        int res = 0;
+        const bool shared_lo_cfg_mode = true;
+
+        opt_u64_set_val(&d->tx_bxfc[hwidx][w->band], freq);
+
+        for (unsigned s = 0; s < (shared_lo_cfg_mode ? 2 : 1); s++) {
+            unsigned iter_hwid = shared_lo_cfg_mode ? iter_shared_lo_chans[iter_shared_selector[hwidx]][s] : hwidx;
+            for (unsigned j = 0; j < MAX_PORT_BANDS; j++) {
+                if (d->tx_bxfc[iter_hwid][j].set) {
+                    chan_mid += d->tx_bxfc[iter_hwid][j].value;
+                    cnt++;
+                }
+            }
+        }
+        chan_mid /= cnt;
+
+        for (unsigned s = 0; s < (shared_lo_cfg_mode ? 2 : 1); s++) {
+            unsigned iter_hwid = shared_lo_cfg_mode ? iter_shared_lo_chans[iter_shared_selector[hwidx]][s] : hwidx;
+            res = res ? res : dsdr_hiper_fe_tx_freq_set(&d->hiper, s_chanmap_hw_to_fe[iter_hwid], chan_mid, &ncoval, &ch_txiq);
+        }
+
+        if (res)
+            return res;
+
+        for (unsigned k = 0; k < d->logic_chcnt_tx; k++) {
+            uint8_t logic_ch = d->tx_ordinal_to_logic[k];
+            if (logic_ch == 0xff)
+                continue;
+
+            unsigned hw_iter = d->hw_txch_route[d->tx_lmap_info[logic_ch].hwport];
+            for (unsigned s = 0; s < (shared_lo_cfg_mode ? 2 : 1); s++) {
+                unsigned iter_hwid = shared_lo_cfg_mode ? iter_shared_lo_chans[iter_shared_selector[hwidx]][s] : hwidx;
+
+                if (iter_hwid == hw_iter) {
+                    uint8_t nchan = (ch_txiq) ? d->tx_chans.ch_map[k] | CH_SWAP_IQ_FLAG : d->tx_chans.ch_map[k] & ~CH_SWAP_IQ_FLAG;
+                    if (nchan != d->tx_chans.ch_map[k]) {
+                        d->tx_chans.ch_map[k] = nchan;
+                        mod = true;
+                    }
+                }
+            }
+        }
+        if (mod) {
+            res = res ? res : d->tx->ops->option_set(d->tx, "chmap", (uintptr_t)&d->tx_chans);
+        }
+
+        for (unsigned s = 0; s < (shared_lo_cfg_mode ? 2 : 1); s++) {
+            unsigned iter_hwid = shared_lo_cfg_mode ? iter_shared_lo_chans[iter_shared_selector[hwidx]][s] : hwidx;
+
+            for (unsigned j = 0; j < MAX_PORT_BANDS; j++) {
+                if (!d->tx_bxfc[iter_hwid][j].set)
+                    continue;
+
+                uint64_t freq_req = d->tx_bxfc[iter_hwid][j].value;
+                int64_t nco_offset = freq_req - chan_mid;
+                uint64_t freq_mod = ch_txiq ? (ncoval - nco_offset) : (ncoval + nco_offset);
+
+                if (d->tx_raw_nco[iter_hwid][j].set && d->tx_raw_nco[iter_hwid][j].value == freq_mod)
+                    continue;
+
+                res = res ? res : d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_TX, iter_hwid, freq_mod / 1000, 0, j);
+                USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d => %c Band%d] F=%.3f TX_NCO=%.3f MID_F=%.3f\n",
+                         ord, iter_hwid + 'A', j, freq_req / 1.0e6, freq_mod / 1.0e6, chan_mid / 1.0e6);
+
+                opt_u64_set_val(&d->tx_raw_nco[iter_hwid][j], freq_mod);
+            }
+        }
+
+        return res;
+    }
+
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d => %c Band%d] F=%.3f TX_NCO=%.3f\n", ord, hwidx + 'A', w->band, freq / 1.0e6, ncoval / 1.0e6);
+    res = res ? res : d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_TX, hwidx, ncoval / 1000, 0, w->band);
+    return res;
+#if 0
     uint64_t ncoval = freq;
     if (dev_m2_dsdr_has_hiper(d)) {
         bool ch_txiq;
@@ -850,6 +1080,7 @@ static int dsdr_set_tx_frequency_chan(dev_m2_dsdr_t* d, uint64_t freq, unsigned 
 
     USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] F=%.3f TX_NCO=%.3f\n", chno, freq / 1.0e6, ncoval / 1.0e6);
     return d->st.libcapi79xx_upd_nco(&d->st.capi, NCO_TX, chno, ncoval / 1000, 0, 0);
+#endif
 }
 
 int dev_m2_dsdr_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -859,7 +1090,7 @@ int dev_m2_dsdr_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/freqency", true);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/freqency", true);
 
     return dsdr_set_rx_frequency_chan(d, value, obj->full_path[1]);
 }
@@ -871,11 +1102,15 @@ int dev_m2_dsdr_sdr_rx_dsa_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/dsa", true);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/dsa", true);
 
     unsigned i = obj->full_path[1];
-    int res = d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, value);
-    return res;
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, true, i);
+    if (!w) {
+        return -EINVAL;
+    }
+
+    return d->st.libcapi79xx_set_dsa(&d->st.capi, w->dsp_type, d->hw_rxch_route[w->hwport], value);
 }
 
 int dev_m2_dsdr_sdr_tx_dsa_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -885,11 +1120,15 @@ int dev_m2_dsdr_sdr_tx_dsa_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/tx/dsa", false);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/tx/dsa", false);
 
     unsigned i = obj->full_path[1];
-    int res = d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_TX, i, value);
-    return res;
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, false, i);
+    if (!w) {
+        return -EINVAL;
+    }
+
+    return d->st.libcapi79xx_set_dsa(&d->st.capi, w->dsp_type, d->hw_txch_route[w->hwport], value);
 }
 
 
@@ -900,7 +1139,7 @@ int dev_m2_dsdr_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/tx/freqency", false);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/tx/freqency", false);
 
     return dsdr_set_tx_frequency_chan(d, value, obj->full_path[1]);
 }
@@ -912,17 +1151,23 @@ int dev_m2_dsdr_gain_rx_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t v
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/gain", false);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/gain", true);
 
     int res = 0;
     unsigned i = obj->full_path[1];
     unsigned dsa_attn = (value > 25) ? 0 : 50 - 2 * value;
     unsigned rem_gain = (value > 25) ? value - 25 : 0;
-
-    if (dev_m2_dsdr_has_hiper(d)) {
-        res = res ? res : dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[i], rem_gain, NULL);
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, true, i);
+    if (!w) {
+        return -EINVAL;
     }
-    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, dsa_attn);
+    unsigned hwidx = d->hw_rxch_route[w->hwport];
+
+    if (dev_m2_dsdr_has_hiper(d) && (hwidx < MAX_HIPER_FE_PORT)) {
+        res = res ? res : dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[hwidx], rem_gain, NULL);
+    }
+
+    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, w->dsp_type, hwidx, dsa_attn);
     return res;
 }
 
@@ -933,13 +1178,18 @@ int dev_m2_dsdr_gain_tx_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t v
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/tx/gain", false);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/tx/gain", false);
 
-    int res = 0;
     unsigned i = obj->full_path[1];
     unsigned dsa_attn = (value > 29) ? 0 : 29 - value;
-    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_TX, i, dsa_attn);
-    return res;
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, false, i);
+    if (!w) {
+        return -EINVAL;
+    }
+    unsigned hwidx = d->hw_txch_route[w->hwport];
+    return d->st.libcapi79xx_set_dsa(&d->st.capi, w->dsp_type, hwidx, dsa_attn);
+    //res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_TX, i, dsa_attn);
+    //return res;
 }
 
 int dev_m2_dsdr_gain_rx_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
@@ -949,17 +1199,23 @@ int dev_m2_dsdr_gain_rx_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint6
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/gain/auto", false);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/gain/auto", true);
 
     int res = 0;
     unsigned i = obj->full_path[1];
     unsigned dsa_attn = (value > 25) ? 0 : 50 - 2 * value;
     unsigned rem_gain = (value > 25) ? value - 25 : 0;
-
-    if (dev_m2_dsdr_has_hiper(d)) {
-        res = res ? res : dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[i], rem_gain, NULL);
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, true, i);
+    if (!w) {
+        return -EINVAL;
     }
-    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, dsa_attn);
+    unsigned hwidx = d->hw_rxch_route[w->hwport];
+
+    if (dev_m2_dsdr_has_hiper(d) && (hwidx < MAX_HIPER_FE_PORT)) {
+        res = res ? res : dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[hwidx], rem_gain, NULL);
+    }
+    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, w->dsp_type, hwidx, dsa_attn);
+    //res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, dsa_attn);
     return res;
 }
 
@@ -970,11 +1226,22 @@ int dev_m2_dsdr_gain_rx_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
         return -ENOTSUP;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/gain/lna", false);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/gain/lna", true);
 
     unsigned i = obj->full_path[1];
-    int res = dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[i], value, NULL);
-    return res;
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, true, i);
+    if (!w) {
+        return -EINVAL;
+    }
+    unsigned hwidx = d->hw_rxch_route[w->hwport];
+
+    if (dev_m2_dsdr_has_hiper(d) && (hwidx < MAX_HIPER_FE_PORT)) {
+        return dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[hwidx], value, NULL);
+    }
+
+    return -EINVAL;
+    //int res = dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[i], value, NULL);
+    //return res;
 }
 
 int dev_m2_dsdr_gain_rx_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -984,14 +1251,18 @@ int dev_m2_dsdr_gain_rx_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_chans(ud, obj, value, "/dm/sdr/0/rx/gain/pga", false);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/gain/pga", true);
 
     unsigned i = obj->full_path[1];
-    if (value > 25)
-        value = 25;
-
-    int res = d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, 50 - 2 * value);
-    return res;
+    unsigned dsa_attn = (value > 25) ? 0 : 50 - 2 * value;
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, true, i);
+    if (!w) {
+        return -EINVAL;
+    }
+    unsigned hwidx = d->hw_rxch_route[w->hwport];
+    return d->st.libcapi79xx_set_dsa(&d->st.capi, w->dsp_type, hwidx, dsa_attn);
+    //int res = d->st.libcapi79xx_set_dsa(&d->st.capi, NCO_RX, i, 50 - 2 * value);
+    //return res;
 }
 
 
@@ -1029,7 +1300,6 @@ static int dsdr_set_rates(dev_m2_dsdr_t* d, uint32_t rx_rate, uint32_t tx_rate)
         res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x2);
     }
 
-
     USDR_LOG("DSDR", USDR_LOG_ERROR, "Set rate: RX %.3f Mhz => %.3f (Decim: %d) -- TX %.3f Mhz => %.3f (Inter: %d)\n",
              rx_rate / 1.0e6, d->rxbb_rate / 1.0e6, d->rxbb_decim,
              tx_rate / 1.0e6, d->txbb_rate / 1.0e6, d->txbb_inter);
@@ -1053,16 +1323,6 @@ static int dsdr_set_rates(dev_m2_dsdr_t* d, uint32_t rx_rate, uint32_t tx_rate)
     if (rx_rate) {
         res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x0);
     }
-
-#if 0
-    for (int i = 0; i < 5; i++) {
-        uint32_t clk;
-        res = res ? res : dev_gpi_get32(d->base.dev, 20, &clk);
-
-        USDR_LOG("DSDR", USDR_LOG_ERROR, "Clk %d: %d\n", clk >> 28, clk & 0xfffffff);
-        usleep(0.5 * 1e6);
-    }
-#endif
 
     return res;
 }
@@ -1097,22 +1357,28 @@ static int dsdr_check_fpga_gtrx(dev_m2_dsdr_t* o)
     uint32_t fpga_jesd = ~0, fpga_err_0 = ~0, fpga_err_1 = ~0;
     unsigned delay;
     int res = 0;
-    res = res ? res : dev_gpi_get32(o->base.dev, IGPI_JESD_SYSREF_RAC, &fpga_jesd);
-    res = res ? res : dev_gpi_get32(o->base.dev, IGPI_JESD_FPGA_ERR_0, &fpga_err_0);
-    res = res ? res : dev_gpi_get32(o->base.dev, IGPI_JESD_FPGA_ERR_1, &fpga_err_1);
 
-    delay = (fpga_jesd >> 16) & 0x3ff;
-    USDR_LOG("DSDR", (fpga_err_0 != 0 || fpga_err_1 != 0) ? USDR_LOG_ERROR : USDR_LOG_INFO,
-             "FPGA JESD: SYSREF realign TX/RX = %08x Delay = %d PLL Locked %d BUFFER_OVERFLOW: %04x ERRS %04x %04x %04x %04x \n",
-             fpga_jesd & 0xff, delay, (fpga_jesd >> 26) & 3, fpga_jesd >> 28,
-             fpga_err_0 >> 16, fpga_err_0 & 0xffff, fpga_err_1 >> 16, fpga_err_1 & 0xffff);
+    for (unsigned q = 0; q < (o->jesd_x8 ? 2 : 1); q++) {
+        if (o->jesd_x8) {
+            res = res ? res : dev_gpo_set(o->base.dev, IGPO_TIAFE_MASTER_RESET_N, q == 0 ? 0x01 : 0x81);
+        }
 
-    USDR_LOG("DSDR", USDR_LOG_INFO, "FPGA JESD lanes:                     3   2   1   0\n");
-    USDR_LOG("DSDR", USDR_LOG_INFO, "Block Header errors:                %2d  %2d  %2d  %2d\n", (fpga_err_0 >> 12) & 0xf, (fpga_err_0 >> 8) & 0xf, (fpga_err_0 >> 4) & 0xf, (fpga_err_0 >> 0) & 0xf);
-    USDR_LOG("DSDR", USDR_LOG_INFO, "End of Multi-Block errors:          %2d  %2d  %2d  %2d\n", (fpga_err_0 >> 28) & 0xf, (fpga_err_0 >> 24) & 0xf, (fpga_err_0 >> 20) & 0xf, (fpga_err_0 >> 16) & 0xf);
-    USDR_LOG("DSDR", USDR_LOG_INFO, "End of Extended Multi-Block errors: %2d  %2d  %2d  %2d\n", (fpga_err_1 >> 12) & 0xf, (fpga_err_1 >> 8) & 0xf, (fpga_err_1 >> 4) & 0xf, (fpga_err_1 >> 0) & 0xf);
-    USDR_LOG("DSDR", USDR_LOG_INFO, "CRC mismatch errors:                %2d  %2d  %2d  %2d\n", (fpga_err_1 >> 28) & 0xf, (fpga_err_1 >> 24) & 0xf, (fpga_err_1 >> 20) & 0xf, (fpga_err_1 >> 16) & 0xf);
+        res = res ? res : dev_gpi_get32(o->base.dev, IGPI_JESD_SYSREF_RAC, &fpga_jesd);
+        res = res ? res : dev_gpi_get32(o->base.dev, IGPI_JESD_FPGA_ERR_0, &fpga_err_0);
+        res = res ? res : dev_gpi_get32(o->base.dev, IGPI_JESD_FPGA_ERR_1, &fpga_err_1);
 
+        delay = (fpga_jesd >> 16) & 0x3ff;
+        USDR_LOG("DSDR", (fpga_err_0 != 0 || fpga_err_1 != 0) ? USDR_LOG_ERROR : USDR_LOG_INFO,
+                 "FPGA JESD: SYSREF realign TX/RX = %08x Delay = %d PLL Locked %d BUFFER_OVERFLOW: %04x ERRS %04x %04x %04x %04x \n",
+                 fpga_jesd & 0xff, delay, (fpga_jesd >> 26) & 3, fpga_jesd >> 28,
+                 fpga_err_0 >> 16, fpga_err_0 & 0xffff, fpga_err_1 >> 16, fpga_err_1 & 0xffff);
+
+        USDR_LOG("DSDR", USDR_LOG_INFO, "FPGA JESD lanes:                     3   2   1   0\n");
+        USDR_LOG("DSDR", USDR_LOG_INFO, "Block Header errors:                %2d  %2d  %2d  %2d\n", (fpga_err_0 >> 12) & 0xf, (fpga_err_0 >> 8) & 0xf, (fpga_err_0 >> 4) & 0xf, (fpga_err_0 >> 0) & 0xf);
+        USDR_LOG("DSDR", USDR_LOG_INFO, "End of Multi-Block errors:          %2d  %2d  %2d  %2d\n", (fpga_err_0 >> 28) & 0xf, (fpga_err_0 >> 24) & 0xf, (fpga_err_0 >> 20) & 0xf, (fpga_err_0 >> 16) & 0xf);
+        USDR_LOG("DSDR", USDR_LOG_INFO, "End of Extended Multi-Block errors: %2d  %2d  %2d  %2d\n", (fpga_err_1 >> 12) & 0xf, (fpga_err_1 >> 8) & 0xf, (fpga_err_1 >> 4) & 0xf, (fpga_err_1 >> 0) & 0xf);
+        USDR_LOG("DSDR", USDR_LOG_INFO, "CRC mismatch errors:                %2d  %2d  %2d  %2d\n", (fpga_err_1 >> 28) & 0xf, (fpga_err_1 >> 24) & 0xf, (fpga_err_1 >> 20) & 0xf, (fpga_err_1 >> 16) & 0xf);
+    }
     return res;
 }
 
@@ -1285,7 +1551,7 @@ static int usdr_jesd204b_bringup_pre(struct dev_m2_dsdr *dd)
 {
     lldev_t dev = dd->base.dev;
     int res = 0;
-    uint32_t d;
+    uint32_t d = 0;
     bool pll_ready = false;
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_SYNC_RESET, 1);
@@ -1294,17 +1560,15 @@ static int usdr_jesd204b_bringup_pre(struct dev_m2_dsdr *dd)
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_BUFFER_RELDLY_0, 0); // 0 means autodetect and adjust
 
-    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_0, 0x10);
-    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_1, 0x32);
-
-    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_0, 0x10);
-    // res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_1, 0x32);
-
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_0, dd->cfg_rx_lanemap & 0xff);
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_1, (dd->cfg_rx_lanemap >> 8) & 0xff);
+    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_2, (dd->cfg_rx_lanemap >> 16) & 0xff);
+    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_MAP_3, (dd->cfg_rx_lanemap >> 24) & 0xff);
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_0, dd->cfg_tx_lanemap & 0xff);
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_1, (dd->cfg_tx_lanemap >> 8) & 0xff);
+    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_2, (dd->cfg_tx_lanemap >> 16) & 0xff);
+    res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_MAP_3, (dd->cfg_tx_lanemap >> 24) & 0xff);
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_POLARITY, 0x0);
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_POLARITY, 0x0);
@@ -1312,14 +1576,13 @@ static int usdr_jesd204b_bringup_pre(struct dev_m2_dsdr *dd)
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_LANE_ENABLED, dd->hw_fpga_jesd_rx_en);
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_LANE_ENABLED, dd->hw_fpga_jesd_tx_en);
 
-    usleep(1);
+    res = res ? res : usleep(1000);
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_MASTER_RESET_N, 1);
 
     for (unsigned k = 0; k < 100; k++) {
-        usleep(10000);
-
-        res = dev_gpi_get32(dev, IGPI_JESD_SYSREF_RAC, &d);
+        res = res ? res : usleep(10000);
+        res = res ? res : dev_gpi_get32(dev, IGPI_JESD_SYSREF_RAC, &d);
         USDR_LOG("DSDR", USDR_LOG_ERROR, "STAT = %08x\n", d);
         if (d & 0x08000000) {
             pll_ready = true;
@@ -1332,12 +1595,12 @@ static int usdr_jesd204b_bringup_pre(struct dev_m2_dsdr *dd)
         return -EIO;
     }
 
-    usleep(10000);
+    res = res ? res : usleep(100000); //TODO check
 
     // TODO wait for PLL to lock..
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_TX_SYNC_RESET, 0);
 
-    usleep(10000);
+    res = res ? res : usleep(10000);
 
     res = res ? res :dev_gpi_get32(dev, IGPI_JESD_SYSREF_RAC, &d);
     USDR_LOG("DSDR", USDR_LOG_ERROR, "STAT = %08x\n", d);
@@ -1351,9 +1614,7 @@ static int usdr_jesd204b_bringup_post(struct dev_m2_dsdr *dd)
     uint32_t d = 0;
 
     res = res ? res : dev_gpo_set(dev, IGPO_TIAFE_RX_SYNC_RESET, 0);
-
-    usleep(10000);
-
+    res = res ? res : usleep(10000);
     res = res ? res : dev_gpi_get32(dev, IGPI_JESD_SYSREF_RAC, &d);
     USDR_LOG("DSDR", USDR_LOG_ERROR, "STAT = %08x\n", d);
     return res;
@@ -1371,7 +1632,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     d->subdev = 0;
     d->dsdr_state = STATE_IDLE;
-    d->hw_mask_fb = 0;
+
     d->hw_mask_rx = 0xf; // RX_3 RX_2 RX_1 RX_0
     d->hw_mask_tx = 0xf; // TX_3 TX_2 TX_1 TX_0
     d->hw_fpga_jesd_rx_en = 0xf;
@@ -1396,13 +1657,76 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     if (getenv("DSDR_AFE7903")) {
         d->hw_mask_rx = 0x5; // RX_3 RX_1
         d->hw_mask_tx = 0xA; // TX_4 TX_2
-
-       // d->hw_fpga_jesd_rx_en = 0xc;
-       // d->hw_fpga_jesd_tx_en = 0xc;
     }
 
     devid = (hwid >> 16) & 0xff;
     jesdv = (hwid >> 8) & 0xff;
+    bool dpump_afe_clk = false;
+    bool jesd_x8 = false;
+    if (jesdv & 0x08) {
+        dpump_afe_clk = true;
+        jesdv ^= 0x08;
+    }
+
+    unsigned master_rate = 491520000;
+    unsigned maxusr_rate = 520000000;
+    unsigned jesd_cfg = (jesdv >> 4);
+    jesdv &= 0x0f;
+
+    switch (jesd_cfg) {
+    case JESD_MODE_4X_4X_491:
+        d->rx_chmap_info = s_dsdr_chmap_s_nco;
+        d->tx_chmap_info = s_dsdr_chmap_s_nco;
+        d->rx_lmap_info = s_dsdr_lmap_s_nco;
+        d->tx_lmap_info = s_dsdr_lmap_s_nco;
+
+        d->logic_chcnt_rx = 4;
+        d->logic_chcnt_tx = 4;
+        d->hw_chcnt_rx = 4;
+        d->hw_chcnt_tx = 4;
+        break;
+
+    case JESD_MODE_8X_8X_369:
+        d->rx_chmap_info = s_dsdr_chmap_d_nco;
+        d->tx_chmap_info = s_dsdr_chmap_d_nco;
+        d->rx_lmap_info = s_dsdr_lmap_d_nco;
+        d->tx_lmap_info = s_dsdr_lmap_d_nco;
+
+        d->logic_chcnt_rx = 8;
+        d->logic_chcnt_tx = 4; //TODO: recompile to 8!!!
+        d->hw_chcnt_rx = 4;
+        d->hw_chcnt_tx = 4;
+
+        master_rate = 368640000;
+        maxusr_rate = 380000000;
+
+        d->hw_fpga_jesd_rx_en = 0xff;
+        d->hw_fpga_jesd_tx_en = 0xff;
+        jesd_x8 = true;
+        break;
+
+    case JESD_MODE_8X_4X_491:
+        d->rx_chmap_info = s_dsdr_chmap_s_nco_fb;
+        d->tx_chmap_info = s_dsdr_chmap_s_nco;
+        d->rx_lmap_info = s_dsdr_lmap_s_nco_fb;
+        d->tx_lmap_info = s_dsdr_lmap_s_nco;
+
+        d->logic_chcnt_rx = 6; // a FB channels can occupy x2 lanes, but we support only x1 at the moment
+        d->logic_chcnt_tx = 4;
+        d->hw_chcnt_rx = 6;
+        d->hw_chcnt_tx = 4;
+
+        d->hw_fpga_jesd_rx_en = 0x3f;
+        jesd_x8 = true;
+        break;
+
+    default:
+        USDR_LOG("XDEV", USDR_LOG_ERROR, "Unsupported JESD_CFG=%d!\n", jesd_cfg);
+        return -EIO;
+    }
+
+    d->jesd_x8 = jesd_x8;
+
     switch (devid) {
     case DSDR_KCU116_EVM:
     case DSDR_M2_R0:
@@ -1410,10 +1734,6 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     case DSDR_PCIE_HIPER_R0:
         d->type = devid;
         break;
-
-    //case 0xff:
-    //    d->type = DSDR_PCIE_HIPER_R0;
-    //    break;
 
     default:
         USDR_LOG("XDEV", USDR_LOG_ERROR, "Unsupported HWID = %08x, skipping initialization!\n", hwid);
@@ -1428,7 +1748,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     d->cfg_rx_lanemap = 0x76543210;
     d->cfg_tx_lanemap = 0x76543210;
 
-    for (unsigned h = 0; h < 8; h++) {
+    for (unsigned h = 0; h < MAX_LOGIC_CHANS; h++) {
         d->hw_rxch_route[h] = h;
         d->hw_txch_route[h] = h;
     }
@@ -1436,49 +1756,72 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     afeType = 7901;
     switch (jesdv) {
     case DSDR_JESD204B_810_245:
-        d->max_rate = 260e6;
-        d->dac_rate = d->adc_rate = 245760000;
+        d->max_rate = maxusr_rate / 2;
+        d->dac_rate = d->adc_rate = master_rate / 2;
         d->afecongiguration = "Afe79xxPg1_02.txt";
         break;
 
     case DSDR_JESD204C_6664_245:
-        d->max_rate = 260e6;
-        d->dac_rate = d->adc_rate = 245760000;
+        d->max_rate = maxusr_rate / 2;
+        d->dac_rate = d->adc_rate = master_rate / 2;
         d->afecongiguration =  "Afe79xxPg1_6664_245.txt";
         break;
 
     case DSDR_JESD204C_6664_491:
-        d->cfg_rx_lanemap = 0x75643210;
-        d->cfg_tx_lanemap = 0x75643210;
+        d->max_rate = maxusr_rate;
+        d->dac_rate = d->adc_rate = master_rate;
 
-        d->max_rate = 520e6;
-        d->dac_rate = d->adc_rate = 491520000;
-        d->afecongiguration =  "Afe79xxPg1_6664_491.txt";
+        if (jesd_x8 == false && master_rate == 491520000) {
+            d->afecongiguration = "Afe79xxPg1_6664_491.txt";
+        } else if (jesd_x8 == true && master_rate == 368640000) {
+            d->afecongiguration = "Afe79xxPg1_6664_369_D.txt";
+        } else if (jesd_x8 == true && master_rate == 491520000) {
+            d->afecongiguration = "Afe79xxPg1_6664_491_fb3.txt";
+        }
 
         if (d->hw_mask_rx == 0x5 && d->hw_mask_tx == 0xA) {
             // RX C/A
             // TX D/B
             // d->afecongiguration = "Afe79xxPg1_dsdr_491_7903.txt";
+
             afeType = 7903;
 
-            d->cfg_rx_lanemap = 0x75643120;
-            d->cfg_tx_lanemap = 0x75642031;
-            //d->hw_fpga_jesd_rx_en = 0x3;
-            //d->hw_fpga_jesd_tx_en = 0xc;
+            d->hw_chcnt_rx = 2;
+            d->hw_chcnt_tx = 2;
+
+            d->cfg_rx_lanemap = 0x76543120;
+            d->cfg_tx_lanemap = 0x76542031;
 
             d->hw_rxch_route[0] = 0;
             d->hw_rxch_route[1] = 2;
             d->hw_rxch_route[2] = 1;
             d->hw_rxch_route[3] = 3;
+            d->hw_rxch_route[4] = 0;
+            d->hw_rxch_route[5] = 2;
+            d->hw_rxch_route[6] = 1;
+            d->hw_rxch_route[7] = 3;
+
             d->hw_txch_route[0] = 1;
             d->hw_txch_route[1] = 3;
             d->hw_txch_route[2] = 0;
             d->hw_txch_route[3] = 2;
+            d->hw_txch_route[4] = 1;
+            d->hw_txch_route[5] = 3;
+            d->hw_txch_route[6] = 0;
+            d->hw_txch_route[7] = 2;
         }
 
         if (getenv("DSDR_M2_7950")) {
+            if (master_rate != 491520000) {
+                USDR_LOG("XDEV", USDR_LOG_ERROR, "No configuration for 7950@369MSPS!\n");
+                return -EIO;
+            }
             // AFE7950
-            d->afecongiguration = "Afe79xxPg1_6664_491_7950.txt";
+            if (jesd_x8 == true) {
+                d->afecongiguration = "Afe79xxPg1_6664_491_7950_fb3.txt";
+            } else {
+                d->afecongiguration = "Afe79xxPg1_6664_491_7950.txt";
+            }
             afeType = 7950;
         }
         break;
@@ -1490,8 +1833,9 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     d->cfg_afe_type = afeType;
     d->jesdv = jesdv;
-    USDR_LOG("XDEV", USDR_LOG_ERROR, "Configuration: %s, Type: %d, AFE: %d, JESD204%c, CH_TX=%02x, CH_RX=%02x",
-             d->afecongiguration, d->type, d->cfg_afe_type, (jesdv == DSDR_JESD204B_810_245) ? 'B' : 'C', d->hw_mask_tx, d->hw_mask_rx);
+    USDR_LOG("XDEV", USDR_LOG_ERROR, "Configuration: %s, Type: %d, AFE: %d, JESD204%c, CH_TX=%02x, CH_RX=%02x JESDx%d",
+             d->afecongiguration, d->type, d->cfg_afe_type, (jesdv == DSDR_JESD204B_810_245) ? 'B' : 'C', d->hw_mask_tx, d->hw_mask_rx,
+             jesd_x8 ? 8 : 4);
 
     if (getenv("SKIPAFE")) {
         d->type = DSDR_KCU116_EVM;
@@ -1583,14 +1927,14 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 
     lmk05318_out_config_t lmk_out[8];
 
-    lmk05318_port_request(&lmk_out[0], 0,         491520000, false, OUT_OFF);
-    lmk05318_port_request(&lmk_out[1], 1,         491520000, false, LVDS);
+    lmk05318_port_request(&lmk_out[0], 0,       master_rate, false, OUT_OFF);
+    lmk05318_port_request(&lmk_out[1], 1,       master_rate, false, LVDS);
     lmk05318_port_request(&lmk_out[2], 2,           3840000, false, LVDS);
     lmk05318_port_request(&lmk_out[3], 3,           3840000, false, OUT_OFF);
     lmk05318_port_request(&lmk_out[4], 4,                 0, false, OUT_OFF);
     lmk05318_port_request(&lmk_out[5], 5,   d->dac_rate / 2, false, LVDS);
     lmk05318_port_request(&lmk_out[6], 6,           3840000, false, LVDS);
-    lmk05318_port_request(&lmk_out[7], 7,   d->dac_rate / 2, false, LVDS);
+    lmk05318_port_request(&lmk_out[7], 7,   dpump_afe_clk ? d->dac_rate : d->dac_rate / 2, false, LVDS);
 
     res = lmk05318_create(dev, d->subdev, I2C_LMK, (d->type == DSDR_PCIE_HIPER_R0) ? 52000000 : 26000000, XO_CMOS,
                           false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->lmk, false /*dry_run*/);
@@ -1711,7 +2055,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     // Test AFE chip
     USDR_LOG("DSDR", USDR_LOG_ERROR, "AFE is powered up!\n");
 
-    res = res ? res : usleep(100000);
+    res = res ? res : usleep(300000);
 
     res = res ? res : dev_gpo_set(dev, IGPO_AFE_RST, 0x0);
     res = res ? res : usleep(100000);
@@ -1727,8 +2071,8 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     if (res == 0) {
         res = res ? res : usdr_jesd204b_bringup_pre(d);
 
-        // sleep(1);
-        res = res ? res : usleep(10000);
+        // TODO accurate check GTH/GTY TX is up and running
+        res = res ? res : usleep(100000);
 
         char afeconfig_path[1024];
         char *afecfgpath = getenv("AFECFG_PATH");
@@ -1786,8 +2130,10 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
 int dev_m2_dsdr_sdr_rx_remap_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
-    for (unsigned i = 0; i < 4; i++) {
-        d->rx_logic_to_hw[i] = (value >> (2 * i)) & 0x3;
+    unsigned bits = (d->logic_chcnt_rx == 1) ? 0 : (d->logic_chcnt_rx == 2) ? 1 : (d->logic_chcnt_rx <= 4) ? 2 : 3;
+    unsigned mask = (1 << bits) - 1;
+    for (unsigned i = 0; i < d->logic_chcnt_rx; i++) {
+        d->rx_ordinal_to_logic[i] = (value >> (bits * i)) & mask;
     }
 
     return dsdr_update_rx_remap(d);
@@ -1796,9 +2142,11 @@ int dev_m2_dsdr_sdr_rx_remap_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
 int dev_m2_dsdr_sdr_rx_remap_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    unsigned bits = (d->logic_chcnt_rx == 1) ? 0 : (d->logic_chcnt_rx == 2) ? 1 : (d->logic_chcnt_rx <= 4) ? 2 : 3;
+    unsigned mask = (1 << bits) - 1;
     uint64_t remap = 0;
-    for (unsigned i = 0; i < 4; i++) {
-        remap |= (d->rx_logic_to_hw[i] & 0x3) << (2 * i);
+    for (unsigned i = 0; i < d->logic_chcnt_rx; i++) {
+        remap |= (d->rx_ordinal_to_logic[i] & mask) << (bits * i);
     }
 
     *ovalue = remap;
@@ -1808,60 +2156,43 @@ int dev_m2_dsdr_sdr_rx_remap_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ov
 int dev_m2_dsdr_sdr_tx_remap_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
-    for (unsigned i = 0; i < 4; i++) {
-        d->tx_hw_to_logic[i] = (value >> (2 * i)) & 0x3;
+    unsigned bits = (d->logic_chcnt_tx == 1) ? 0 : (d->logic_chcnt_tx == 2) ? 1 : (d->logic_chcnt_tx <= 4) ? 2 : 3;
+    unsigned mask = (1 << bits) - 1;
+    for (unsigned i = 0; i < d->logic_chcnt_tx; i++) {
+        d->tx_ordinal_to_logic[i] = (value >> (bits * i)) & mask;
     }
-
     return dsdr_update_tx_remap(d);
 }
+
 int dev_m2_dsdr_sdr_tx_remap_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    unsigned bits = (d->logic_chcnt_tx == 1) ? 0 : (d->logic_chcnt_tx == 2) ? 1 : (d->logic_chcnt_tx <= 4) ? 2 : 3;
+    unsigned mask = (1 << bits) - 1;
     uint64_t remap = 0;
-    for (unsigned i = 0; i < 4; i++) {
-        remap |= (d->tx_hw_to_logic[i] & 0x3) << (2 * i);
+    for (unsigned i = 0; i < d->logic_chcnt_tx; i++) {
+        remap |= (d->tx_ordinal_to_logic[i] & mask) << (bits * i);
     }
 
     *ovalue = remap;
     return 0;
 }
 
-char static dsdr_chan_name(uint8_t n)
+static const char* dsdr_chan_name(struct dev_m2_dsdr *d, bool rx, uint8_t logic_number)
 {
-    return n == 0xff ? '-' : 'a' + n;
+    const channel_map_info_t *nfo = rx ? d->rx_chmap_info : d->tx_chmap_info;
+    for (unsigned p = 0; p < 16; p++) {
+        if (nfo[p].name == NULL)
+            break;
+
+        if (nfo[p].hwidx == logic_number)
+            return nfo[p].name;
+    }
+
+    return "-";
 }
 
-char static dsdr_chan_num(uint8_t n)
-{
-    return n == 0xff ? '-' : '0' + n;
-}
-
-static const channel_map_info_t s_dsdr_chmap[] = {
-    // Single NCO mode
-    { "a", 0 },
-    { "b", 1 },
-    { "c", 2 },
-    { "d", 3 },
-
-    // Dual NCO mode
-    { "a0", 0 },
-    { "b0", 1 },
-    { "c0", 2 },
-    { "d0", 3 },
-    { "a1", 4 },
-    { "b1", 5 },
-    { "c1", 6 },
-    { "d1", 7 },
-
-    { NULL, CH_NULL },
-    };
-
-int dsdr_map_channels(const usdr_channel_info_t* channels, channel_info_t* core_chans)
-{
-    return usdr_channel_info_map_default(channels, s_dsdr_chmap, 4, core_chans);
-}
-
-int device_path_to_chmsk(const char* full_path, const char* basename, chmsk_t *hw_mask, chmsk_t *lg_mask)
+int device_path_to_chmsk(const char* full_path, const char* basename, const channel_map_info_t* map, const unsigned max_lchan, chmsk_t *hw_mask, chmsk_t *lg_mask)
 {
     *hw_mask = 0;
     *lg_mask = 0;
@@ -1899,7 +2230,7 @@ int device_path_to_chmsk(const char* full_path, const char* basename, chmsk_t *h
     }
 
     channel_info_t mmaped;
-    res = dsdr_map_channels(&nfo, &mmaped);
+    res = usdr_channel_info_map_default(&nfo, map, max_lchan, &mmaped);
     if (res)
         return res;
 
@@ -1911,7 +2242,7 @@ int device_path_to_chmsk(const char* full_path, const char* basename, chmsk_t *h
     return 0;
 }
 
-static int parse_overriden_cahnnel_info(const char* env_string, const usdr_channel_info_t* orig, channel_info_t* override)
+static int parse_overriden_cahnnel_info(const char* env_string, const usdr_channel_info_t* orig, const channel_map_info_t* map, const unsigned max_lchan, channel_info_t* override)
 {
     char chanlist[64*4];
     char* phys_names[DSDR_CHANS_LOGIC];
@@ -1931,7 +2262,7 @@ static int parse_overriden_cahnnel_info(const char* env_string, const usdr_chann
         return -EINVAL;
     }
 
-    res = dsdr_map_channels(&nfo, override);
+    res = usdr_channel_info_map_default(&nfo, map, max_lchan, override);
     return res;
 }
 
@@ -1949,53 +2280,72 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         return -EFAULT;
     }
 
-    res = dsdr_map_channels(channels, &lchans);
+    bool rx_str = strstr(sid, "rx") != NULL;
+    bool tx_str = strstr(sid, "tx") != NULL;
+    if (!rx_str && !tx_str) {
+        USDR_LOG("UDEV", USDR_LOG_ERROR, "DSDR Unrecognised stream: %s\n", sid);
+        return -EINVAL;
+    }
+
+    res = usdr_channel_info_map_default(channels,
+                                        rx_str ? d->rx_chmap_info : d->tx_chmap_info,
+                                        rx_str ? d->logic_chcnt_rx : d->logic_chcnt_tx, &lchans);
     if (res) {
         return res;
     }
-    if (channels->count > 4 || channels->count == 3) {
+    if (channels->count > 8 || channels->count == 3 || channels->count == 5 || channels->count == 7 || channels->count == 6) {
         USDR_LOG("UDEV", USDR_LOG_ERROR, "DSDR %s: Unsupported channel count: %d, valid are (1, 2, 4)\n", sid, channels->count);
         return -EINVAL;
     }
 
-    if (strstr(sid, "rx") != NULL) {
+    if (rx_str) {
         if (d->rx) {
             return -EBUSY;
         }
 
-        memset(d->rx_logic_to_hw, 0xff, sizeof(d->rx_logic_to_hw));
+        memset(d->rx_ordinal_to_logic, 0xff, sizeof(d->rx_ordinal_to_logic));
 
         const char* env_ch = getenv("DSDR_CH_RX");
         if (env_ch) {
-            res = parse_overriden_cahnnel_info(env_ch, channels, &lchans);
+            res = parse_overriden_cahnnel_info(env_ch, channels, d->rx_chmap_info, d->logic_chcnt_rx, &lchans);
             if (res)
                 return res;
             USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR RX channel mask is overriden to `%s`\n", env_ch);
         }
 
-        memcpy(d->rx_logic_to_hw, lchans.ch_map, sizeof(lchans.ch_map[0]) * channels->count);
-
+        memcpy(d->rx_ordinal_to_logic, lchans.ch_map, sizeof(lchans.ch_map[0]) * channels->count);
 
         d->hw_enabled_rx = 0;
+        d->logic_enabled_rx = 0;
         for (unsigned i = 0; i < channels->count; i++) {
-            unsigned hw = d->rx_logic_to_hw[i];
-            if (hw >= DSDR_CHANS_HW) {
+            unsigned logic = d->rx_ordinal_to_logic[i];
+            unsigned hw = d->rx_lmap_info[logic].hwport;
+            if (hw >= d->hw_chcnt_rx) {
+                USDR_LOG("UDEV", USDR_LOG_ERROR, "Stream RX: Logical channel %d incorrectly mmaped to HW %d\n", i, hw);
                 return -EINVAL;
             }
 
             d->hw_enabled_rx |= (1ull << hw);
+            d->logic_enabled_rx |= (1ull << logic);
         }
 
         res = res ? res : dsdr_update_rx_remap(d);
-        USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR RX channels %d remmaped: [%c, %c, %c, %c] mux, hw_mask %02x\n", channels->count,
-                 dsdr_chan_name(d->rx_logic_to_hw[0]), dsdr_chan_name(d->rx_logic_to_hw[1]),
-                 dsdr_chan_name(d->rx_logic_to_hw[2]), dsdr_chan_name(d->rx_logic_to_hw[3]), d->hw_enabled_rx);
+        USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR RX channels %d remmaped: [%s, %s, %s, %s -- %s, %s, %s, %s] mux, hw_mask %02x logic_mask %02x\n", channels->count,
+                 dsdr_chan_name(d, true, 0), dsdr_chan_name(d, true, 1),
+                 dsdr_chan_name(d, true, 2), dsdr_chan_name(d, true, 3),
+                 dsdr_chan_name(d, true, 4), dsdr_chan_name(d, true, 5),
+                 dsdr_chan_name(d, true, 6), dsdr_chan_name(d, true, 7),
+                 d->hw_enabled_rx, d->logic_enabled_rx);
 
-        uint64_t v;
+        uint64_t v0, v1;
         for (unsigned ch = 0; ch < 4; ch++) {
-            d->st.libcapi79xx_get_nco(&d->st.capi, NCO_RX, ch, &v, 0, 0);
-
-            USDR_LOG("UDEV", USDR_LOG_INFO, "RX NCO[%d] = %lld\n", ch, (long long)v);
+            d->st.libcapi79xx_get_nco(&d->st.capi, NCO_RX, ch, &v0, 0, 0);
+            d->st.libcapi79xx_get_nco(&d->st.capi, NCO_RX, ch, &v1, 0, 1);
+            USDR_LOG("UDEV", USDR_LOG_INFO, "RX NCO[%d] = %lld | NCO[%d] = %lld \n", ch, (long long)v0, ch, (long long)v1);
+        }
+        for (unsigned ch = 0; ch < 2; ch++) {
+            d->st.libcapi79xx_get_nco(&d->st.capi, NCO_FB, ch, &v0, 0, 0);
+            USDR_LOG("UDEV", USDR_LOG_INFO, "FB NCO[%d] = %lld \n", ch, (long long)v0);
         }
 
         struct sfetrx4_config rxcfg;
@@ -2009,9 +2359,10 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         usleep(1000);
         res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x0);
 
-        res = (res) ? res : create_sfetrx4_stream(dev, CORE_EXFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE, 0,
-                                    SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
+        res = (res) ? res : create_sfetrx4_stream(dev, (d->logic_chcnt_rx == 8 || d->logic_chcnt_rx == 6) ? CORE_EXFERX_DMA32_R0_8 : CORE_EXFERX_DMA32_R0,
+                                                  dformat, channels->count, &lchans, pktsyms,
+                                                  flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE, 0,
+                                                  SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
         if (res) {
             return res;
         }
@@ -2020,9 +2371,9 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         d->rx_chans = lchans;
 
         // Restore cached parameters we couldn't set before activating streams
-        for (unsigned i = 0; i < SIZEOF_ARRAY(d->rx_freqs); i++) {
-            if (d->rx_freqs[i].set && (d->hw_enabled_rx & (1u << i))) {
-                res = (res) ? res : dsdr_set_rx_frequency_chan(d, d->rx_freqs[i].value, i);
+        for (unsigned i = 0; i < SIZEOF_ARRAY(d->rx_ord_freqs); i++) {
+            if (d->rx_ord_freqs[i].set && (d->hw_enabled_rx & (1u << i))) {
+                res = (res) ? res : dsdr_set_rx_frequency_chan(d, d->rx_ord_freqs[i].value, i);
             }
         }
 
@@ -2031,38 +2382,53 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         //res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_RX_CHEN, 0x0);
 
         *out_handle = d->rx;
-    } else if (strstr(sid, "tx") != NULL) {
+    } else {
         if (d->tx) {
             return -EBUSY;
-        }
-
-        d->hw_enabled_tx = 0;
-        memset(d->tx_hw_to_logic, 0xff, sizeof(d->tx_hw_to_logic));
+        }        
+        memset(d->tx_ordinal_to_logic, 0xff, sizeof(d->tx_ordinal_to_logic));
 
         const char* env_ch = getenv("DSDR_CH_TX");
         if (env_ch) {
-            res = parse_overriden_cahnnel_info(env_ch, channels, &lchans);
+            res = parse_overriden_cahnnel_info(env_ch, channels, d->tx_chmap_info, d->logic_chcnt_tx, &lchans);
             if (res)
                 return res;
             USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR TX channel mask is overriden to `%s`\n", env_ch);
         }
 
+        memcpy(d->tx_ordinal_to_logic, lchans.ch_map, sizeof(lchans.ch_map[0]) * channels->count);
+
+        //memset(d->tx_hw_to_logic, 0xff, sizeof(d->tx_hw_to_logic));
+
+        d->hw_enabled_tx = 0;
+        d->logic_enabled_tx = 0;
+
         for (unsigned i = 0; i < channels->count; i++) {
-            unsigned hw = lchans.ch_map[i];
-            if (hw >= DSDR_CHANS_HW) {
+            unsigned logic = d->tx_ordinal_to_logic[i];
+            unsigned hw = d->tx_lmap_info[logic].hwport;
+            if (hw >= d->hw_chcnt_tx) {
+                USDR_LOG("UDEV", USDR_LOG_ERROR, "Stream TX: Logical channel %d incorrectly mmaped to HW %d\n", i, hw);
                 return -EINVAL;
             }
 
-            d->tx_hw_to_logic[hw] = i;
             d->hw_enabled_tx |= (1ull << hw);
-        }
+            d->logic_enabled_tx |= (1ull << logic);
 
+
+            //d->tx_hw_to_logic[hw] = i;
+        }
 
         // Map as single channel only
         res = res ? res : dsdr_update_tx_remap(d);
-        USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR TX channels %d remmaped: [A <= %c, B <= %c, C <= %c, D <= %c] mux, hw_mask %02x\n",
-                 channels->count, dsdr_chan_num(d->tx_hw_to_logic[0]), dsdr_chan_num(d->tx_hw_to_logic[1]),
-                 dsdr_chan_num(d->tx_hw_to_logic[2]), dsdr_chan_num(d->tx_hw_to_logic[3]), d->hw_enabled_tx);
+        USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR TX channels %d remmaped: [%s, %s, %s, %s -- %s, %s, %s, %s] mux, hw_mask %02x logic_mask %02x\n", channels->count,
+                 dsdr_chan_name(d, false, 0), dsdr_chan_name(d, false, 1),
+                 dsdr_chan_name(d, false, 2), dsdr_chan_name(d, false, 3),
+                 dsdr_chan_name(d, false, 4), dsdr_chan_name(d, false, 5),
+                 dsdr_chan_name(d, false, 6), dsdr_chan_name(d, false, 7),
+                 d->hw_enabled_tx, d->logic_enabled_tx);
+        // USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR TX channels %d remmaped: [A <= %c, B <= %c, C <= %c, D <= %c] mux, hw_mask %02x\n",
+        //          channels->count, dsdr_chan_num(d->tx_hw_to_logic[0]), dsdr_chan_num(d->tx_hw_to_logic[1]),
+        //          dsdr_chan_num(d->tx_hw_to_logic[2]), dsdr_chan_num(d->tx_hw_to_logic[3]), d->hw_enabled_tx);
 
         struct sfetrx4_config txcfg;
         res = (res) ? res : parse_sfetrx4(dformat, &lchans, pktsyms, channels->count, &txcfg);
@@ -2075,7 +2441,8 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         usleep(1000);
         res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_TX_RST, 0x0);
 
-        res = (res) ? res : create_sfetrx4_stream(dev, CORE_EXFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
+        res = (res) ? res : create_sfetrx4_stream(dev, (d->logic_chcnt_tx == 8) ? CORE_EXFETX_DMA32_R0_8 : CORE_EXFETX_DMA32_R0,
+                                                  dformat, channels->count, &lchans, pktsyms,
                                                   flags | DMS_DONT_CHECK_FWID,
                                                   M2PCI_REG_WR_TXDMA_CFG0,
                                                   M2PCI_REG_WR_SYNC_CTRL,
@@ -2089,9 +2456,9 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
         d->tx_chans = lchans;
 
         // Restore cached parameters we couldn't set before activating streams
-        for (unsigned i = 0; i < SIZEOF_ARRAY(d->tx_freqs); i++) {
-            if (d->tx_freqs[i].set && (d->hw_enabled_tx & (1u << i))) {
-                res = (res) ? res : dsdr_set_tx_frequency_chan(d, d->tx_freqs[i].value, i);
+        for (unsigned i = 0; i < SIZEOF_ARRAY(d->tx_ord_freqs); i++) {
+            if (d->tx_ord_freqs[i].set && (d->hw_enabled_tx & (1u << i))) {
+                res = (res) ? res : dsdr_set_tx_frequency_chan(d, d->tx_ord_freqs[i].value, i);
             }
         }
 
@@ -2173,21 +2540,36 @@ int usdr_device_m2_dsdr_create(lldev_t dev, device_id_t devid)
     d->hw_enabled_rx = 0;
     d->hw_mask_tx = 0;
     d->hw_mask_rx = 0;
-    d->hw_mask_fb = 0;
+
+    d->logic_enabled_rx = 0;
+    d->logic_enabled_tx = 0;
 
     d->hw_fpga_jesd_rx_en = 0;
     d->hw_fpga_jesd_tx_en = 0;
 
-    memset(d->rx_logic_to_hw, 0xff, sizeof(d->rx_logic_to_hw));
-    memset(d->tx_hw_to_logic, 0xff, sizeof(d->tx_hw_to_logic));
+    memset(d->rx_ordinal_to_logic, 0xff, sizeof(d->rx_ordinal_to_logic));
+    memset(d->tx_ordinal_to_logic, 0xff, sizeof(d->tx_ordinal_to_logic));
+    //memset(d->tx_hw_to_logic, 0xff, sizeof(d->tx_hw_to_logic));
 
     d->tx_activated = false;
     d->rx_activated = false;
 
-    for (unsigned i = 0; i < SIZEOF_ARRAY(d->rx_freqs); i++) {
-        opt_u64_set_null(&d->rx_freqs[i]);
-        opt_u64_set_null(&d->tx_freqs[i]);
+    for (unsigned i = 0; i < SIZEOF_ARRAY(d->rx_ord_freqs); i++) {
+        opt_u64_set_null(&d->rx_ord_freqs[i]);
+        opt_u64_set_null(&d->tx_ord_freqs[i]);
     }
+
+    for (unsigned i = 0; i < MAX_HIPER_FE_PORT; i++) {
+        for (unsigned j = 0; j < MAX_PORT_BANDS; j++) {
+            opt_u64_set_null(&d->rx_bxfc[i][j]);
+            opt_u64_set_null(&d->tx_bxfc[i][j]);
+
+            opt_u64_set_null(&d->rx_raw_nco[i][j]);
+            opt_u64_set_null(&d->tx_raw_nco[i][j]);
+
+        }
+    }
+
 
     d->type = DSDR_PCIE_HIPER_R0;
     dev->pdev = &d->base;
