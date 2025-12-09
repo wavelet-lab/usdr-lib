@@ -32,6 +32,8 @@ set(TEST_SUIT_SRCS
     conv_ci12_4ci16_utest.c
     conv_2ci16_ci12_utest.c
     conv_4ci16_ci12_utest.c
+    conv_ci16_6ci16_utest.c
+    conv_ci16_6cf32_utest.c
 
     ../fft_window_functions.c
     ../fftad_functions.c
@@ -61,6 +63,8 @@ set(TEST_SUIT_SRCS
     ../conv_ci12_4ci16_2.c
     ../conv_2ci16_ci12_2.c
     ../conv_4ci16_ci12_2.c
+    ../conv_ci16_6ci16_2.c
+    ../conv_ci16_6cf32_2.c
     ../vbase.c
 )
 

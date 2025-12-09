@@ -82,6 +82,13 @@ void tr_##conv_fn (const void *__restrict *__restrict indata, \
                       unsigned outdatabsz) \
    { conv_fn(indata[0], indata[1], indata[2], indata[3], indatabsz, outdata[0], outdatabsz); }
 
+#define DECLARE_TR_FUNC_1_6(conv_fn) \
+    void tr_##conv_fn (const void *__restrict *__restrict indata, \
+                  unsigned indatabsz, \
+                  void *__restrict *__restrict outdata, \
+                  unsigned outdatabsz) \
+   { conv_fn(*indata, indatabsz, outdata[0], outdata[1], outdata[2], outdata[3], outdata[4], outdata[5], outdatabsz); }
+
 
 typedef void (*sincos_i16_interleaved_ctrl_function_t)(int32_t *__restrict start_phase,
                                 int32_t delta_phase, int16_t gain, bool inv_sin, bool inv_cos,

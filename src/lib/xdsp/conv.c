@@ -28,6 +28,9 @@
 #include "conv_2ci16_ci12_2.h"
 #include "conv_4ci16_ci12_2.h"
 
+#include "conv_ci16_6ci16_2.h"
+#include "conv_ci16_6cf32_2.h"
+
 #include "conv_ci16_8cf32_2.h"
 #include "conv_ci16_8ci16_2.h"
 
@@ -140,6 +143,22 @@ transform_info_t get_transform_fn(const char* from,
         {
             transform_info_t l_conv_ci16_8ci16 = { conv_get_ci16_8ci16(), tr_dummy_sz };
             return l_conv_ci16_8ci16;
+        }
+    }
+
+    /* Interleave 1 -> 6 */
+    if(inveccnt == 1 && outveccnt == 6)
+    {
+        if(isCI16(from) && isCI16(to))
+        {
+            transform_info_t l_conv_ci16_6ci16 = { conv_get_ci16_6ci16(), tr_dummy_sz };
+            return l_conv_ci16_6ci16;
+        }
+
+        if(isCI16(from) && isCF32(to))
+        {
+            transform_info_t l_conv_ci16_6cf32 = { conv_get_ci16_6cf32(), tr_conv_i16_f32_sz };
+            return l_conv_ci16_6cf32;
         }
     }
 
