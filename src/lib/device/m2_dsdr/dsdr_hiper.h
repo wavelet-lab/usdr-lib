@@ -3,6 +3,7 @@
 
 #include "../device.h"
 #include "../hw/lms8001/lms8001.h"
+#include "../dev_param.h"
 
 #define HIPER_MAX_HW_CHANS 4
 
@@ -106,6 +107,9 @@ struct dsdr_hiper_fe {
     uint32_t lms8st_iq_gen;
     uint32_t lms8st_int_mod;
     uint32_t lms8st_enabled;
+
+    // Cached LO values
+    opt_u64_t lms8_lo[6];
 
     // High level control
     fe_chan_config_t ucfg[HIPER_MAX_HW_CHANS];

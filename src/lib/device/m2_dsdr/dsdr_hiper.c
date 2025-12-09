@@ -865,6 +865,8 @@ int dsdr_hiper_fe_create(lldev_t dev, unsigned int spix_num, unsigned* plms8_mpw
     // LMS8
     unsigned lms8_mask = (plms8_mpw_mask) ? *plms8_mpw_mask : (dfe->rev == HIPER_REV2) ? 0b001100 : 0;
     for (unsigned k = 0; k < 6; k++) {
+        opt_u64_set_null(&dfe->lms8_lo[k]);
+
         uint32_t cfg = MAKE_SPIEXT_LSOPADR(MAKE_SPIEXT_CFG(LMS8_BCNTZ, k, LMS8_DIV), 0, spix_num);
         res = res ? res : dsdr_hiper_initialize_lms8(dfe, cfg, (lms8_mask >> k) & 1, &dfe->lms8[k]);
     }
@@ -1686,6 +1688,7 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxi
 
     if (high_path) {
         unsigned zeroes[4] = {0, 0, 0, 0};
+        opt_u64_set_null(&def->lms8_lo[idx_off]);
         res = res ? res : lms8001a_ch_enable(&def->lms8[idx_off], 0x0, zeroes, zeroes);
         res = res ? res : lms8001_ch_enable(&def->lms8[idx], chmsk);
     } else if ((def->rev == HIPER_REV2) && ((rxpath & 0x3) == RXBAND_OPTS_BAND_1580_2760_BP)) {
@@ -1695,7 +1698,10 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxi
         res = res ? res : lms8001_ch_enable(&def->lms8[idx_off], 0x0);
         res = res ? res : lms8001a_ch_enable(&def->lms8[idx], 0, lnas, pas);
 
-        def->ucfg[chno].rx_nco = 0;
+        opt_u64_set_null(&def->lms8_lo[idx_off]);
+        opt_u64_set_null(&def->lms8_lo[idx]);
+
+        def->ucfg[chno].rx_nco = def->ucfg[chno].rx_freq;
 
         *p_path = rxpath;
         *p_swap_rxiq = 0;
@@ -1709,11 +1715,20 @@ int dsdr_hiper_fe_rxlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_rxi
         convert_lms8_gains_to_loss(def, (chno & 1) ? chno - 0 : chno + 1, pas + 3, lnas + 3);
         convert_lms8_gains_to_loss(def, (chno & 1) ? chno - 1 : chno + 0, pas + 2, lnas + 2);
 
+        opt_u64_set_null(&def->lms8_lo[idx_off]);
         res = res ? res : lms8001_ch_enable(&def->lms8[idx_off], 0x0);
         res = res ? res : lms8001a_ch_enable(&def->lms8[idx], chmsk, lnas, pas);
     }
 
-    res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
+    if (def->lms8_lo[idx].set && def->lms8_lo[idx].value == fLO) {
+        USDR_LOG("HIPR", USDR_LOG_INFO, "HIPER_LMS8_%s: CH[%d] LMS[%d] LO Setup skipped\n",
+                 s_lms8_names[idx], chno, idx);
+    } else {
+        res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
+        if (res == 0) {
+            opt_u64_set_val(&def->lms8_lo[idx], fLO);
+        }
+    }
 
     def->ucfg[chno].rx_nco = fIF;
     *p_swap_rxiq = (fLOh) ? 1 : 0;
@@ -1737,7 +1752,7 @@ int dsdr_hiper_fe_txlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_txi
         high_path = (def->ucfg[chno].tx_freq < 3500e6) ? false : true;
     }
 
-    uint64_t fIF = (high_path) ? 1875e6 : def->ucfg[chno].tx_freq;
+    uint64_t fIF = 1875e6; // (high_path) ? 1875e6 : def->ucfg[chno].tx_freq;
     uint64_t fLO = (high_path) ? def->ucfg[chno].tx_freq + fIF : 0;
 
     unsigned idx = get_lms8_tx_idx(chno);
@@ -1745,14 +1760,24 @@ int dsdr_hiper_fe_txlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_txi
                          (def->ucfg[chno].tx_en << 3) | (def->ucfg[chno - 1].tx_en << 2) :
                          (def->ucfg[chno + 1].tx_en << 3) | (def->ucfg[chno].tx_en << 2);
 
-
     res = res ? res : lms8001_core_enable(&def->lms8[idx], high_path);
     res = res ? res : lms8001_ch_enable(&def->lms8[idx], high_path ? chmsk : 0);
     if (fLO > 0) {
-        res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
+        if (def->lms8_lo[idx].set && def->lms8_lo[idx].value == fLO) {
+            USDR_LOG("HIPR", USDR_LOG_INFO, "HIPER_LMS8_%s: CH[%d] LMS[%d] LO Setup skipped\n",
+                     s_lms8_names[idx], chno, idx);
+        } else {
+            res = res ? res : dsdr_hiper_fe_lms8_set_lo(def, idx, fLO);
+            if (res == 0) {
+                opt_u64_set_val(&def->lms8_lo[idx], fLO);
+            }
+        }
+        def->ucfg[chno].tx_nco = fIF;
+    } else {
+        opt_u64_set_null(&def->lms8_lo[idx]);
+        def->ucfg[chno].tx_nco = def->ucfg[chno].tx_freq;
     }
 
-    def->ucfg[chno].tx_nco = fIF;
     *p_swap_txiq = high_path;
     *p_high_path = high_path;
 
