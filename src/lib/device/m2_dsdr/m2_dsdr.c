@@ -277,6 +277,7 @@ const usdr_dev_param_constant_t s_params_m2_dsdr_rev000[] = {
 
 static int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_dsdr_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_dsdr_rate_m_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 static int dev_m2_dsdr_rx_enchan(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_dsdr_tx_enchan(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -353,7 +354,7 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/ll/sdr/max_sw_tx_chans",  { NULL, dev_m2_dsdr_ltxnumchans_get } },
 
     { "/dm/rate/master",          { dev_m2_dsdr_rate_set, NULL }},
-    { "/dm/rate/rxtxadcdac",      { dev_m2_dsdr_rate_m_set, NULL }},
+    { "/dm/rate/rxtxadcdac",      { dev_m2_dsdr_rate_m_set, dev_m2_dsdr_rate_m_get }},
 
     { "/dm/sdr/0/rx_enchan",      { dev_m2_dsdr_rx_enchan, NULL }},
     { "/dm/sdr/0/tx_enchan",      { dev_m2_dsdr_tx_enchan, NULL }},
@@ -481,7 +482,7 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
 
 // HIPER FE channel map table
 static const uint8_t s_chanmap_hw_to_fe[MAX_HIPER_FE_PORT] = { 2, 3, 1, 0 };
-static const uint8_t s_chanmap_fe_to_hw[MAX_HIPER_FE_PORT] = { 3, 2, 0, 1 };
+// static const uint8_t s_chanmap_fe_to_hw[MAX_HIPER_FE_PORT] = { 3, 2, 0, 1 };
 
 enum DSDR_STATE {
     STATE_IDLE = 0,
@@ -968,7 +969,7 @@ static int dsdr_set_tx_frequency_chan(dev_m2_dsdr_t* d, uint64_t freq, unsigned 
     }
 
     // Ordinal to logic converter
-    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, true, ord);
+    const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, false, ord);
     if (!w) {
         return -EINVAL;
     }
@@ -1292,39 +1293,44 @@ static int dsdr_set_rates(dev_m2_dsdr_t* d, uint32_t rx_rate, uint32_t tx_rate)
             break;
     }
 
+    if (d->tx_activated && tx_inters[i] == 0) {
+        i = j;
+    }
+
     d->rxbb_rate = d->adc_rate / rx_decims[i];
     d->rxbb_decim = rx_decims[i];
 
     d->txbb_rate = tx_inters[i] == 0 ? 0 : d->dac_rate / tx_inters[i];
     d->txbb_inter = tx_inters[i];
 
-    // Reset FIFO after rate change
-    if (rx_rate) {
-        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x2);
-    }
 
     USDR_LOG("DSDR", USDR_LOG_ERROR, "Set rate: RX %.3f Mhz => %.3f (Decim: %d) -- TX %.3f Mhz => %.3f (Inter: %d)\n",
              rx_rate / 1.0e6, d->rxbb_rate / 1.0e6, d->rxbb_decim,
              tx_rate / 1.0e6, d->txbb_rate / 1.0e6, d->txbb_inter);
 
-    res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim, DSP_USSERIES);
-    if (res) {
-        USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize decimation FIR gearbox, error = %d!\n", res);
-        return res;
-    }
+    // Reset FIFO after rate change
+    if (rx_rate) {
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x2);
+        res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSPCHAIN_PRG, (fgearbox_firs_t)d->rxbb_decim, DSP_USSERIES);
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x0);
 
-    if (d->txbb_inter > 0) {
-        d->txbb_rate = d->dac_rate / d->txbb_inter;
-
-        res = (res) ? res : fgearbox_load_fir_i(d->base.dev, IGPO_DSPCHAIN_TX_PRG, (fgearbox_firs_t)d->txbb_inter, DSP_USSERIES);
         if (res) {
-            USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize interpolation FIR gearbox, error = %d!\n", res);
+            USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize decimation RX FIR gearbox, error = %d!\n", res);
             return res;
         }
     }
 
-    if (rx_rate) {
-        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_RST, 0x0);
+    if (tx_rate && (d->txbb_inter > 0)) {
+        d->txbb_rate = d->dac_rate / d->txbb_inter;
+
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_TX_RST, 0x2);
+        res = (res) ? res : fgearbox_load_fir_i(d->base.dev, IGPO_DSPCHAIN_TX_PRG, (fgearbox_firs_t)d->txbb_inter, DSP_USSERIES);
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSPCHAIN_TX_RST, 0x0);
+
+        if (res) {
+            USDR_LOG("LSDR", USDR_LOG_ERROR, "Unable to initialize interpolation TX FIR gearbox, error = %d!\n", res);
+            return res;
+        }
     }
 
     return res;
@@ -1348,6 +1354,18 @@ int dev_m2_dsdr_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     return dsdr_set_rates(d, rx_rate, tx_rate);
 }
 
+int dev_m2_dsdr_rate_m_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    uint32_t *rates = (uint32_t *)(uintptr_t)*ovalue;
+
+    rates[0] = d->rxbb_rate;
+    rates[1] = d->txbb_rate;
+    rates[2] = d->adc_rate;
+    rates[3] = d->dac_rate;
+
+    return 0;
+}
 
 int dev_m2_dsdr_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -2388,7 +2406,7 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
 
         // Restore cached parameters we couldn't set before activating streams
         for (unsigned i = 0; i < SIZEOF_ARRAY(d->rx_ord_freqs); i++) {
-            if (d->rx_ord_freqs[i].set && (d->hw_enabled_rx & (1u << i))) {
+            if (d->rx_ord_freqs[i].set && (d->logic_enabled_rx & (1u << i))) {
                 res = (res) ? res : dsdr_set_rx_frequency_chan(d, d->rx_ord_freqs[i].value, i);
             }
         }
@@ -2473,7 +2491,7 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
 
         // Restore cached parameters we couldn't set before activating streams
         for (unsigned i = 0; i < SIZEOF_ARRAY(d->tx_ord_freqs); i++) {
-            if (d->tx_ord_freqs[i].set && (d->hw_enabled_tx & (1u << i))) {
+            if (d->tx_ord_freqs[i].set && (d->logic_enabled_rx & (1u << i))) {
                 res = (res) ? res : dsdr_set_tx_frequency_chan(d, d->tx_ord_freqs[i].value, i);
             }
         }
