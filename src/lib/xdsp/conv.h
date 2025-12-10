@@ -54,6 +54,13 @@ typedef void (*filter_function_t)(const int16_t *__restrict data,
                        unsigned outdatabsz) \
    { conv_fn(*indata, indatabsz, outdata[0], outdata[1], outdatabsz); }
 
+#define DECLARE_TR_FUNC_1_3(conv_fn) \
+void tr_##conv_fn (const void *__restrict *__restrict indata, \
+                  unsigned indatabsz, \
+                  void *__restrict *__restrict outdata, \
+                  unsigned outdatabsz) \
+{ conv_fn(*indata, indatabsz, outdata[0], outdata[1], outdata[2], outdatabsz); }
+
 #define DECLARE_TR_FUNC_1_4(conv_fn) \
     void tr_##conv_fn (const void *__restrict *__restrict indata, \
                        unsigned indatabsz, \
