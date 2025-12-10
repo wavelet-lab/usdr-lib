@@ -36,6 +36,10 @@
 
 #include "conv_ci16_3cf32_2.h"
 
+#include "conv_3cf32_ci16_2.h"
+#include "conv_3ci16_ci16_2.h"
+
+
 #include <strings.h>
 #include <string.h>
 
@@ -248,6 +252,21 @@ transform_info_t get_transform_fn(const char* from,
             transform_info_t l_conv_2ci16_ci12 = { conv_get_2ci16_ci12(), tr_conv_i16_i12_sz };
             return l_conv_2ci16_ci12;
         }
+    }
+
+    /* Deinterleave 3 -> 1 */
+    if(inveccnt == 3 && outveccnt == 1)
+    {
+        if (isCF32(from) && isCI16(to)) {
+            transform_info_t l_conv_3cf32_ci16 = { conv_get_3cf32_ci16(), tr_conv_f32_i16_sz };
+            return l_conv_3cf32_ci16;
+        }
+
+        if (isCI16(from) && isCI16(to)) {
+            transform_info_t l_conv_3ci16_ci16 = { conv_get_3ci16_ci16(), tr_dummy_sz };
+            return l_conv_3ci16_ci16;
+        }
+
     }
 
     /* Interleave 1 -> 3 */

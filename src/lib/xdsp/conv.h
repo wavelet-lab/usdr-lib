@@ -82,6 +82,13 @@ void tr_##conv_fn (const void *__restrict *__restrict indata, \
                        unsigned outdatabsz) \
    { conv_fn(indata[0], indata[1], indatabsz, outdata[0], outdatabsz); }
 
+#define DECLARE_TR_FUNC_3_1(conv_fn) \
+void tr_##conv_fn (const void *__restrict *__restrict indata, \
+                  unsigned indatabsz, \
+                  void *__restrict *__restrict outdata, \
+                  unsigned outdatabsz) \
+{ conv_fn(indata[0], indata[1], indata[2], indatabsz, outdata[0], outdatabsz); }
+
 #define DECLARE_TR_FUNC_4_1(conv_fn) \
     void tr_##conv_fn (const void *__restrict *__restrict indata, \
                       unsigned indatabsz, \

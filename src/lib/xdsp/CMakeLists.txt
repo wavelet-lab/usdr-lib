@@ -47,6 +47,8 @@ set(xdsplib_conv_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_8cf32_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_8ci16_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_3cf32_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_3cf32_ci16_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_3ci16_ci16_2.c
 )
 
 if(WVLT_ARCH_X86 OR WVLT_ARCH_X86_64)
