@@ -1273,7 +1273,7 @@ int dev_m2_dsdr_gain_rx_pga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
 static int dsdr_set_rates(dev_m2_dsdr_t* d, uint32_t rx_rate, uint32_t tx_rate)
 {
     int res = 0;
-    unsigned tx_inters[] = { 1, 2, 0, 4, 0, 8, 16, 32, 64, 128, 256 };
+    unsigned tx_inters[] = { 1, 2, 0, 4, 0, 8, 16, 32, 0, 0, 0 };
     unsigned rx_decims[] = { 1, 2, 3, 4, 6, 8, 16, 32, 64, 128, 256 };
     unsigned i = 0;
     unsigned ii;
