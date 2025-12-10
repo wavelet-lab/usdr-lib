@@ -753,7 +753,19 @@ int dsdr_hiper_sens2temp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue
 {
     return dsdr_hiper_sens_get((dsdr_hiper_fe_t*)obj->object, 2, ovalue);
 }
+int dsdr_hiper_fe_get_temp_max(dsdr_hiper_fe_t* dfe, uint64_t* temp_max)
+{
+    int64_t tmp = 0, tmax = 0;
+    int res = 0;
+    for (unsigned i = 0; i < 3; i++) {
+        res = res ? res : dsdr_hiper_sens_get(dfe, i, (uint64_t*)&tmp);
+        if (tmp > tmax)
+            tmax = tmp;
+    }
 
+    *temp_max = tmax;
+    return res;
+}
 
 
 static int dsdr_hiper_initialize_lms8(dsdr_hiper_fe_t* dfe, unsigned addr, unsigned stepping, lms8001_state_t* obj)

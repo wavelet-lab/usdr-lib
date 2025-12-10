@@ -26,6 +26,7 @@
 #include "../hw/lmk05318/lmk05318.h"
 #include "../hw/lp875484/lp875484.h"
 #include "../hw/afe79xx/afe79xx.h"
+#include "../hw/tmp114/tmp114.h"
 
 #include "dsdr_hiper.h"
 
@@ -93,6 +94,8 @@ enum i2c_idx {
     I2C_AFE_PMIC   = MAKE_LSOP_I2C_ADDR(0, 0, I2C_ADDR_PMIC_0P9),
     I2C_TPS63811   = MAKE_LSOP_I2C_ADDR(0, 1, I2C_DEV_DCDCBOOST),
     I2C_LMK        = MAKE_LSOP_I2C_ADDR(0, 1, I2C_ADDR_LMK),
+    I2C_TEMP_AFE   = MAKE_LSOP_I2C_ADDR(0, 0, I2C_DEV_TMP114NB), // Since M.2 rev1
+    I2C_TEMP_FPGA  = MAKE_LSOP_I2C_ADDR(0, 1, I2C_DEV_TMP114NB), // Since M.2 rev1
 };
 
 // LMK ports
@@ -1483,15 +1486,28 @@ int dev_m2_dsdr_debug_lldev_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ova
 
 int dev_m2_dsdr_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue)
 {
-    // struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
-    // lldev_t dev = d->base.dev;
-    // int temp, res;
-    // res = tmp108_temp_get(dev, 0, I2C_BUS_TMP108, &temp);
-    // if (res)
-    //     return res;
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    int res = 0;
 
-    // *ovalue = (int64_t)temp;
-    return 0;
+    uint64_t fe_temp = 0;
+    unsigned board_temp = 0;
+
+    if (dev_m2_dsdr_has_hiper(d)) {
+        res = res ? res : dsdr_hiper_fe_get_temp_max(&d->hiper, &fe_temp);
+    }
+
+    if (d->type == DSDR_M2_R1) {
+        res = res ? res : tmp114_temp_get(d->base.dev, d->subdev, I2C_TEMP_AFE, (int*)&board_temp);
+    } else if (!dev_m2_dsdr_has_hiper(d)) {
+        // No temp sensors
+        return -EINVAL;
+    } else {
+        *ovalue = fe_temp;
+        return res;
+    }
+
+    *ovalue = fe_temp > board_temp ? fe_temp : board_temp;
+    return res;
 }
 
 int dev_m2_dsdr_debug_all_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)

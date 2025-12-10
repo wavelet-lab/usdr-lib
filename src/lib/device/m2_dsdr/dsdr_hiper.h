@@ -120,6 +120,8 @@ typedef struct dsdr_hiper_fe dsdr_hiper_fe_t;
 int dsdr_hiper_fe_create(lldev_t dev, unsigned spix_num, unsigned int *lms8_mpw_mask, dsdr_hiper_fe_t* dfe);
 int dsdr_hiper_fe_destroy(dsdr_hiper_fe_t* dfe);
 
+int dsdr_hiper_fe_get_temp_max(dsdr_hiper_fe_t* dfe, uint64_t* temp_max);
+
 int dsdr_hiper_fe_rx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool *p_swap_rxiq);
 int dsdr_hiper_fe_tx_freq_set(dsdr_hiper_fe_t* def, unsigned chno, uint64_t freq, uint64_t* ncotune, bool* p_swap_txiq);
 
