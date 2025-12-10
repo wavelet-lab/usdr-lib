@@ -89,6 +89,7 @@ struct stream_sfetrx_dma32 {
     extxcfg_cache_t cstx4;
 
     uint64_t hw_pwr_mask; // Powered chans (hw)
+    uint8_t pack_3x16;
 };
 typedef struct stream_sfetrx_dma32 stream_sfetrx_dma32_t;
 
@@ -600,6 +601,7 @@ int _sfetrx4_option_set(stream_handle_t* str, const char* name, int64_t in_val)
         return exfe_trx4_update_chmap(&stream->storage.srx4,
                                       stream->type == USDR_ZCPY_TX,
                                       stream->fe_complex,
+                                      stream->pack_3x16,
                                       (stream->fe_complex ? 2 : 1) * stream->fe_chans,
                                       (const channel_info_t *)in_val);
     } else if (stream->type == USDR_ZCPY_TX && (strcmp(name, "mute") == 0)) {
@@ -792,8 +794,9 @@ static int initialize_stream_rx_32(device_t* device,
     }
 
     // TODO obtain exfe configuration constants
+    bool pack_3x16 = false;
     res = (fecfg->cfg_fecore_id == CORE_EXFERX_DMA32_R0 || fecfg->cfg_fecore_id == CORE_EXFERX_DMA32_R0_8) ?
-        exfe_rx4_configure(fecfg, &sc, &fc) :
+        exfe_rx4_configure(fecfg, &sc, &fc, &pack_3x16) :
         sfe_rx4_configure(fecfg, &sc, &fc, &hw_chan_msk);
     if (res)
         return res;
@@ -845,7 +848,7 @@ static int initialize_stream_rx_32(device_t* device,
     strdev->pkt_bytes = sparams.block_size;
     strdev->host_bytes = funcs.sfunc(sparams.block_size, false);
 
-    strdev->wire_bps = 8 * strdev->pkt_bytes / strdev->pkt_symbs;
+    strdev->wire_bps = 8 * strdev->pkt_bytes / strdev->pkt_symbs / strdev->channels;
 
     strdev->tf_data = funcs.cfunc;
     strdev->tf_size = funcs.sfunc;
@@ -871,9 +874,9 @@ static int initialize_stream_rx_32(device_t* device,
     strdev->storage.srx4 = *fecfg;
 
     strdev->hw_pwr_mask = hw_chan_msk;
-
-    USDR_LOG("DSTR", USDR_LOG_INFO, "RX: Samples=%d Bps=%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%"PRIx64"\n",
-             strdev->pkt_symbs, strdev->wire_bps, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask);
+    strdev->pack_3x16 = pack_3x16;
+    USDR_LOG("DSTR", USDR_LOG_INFO, "RX: Samples=%d Bps=%dx%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%"PRIx64" Pack3x16=%d\n",
+             strdev->pkt_symbs, strdev->wire_bps, strdev->channels, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask, strdev->pack_3x16);
 
     *outu = strdev;
     return 0;
@@ -999,9 +1002,8 @@ static int initialize_stream_tx_32(device_t* device,
         }
     }
 
-    unsigned bits_per_single_sym = bfmt.bits * (bfmt.complex ? 2 : 1);
-
     // Check core fe sanity
+    bool pack_3x16 = false;
     unsigned fe_old_tx_swap = 0;
     unsigned fe_old_tx_mute = 0;
     if (fecfg->cfg_fecore_id == CORE_SFETX_DMA32_R0) {
@@ -1026,6 +1028,13 @@ static int initialize_stream_tx_32(device_t* device,
 
         unsigned llcanhs = (bfmt.complex ? 2 : 1) * sc.chcnt;
         unsigned expand;
+        unsigned lbits = bfmt.bits;
+        if ((lbits == 16) && (llcanhs == 6 || llcanhs == 12 || llcanhs == 24 || llcanhs == 48)) {
+            llcanhs = (llcanhs / 3) * 4;
+            pack_3x16 = true;
+            lbits = 12;
+        }
+
         switch (llcanhs) {
         case 1: expand = 0; break;
         case 2: expand = 1; break;
@@ -1034,12 +1043,13 @@ static int initialize_stream_tx_32(device_t* device,
         case 16: expand = 4; break;
         case 32: expand = 5; break;
         default:
+            USDR_LOG("DSTR", USDR_LOG_ERROR, "TX: Unable to deliver %d chans in %d bits!\n", llcanhs, lbits);
             return -EINVAL;
         }
 
         res = res ? res : exfe_tx4_mute(fecfg, 0);
-        res = res ? res : exfe_tx4_config(fecfg, bfmt.bits, expand);
-        res = res ? res : exfe_trx4_update_chmap(fecfg, true, bfmt.complex, llcanhs, &sc.channels);
+        res = res ? res : exfe_tx4_config(fecfg, lbits, expand, pack_3x16);
+        res = res ? res : exfe_trx4_update_chmap(fecfg, true, bfmt.complex, pack_3x16, llcanhs, &sc.channels);
 
         if (res) {
             return res;
@@ -1050,6 +1060,7 @@ static int initialize_stream_tx_32(device_t* device,
     if (res)
         return res;
 
+    unsigned bits_per_single_sym = bfmt.bits * (bfmt.complex ? 2 : 1);
     lowlevel_stream_params_t sparams;
     stream_t sid;
     lowlevel_ops_t* dops = lowlevel_get_ops(device->dev);
@@ -1157,8 +1168,9 @@ static int initialize_stream_tx_32(device_t* device,
     extxcfg_cache_init(&strdev->cstx4);
 
     strdev->hw_pwr_mask = pwr_hw_mask;
-    USDR_LOG("DSTR", USDR_LOG_INFO, "TX: Samples=%d Bps=%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%"PRIx64"\n",
-             strdev->pkt_symbs, strdev->wire_bps, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask);
+    strdev->pack_3x16 = pack_3x16;
+    USDR_LOG("DSTR", USDR_LOG_INFO, "TX: Samples=%d Bps=%dx%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%"PRIx64" Pack3x16=%d\n",
+             strdev->pkt_symbs, strdev->wire_bps, strdev->channels, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask, strdev->pack_3x16);
     *outu = strdev;
     return 0;
 

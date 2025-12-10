@@ -2327,8 +2327,8 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
     if (res) {
         return res;
     }
-    if (channels->count > 8 || channels->count == 3 || channels->count == 5 || channels->count == 7 || channels->count == 6) {
-        USDR_LOG("UDEV", USDR_LOG_ERROR, "DSDR %s: Unsupported channel count: %d, valid are (1, 2, 4)\n", sid, channels->count);
+    if (channels->count > 8 || channels->count == 5 || channels->count == 7) {
+        USDR_LOG("UDEV", USDR_LOG_ERROR, "DSDR %s: Unsupported channel count: %d, valid are (1, 2, 3, 4, 6, 8)\n", sid, channels->count);
         return -EINVAL;
     }
 
