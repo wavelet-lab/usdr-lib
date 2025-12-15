@@ -1455,7 +1455,8 @@ int SoapyUSDR::writeStream(SoapySDR::Stream *stream,
 
     unsigned toSend = numElems;
     int res = usdr_dms_send(ustr->strm, (const void **) buffs, numElems, ts, timeoutUs / 1000);
-    this->calc_ts += numElems;
+    if (this->calc_ts >= 0)
+        this->calc_ts += numElems;
 
     if (tx_pkts % 1000 == 0) {
         SoapySDR::logf(_dump_calls ? SOAPY_SDR_ERROR : SOAPY_SDR_TRACE,
