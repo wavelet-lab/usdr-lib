@@ -366,7 +366,7 @@ private:
 
     int _txcorr = 0;
 
-    int64_t calc_ts = 0LL;
+    int64_t calc_ts = -1LL;
 
     std::string _clk_source = "internal";
 };
