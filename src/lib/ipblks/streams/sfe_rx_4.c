@@ -608,11 +608,24 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     if (pack_3x16) {
         // Every 7th and 8-th channel is ignored since it coinatins garbage anyway
         for (unsigned g = 0, h = 0; g < fe->cfg_raw_chans; g++) {
-            if ((g % 8) == 6 || (g % 8) == 7) {
-                pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h + (g % 8) - 8];
+            if (complex) {
+                if ((g % 4) == 3) {
+                    pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h + (g % 4) - 4];
+                } else {
+                    pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h++];
+                }
             } else {
-                pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h++];
+                if ((g % 8) == 6 || (g % 8) == 7) {
+                    pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h + (g % 8) - 8];
+                } else {
+                    pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h++];
+                }
             }
+        }
+
+        for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
+            USDR_LOG("STRM", USDR_LOG_INFO, "3x16_MAP[%d]: %d => %d\n", g,
+                     newmap_orig->ch_map[g], pack_3x16_mmap.ch_map[g]);
         }
     }
 
