@@ -50,6 +50,7 @@ typedef int (*libcapi79xx_set_dsa_fn_t)(libcapi79xx_t* o, unsigned type, unsigne
 
 typedef int (*libcapi79xx_check_health_fn_t)(libcapi79xx_t* o, int *ok, unsigned sz, char* buf);
 
+typedef int (*libcapi79xx_set_tdd_fn_t)(libcapi79xx_t* o, uint8_t rx, uint8_t fb, uint8_t tx);
 
 #define LIBCAPI79XX_CREATE_FN "libcapi79xx_create"
 #define LIBCAPI79XX_DESTROY_FN "libcapi79xx_destroy"
@@ -61,5 +62,7 @@ typedef int (*libcapi79xx_check_health_fn_t)(libcapi79xx_t* o, int *ok, unsigned
 
 
 #define LIBCAPI79XX_CHECK_HEALTH_FN  "libcapi79xx_check_health"
+
+#define LIBCAPI79XX_SET_TDD_FN  "libcapi79xx_set_tdd"
 
 #endif

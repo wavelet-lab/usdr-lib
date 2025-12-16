@@ -138,8 +138,10 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipT
 
     out->libcapi79xx_check_health = (libcapi79xx_check_health_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_CHECK_HEALTH_FN);
 
+    out->libcapi79xx_set_tdd = (libcapi79xx_set_tdd_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_SET_TDD_FN);
+
     if (!out->libcapi79xx_create || !out->libcapi79xx_destroy || !out->libcapi79xx_init ||
-        !out->libcapi79xx_set_dsa ||
+        !out->libcapi79xx_set_dsa || !out->libcapi79xx_set_tdd ||
         !out->libcapi79xx_upd_nco || !out->libcapi79xx_get_nco || !out->libcapi79xx_check_health) {
         USDR_LOG("79xx", USDR_LOG_ERROR, "Broken CAPI AFE79XX NDA LIB wrapper `%s`!\n",
                  afe79xxlib);

@@ -26,6 +26,8 @@ struct afe79xx_state {
 
     libcapi79xx_check_health_fn_t libcapi79xx_check_health;
 
+    libcapi79xx_set_tdd_fn_t libcapi79xx_set_tdd;
+
 };
 typedef struct afe79xx_state afe79xx_state_t;
 
