@@ -15,10 +15,10 @@
 #define WORD_COUNT (32u)
 #define IN_STREAM_SIZE_BZ (WORD_COUNT * 12u / 8u)
 
-#define SPEED_WORD_COUNT (8192u)
+#define SPEED_WORD_COUNT (65536u)
 #define SPEED_SIZE_BZ (SPEED_WORD_COUNT * 12u / 8u)
 
-static const unsigned packet_lens[3] = { 1235, 7777, SPEED_SIZE_BZ };
+static const unsigned packet_lens[4] = { 1235, 7777, 12288, SPEED_SIZE_BZ };
 
 #define SPEED_MEASURE_ITERS 1000000
 
@@ -60,7 +60,7 @@ static void setup()
 
     uint8_t *pin = (uint8_t*)in;
 
-    for(int16_t i = SPEED_WORD_COUNT, j = SPEED_SIZE_BZ; i ; i -= 2, j -= 3)
+    for(int32_t i = SPEED_WORD_COUNT, j = SPEED_SIZE_BZ; i ; i -= 2, j -= 3)
     {
         int16_t v0 = i - 1;
         int16_t v1 = i - 2;
@@ -207,8 +207,10 @@ START_TEST(conv_ci12_4cf32_speed)
             uint64_t tk = clock_get_time();
             for(int i = 0; i < SPEED_MEASURE_ITERS; ++i) (*fn)(&pin, bzin, pout, bzout);
             uint64_t tk1 = clock_get_time() - tk;
-            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 call, ave speed = %" PRIu64 " calls/s \n",
-                    tk1, (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS), (uint64_t)(1000000LL*SPEED_MEASURE_ITERS/tk1));
+            double ref = 1e6 * tk1 / SPEED_MEASURE_ITERS / (bzin * 8 / 3);
+
+            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 call, ave speed = %" PRIu64 " calls/s REF=%.3f\n",
+                    tk1, (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS), (uint64_t)(1000000LL*SPEED_MEASURE_ITERS/tk1), ref);
         }
     }
 }
@@ -222,7 +224,7 @@ Suite * conv_ci12_4cf32_suite(void)
 
     ADD_REGRESS_TEST(s, conv_ci12_4cf32_check);
     ADD_REGRESS_TEST(s, conv_ci12_4cf32_check_simd);
-    ADD_PERF_LOOP_TEST(s, conv_ci12_4cf32_speed, 60, 0, 3);
+    ADD_PERF_LOOP_TEST(s, conv_ci12_4cf32_speed, 60, 0, 4);
 
     return s;
 }

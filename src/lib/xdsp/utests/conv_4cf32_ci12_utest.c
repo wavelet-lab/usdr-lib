@@ -18,7 +18,7 @@
 #define CONV_SCALE (1.0f/32767)
 #define EPS (5E-4)
 
-static const unsigned packet_lens[3] = { 1111u, 4123u, PACKET_SIZE };
+static const unsigned packet_lens[4] = { 1111u, 4123u, PACKET_SIZE, 262144u };
 
 #define SPEED_MEASURE_ITERS 1000000
 
@@ -241,7 +241,7 @@ Suite * conv_4cf32_ci12_suite(void)
     Suite* s = suite_create("conv_4cf32_ci12");
 
     ADD_REGRESS_TEST(s, conv_4cf32_ci12_check_simd);
-    ADD_PERF_LOOP_TEST(s, conv_4cf32_ci12_speed, 60, 0, 3);
+    ADD_PERF_LOOP_TEST(s, conv_4cf32_ci12_speed, 60, 0, 4);
 
     return s;
 }

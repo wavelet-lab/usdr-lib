@@ -15,7 +15,7 @@
 #define WORD_COUNT (4096u + 80u)
 #define IN_STREAM_SIZE_BZ (WORD_COUNT * sizeof(int16_t))
 
-#define SPEED_WORD_COUNT (32768u)
+#define SPEED_WORD_COUNT (65536u)
 #define SPEED_SIZE_BZ (SPEED_WORD_COUNT * sizeof(int16_t))
 
 static const unsigned packet_lens[3] = { 1024, 16384, SPEED_SIZE_BZ };
@@ -177,8 +177,10 @@ START_TEST(conv_ci16_4cf32_speed)
             uint64_t tk = clock_get_time();
             for(int i = 0; i < SPEED_MEASURE_ITERS; ++i) (*fn)(&pin, bzin, pout, bzout);
             uint64_t tk1 = clock_get_time() - tk;
-            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 call, ave speed = %" PRIu64 " calls/s \n",
-                    tk1, (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS), (uint64_t)(1000000LL*SPEED_MEASURE_ITERS/tk1));
+            double ref = 1e6 * tk1 / SPEED_MEASURE_ITERS / (bzin * 2);
+
+            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 call, ave speed = %" PRIu64 " calls/s REF=%.3f\n",
+                    tk1, (uint64_t)(tk1*1000LL/SPEED_MEASURE_ITERS), (uint64_t)(1000000LL*SPEED_MEASURE_ITERS/tk1), ref);
         }
     }
 }
