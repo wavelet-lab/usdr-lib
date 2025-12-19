@@ -602,7 +602,7 @@ int _sfetrx4_option_set(stream_handle_t* str, const char* name, int64_t in_val)
                                       stream->type == USDR_ZCPY_TX,
                                       stream->fe_complex,
                                       stream->pack_3x16,
-                                      (stream->fe_complex ? 2 : 1) * stream->fe_chans,
+                                      (stream->fe_complex ? 2 : 1) * (stream->pack_3x16 ? (stream->fe_chans * 4 / 3) : stream->fe_chans),
                                       (const channel_info_t *)in_val);
     } else if (stream->type == USDR_ZCPY_TX && (strcmp(name, "mute") == 0)) {
         if (stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0 && stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0_8) {

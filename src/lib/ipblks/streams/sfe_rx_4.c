@@ -3,6 +3,7 @@
 
 #include "sfe_rx_4.h"
 #include <string.h>
+#include "stream_sfetrx4_dma32.h"
 
 enum sfe_rx_regs {
     FE_CMD_REG_ROUTE,
@@ -602,6 +603,7 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     memset(ch_remapped, 0, sizeof(ch_remapped));
     memset(flag_swap_iq, 0, sizeof(flag_swap_iq));
     channel_info_t pack_3x16_mmap;
+    channel_info_t reverse_map;
     unsigned lg_chans = (fe->cfg_raw_chans == 16) ? 4 : (fe->cfg_raw_chans == 8) ? 3 : (fe->cfg_raw_chans == 4) ? 2 : (fe->cfg_raw_chans == 2) ? 1 : 0;
     unsigned msk = mask ? ((complex ? total_chan_num / 2 : total_chan_num) - 1) : 0xff;
 
@@ -610,26 +612,54 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
         for (unsigned g = 0, h = 0; g < fe->cfg_raw_chans; g++) {
             if (complex) {
                 if ((g % 4) == 3) {
-                    pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h + (g % 4) - 4];
+                    pack_3x16_mmap.ch_map[g] = 0xff; //newmap_orig->ch_map[h + (g % 4) - h];
                 } else {
                     pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h++];
                 }
             } else {
                 if ((g % 8) == 6 || (g % 8) == 7) {
-                    pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h + (g % 8) - 8];
+                    pack_3x16_mmap.ch_map[g] = 0xff; //newmap_orig->ch_map[h + (g % 8) - 8];
                 } else {
                     pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h++];
                 }
             }
         }
+    }
+    const channel_info_t* newmap = (pack_3x16) ? &pack_3x16_mmap : newmap_orig;
+
+    // For TX we need invert in and out
+    if (fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0 || fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_8) {
+        memset(reverse_map.ch_map, ~CH_SWAP_IQ_FLAG, sizeof(reverse_map.ch_map));
 
         for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
-            USDR_LOG("STRM", USDR_LOG_INFO, "3x16_MAP[%d]: %d => %d\n", g,
-                     newmap_orig->ch_map[g], pack_3x16_mmap.ch_map[g]);
+            if (newmap->ch_map[g] == 0xff)
+                continue;
+
+            unsigned idx = (newmap->ch_map[g] & ~CH_SWAP_IQ_FLAG);
+            if (idx >= fe->cfg_raw_chans)
+                return -EINVAL;
+
+            reverse_map.ch_map[idx] = g;
         }
+
+        for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
+            if (newmap->ch_map[g] == 0xff)
+                continue;
+
+            if (newmap->ch_map[g] & CH_SWAP_IQ_FLAG) {
+                reverse_map.ch_map[g] |= CH_SWAP_IQ_FLAG;
+            }
+        }
+
+        newmap = &reverse_map;
     }
 
-    const channel_info_t* newmap = (pack_3x16) ? &pack_3x16_mmap : newmap_orig;
+
+    USDR_LOG("STRM", USDR_LOG_INFO, "NEW_MAP %d x %d CHANS:\n", total_chan_num, complex ? 2 : 1);
+    for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
+        USDR_LOG("STRM", USDR_LOG_INFO, "NEW_MAP[%d]: %d => %d\n", g,
+                 newmap_orig->ch_map[g], newmap->ch_map[g]);
+    }
 
     for (unsigned g = 0; g < fe->cfg_raw_chans; g = g + total_chan_num) {
         for (unsigned f = 0; f < total_chan_num; f++) {
