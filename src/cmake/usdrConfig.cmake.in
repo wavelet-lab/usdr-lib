@@ -1,0 +1,10 @@
+@PACKAGE_INIT@
+
+get_filename_component(_USDR_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(_USDR_PREFIX_DIR "${_USDR_CMAKE_DIR}/../.." ABSOLUTE)
+
+set(usdr_INCLUDE_DIR "${_USDR_PREFIX_DIR}/include/usdr")
+set(usdr_LIB_DIR "${_USDR_PREFIX_DIR}/${CMAKE_INSTALL_LIBDIR}")
+set(usdr_VERSION "@USDR_VERSION@")
+
+include("${_USDR_CMAKE_DIR}/usdrTargets.cmake")

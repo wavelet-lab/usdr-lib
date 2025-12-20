@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024 Wavelet Lab
+# Copyright (c) 2023-2025 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
 cmake_minimum_required(VERSION 3.8)
@@ -32,11 +32,36 @@ include_directories(${USDR_INCLUDE_DIRS})
 
 
 add_library(usdr ${USDR_LIBRARY_FILES})
-target_link_libraries(usdr dl pthread rt ${USDR_LINK_FILES} usdr-dsp)
+target_link_libraries(usdr PUBLIC dl pthread rt ${USDR_LINK_FILES} usdr-dsp)
 add_dependencies(usdr ${USDR_DEPEND_TARGETS})
 target_compile_options(usdr PRIVATE "-Wall" "-Werror=implicit-function-declaration")
+
+# Public include directories (for build and install)
+target_include_directories(usdr
+	PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+		$<INSTALL_INTERFACE:include>
+)
 
 set_target_properties(usdr PROPERTIES SOVERSION ${USDR_ABI_VERSION})
 set_target_properties(usdr PROPERTIES VERSION ${USDR_LIBVER})
 
-install(TARGETS usdr LIBRARY)
+install(TARGETS usdr
+	EXPORT usdrTargets
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Install public headers (install all .h files from the lib tree)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/usdr
+	FILES_MATCHING PATTERN "*.h" PATTERN "*.yaml"
+)
+
+# Export targets for use by find_package
+install(EXPORT usdrTargets
+	FILE usdrTargets.cmake
+	NAMESPACE usdr::
+	DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/usdr
+)

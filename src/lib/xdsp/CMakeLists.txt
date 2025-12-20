@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024 Wavelet Lab
+# Copyright (c) 2023-2025 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
 # Populate a CMake variable with the sources
@@ -86,9 +86,14 @@ else()
     endif()
 
     add_library(usdr-dsp ${xdsplib_SRCS})
-    target_link_libraries(usdr-dsp m pthread)
+    target_link_libraries(usdr-dsp PUBLIC m pthread)
     target_compile_options(usdr-dsp PRIVATE "-Wall" "-Werror=implicit-function-declaration")
-    install(TARGETS usdr-dsp LIBRARY)
+    install(TARGETS usdr-dsp
+        EXPORT usdrTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
 
     set_target_properties(usdr-dsp PROPERTIES SOVERSION ${USDR_ABI_VERSION})
     set_target_properties(usdr-dsp PROPERTIES VERSION ${USDR_LIBVER})

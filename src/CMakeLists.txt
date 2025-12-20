@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024 Wavelet Lab
+# Copyright (c) 2023-2025 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
 cmake_minimum_required(VERSION 3.8)
@@ -79,6 +79,30 @@ endif(ENABLE_DMONITOR)
 
 
 include(FeatureSummary)
+include(CMakePackageConfigHelpers)
+
+# Generate and install CMake package config files so consumers can use find_package(usdr)
+set(CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/usdr")
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/usdrConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/usdrConfig.cmake"
+    INSTALL_DESTINATION "${CONFIG_INSTALL_DIR}"
+    # Note: avoid newer keywords for broader CMake compatibility
+)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/usdrConfigVersion.cmake"
+    VERSION ${USDR_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/usdrConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/usdrConfigVersion.cmake"
+    DESTINATION "${CONFIG_INSTALL_DIR}"
+)
+
 message(STATUS "")
 message(STATUS "######################################################")
 message(STATUS "## ${PROJECT_NAME} enabled features")
