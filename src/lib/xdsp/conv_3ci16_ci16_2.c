@@ -4,8 +4,6 @@
 #include "conv_3ci16_ci16_2.h"
 #include "attribute_switch.h"
 
-//#include <stdio.h>
-
 #define TEMPLATE_FUNC_NAME conv_3ci16_ci16_generic
 VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/conv_3ci16_ci16_generic.t"
