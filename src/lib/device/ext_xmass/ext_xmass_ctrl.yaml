@@ -25,7 +25,7 @@ pages:
         fields:
           - bits: "0"
             name: BDISTRIB
-            desc: Enable OUT_REF_B and OUT_SYREF_B[0 for 4 sync boards
+            desc: Enable OUT_REF_B and OUT_SYREF_B0 for 4 sync boards
           - bits: "1"
             name: BLOCAL
             desc: Enable local PPS and REF distribution
@@ -68,4 +68,4 @@ pages:
             desc: 0 - TX_SYREF_MUX demuliplexing to CLK_SYSREF_OUT, 1 TX_SYREF_MUX to GPS_RX
           - bits: "7:5"
             name: RTS
-            desc: Interboard sync logic
+            desc: Interboard sync logic(Not used)
