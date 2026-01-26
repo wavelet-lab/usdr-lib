@@ -1189,7 +1189,8 @@ static long usdrfd_ioctl(struct file *filp,
         if (ioctl_num != PCIE_DRIVER_GET_UUID &&
                 ioctl_num != PCIE_DRIVER_CLAIM &&
                 ioctl_num != PCIE_DRIVER_SET_DEVLAYOUT &&
-                ioctl_num != PCIE_DRIVER_CLAIM_VERSION) {
+                ioctl_num != PCIE_DRIVER_CLAIM_VERSION &&
+                ioctl_num != PCIE_DRIVER_HWREG_RD32) {
 
             dev_notice(&usdrdev->pdev->dev, "Device not ready!");
             return -EINVAL;
