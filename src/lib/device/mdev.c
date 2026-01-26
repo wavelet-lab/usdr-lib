@@ -550,6 +550,10 @@ int mdev_create(unsigned pcnt, const char** names, const char** values, lldev_t*
     }
     memset(obj, 0, sizeof(*obj));
 
+    if (bus_cnt > 1) {
+        usdrlog_ll_devname_en(true);
+    }
+
     // Creating sub-device
     for (i = 0; i < bus_cnt; i++) {
         values[idx] = bus_names[i];
