@@ -1207,14 +1207,11 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
     if (res)
         return res;
 
-    if (d->xdev.ssdr)
-    {
+    if (d->xdev.ssdr) {
         res = vfs_add_const_i64_vec(&udev->rootfs, ssdr_params_m2_lm7_1_rev000, SIZEOF_ARRAY(ssdr_params_m2_lm7_1_rev000));
         if (res)
             USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "Unable to set device name \"ssdr\"!\n");
-    }
-    else
-    {
+    } else {
         res = vfs_add_const_i64_vec(&udev->rootfs, xsdr_params_m2_lm7_1_rev000, SIZEOF_ARRAY(xsdr_params_m2_lm7_1_rev000));
         if (res)
             USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "Unable to set device name \"xsdr\"!\n");
