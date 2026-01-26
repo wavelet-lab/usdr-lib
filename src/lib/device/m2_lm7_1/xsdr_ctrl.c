@@ -114,7 +114,7 @@ static int _xsdr_init_revo(xsdr_dev_t *d);
 
 static int _xsdr_checkpwr(xsdr_dev_t *d)
 {
-    USDR_LOG("XDEV", USDR_LOG_ERROR, "checkpwr: %d\n", d->pwr_en);
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "checkpwr: %d\n", d->pwr_en);
     if (!d->pwr_en) {
        return xsdr_pwren(d, true);
     }
@@ -284,7 +284,7 @@ int xsdr_override_drp(xsdr_dev_t *d, lsopaddr_t ls_op_addr,
     if (res)
         return res;
 
-    USDR_LOG("XDEV", USDR_LOG_DEBUG, "MMCM DRP_TX CMD=%08x RB=%08x\n", drp_cmd, rb);
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_DEBUG, "MMCM DRP_TX CMD=%08x RB=%08x\n", drp_cmd, rb);
 
     if (meminsz) {
         *((uint16_t*)pin) = rb >> 16;
@@ -303,7 +303,7 @@ int  xsdr_upd_phase(xsdr_dev_t *d)
         g_tx_cfg_raw.ports[CLKOUT_PORT_0].delay = (raw >> 3);
     }
 
-    USDR_LOG("XDEV", USDR_LOG_ERROR, "MMCM_TX set phase to %d.%d\n", g_tx_cfg_raw.ports[CLKOUT_PORT_0].delay, g_tx_cfg_raw.ports[CLKOUT_PORT_0].phase);
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "MMCM_TX set phase to %d.%d\n", g_tx_cfg_raw.ports[CLKOUT_PORT_0].delay, g_tx_cfg_raw.ports[CLKOUT_PORT_0].phase);
     mmcm_init_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_TX, &g_tx_cfg_raw);
 
     // Reset MMCM
@@ -441,13 +441,13 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
         cfg_raw.ports[CLKOUT_PORT_FB].period_l = vco_div_io;
         cfg_raw.ports[CLKOUT_PORT_FB].period_h = vco_div_io;
     }
-    USDR_LOG("XDEV", USDR_LOG_INFO, "MMCM_TX set to MCLK = %.3f IOCLK = %.3f Mhz IODIV = %d FWDCLK_DELAY%s = %d (VCO %d) SISO_DDR=%d VCO=%.3f MHZ OFF=%d\n",
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "MMCM_TX set to MCLK = %.3f IOCLK = %.3f Mhz IODIV = %d FWDCLK_DELAY%s = %d (VCO %d) SISO_DDR=%d VCO=%.3f MHZ OFF=%d REF=%s\n",
              tx_mclk / (1.0e6), io_clk / (1.0e6), vco_div_io,
              (d->tx_override_phase) ? "_OVR" : "",
              cfg_raw.ports[CLKOUT_PORT_0].delay, cfg_raw.ports[CLKOUT_PORT_0].phase,
              d->base.lml_mode.txsisoddr,
              tx_mclk * (cfg_raw.ports[CLKOUT_PORT_FB].period_l + cfg_raw.ports[CLKOUT_PORT_FB].period_h) / 1.0e6,
-             txphase_off);
+             txphase_off, rx_master ? "RX" : "TX");
 
     res = res ? res : mmcm_init_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_TX, &cfg_raw);
 
@@ -467,7 +467,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
         if (res)
             break;
 
-        USDR_LOG("XDEV", USDR_LOG_DEBUG, "MMCM FLAGS:%08x\n", rb);
+        USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_DEBUG, "MMCM FLAGS:%08x\n", rb);
         if (rb & (1 << 8)) {
              g_tx_cfg_raw = cfg_raw;
             return 0;
@@ -476,7 +476,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
         usleep(10);
     }
 
-    USDR_LOG("XDEV", USDR_LOG_ERROR, "MMCM Redy flag timed out!\n");
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "MMCM Redy flag timed out!\n");
     return -EIO;
 }
 
@@ -521,7 +521,7 @@ int xsdr_configure_lml_mmcm_rx(xsdr_dev_t *d)
         cfg_raw.ports[CLKOUT_PORT_FB].period_l = vco_div_io;
         cfg_raw.ports[CLKOUT_PORT_FB].period_h = vco_div_io;
     }
-    USDR_LOG("XDEV", USDR_LOG_ERROR, "MMCM_RX set to MCLK = %.3f IOCLK = %.3f Mhz IODIV = %d\n",
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "MMCM_RX set to MCLK = %.3f IOCLK = %.3f Mhz IODIV = %d\n",
              rx_mclk / (1.0e6), io_clk / (1.0e6), vco_div_io);
 
     res = (res) ? res : lowlevel_reg_wr32(d->base.lmsstate.dev, d->base.lmsstate.subdev, REG_CFG_PHY_0,
@@ -557,7 +557,7 @@ int xsdr_configure_lml_mmcm_rx(xsdr_dev_t *d)
         if (res)
             break;
 
-        USDR_LOG("XDEV", USDR_LOG_INFO, "MMCM FLAGS:%08x\n", rb);
+        USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "MMCM FLAGS:%08x\n", rb);
         if (rb & (1 << 16))
             return 0;
 
@@ -656,6 +656,7 @@ static int _xsdr_calibrate_txlfsr_check(xsdr_dev_t *d, unsigned check_to,
 
 static int _xsdr_calibrate_lml(xsdr_dev_t *d)
 {
+    lldev_t dev = d->base.lmsstate.dev;
     int res = 0;
     bool mmcm_rx_only_path = (!d->base.tx_run[0] && !d->base.tx_run[1]);
     bool old_rx_run[2] = { d->base.rx_run[0], d->base.rx_run[1] };
@@ -745,7 +746,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                 }
                 badness *= 1.0 * check_to / (w + 1); // Rescale
 
-                USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE_RX=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", ph - 1, w,
+                USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_RX=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", ph - 1, w,
                          errs[0], errs[1], errs[2], errs[3], (long long)badness);
                 if (res || (d->dpump ? noerrors_v2(errs, &badness) : noerrors_v4(errs, &badness))) {
                     phase_m = ph;
@@ -771,7 +772,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                 phase_m = (phase_max + phase_min) / 2;
             }
 
-            USDR_LOG("XDEV", USDR_LOG_WARNING, "Restoring RX pahse to %d (bandness=%" PRId64 ")  PH_MIN=%d PH_MAX=%d\n",
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Restoring RX pahse to %d (bandness=%" PRId64 ")  PH_MIN=%d PH_MAX=%d\n",
                      phase_m - 1, badness_m, phase_min, phase_max);
 
             // Try our best at least
@@ -793,7 +794,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                 badness *= 1.0 * check_to / (w + 1); // Rescale
                 rx_badness = badness;
                 if (badness > 100 /*badness_m * 2*/) {
-                    USDR_LOG("XDEV", USDR_LOG_WARNING, "RePHASE_RX=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", phase_m - 1, w,
+                    USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "RePHASE_RX=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", phase_m - 1, w,
                              errs[0], errs[1], errs[2], errs[3], (long long)badness);
 
                     g_clk_reduce++;
@@ -836,7 +837,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                         res = res ? res : usleep(100);
                         res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
                         if (res || (d->dpump ? !noerrors_v2(errs, &badness) : !noerrors_v4(errs, &badness))) {
-                            USDR_LOG("XDEV", USDR_LOG_WARNING, "FAIL_PHASE_RX=%2d PH=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", d->lmlcal_rx_phase, ph - 1,
+                            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "FAIL_PHASE_RX=%2d PH=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", d->lmlcal_rx_phase, ph - 1,
                                      errs[0], errs[1], errs[2], errs[3], (long long)badness);
                             if (badness > 20) {
                                 if (failed_rxcnt < 6) {
@@ -851,7 +852,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                     }
                     res = res ? res : _xsdr_calibrate_txlfsr_check(d, check_to, errs, &iqserrs, &badness);
 
-                    USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE_TX=%2d  [%6d/%6d/%6d/%6d - %6d] BD=%.3e\n", ph - 1,
+                    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX=%2d  [%6d/%6d/%6d/%6d - %6d] BD=%.3e\n", ph - 1,
                              errs[0], errs[1], errs[2], errs[3], iqserrs, (double)badness);
                     if (res || (noerrors_v4(errs, &badness) /* && (iqserrs == 0)*/) || (rty > 1 && badness < 20)) {
                         phase_m = ph;
@@ -867,7 +868,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                                 return res;
 
                             if ((rty == 0 && iqserrs != 0) || iqserrs > 40) {
-                                USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE_TX[%d]=%2d ABIQ=%d\n", g, ph - 1, iqserrs);
+                                USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX[%d]=%2d ABIQ=%d\n", g, ph - 1, iqserrs);
                                 unsigned msk[12] = { 0b1100, 0b0110, 0b0011, 0b1001,   0b1000, 0b0100, 0b0010, 0b0001,  0b1100, 0b0110, 0b1001, 0b1100 };
 
                                 res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : msk[g + 1]);
@@ -877,13 +878,13 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                                 res = res ? res : usleep(10);
 
                             } else if (g > 0) {
-                                USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE_TX=%2d ABIQ=%d\n", ph - 1, iqserrs);
+                                USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX=%2d ABIQ=%d\n", ph - 1, iqserrs);
                                 break;
                             }
                         }
 
                         if ((rty == 0 && iqserrs != 0) || iqserrs > 40) {
-                            USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE_TX=%2d ABIQ=%d\n", ph - 1, iqserrs);
+                            USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX=%2d ABIQ=%d\n", ph - 1, iqserrs);
                             res = res ? res : xsdr_phy_en_lfsr_generator_mimo(d, true, true);
                             continue;
                         }
@@ -903,7 +904,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                 res = res ? res : lms7002m_limelight_toggle_ntx(&d->base.lmsstate);
                 check_rx = true;
             }
-            USDR_LOG("XDEV", USDR_LOG_WARNING, "Restoring TX pahse to %d (bandness=%" PRId64 ")\n",
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Restoring TX pahse to %d (bandness=%" PRId64 ")\n",
                      phase_m, badness_m);
 
             // Try our best at least
@@ -926,7 +927,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
             tx_badness = badness_m;
             tx_iqerrs = iqserrs2;
 
-            USDR_LOG("XDEV", USDR_LOG_INFO, "RESTORE PHASE_TX=%2d  [%6d/%6d/%6d/%6d - %6d - %6d] BD=%.3e\n", phase_m - 1,
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "RESTORE PHASE_TX=%2d  [%6d/%6d/%6d/%6d - %6d - %6d] BD=%.3e\n", phase_m - 1,
                      errs[0], errs[1], errs[2], errs[3], iqserrs, iqserrs2, (double)badness_m);
 
         phase_tx_calibrated:
@@ -951,7 +952,7 @@ no_tx:
 
     if (rx_badness || (!mmcm_rx_only_path && (tx_badness || tx_iqerrs))) {
         bool severe = (rx_badness > 100) || (!mmcm_rx_only_path && (tx_badness > 100 || tx_iqerrs > 10));
-        USDR_LOG("XDEV", severe ? USDR_LOG_ERROR : USDR_LOG_WARNING, "LML Calibration failed: RX_BADNESS=%"PRId64" TX_BADNESS=%"PRId64" TX_IQERRS=%d\n",
+        USDR_LL_LOG(dev, "XDEV", severe ? USDR_LOG_ERROR : USDR_LOG_WARNING, "LML Calibration failed: RX_BADNESS=%"PRId64" TX_BADNESS=%"PRId64" TX_IQERRS=%d\n",
                  rx_badness, mmcm_rx_only_path ? 0 : tx_badness, mmcm_rx_only_path ? 0 : tx_iqerrs);
 
         if (res == 0 && severe)
@@ -971,7 +972,7 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
     int res;
 
     if (!(((d->hwid) & 0xff) & PHY_CFG_VALID_MSK)) {
-        USDR_LOG("XDEV", USDR_LOG_ERROR, "Incompatible firmware, please update to 20250501 at least!\n");
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "Incompatible firmware, please update to 20250501 at least!\n");
         return -ENOTSUP;
     }
 
@@ -1032,7 +1033,7 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
                 res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x80000000 | sisosdrflag);
 
 
-                USDR_LOG("XDEV", USDR_LOG_INFO, "PHASE=%d\n", h);
+                USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE=%d\n", h);
                 res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x00000000);
                 unsigned tmp; //, tmp2;
                 for (unsigned k = 0; k < 100; k++) {
@@ -1087,7 +1088,7 @@ int xsdr_clk_debug_info(xsdr_dev_t *d)
     }
 
 
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "PHY - RX %08x (%d) / TX %08x (%d) / AUX %08x (%d) %d/%d/%d/%d  %d/%d/%d/%d  %d/%d/%d/%d -- %d \n",
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "PHY - RX %08x (%d) / TX %08x (%d) / AUX %08x (%d) %d/%d/%d/%d  %d/%d/%d/%d  %d/%d/%d/%d -- %d \n",
              crx, crx & 0xfffffff,
              ctx, ctx & 0xfffffff,
              caux, caux & 0xfffffff,
@@ -1098,13 +1099,13 @@ int xsdr_clk_debug_info(xsdr_dev_t *d)
 
 int xsdr_set_rx_port_switch(xsdr_dev_t *d, unsigned path)
 {
-    USDR_LOG("XDEV", USDR_LOG_INFO, "RXSW:%d\n", path);
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "RXSW:%d\n", path);
     return dev_gpo_set(d->base.lmsstate.dev, IGPO_RXSW, path);
 }
 
 int xsdr_set_tx_port_switch(xsdr_dev_t *d, unsigned path)
 {
-    USDR_LOG("XDEV", USDR_LOG_INFO, "TXSW:%d\n", path);
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "TXSW:%d\n", path);
     return dev_gpo_set(d->base.lmsstate.dev, IGPO_TXSW, path);
 }
 
@@ -1276,7 +1277,7 @@ const lms7002m_lml_map_t lms7nfe_get_lml_portcfg_o(unsigned chs, unsigned flags,
 //    else if (flags & RFIC_SWAP_IQA)
 //        diqidx |= 12;
 
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "diqidx=%d\n", diqidx);
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "diqidx=%d\n", diqidx);
     assert(diqidx < (sizeof(diqarray)/sizeof(diqarray[0])));
     return diqarray[diqidx];
 }
@@ -1386,7 +1387,7 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
         if (res)
             return res;
 
-        USDR_LOG("XDEV", USDR_LOG_INFO, "Setting FREQ  %.3f Mhz, LNB %.3f Mhz\n", freq / 1.0e6, d->lms7_lob / 1.0e6);
+        USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "Setting FREQ  %.3f Mhz, LNB %.3f Mhz\n", freq / 1.0e6, d->lms7_lob / 1.0e6);
         freq = d->lms7_lob;
     } else {
         d->lms7_lob = 0;
@@ -1545,7 +1546,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
         d->pmic_ch145_valid = true;
     }
 
-    USDR_LOG("XDEV", (good_pmic) ? USDR_LOG_INFO : USDR_LOG_ERROR, "PMIC_RFIC ver %04x (%d)\n",
+    USDR_LL_LOG(dev, "XDEV", (good_pmic) ? USDR_LOG_INFO : USDR_LOG_ERROR, "PMIC_RFIC ver %04x (%d)\n",
              rev, d->pmic_ch145_valid);
 
     if (hwid == SSDRPRO_DEV) {
@@ -1580,7 +1581,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
     }
 
     if (!pg) {
-        USDR_LOG("XDEV", USDR_LOG_INFO, "Couldn't set PMIC voltages!\n");
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "Couldn't set PMIC voltages!\n");
         return -EIO;
     }
 
@@ -1601,7 +1602,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
         usleep(100000);
 
         res = res ? res : lowlevel_spi_tr32(dev, d->base.lmsstate.subdev, 0, 0x002F0000, &chipver);
-        USDR_LOG("XDEV", USDR_LOG_INFO, "LMS7002 version %08x\n", chipver);
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "LMS7002 version %08x\n", chipver);
 
         for (unsigned j = 0; j < 5; j++) {
             res = res ? res : dev_gpo_set(dev, IGPO_LMS8_CTRL, 0x81);
@@ -1609,7 +1610,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
 
             res = res ? res : lowlevel_spi_tr32(dev, d->base.lmsstate.subdev, 0, 0x800000ff, &chipver);
             res = res ? res : lowlevel_spi_tr32(dev, d->base.lmsstate.subdev, 0, 0x000f0000, &chipver);
-            USDR_LOG("XDEV", USDR_LOG_INFO, "LMS8001 version %08x\n", chipver);
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "LMS8001 version %08x\n", chipver);
 
             res = res ? res : lms8001_create(dev, d->base.lmsstate.subdev, 0, lms8_step, &d->lms8);
 
@@ -1627,7 +1628,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
         }
 
         if (!getenv("USDR_BARE_DEV") && (!d->lms8_alive)) {
-            USDR_LOG("XDEV", USDR_LOG_ERROR, "LMS8001 not detected, check the board!\n");
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "LMS8001 not detected, check the board!\n");
             return -EFAULT;
         }
 
@@ -1710,7 +1711,7 @@ int _xsdr_init_revo(xsdr_dev_t *d)
     if (res)
         return res;
 
-    USDR_LOG("XDEV", USDR_LOG_INFO, "PMIC_LMS7 ver %04x\n", rev);
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PMIC_LMS7 ver %04x\n", rev);
     if (rev != 0xe001) {
         return -EIO;
     }
@@ -1739,7 +1740,7 @@ int _xsdr_init_revo(xsdr_dev_t *d)
         usleep(1000);
     }
     if (!bpg) {
-        USDR_LOG("XDEV", USDR_LOG_ERROR, "PMIC_LMS7: couldn't set LMS7 volatges, giving up!\n");
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "PMIC_LMS7: couldn't set LMS7 volatges, giving up!\n");
         return -EIO;
     }
 
@@ -1751,7 +1752,7 @@ int _xsdr_init_revo(xsdr_dev_t *d)
     if (res)
         return res;
 
-    USDR_LOG("XDEV", USDR_LOG_INFO, "PMIC_RFIC ver %04x\n", rev);
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PMIC_RFIC ver %04x\n", rev);
     if (rev != 0xe001) {
         return -EIO;
     }
@@ -1769,7 +1770,7 @@ int _xsdr_init_revo(xsdr_dev_t *d)
     if (res)
         return res;
 
-    USDR_LOG("XDEV", USDR_LOG_INFO, "DAC_ID=%x\n", devid);
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "DAC_ID=%x\n", devid);
     switch (devid) {
     case 0x0194:
     case 0x0195:
@@ -1793,7 +1794,7 @@ int _xsdr_init_revo(xsdr_dev_t *d)
         return res;
 
     d->dac_old_r5 = true;
-    USDR_LOG("XDEV", USDR_LOG_INFO, "Detected r5\n");
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "Detected r5\n");
     return 0;
 
 rev4_check:
@@ -1806,7 +1807,7 @@ rev4_check:
         return res;
 
     if (cfg == 0xdeadbeef) {
-        USDR_LOG("XDEV", USDR_LOG_ERROR, "MCP Config = %08x\n", cfg);
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "MCP Config = %08x\n", cfg);
     }
 
     // unsigned q, r;
@@ -1826,7 +1827,7 @@ rev4_check:
     // }
 
     d->dac_old_r5 = false;
-    USDR_LOG("XDEV", USDR_LOG_INFO, "Detected r4\n");
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "Detected r4\n");
     return 0;
 }
 
@@ -1836,14 +1837,14 @@ int _xsdr_pwren_revx(xsdr_dev_t *d, bool on)
     int res;
     lldev_t dev = d->base.lmsstate.dev;
 
-    USDR_LOG("XDEV", (on && !d->pmic_ch145_valid) ? USDR_LOG_ERROR : USDR_LOG_INFO,
+    USDR_LL_LOG(dev, "XDEV", (on && !d->pmic_ch145_valid) ? USDR_LOG_ERROR : USDR_LOG_INFO,
              "RFIC PWR:%d CH145:%d\n", on, d->pmic_ch145_valid);
     if (on && !d->pmic_ch145_valid) {
         // 1V45 is cricial for Rev0 XSDR and can be ignored in Rev2
         int id = -1;
         res = xsdr_gettemp_id(d, &id);
         if (res == 0) {
-            USDR_LOG("XDEV", USDR_LOG_WARNING, "TEMP ID: %04x\n", id);
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "TEMP ID: %04x\n", id);
         }
 
         return -EIO;
@@ -1885,7 +1886,7 @@ int xsdr_set_vio(xsdr_dev_t *d, unsigned vio_mv)
         else if (vio_mv < 1600)
             vio_mv = 1600;
 
-        USDR_LOG("XDEV", USDR_LOG_WARNING, "VIO set to %d mV\n", vio_mv);
+        USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_WARNING, "VIO set to %d mV\n", vio_mv);
         return lp8758_vout_set(d->base.lmsstate.dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA, 1, vio_mv);
     }
 
@@ -1894,7 +1895,7 @@ int xsdr_set_vio(xsdr_dev_t *d, unsigned vio_mv)
     else if (vio_mv < 1600)
         vio_mv = 1600;
 
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "VIO set to %d mV\n", vio_mv);
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_WARNING, "VIO set to %d mV\n", vio_mv);
     return lp8758_vout_set(d->base.lmsstate.dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA,
                            d->ssdr_pro ? 3 : 1, vio_mv);
 }
@@ -1953,7 +1954,7 @@ int xsdr_init(xsdr_dev_t *d)
         return res;
 
     hwcfg_devid = (hwid >> 16) & 0xff;
-    USDR_LOG("XDEV", USDR_LOG_ERROR, "HWID %08x\n", hwid);
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "HWID %08x\n", hwid);
 
     const uint8_t phycfg_id = hwid & 0xff;
     const bool rx_port_is_1 = ((phycfg_id & PHY_CFG_LML2_IS_RX) != PHY_CFG_LML2_IS_RX);
@@ -1984,7 +1985,7 @@ int xsdr_init(xsdr_dev_t *d)
     case SSDR_DEV: d->new_rev = true; d->ssdr = true; break;
     case SSDRPRO_DEV: d->new_rev = true; d->ssdr = true; d->ssdr_pro = true; break;
     default:
-        USDR_LOG("XDEV", USDR_LOG_ERROR, "unsupported hwcfg_devid=%02x\n", hwcfg_devid);
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "unsupported hwcfg_devid=%02x\n", hwcfg_devid);
 
         if (getenv("XSDR_FORCE")) {
             d->new_rev = true;
@@ -2035,7 +2036,7 @@ int xsdr_dtor(xsdr_dev_t *d)
         res = res ? res : lp8758_vout_ctrl(dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA, 1, 0, 1);
     }
 
-    USDR_LOG("XDEV", USDR_LOG_INFO, "destroyed\n");
+    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "destroyed\n");
     return res;
 }
 
@@ -2047,7 +2048,7 @@ int xsdr_prepare(xsdr_dev_t *d, bool rxen, bool txen)
     if (d->base.cgen_clk == 0) {
         const unsigned default_rate = 1000000;
 
-        USDR_LOG("XDEV", USDR_LOG_WARNING, "clock rate isn't set, defaulting to %d!\n", default_rate);
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "clock rate isn't set, defaulting to %d!\n", default_rate);
         res = xsdr_set_samplerate_ex(d,
                                      rxen ? default_rate : 0,
                                      txen ? default_rate : 0,
@@ -2274,7 +2275,7 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     uint8_t old_rx_lna = d->base.rx_rfic_path;
     uint8_t old_tx_lna = d->base.tx_rfic_path;
     uint8_t tx_loss[2] = { d->base.tx_loss[0] , d->base.tx_loss[1] };
-
+    lldev_t dev = d->base.lmsstate.dev;
     if (channel > 1) {
         return -EINVAL;
     }
@@ -2298,7 +2299,7 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
         return res;
 
     if ((param & XSDR_CAL_RXLO) && (rx_lo > 0)) {
-        USDR_LOG("LMS7", USDR_LOG_INFO, "------------------ Calibration RXLO(%c) ------------------\n", 'A' + channel);
+        USDR_LL_LOG(dev, "LMS7", USDR_LOG_INFO, "------------------ Calibration RXLO(%c) ------------------\n", 'A' + channel);
 
         // Do not touch anything since it may affect optimal I/Q correction values
         // Turn OFF digital RX LO cancellation in RSP
@@ -2335,7 +2336,7 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
 
     if ((param & XSDR_CAL_RXIQIMB) && (rx_lo > 0)) {
         // TODO if TX was disabled enable TX
-        USDR_LOG("LMS7", USDR_LOG_INFO, "------------------ Calibration RXIQIMB(%c) ------------------\n", 'A' + channel);
+        USDR_LL_LOG(dev, "LMS7", USDR_LOG_INFO, "------------------ Calibration RXIQIMB(%c) ------------------\n", 'A' + channel);
         if (!externallb) {
             res = (res) ? res : _xsdr_path_lb(d, rx_rfic_lna, tx_rfic_band, channel, true);
         }
@@ -2350,7 +2351,7 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
             //res = (res) ? res : lms7_afe_ctrl(&d->lmsstate, true, false, false, false);
         }
         if (res) {
-            USDR_LOG("LMS7", USDR_LOG_WARNING, " RXIQIMB failed: res=%d\n", res);
+            USDR_LL_LOG(dev, "LMS7", USDR_LOG_WARNING, " RXIQIMB failed: res=%d\n", res);
             return res;
         }
         if (sarray) {
@@ -2372,12 +2373,12 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
             return res;
 
         if (param & XSDR_CAL_TXLO) {
-            USDR_LOG("LMS7", USDR_LOG_INFO, "------------------ Calibration TXLO(%c) ------------------\n", 'A' + channel);
+            USDR_LL_LOG(dev, "LMS7", USDR_LOG_INFO, "------------------ Calibration TXLO(%c) ------------------\n", 'A' + channel);
             // res = (res) ? res : lms7_txtsp_dc_corr(&d->base.lmsstate, true);
             // res = (res) ? res : lms7002m_xxtsp_dc_corr(&d->base.lmsstate, LMS_TXTSP, false, 0);
             res = (res) ? res : calibrate_txlo(&cops);
             if (res) {
-                USDR_LOG("LMS7", USDR_LOG_WARNING, " TXLO failed: res=%d\n", res);
+                USDR_LL_LOG(dev, "LMS7", USDR_LOG_WARNING, " TXLO failed: res=%d\n", res);
                 return res;
             }
             if (sarray) {
@@ -2387,10 +2388,10 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
         }
 
         if (param & XSDR_CAL_TXIQIMB) {
-            USDR_LOG("LMS7", USDR_LOG_INFO, "------------------ Calibration TXIQIMB(%c) ------------------\n", 'A' + channel);
+            USDR_LL_LOG(dev, "LMS7", USDR_LOG_INFO, "------------------ Calibration TXIQIMB(%c) ------------------\n", 'A' + channel);
             res = (res) ? res : calibrate_txiqimb(&cops);
             if (res) {
-                USDR_LOG("LMS7", USDR_LOG_WARNING, " TXIQIMB failed: res=%d\n", res);
+                USDR_LL_LOG(dev, "LMS7", USDR_LOG_WARNING, " TXIQIMB failed: res=%d\n", res);
                 return res;
             }
             if (sarray) {
@@ -2405,14 +2406,14 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
             res = (res) ? res : lms7002m_sxx_disable(&d->base.lmsstate, SXX_TX);
         }
         if (res) {
-            USDR_LOG("LMS7", USDR_LOG_WARNING, "restore configuration failed: res=%d\n", res);
+            USDR_LL_LOG(dev, "LMS7", USDR_LOG_WARNING, "restore configuration failed: res=%d\n", res);
             return res;
         }
     }
     if (norestore)
         return 0;
 
-    USDR_LOG("LMS7", USDR_LOG_INFO, "Calibration: restoring RXPATH=%d TXPATH=%d TXCFG=%d RXCFG=%d\n",
+    USDR_LL_LOG(dev, "LMS7", USDR_LOG_INFO, "Calibration: restoring RXPATH=%d TXPATH=%d TXCFG=%d RXCFG=%d\n",
              old_rx_lna, old_tx_lna, old_dsp_txcfg, old_dsp_rxcfg);
 
     // Restore individual PAD attenuation

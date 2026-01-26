@@ -534,9 +534,8 @@ int dev_m2_lm7_1_debug_lms7002m_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint6
 
     d->debug_lms7002m_last = ~0u;
     res = lowlevel_spi_tr32(d->base.dev, 0, SPI_LMS7, value & 0xffffffff, &d->debug_lms7002m_last);
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug LMS7/%d REG %08x => %08x\n",
-             lowlevel_get_devname(d->base.dev), chan, (unsigned)value,
-             d->debug_lms7002m_last);
+    USDR_LL_LOG(d->base.dev, "XDEV", USDR_LOG_WARNING, "Debug LMS7/%d REG %08x => %08x\n",
+                chan, (unsigned)value, d->debug_lms7002m_last);
     return res;
 }
 
@@ -544,9 +543,8 @@ int dev_m2_lm7_1_debug_lms8001_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
     int res = xsdr_trspi_lms8(&d->xdev, value & 0xffffffff, &d->debug_lms8001_last);
-    USDR_LOG("XDEV", USDR_LOG_WARNING, "%s: Debug LMS8 REG %08x => %08x\n",
-             lowlevel_get_devname(d->base.dev), (unsigned)value,
-             d->debug_lms8001_last);
+    USDR_LL_LOG(d->base.dev, "XDEV", USDR_LOG_WARNING, "Debug LMS8 REG %08x => %08x\n",
+                (unsigned)value, d->debug_lms8001_last);
     return res;
 }
 
@@ -598,7 +596,7 @@ int dev_m2_lm7_1_sdr_rx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
     unsigned qg = ((value >> 16) & 0xffff);
     unsigned pcorr = ((value >> 48) & 0xffff);
 
-    USDR_LOG("UDEV", USDR_LOG_NOTE, "RXGAC CH=%d I=%d Q=%d A=%d\n", chan, ig, qg, pcorr);
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_NOTE, "RXGAC CH=%d I=%d Q=%d A=%d\n", chan, ig, qg, pcorr);
 
     res = (res) ? res : lms7002m_xxtsp_iq_gcorr(&d->xdev.base.lmsstate, LMS_RXTSP, ig, qg);
     res = (res) ? res : lms7002m_xxtsp_iq_phcorr(&d->xdev.base.lmsstate, LMS_RXTSP, pcorr);
@@ -616,7 +614,7 @@ int dev_m2_lm7_1_sdr_tx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
     unsigned qg = ((value >> 16) & 0xffff);
     unsigned pcorr = ((value >> 48) & 0xffff);
 
-    USDR_LOG("UDEV", USDR_LOG_NOTE, "TXGAC CH=%d I=%d Q=%d A=%d\n", chan, ig, qg, pcorr);
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_NOTE, "TXGAC CH=%d I=%d Q=%d A=%d\n", chan, ig, qg, pcorr);
 
     res = (res) ? res : lms7002m_xxtsp_iq_gcorr(&d->xdev.base.lmsstate, LMS_TXTSP, ig, qg);
     res = (res) ? res : lms7002m_xxtsp_iq_phcorr(&d->xdev.base.lmsstate, LMS_TXTSP, pcorr);
@@ -740,7 +738,7 @@ int dev_m2_lm7_1_rfe_nco_pwrdc_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* 
 
     res = lowlevel_reg_rdndw(d->base.dev, 0, /* REG_RD_UNUSED_0 */ 7, (uint32_t*)&val[0], 2);
 
-    USDR_LOG("UDEV", USDR_LOG_NOTE, "DCV I=%d Q=%d\n", val[0], val[1]);
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_NOTE, "DCV I=%d Q=%d\n", val[0], val[1]);
 
     double i = val[0];
     double q = val[1];
@@ -1027,7 +1025,7 @@ int _sdr_get_path(const char* param)
 {
     int idx = find_param_list(param, s_path_list, SIZEOF_ARRAY(s_path_list));
     if (idx < 0) {
-        USDR_LOG("UDEV", USDR_LOG_WARNING, "m2_lm7_1_GPS: unknown '%s' path!\n",
+        USDR_LOG("UDEV", USDR_LOG_WARNING, "Unknown '%s' path!\n",
                  param);
         return -EINVAL;
     }
@@ -1079,7 +1077,7 @@ int dev_m2_lm7_1_sdr_tx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
 int dev_m2_lm7_1_sdr_refclk_frequency_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    USDR_LOG("UDEV", USDR_LOG_WARNING, "m2_lm7_1_GPS: Set fref=%d\n", (unsigned)value);
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "Set fref=%d\n", (unsigned)value);
     d->xdev.base.fref = value;
     return 0;
 }
@@ -1106,7 +1104,7 @@ int dev_m2_lm7_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
     }
 
     xsdr_set_extref(&d->xdev, value ? true : false, d->xdev.base.fref);
-    USDR_LOG("UDEV", USDR_LOG_INFO, "m2_lm7_1_GPS: set clk ref path to %d\n", (int)value);
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_INFO, "Set clk ref path to %d\n", (int)value);
     return 0;
 }
 
@@ -1124,7 +1122,7 @@ void usdr_device_m2_lm7_1_destroy(pdevice_t udev)
     }
 
     xsdr_dtor(&d->xdev);
-    USDR_LOG("UDEV", USDR_LOG_INFO, "m2_lm7_1_GPS: turnoff\n");
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_INFO, "Turnoff\n");
 
     usdr_device_base_destroy(udev);
 }
@@ -1132,7 +1130,7 @@ void usdr_device_m2_lm7_1_destroy(pdevice_t udev)
 int dev_m2_lm7_1_tx_antennat_port_cfg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    USDR_LOG("UDEV", USDR_LOG_INFO, "m2_lm7_1_GPS: tx antennat port cfg:%d\n", (unsigned)value);
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_INFO, "Tx antennat port cfg:%d\n", (unsigned)value);
     return xsdr_tx_antennat_port_cfg(&d->xdev, value);
 }
 
@@ -1213,13 +1211,13 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
     {
         res = vfs_add_const_i64_vec(&udev->rootfs, ssdr_params_m2_lm7_1_rev000, SIZEOF_ARRAY(ssdr_params_m2_lm7_1_rev000));
         if (res)
-            USDR_LOG("UDEV", USDR_LOG_WARNING, "Unable to set device name \"ssdr\"!\n");
+            USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "Unable to set device name \"ssdr\"!\n");
     }
     else
     {
         res = vfs_add_const_i64_vec(&udev->rootfs, xsdr_params_m2_lm7_1_rev000, SIZEOF_ARRAY(xsdr_params_m2_lm7_1_rev000));
         if (res)
-            USDR_LOG("UDEV", USDR_LOG_WARNING, "Unable to set device name \"xsdr\"!\n");
+            USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "Unable to set device name \"xsdr\"!\n");
     }
 
     d->xdev.dpump = d->double_pump;
@@ -1332,7 +1330,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         struct sfetrx4_config rxcfg;
         res = parse_sfetrx4(dformat, &lchans, pktsyms, channels->count, &rxcfg);
         if (res) {
-            USDR_LOG("UDEV", USDR_LOG_ERROR, "Unable to parse RX stream configuration!\n");
+            USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_ERROR, "Unable to parse RX stream configuration!\n");
             return res;
         }
 
@@ -1365,7 +1363,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
                                     flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE, 0,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
         if (res) {
-            USDR_LOG("XSDR", USDR_LOG_ERROR, "Unable to create stream '%s': error=%d\n", sid, res);
+            USDR_LL_LOG(d->base.dev, "XSDR", USDR_LOG_ERROR, "Unable to create stream '%s': error=%d\n", sid, res);
             return res;
         }
 
@@ -1383,7 +1381,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         struct sfetrx4_config txcfg;
         res = parse_sfetrx4(dformat, &lchans, pktsyms, channels->count, &txcfg);
         if (res) {
-            USDR_LOG("UDEV", USDR_LOG_ERROR, "Unable to parse TX stream configuration!\n");
+            USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_ERROR, "Unable to parse TX stream configuration!\n");
             return res;
         }
 

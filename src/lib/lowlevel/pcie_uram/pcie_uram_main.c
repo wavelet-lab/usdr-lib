@@ -98,12 +98,12 @@ int pcie_reg_write32_ioctl(pcie_uram_dev_t* dev, unsigned dwoff, unsigned data)
     int res = ioctl(dev->fd, PCIE_DRIVER_HWREG_WR32, &rop);
     if (res == -1) {
         int err = -errno;
-        USDR_LOG("PCIE", USDR_LOG_ERROR,
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
                  "pcie:%s unable to write register %d, error %d\n", dev->name, dwoff, err);
         return err;
     }
 
-    USDR_LOG("PCIE", USDR_LOG_TRACE, "Write[%d] <= %08x\n",
+    USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_TRACE, "Write[%d] <= %08x\n",
              dwoff, data);
     return 0;
 }
@@ -117,12 +117,12 @@ int pcie_reg_read32_ioctl(pcie_uram_dev_t* dev, unsigned dwoff, unsigned* data)
     int res = ioctl(dev->fd, PCIE_DRIVER_HWREG_RD32, &rop);
     if (res == -1) {
         int err = -errno;
-        USDR_LOG("PCIE", USDR_LOG_ERROR,
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
                  "pcie:%s unable to read register %d, error %d\n", dev->name, dwoff, err);
         return err;
     }
 
-    USDR_LOG("PCIE", USDR_LOG_TRACE, "Read [%d] => %08x\n",
+    USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_TRACE, "Read [%d] => %08x\n",
              dwoff, rop.value);
     *data = rop.value;
     return 0;
@@ -198,14 +198,14 @@ int pcie_reg_op_iommap(struct pcie_uram_dev* d, unsigned ls_op_addr,
                 d->mmaped_io[d->db.idxreg_base[k]] = htobe32(ls_op_addr - d->db.idxreg_virt_base[k] + i);
                 if (i < memoutsz / 4) {
                     d->mmaped_io[d->db.idxreg_base[k] + 1] = htobe32(outa[i]);\
-                    USDR_LOG("PCIE", USDR_LOG_TRACE, "Write[%d+%d -> %d] <= %08x\n",
+                    USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_TRACE, "Write[%d+%d -> %d] <= %08x\n",
                              d->db.idxreg_virt_base[k],
                              ls_op_addr - d->db.idxreg_virt_base[k] + i,
                              d->db.idxreg_base[k] + 1, outa[i]);
                 }
                 if (i < meminsz / 4) {
                     ina[i] = be32toh(d->mmaped_io[d->db.idxreg_base[k] + 1]);
-                    USDR_LOG("PCIE", USDR_LOG_TRACE, "Read [%d+%d -> %d] => %08x\n",
+                    USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_TRACE, "Read [%d+%d -> %d] => %08x\n",
                              d->db.idxreg_virt_base[k],
                              ls_op_addr - d->db.idxreg_virt_base[k] + i,
                              d->db.idxreg_base[k] + 1, ina[i]);
@@ -224,18 +224,18 @@ int pcie_reg_op_iommap(struct pcie_uram_dev* d, unsigned ls_op_addr,
             uint64_t outb = htobe32(outa[i]) | (((uint64_t)htobe32(outa[i + 1])) << 32);
             *((uint64_t*)&d->mmaped_io[ls_op_addr + i]) = outb;
 
-            USDR_LOG("PCIE", USDR_LOG_TRACE, "Write64[%d] <= %08x%08x\n",
+            USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_TRACE, "Write64[%d] <= %08x%08x\n",
                      ls_op_addr + i, outa[i], outa[i + 1]);
             i++;
         } else {
             d->mmaped_io[ls_op_addr + i] = htobe32(outa[i]);
-            USDR_LOG("PCIE", USDR_LOG_TRACE, "Write32[%d] <= %08x\n",
+            USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_TRACE, "Write32[%d] <= %08x\n",
                      ls_op_addr + i, outa[i]);
         }
     }
     for (i = 0; i < indwsz; i++) {
         ina[i] = be32toh(d->mmaped_io[ls_op_addr + i]);
-        USDR_LOG("PCIE", USDR_LOG_TRACE, "Read [%d] => %08x\n",
+        USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_TRACE, "Read [%d] => %08x\n",
                  ls_op_addr + i, ina[i]);
     }
     return 0;
@@ -261,7 +261,7 @@ int pcie_i2c_read(pcie_uram_dev_t* dev, unsigned reg_base, unsigned control, uns
             break;
     }
     if (i == 100) {
-        USDR_LOG("PCIE", USDR_LOG_ERROR, "i2c: data not ready, status = %08x!\n", stat);
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR, "i2c: data not ready, status = %08x!\n", stat);
         return -EIO;
     }
 
@@ -287,7 +287,7 @@ int pcie_spi_transact(pcie_uram_dev_t* dev, unsigned bus, unsigned in, unsigned 
             break;
     }
     if (i == 100) {
-        USDR_LOG("PCIE", USDR_LOG_ERROR, "spi: data not ready, status = %08x!\n", out);
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR, "spi: data not ready, status = %08x!\n", out);
         return -EIO;
     }
 
@@ -359,7 +359,7 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
         if (res)
             return -errno;
 
-        USDR_LOG("PCIE", USDR_LOG_NOTE, "SPI%d: DW=%08x => %08x\n", SPIEXT_LSOP_GET_BUS(ls_op_addr), *(const uint32_t*)pout, iospi.dw_io);
+        USDR_LL_LOG(dev, "PCIE", USDR_LOG_NOTE, "SPI%d: DW=%08x => %08x\n", SPIEXT_LSOP_GET_BUS(ls_op_addr), *(const uint32_t*)pout, iospi.dw_io);
 
         if (meminsz) {
             if (pdb->spi_core[SPIEXT_LSOP_GET_BUS(ls_op_addr)] == SPI_CORE_32W) {
@@ -390,7 +390,7 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
 
         usleep(1000);
 
-        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d.%d.%d: W=%d R=%d OUT=%s\n",
+        USDR_LL_LOG(dev, "PCIE", USDR_LOG_NOTE, "I2C%d.%d.%d: W=%d R=%d OUT=%s\n",
                  LSOP_I2C_INSTANCE(ls_op_addr), LSOP_I2C_BUSNO(ls_op_addr),
                  LSOP_I2C_ADDR(ls_op_addr), ioi2c.wcnt, ioi2c.rcnt, _dump_buffer(memoutsz, pout));
 
@@ -401,7 +401,7 @@ int pcie_uram_ls_op(lldev_t dev, subdev_t subdev,
         if (meminsz <= sizeof(ioi2c.rdb)) {
             memcpy(pin, ioi2c.rdb, meminsz);
         }
-        USDR_LOG("PCIE", USDR_LOG_NOTE, "I2C%d.%d.%d:         => %s\n",
+        USDR_LL_LOG(dev, "PCIE", USDR_LOG_NOTE, "I2C%d.%d.%d:         => %s\n",
                  LSOP_I2C_INSTANCE(ls_op_addr), LSOP_I2C_BUSNO(ls_op_addr),
                  LSOP_I2C_ADDR(ls_op_addr), _dump_buffer(meminsz, pin));
 
@@ -440,11 +440,11 @@ int pcie_uram_stream_initialize(lldev_t dev, subdev_t subdev,
     res = ioctl(d->fd, PCIE_DRIVER_DMA_CONF, &pdsc);
     if (res) {
         res = -errno;
-        USDR_LOG("PCIE", USDR_LOG_ERROR, "Unable to initialize driver DMA configuration, error %d\n", res);
+        USDR_LL_LOG(dev, "PCIE", USDR_LOG_ERROR, "Unable to initialize driver DMA configuration, error %d\n", res);
         return res;
     }
     if (pdsc.sno >= SIZEOF_ARRAY(d->scache)) {
-        USDR_LOG("PCIE", USDR_LOG_ERROR, "ioctl(PCIE_DRIVER_DMA_CONF) returned incorrect stream index! idx=%d\n", pdsc.sno);
+        USDR_LL_LOG(dev, "PCIE", USDR_LOG_ERROR, "ioctl(PCIE_DRIVER_DMA_CONF) returned incorrect stream index! idx=%d\n", pdsc.sno);
         return -EINVAL;
     }
 
@@ -485,7 +485,7 @@ int pcie_uram_stream_initialize(lldev_t dev, subdev_t subdev,
     //d->bit_per_all_sym[pdsc.sno] = params->bits_per_sym;
     params->underlying_fd = d->fd;
     params->out_mtu_size = pdsc.dma_buf_sz;
-    USDR_LOG("PCIE", USDR_LOG_INFO, "Configured stream%d: %d X %d (vma_off=%08lx vma_len=%08lx)\n",
+    USDR_LL_LOG(dev, "PCIE", USDR_LOG_INFO, "Configured stream%d: %d X %d (vma_off=%08lx vma_len=%08lx)\n",
              pdsc.sno, pdsc.dma_buf_sz, pdsc.dma_bufs, pdsc.out_vma_off, pdsc.out_vma_length);
     return 0;
 
@@ -563,19 +563,19 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
             sc->oob_idx = 0;
 
             if (res * 16 != data.ooblength) {
-                USDR_LOG("PCIE", USDR_LOG_CRITICAL_WARNING, " RES %d != %d OOBLEN\n", res, sc->oob_size);
+                USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_CRITICAL_WARNING, " RES %d != %d OOBLEN\n", res, sc->oob_size);
             }
         }
         if (res < 0) {
             res = -errno;
             if (res != -ETIMEDOUT) {
-                USDR_LOG("PCIE", USDR_LOG_CRITICAL_WARNING, "STR[%d]: PCIe %s dma buffer alloc error: %d!\n",
+                USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_CRITICAL_WARNING, "STR[%d]: PCIe %s dma buffer alloc error: %d!\n",
                          channel, rx ? "recv" : "send", res);
             } else if (rx) {
                 unsigned stat[4];
                 // TODO: Remove hardcoded address to upper layer
                 pcie_reg_op_iommap(d, 4, &stat[0], 12, NULL, 0);
-                USDR_LOG("PCIE", USDR_LOG_NOTE, "STR[%d]: PCIe recv dma buffer alloc timed out stat=%08x:%08x:%08x %08x!\n",
+                USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_NOTE, "STR[%d]: PCIe recv dma buffer alloc timed out stat=%08x:%08x:%08x %08x!\n",
                          channel, stat[0], stat[1], stat[2], stat[3]);
 
                 uint32_t* oob32 = (uint32_t*)oob_ptr;
@@ -586,7 +586,7 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
                 unsigned stat[4];
                 // TODO: Remove hardcoded address to upper layer
                 pcie_reg_op_iommap(d, 28, &stat[0], 16, NULL, 0);
-                USDR_LOG("PCIE", USDR_LOG_NOTE, "STR[%d]: PCIe send dma buffer alloc timed out stat=%08x:%08x:%08x %08x!\n",
+                USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_NOTE, "STR[%d]: PCIe send dma buffer alloc timed out stat=%08x:%08x:%08x %08x!\n",
                          channel, stat[0], stat[1], stat[2], stat[3]);
             }
             return res;
@@ -594,7 +594,7 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
         }
 
         sc->bufavail = res;
-        USDR_LOG("PCIE", (res > 1) ? USDR_LOG_NOTE : USDR_LOG_DEBUG, "STR[%d]: Alloced %d buffs, BNO=%d (%016lx) seq=%16ld OOB_sz=%d\n",
+        USDR_LL_LOG(&d->ll, "PCIE", (res > 1) ? USDR_LOG_NOTE : USDR_LOG_DEBUG, "STR[%d]: Alloced %d buffs, BNO=%d (%016lx) seq=%16ld OOB_sz=%d\n",
                  channel, res, sc->bno, (oob_ptr) ? (*(uint64_t*)sc->oob_cache) : 0, sc->seq, sc->oob_size);
     }
 
@@ -613,7 +613,7 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
             *oob_size = 2 * sizeof(uint64_t);
             sc->oob_idx++;
         } else {
-            USDR_LOG("PCIE", USDR_LOG_CRITICAL_WARNING, "No OOB data available for %d idx (%d size)!\n",
+            USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_CRITICAL_WARNING, "No OOB data available for %d idx (%d size)!\n",
                      sc->oob_idx, sc->oob_size);
 
             sc->oob_idx++;
@@ -648,7 +648,7 @@ int pcie_uram_recv_dma_release(lldev_t dev, subdev_t subdev, stream_t channel, v
     if (res) {
         res = -errno;
         if (res != -EAGAIN) {
-            USDR_LOG("PCIE", USDR_LOG_CRITICAL_WARNING, "PCIe recv dma buffer release error: %d!\n", res);
+            USDR_LL_LOG(dev, "PCIE", USDR_LOG_CRITICAL_WARNING, "PCIe recv dma buffer release error: %d!\n", res);
         }
         return res;
     }
@@ -674,7 +674,7 @@ int pcie_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, vo
         return -EINVAL;
 
     if (sc->cfg_bufsize < sz) {
-        USDR_LOG("PCIE", USDR_LOG_CRITICAL_WARNING, "Stream was configured with %d DMA buffer but tried to write %d!\n",
+        USDR_LL_LOG(dev, "PCIE", USDR_LOG_CRITICAL_WARNING, "Stream was configured with %d DMA buffer but tried to write %d!\n",
                  d->scache[channel].cfg_bufsize, sz);
         return -EINVAL;
     }
@@ -727,7 +727,7 @@ int pcie_uram_destroy(lldev_t dev)
     close(d->fd);
     d->fd = -1;
 
-    USDR_LOG("PCIE", USDR_LOG_INFO, "Device %s destroyed!\n", d->name);
+    USDR_LL_LOG(dev, "PCIE", USDR_LOG_INFO, "Device %s destroyed!\n", d->name);
 
     free(d);
     return 0;
@@ -781,7 +781,7 @@ static int pcie_filtering_params_parse(unsigned pcount, const char** filterparam
                 j = 3;
             } else {
                 // Non-compatible bus
-                USDR_LOG("USBX", USDR_LOG_TRACE, "`%s` ignored by PCI driver\n", val);
+                USDR_LOG("PCIE", USDR_LOG_TRACE, "`%s` ignored by PCI driver\n", val);
                 return -ENODEV;
             }
 
@@ -931,7 +931,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     err = ioctl(fd, PCIE_DRIVER_GET_UUID, &did);
     if (err) {
         err = -errno;
-        USDR_LOG("PCIE", USDR_LOG_ERROR,
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
                  "Unable to get device uuid, error %d\n", err);
         goto remove_dev;
     }
@@ -939,7 +939,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     err = ioctl(fd, PCIE_DRIVER_CLAIM_VERSION, USDR_DRIVER_ABI_VERSION);
     if (err) {
         err = -errno;
-        USDR_LOG("PCIE", USDR_LOG_ERROR,
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
                  "ABI verification failed %d, you need to update the driver or host libraries!\n", err);
         goto remove_dev;
     }
@@ -949,7 +949,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
 
     err = usdr_device_create(&dev->ll, did);
     if (err) {
-        USDR_LOG("PCIE", USDR_LOG_ERROR,
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
                  "Unable to find device spcec for %s, uuid %s! Update software!\n",
                  dev->name,
                  usdr_device_id_to_str(did));
@@ -959,7 +959,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
 
     err = device_bus_init(dev->ll.pdev, &dev->db);
     if (err) {
-        USDR_LOG("PCIE", USDR_LOG_ERROR,
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
                  "Unable to initialize bus parameters for the device %s!\n", dev->name);
 
         goto remove_dev;
@@ -982,7 +982,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
         goto remove_dev;
     }
     if (dev->db.bucket_count != 1) {
-        USDR_LOG("PCIE", USDR_LOG_ERROR, "Broken device description: no bucket!\n");
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR, "Broken device description: no bucket!\n");
         err = -ENOSPC;
         goto remove_dev;
     }
@@ -1049,7 +1049,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     err = err ? err : ioctl(fd, PCIE_DRIVER_SET_DEVLAYOUT, &dl);
     if (err) {
         err = -errno;
-        USDR_LOG("PCIE", USDR_LOG_ERROR,
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
                  "Unable to set device driver layout, error %d\n", err);
         goto remove_dev;
     }
@@ -1057,7 +1057,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     if (mmapedio) {
         dev->mmaped_io = mmap(NULL, iospacesz, PROT_READ | PROT_WRITE, MAP_SHARED, dev->fd, 0);
         if (dev->mmaped_io == MAP_FAILED) {
-            USDR_LOG("PCIE", USDR_LOG_CRITICAL_WARNING, "Unable to use MMAPed IO, falling back to ioctl(), error: %d",
+            USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_CRITICAL_WARNING, "Unable to use MMAPed IO, falling back to ioctl(), error: %d",
                      errno);
 
             dev->mmaped_io = NULL;
@@ -1067,7 +1067,7 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     // Device initialization
     err = err ? err : dev->ll.pdev->initialize(dev->ll.pdev, pcount, devparam, devval);
     if (err) {
-        USDR_LOG("PCIE", USDR_LOG_ERROR,
+        USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
                  "Unable to initialize device, error %d\n", err);
         goto clear_map;
     }
