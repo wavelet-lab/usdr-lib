@@ -638,11 +638,18 @@ int ext_fe_ch4_400_7200_init(lldev_t dev,
     res = (res) ? res : tca6424a_reg16_get(dev, subdev, I2C_TCA6424AR_U300, TCA6424_CFG0, &val16[2]);
     res = (res) ? res : tca6424a_reg16_get(dev, subdev, I2C_TCA6424AR_U301, TCA6424_CFG0, &val16[3]);
 
-    USDR_LOG("FE4C", USDR_LOG_ERROR, "Temp ID = %4x, {U114/U110/U300/U301}_Cfg0 = %4x/%4x/%4x/%4x\n", val,
-             val16[0], val16[1], val16[2], val16[3]);
+    if (res) {
+        USDR_LOG("FE4C", USDR_LOG_ERROR, "Unable to initialize I2C bus, error: %d\n", res);
+    } else {
+        USDR_LOG("FE4C", USDR_LOG_ERROR, "Temp ID = %4x, {U114/U110/U300/U301}_Cfg0 = %4x/%4x/%4x/%4x\n", val,
+                 val16[0], val16[1], val16[2], val16[3]);
+    }
 
     if (res || val != TMP114_DEVICE_ID)
         return res;
+
+    //res = (res) ? res : tmp114_config_set(dev, subdev, I2C_TEMP_U69, 0x4);
+    //res = (res) ? res : tmp114_temp_get(dev, subdev, I2C_TEMP_U69, &val);
 
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_1PPS, GPIO_CFG_ALT0);
 
@@ -655,9 +662,6 @@ int ext_fe_ch4_400_7200_init(lldev_t dev,
     res = (res) ? res : tca6424a_reg8_set(dev, subdev, I2C_TCA6424AR_U114, TCA6424_CFG0 + 2, 0);
     res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U110, TCA6424_CFG0, 0);
     res = (res) ? res : tca6424a_reg8_set(dev, subdev, I2C_TCA6424AR_U110, TCA6424_CFG0 + 2, 0);
-
-    res = (res) ? res : tmp114_temp_get(dev, subdev, I2C_TEMP_U69, &val);
-    USDR_LOG("FE4C", USDR_LOG_ERROR, "Temp %.2fC\n", val / 256.0);
 
     // User initialization
     ob->ref_gps = 1;
@@ -687,6 +691,14 @@ int ext_fe_ch4_400_7200_init(lldev_t dev,
         //return -ENODEV;
         // ob->dac_present = false;
     }
+
+    uint64_t uid;
+    res = (res) ? res : tmp114_uid_get(dev, subdev, I2C_TEMP_U69, &uid);
+    res = (res) ? res : tmp114_temp_get(dev, subdev, I2C_TEMP_U69, &val);
+    if (res)
+        return res;
+
+    USDR_LOG("FE4C", USDR_LOG_WARNING, "BoardID %012llx, Temp %.2fC\n", (long long)uid, val / 256.0);
 
     res = (res) ? res : usdr_vfs_obj_param_init_array_param(base,
                                               (void*)ob,
