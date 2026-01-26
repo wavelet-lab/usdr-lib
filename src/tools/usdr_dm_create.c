@@ -417,6 +417,7 @@ static void usage(int severity, const char* me)
                                 "\t[-g comma-separated list of sin generator gains (FP values, dBFS -100..0)] \n"
                                 "\t[-X <flag: Skip initialization>] \n"
                                 "\t[-z <flag: Continue on error>] \n"
+                                "\t[-b TX packet precharge count before doing RX (valid with -T flag) [16]\n"
                                 "\t[-l loglevel [3(INFO)]] \n"
                                 "\t[-G calibration [algo#]] \n"
                                 "\t[-Z param1=value1,param2=value2,...] \n"
@@ -638,6 +639,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned calibrate = 0;
     param_list_t extra_params[32];
     unsigned extra_param_len = 0;
+    int tx_pkt_precharge = 16;
 
     memset(rx_thread_inputs, 0, sizeof(rx_thread_inputs));
     memset(tx_thread_inputs, 0, sizeof(tx_thread_inputs));
@@ -678,7 +680,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:")) != -1) {
+    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -720,6 +722,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         //If omitted, the default internal ref clock will be used (26MHz typically)
         case 'x':
             fref = atof(optarg);
+            break;
+        case 'b':
+            tx_pkt_precharge = atoi(optarg);
             break;
         //Calibration frequency
         case 'B':
@@ -1302,8 +1307,19 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     for (unsigned i = 0; !s_stop && (i < count); i++)
     {
-        if(dotx && !do_transmit(usds_tx, &stm, &snfo_tx, nots, i, &tx_samples_cnt, &txstat))
-            goto stop;
+        if (tx_pkt_precharge < 0) {
+            if (tx_pkt_precharge != 0) {
+                ++tx_pkt_precharge;
+            }
+        } else {
+            if (dotx && !do_transmit(usds_tx, &stm, &snfo_tx, nots, i, &tx_samples_cnt, &txstat))
+                goto stop;
+
+            if (tx_pkt_precharge != 0) {
+                --tx_pkt_precharge;
+                continue;
+            }
+        }
 
         if(dorx && !do_receive(usds_rx, i, &rxstat))
             goto stop;
