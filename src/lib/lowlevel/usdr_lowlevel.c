@@ -4,6 +4,9 @@
 #include "usdr_lowlevel.h"
 #include "usb_uram/usb_uram_generic.h"
 #include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 lowlevel_ops_t *lowlevel_get_ops(lldev_t dev)
 {
@@ -111,6 +114,51 @@ void lowlevel_ops_set_custom(lldev_t obj, lowlevel_ops_t* newops)
 {
     obj->ops = newops;
 }
+
+static bool s_show_devname = false;
+
+void usdrlog_ll_devname_en(bool show_devname)
+{
+    s_show_devname = show_devname;
+}
+
+void usdrlog_ll_out(lldev_t dev,
+                    unsigned loglevel,
+                    const char* subsystem,
+                    const char* function,
+                    const char* file,
+                    int line,
+                    const char* fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    usdrlog_ll_vout(dev, loglevel, subsystem, function, file, line, fmt, ap);
+    va_end(ap);
+}
+
+void usdrlog_ll_vout(lldev_t dev,
+                     unsigned loglevel,
+                     const char* subsystem,
+                     const char* function,
+                     const char* file,
+                     int line,
+                     const char* fmt,
+                     va_list list)
+{
+    if (s_show_devname) {
+        char buf[8192];
+        int sz = snprintf(buf, sizeof(buf), "%s: %s", lowlevel_get_devname(dev), fmt);
+        if (sz < 0) {
+            buf[8192 - 1] = 0;
+        }
+
+        return usdrlog_vout(loglevel, subsystem, function, file, line, buf, list);
+    }
+
+    return usdrlog_vout(loglevel, subsystem, function, file, line, fmt, list);
+}
+
 
 void __attribute__ ((constructor(110))) setup_lowlevel(void) {
     lowlevel_initialize_plugins();
