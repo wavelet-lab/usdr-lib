@@ -94,6 +94,7 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipT
     const char* afe79xxlib = "liblibcapi79xx.so";
     unsigned g;
 
+    memset(out, 0, sizeof(*out));
     out->dev = dev;
     out->subdev = subdev;
     out->addr = lsaddr;
@@ -143,8 +144,16 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipT
     if (!out->libcapi79xx_create || !out->libcapi79xx_destroy || !out->libcapi79xx_init ||
         !out->libcapi79xx_set_dsa || !out->libcapi79xx_set_tdd ||
         !out->libcapi79xx_upd_nco || !out->libcapi79xx_get_nco || !out->libcapi79xx_check_health) {
-        USDR_LOG("79xx", USDR_LOG_ERROR, "Broken CAPI AFE79XX NDA LIB wrapper `%s`!\n",
-                 afe79xxlib);
+        USDR_LOG("79xx", USDR_LOG_ERROR, "Broken CAPI AFE79XX NDA LIB wrapper `%s`: %d%d%d%d.%d%d%d%d!\n",
+                 afe79xxlib,
+                 out->libcapi79xx_create != NULL,
+                 out->libcapi79xx_destroy != NULL,
+                 out->libcapi79xx_init != NULL,
+                 out->libcapi79xx_upd_nco != NULL,
+                 out->libcapi79xx_get_nco != NULL,
+                 out->libcapi79xx_set_dsa != NULL,
+                 out->libcapi79xx_check_health != NULL,
+                 out->libcapi79xx_set_tdd != NULL);
 
         dlclose(out->dl_handle);
         return -EFAULT;
