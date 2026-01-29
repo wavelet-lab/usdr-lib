@@ -37,6 +37,10 @@ Suite * conv_ci16_6ci16_suite(void);
 Suite * conv_ci16_6cf32_suite(void);
 Suite * conv_ci16_8cf32_suite(void);
 Suite * conv_ci16_8ci16_suite(void);
+Suite * conv_ci16_3cf32_suite(void);
+Suite * conv_ci16_3ci16_suite(void);
+Suite * conv_3ci16_ci16_suite(void);
+Suite * conv_3cf32_ci16_suite(void);
 
 int main(int argc, char** argv)
 {
@@ -54,17 +58,23 @@ int main(int argc, char** argv)
     //
     srunner_add_suite(sr, conv_i16_f32_suite());
     srunner_add_suite(sr, conv_ci16_2cf32_suite());
+    srunner_add_suite(sr, conv_ci16_3cf32_suite());
     srunner_add_suite(sr, conv_ci16_4cf32_suite());
     srunner_add_suite(sr, conv_ci16_6cf32_suite());
+    srunner_add_suite(sr, conv_ci16_8cf32_suite());
     //
     srunner_add_suite(sr, conv_f32_i16_suite());
     srunner_add_suite(sr, conv_2cf32_ci16_suite());
+    srunner_add_suite(sr, conv_3cf32_ci16_suite());
     srunner_add_suite(sr, conv_4cf32_ci16_suite());
     //
     srunner_add_suite(sr, conv_ci16_2ci16_suite());
+    srunner_add_suite(sr, conv_ci16_3ci16_suite());
     srunner_add_suite(sr, conv_ci16_4ci16_suite());
     srunner_add_suite(sr, conv_ci16_6ci16_suite());
+    srunner_add_suite(sr, conv_ci16_8ci16_suite());
     srunner_add_suite(sr, conv_2ci16_ci16_suite());
+    srunner_add_suite(sr, conv_3ci16_ci16_suite());
     srunner_add_suite(sr, conv_4ci16_ci16_suite());
     //
     srunner_add_suite(sr, conv_i16_i12_suite());
@@ -84,14 +94,10 @@ int main(int argc, char** argv)
     srunner_add_suite(sr, conv_ci12_4cf32_suite());
     //
 #else
-    //sr = srunner_create(conv_i16_f32_suite());
-    //sr = srunner_create(fft_window_ci16_cf32_suite());
-    sr = srunner_create(conv_ci16_8cf32_suite());
-    srunner_add_suite(sr, conv_ci16_8ci16_suite());
-
-    //srunner_add_suite(sr, fft_window_cf32_suite());
-    //srunner_add_suite(sr, conv_f32_i12_suite());
-    //srunner_add_suite(sr, conv_2cf32_ci12_suite());
+    sr = srunner_create(  conv_3cf32_ci16_suite());
+    srunner_add_suite(sr, conv_ci16_3cf32_suite());
+    srunner_add_suite(sr, conv_3ci16_ci16_suite());
+    srunner_add_suite(sr, conv_ci16_3ci16_suite());
 #endif
     srunner_set_fork_status (sr, CK_NOFORK);
     srunner_run_all(sr, (argc > 1) ? CK_VERBOSE : CK_NORMAL);

@@ -7,15 +7,15 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
                         unsigned outdatabsz)
 {
     unsigned i = indatabsz;
-    if ((outdatabsz / 2) < i)
-        i = (outdatabsz / 2);
+    if ((outdatabsz) < i)
+        i = (outdatabsz);
 
-    float* outdata_0 = (float*)outdata_0_p;
-    float* outdata_1 = (float*)outdata_1_p;
-    float* outdata_2 = (float*)outdata_2_p;
+    int16_t* outdata_0 = (int16_t*)outdata_0_p;
+    int16_t* outdata_1 = (int16_t*)outdata_1_p;
+    int16_t* outdata_2 = (int16_t*)outdata_2_p;
 
     const uint32_t *ld = (const uint32_t *)indata;
-    #include "conv_ci16_3cf32_generic.inc"
+    #include "conv_ci16_3ci16_generic.inc"
 }
 
 #undef TEMPLATE_FUNC_NAME
