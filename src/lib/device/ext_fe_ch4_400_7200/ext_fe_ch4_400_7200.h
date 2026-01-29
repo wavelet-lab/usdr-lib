@@ -20,7 +20,8 @@
 
 #define FE_CTRL_REGS 10
 
-enum rx_filterbank {
+#ifndef NO_ECFG_DEFS
+enum ext_fe_rx_filterbank {
     RX_FB_400_1000M,
     RX_FB_1000_2000M,
     RX_FB_2000_3500M,
@@ -30,7 +31,7 @@ enum rx_filterbank {
     RX_FB_AUTO = 8,
 };
 
-enum antenna_cfg {
+enum ext_fe_antenna_cfg {
     ANT_RX_TRX,   // RX connected to RX antenna and TX connected to TRX antenna
     ANT_TRX_TERM, // RX connected to TRX antenna and TX terminated
     ANT_RX_TERM,  // RX connected to RX antenna and TX terminated
@@ -39,8 +40,9 @@ enum antenna_cfg {
     ANT_HW_TDD,   // TRX antenna is dynamically switched to TX/RX ports based on burst information
     ANT_OFF,
 };
+#endif
 
-struct fe_chan_config {
+struct fe_echan_config {
     uint8_t rx_fb_sel; // rx_filterbank
     uint8_t rx_dsa;
     uint8_t ant_sel;   // antenna selector
@@ -52,7 +54,7 @@ struct fe_chan_config {
     // For auto band & filter selection
     uint64_t rx_freq;
 };
-typedef struct fe_chan_config fe_chan_config_t;
+typedef struct fe_echan_config fe_echan_config_t;
 
 struct ext_fe_ch4_400_7200 {
     lldev_t dev;
@@ -69,7 +71,7 @@ struct ext_fe_ch4_400_7200 {
     // High level control
     uint8_t ref_gps; // Globally enable GPS
     uint8_t if_vbyp; // Globally enable IF BYP
-    fe_chan_config_t ucfg[FE_MAX_HW_CHANS];
+    fe_echan_config_t ucfg[FE_MAX_HW_CHANS];
 };
 
 typedef struct ext_fe_ch4_400_7200 ext_fe_ch4_400_7200_t;
@@ -87,7 +89,10 @@ int ext_fe_rx_chan_en(ext_fe_ch4_400_7200_t* def, unsigned ch_fe_mask_rx);
 int ext_fe_tx_chan_en(ext_fe_ch4_400_7200_t* def, unsigned ch_fe_mask_tx);
 
 int ext_fe_rx_gain_set(ext_fe_ch4_400_7200_t* def, unsigned chno, unsigned gain, unsigned* actual_gain);
+int ext_fe_tx_gain_set(ext_fe_ch4_400_7200_t* def, unsigned chno, unsigned gain, unsigned* actual_gain);
 
 int ext_fe_set_dac(ext_fe_ch4_400_7200_t* brd, unsigned value);
+
+int ext_fe_get_temp_max(ext_fe_ch4_400_7200_t* dfe, uint64_t* temp_max);
 
 #endif

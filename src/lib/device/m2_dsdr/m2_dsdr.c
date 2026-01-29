@@ -28,6 +28,8 @@
 #include "../hw/tmp114/tmp114.h"
 
 #include "dsdr_hiper.h"
+#define NO_ECFG_DEFS
+#include "../device/ext_fe_ch4_400_7200/ext_fe_ch4_400_7200.h"
 
 // Board revisions:
 //  1 - DSDR
@@ -301,6 +303,8 @@ static int dev_m2_dsdr_sdr_tx_dsa_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_
 
 static int dev_m2_dsdr_afe_health_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
+static int dev_m2_dsdr_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int dev_m2_dsdr_dummy(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     return 0;
@@ -308,7 +312,6 @@ static int dev_m2_dsdr_dummy(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 
 static int _debug_lmk05318_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int _debug_lmk05318_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
-
 
 static int dev_m2_dsdr_sdr_rx_remap_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_dsdr_sdr_rx_remap_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
@@ -464,6 +467,9 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/stat",         { NULL, dev_m2_dsdr_stat }},
     { "/debug/lldev",     { NULL, dev_m2_dsdr_debug_lldev_get}},
     { "/dm/sdr/refclk/path", { dev_m2_dsdr_dummy, NULL}},
+
+    { "/dm/sdr/0/dac_vctcxo",      { dev_m2_dsdr_vctcxo_set, NULL }},
+
     { "/debug/clk_info",  { dev_m2_dsdr_debug_clk_info, dev_m2_dsdr_debug_clk_info_get }},
 
     { "/debug/hw/lmk05318/0/reg", { _debug_lmk05318_reg_set, _debug_lmk05318_reg_get }},
@@ -646,12 +652,14 @@ struct dev_m2_dsdr {
     unsigned type;
     //unsigned jesdv;
     unsigned jesd_x8;
+    unsigned has_extfe;
 
     stream_handle_t* rx;
     stream_handle_t* tx;
 
     afe79xx_state_t st;
     dsdr_hiper_fe_t hiper;
+    ext_fe_ch4_400_7200_t extfe;
 
     uint32_t dsdr_state;
     //uint32_t cfg_afe_type;
@@ -838,6 +846,11 @@ bool dev_m2_dsdr_has_hiper(dev_m2_dsdr_t* d)
     return d->type == DSDR_PCIE_HIPER_R0;
 }
 
+bool dev_m2_dsdr_has_extfe0472(dev_m2_dsdr_t* d)
+{
+    return d->has_extfe;
+}
+
 
 int dev_m2_dsdr_lrxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
@@ -879,6 +892,8 @@ static int dsdr_update_rx_remap(dev_m2_dsdr_t* d)
 {
     // Mark corresponding RX chanel
     uint64_t hiper_cfg_msk = 0;
+    unsigned hw_cfg_msk = 0;
+
     //unsigned rx_remap  = 0;
     int res = 0;
 
@@ -890,11 +905,14 @@ static int dsdr_update_rx_remap(dev_m2_dsdr_t* d)
             if (hw_chan < MAX_HIPER_FE_PORT) {
                 hiper_cfg_msk |= (1u << s_chanmap_hw_to_fe[hw_chan]);
             }
+            hw_cfg_msk |= (1 << hw_chan);
         }
     }
 
     if (dev_m2_dsdr_has_hiper(d)) {
         res = dsdr_hiper_fe_rx_chan_en(&d->hiper, hiper_cfg_msk);
+    } else if (dev_m2_dsdr_has_extfe0472(d)) {
+        res = ext_fe_rx_chan_en(&d->extfe, hw_cfg_msk);
     }
     // TODO issue FE cmd
     // return res ? res : dev_gpo_set(d->base.dev, IGPO_RX_MAP, rx_remap);
@@ -906,6 +924,8 @@ static int dsdr_update_tx_remap(dev_m2_dsdr_t* d)
 {
     // Mark corresponding TX chanel
     uint64_t hiper_cfg_msk = 0;
+    unsigned hw_cfg_msk = 0;
+
     //unsigned tx_remap  = 0;
     int res = 0;
 
@@ -917,11 +937,14 @@ static int dsdr_update_tx_remap(dev_m2_dsdr_t* d)
             if (hw_chan < MAX_HIPER_FE_PORT) {
                 hiper_cfg_msk |= (1u << s_chanmap_hw_to_fe[hw_chan]);
             }
+            hw_cfg_msk |= (1 << hw_chan);
         }
     }
 
     if (dev_m2_dsdr_has_hiper(d)) {
         res = dsdr_hiper_fe_tx_chan_en(&d->hiper, hiper_cfg_msk);
+    } else if (dev_m2_dsdr_has_extfe0472(d)) {
+        res = ext_fe_tx_chan_en(&d->extfe, hw_cfg_msk);
     }
     // TODO issue FE cmd
     //return res ? res : dev_gpo_set(d->base.dev, IGPO_TX_MAP, tx_remap);
@@ -1100,6 +1123,8 @@ static int dsdr_set_rx_frequency_chan(dev_m2_dsdr_t* d, uint64_t freq, unsigned 
             res = res ? res : d->rx->ops->option_set(d->rx, "chmap", (uintptr_t)&d->rx_chans);
         }
         return res;
+    } else if (dev_m2_dsdr_has_extfe0472(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
+        res = res ? res : ext_fe_rx_freq_set(&d->extfe, w->hwport, ncoval);
     }
 
     USDR_LOG("DSDR", USDR_LOG_WARNING, "RX CH[%d => %c: %s%d.Band%d] NCO[%d]=%.3f\n",
@@ -1297,6 +1322,8 @@ int dev_m2_dsdr_gain_rx_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t v
 
     if (dev_m2_dsdr_has_hiper(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
         res = res ? res : dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[w->hwport], rem_gain, NULL);
+    } else if (dev_m2_dsdr_has_extfe0472(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
+        res = res ? res : ext_fe_rx_gain_set(&d->extfe, s_chanmap_hw_to_fe[w->hwport], rem_gain, NULL);
     }
 
     res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, GET_HWRX_TYPE(w->hwport), GET_HWRX_IDX(w->hwport), dsa_attn);
@@ -1312,14 +1339,22 @@ int dev_m2_dsdr_gain_tx_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t v
     if (obj->full_path[0])
         return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/tx/gain", false);
 
+    int res = 0;
     unsigned i = obj->full_path[1];
     unsigned dsa_attn = (value > 29) ? 0 : 29 - value;
+    unsigned rem_gain = (value > 25) ? value - 29 : 0;
     const channel_logic_dsp_wire_t* w = get_chmapnfo_from_ordinal(d, false, i);
     if (!w) {
         return -EINVAL;
     }
 
-    return d->st.libcapi79xx_set_dsa(&d->st.capi, GET_HWTX_TYPE(w->hwport), GET_HWTX_IDX(w->hwport), dsa_attn);
+    if (dev_m2_dsdr_has_hiper(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
+        res = res ? res : dsdr_hiper_fe_tx_gain_set(&d->hiper, s_chanmap_hw_to_fe[w->hwport], rem_gain, NULL);
+    } else if (dev_m2_dsdr_has_extfe0472(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
+        res = res ? res : ext_fe_tx_gain_set(&d->extfe, s_chanmap_hw_to_fe[w->hwport], rem_gain, NULL);
+    }
+    res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, GET_HWTX_TYPE(w->hwport), GET_HWTX_IDX(w->hwport), dsa_attn);
+    return res;
 }
 
 int dev_m2_dsdr_gain_rx_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint64_t value)
@@ -1342,6 +1377,8 @@ int dev_m2_dsdr_gain_rx_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint6
 
     if (dev_m2_dsdr_has_hiper(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
         res = res ? res : dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[w->hwport], rem_gain, NULL);
+    } else if (dev_m2_dsdr_has_extfe0472(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
+        res = res ? res : ext_fe_rx_gain_set(&d->extfe, s_chanmap_hw_to_fe[w->hwport], rem_gain, NULL);
     }
     res = res ? res : d->st.libcapi79xx_set_dsa(&d->st.capi, GET_HWRX_TYPE(w->hwport), GET_HWRX_IDX(w->hwport), dsa_attn);
     return res;
@@ -1350,7 +1387,7 @@ int dev_m2_dsdr_gain_rx_auto_set(pdevice_t ud, pusdr_vfs_obj_t UNUSED obj, uint6
 int dev_m2_dsdr_gain_rx_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
-    if (!dev_m2_dsdr_has_hiper(d))
+    if (!dev_m2_dsdr_has_hiper(d) && !dev_m2_dsdr_has_extfe0472(d))
         return -ENOTSUP;
 
     if (obj->full_path[0])
@@ -1364,6 +1401,8 @@ int dev_m2_dsdr_gain_rx_lna_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
 
     if (dev_m2_dsdr_has_hiper(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
         return dsdr_hiper_fe_rx_gain_set(&d->hiper, s_chanmap_hw_to_fe[w->hwport], value, NULL);
+    } else if (dev_m2_dsdr_has_extfe0472(d) && (w->hwport < MAX_HIPER_FE_PORT)) {
+        return ext_fe_rx_gain_set(&d->extfe, s_chanmap_hw_to_fe[w->hwport], value, NULL);
     }
 
     return -EINVAL;
@@ -1630,11 +1669,13 @@ int dev_m2_dsdr_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue
 
     if (dev_m2_dsdr_has_hiper(d)) {
         res = res ? res : dsdr_hiper_fe_get_temp_max(&d->hiper, &fe_temp);
+    } else if (dev_m2_dsdr_has_extfe0472(d)) {
+        res = res ? res : ext_fe_get_temp_max(&d->extfe, &fe_temp);
     }
 
     if (d->type == DSDR_M2_R1) {
         res = res ? res : tmp114_temp_get(d->base.dev, d->subdev, I2C_TEMP_AFE, (int*)&board_temp);
-    } else if (!dev_m2_dsdr_has_hiper(d)) {
+    } else if (!dev_m2_dsdr_has_hiper(d) && !dev_m2_dsdr_has_extfe0472(d)) {
         // No temp sensors
         return -EINVAL;
     } else {
@@ -1643,6 +1684,19 @@ int dev_m2_dsdr_senstemp_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue
     }
 
     *ovalue = fe_temp > board_temp ? fe_temp : board_temp;
+    return res;
+}
+
+int dev_m2_dsdr_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_dsdr *d = (struct dev_m2_dsdr *)ud;
+    int res = -ENOTSUP;
+
+    if (dev_m2_dsdr_has_hiper(d)) {
+        res = res ? res : dsdr_hiper_fe_set_dac(&d->hiper, value);
+    } else if (dev_m2_dsdr_has_extfe0472(d)) {
+        res = res ? res : ext_fe_set_dac(&d->extfe, value);
+    }
     return res;
 }
 
@@ -1689,6 +1743,8 @@ static void usdr_device_m2_dsdr_destroy(pdevice_t udev)
     // FE Power OFF
     if (dev_m2_dsdr_has_hiper(d)) {
         dsdr_hiper_fe_destroy(&d->hiper);
+    } else if (dev_m2_dsdr_has_extfe0472(d)) {
+        ext_fe_destroy(&d->extfe);
     }
 
     dev_gpo_set(dev, IGPO_AFE_RST, 0x1);
@@ -2103,7 +2159,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
             res = res ? res : dsdr_gth_set_rate(d, master_rate);
         } else {
             USDR_LOG("XDEV", USDR_LOG_ERROR, "GTY reconfiguration isn't supported yet!\n");
-            return -EINVAL;
+            //return -EINVAL;
         }
     }
     if (res)
@@ -2389,6 +2445,16 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         }
 
         res = res ? res : dsdr_hiper_fe_create(dev, SPI_BUS_HIPER_FE, poverride, &d->hiper);
+    } else if (d->type == DSDR_M2_R0 || d->type == DSDR_M2_R1) {
+        if (res)
+            return res;
+
+        res = ext_fe_ch4_400_7200_init(dev, 0, M2PCI_REG_GPIO_S, "", "m2m", &d->extfe);
+        if (res && res != -ENODEV)
+            return res;
+
+        d->has_extfe = (res == 0);
+        res = 0;
     }
 
     res = res ? res : usleep(100000);
@@ -2761,6 +2827,8 @@ int usdr_device_m2_dsdr_unregister_stream(device_t* dev, stream_handle_t* stream
 
         if (dev_m2_dsdr_has_hiper(d)) {
             res = dsdr_hiper_fe_rx_chan_en(&d->hiper, 0);
+        } else if (dev_m2_dsdr_has_extfe0472(d)) {
+            res = ext_fe_rx_chan_en(&d->extfe, 0);
         }
 
         //dev_gpo_set(d->base.dev, IGPO_RX_CHEN, 0);
@@ -2772,6 +2840,8 @@ int usdr_device_m2_dsdr_unregister_stream(device_t* dev, stream_handle_t* stream
 
         if (dev_m2_dsdr_has_hiper(d)) {
             res = dsdr_hiper_fe_tx_chan_en(&d->hiper, 0);
+        } else if (dev_m2_dsdr_has_extfe0472(d)) {
+            res = ext_fe_tx_chan_en(&d->extfe, 0);
         }
 
         //dev_gpo_set(d->base.dev, IGPO_TX_CHEN, 0);
@@ -2812,6 +2882,8 @@ int usdr_device_m2_dsdr_create(lldev_t dev, device_id_t devid)
     d->base.unregister_stream = &usdr_device_m2_dsdr_unregister_stream;
     d->base.timer_op = &sfetrx4_stream_sync;
 
+    memset(&d->st, 0, sizeof(d->st));
+
     d->rx = NULL;
     d->tx = NULL;
 
@@ -2834,6 +2906,8 @@ int usdr_device_m2_dsdr_create(lldev_t dev, device_id_t devid)
         opt_u64_set_null(&d->rx_ord_freqs[i]);
         opt_u64_set_null(&d->tx_ord_freqs[i]);
     }
+
+    d->has_extfe = false;
 
 #if 0
     for (unsigned i = 0; i < MAX_HIPER_FE_PORT; i++) {

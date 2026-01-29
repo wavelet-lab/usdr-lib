@@ -133,6 +133,7 @@ int dsdr_hiper_fe_tx_gain_set(dsdr_hiper_fe_t* def, unsigned chno, unsigned gain
 int dsdr_hiper_fe_rx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_rx);
 int dsdr_hiper_fe_tx_chan_en(dsdr_hiper_fe_t* def, unsigned ch_fe_mask_tx);
 
+int dsdr_hiper_fe_set_dac(dsdr_hiper_fe_t* def, unsigned value);
 
 
 #endif

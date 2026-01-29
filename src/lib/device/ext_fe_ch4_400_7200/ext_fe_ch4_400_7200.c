@@ -28,7 +28,7 @@
 //
 // 10          SSDR_GPLED0    GPIO33_0       EXT_I2C_SDA
 // 20          SSDR_GPIO1     --------       AUX_MUX_GPIO1  -- *EXT2_I2C_SDA / FAN0_TACH
-// 38          SSDR_GPLED1_P                 FGPIO_N
+// 38          SSDR_GPLED1_P  GPIO33_3       FGPIO_N
 // 40          SSDR_GPLED1_N                 FGPIO_P
 // 54          SSDR_GPIO6     GPIO33_1       EXT_I2C_SCL
 // 56          SSDR_GPIO3_P   --------       n/c GPS_TX
@@ -36,12 +36,13 @@
 // 68          SSDR_GPIO5     GPIO33_2       AUX_MUX_GPIO0  -- *EXT2_I2C_SCL / FAN1_TACH
 //
 // I2C3:
-//   SSDR_GPLED0  M1
-//   SSDR_GPIO6   H2
+//   SSDR_GPLED0  M1  | GPIO33_0
+//   SSDR_GPIO6   H2  | GPIO33_1
 // I2C4:
-//   SSDR_GPIO1   L1
-//   SSDR_GPIO5   J2
-
+//   SSDR_GPIO1   L1  |                                   GPIO_EXT_18_5
+//   SSDR_GPIO5   J2  | GPIO33_2       through R2012      GPIO_EXT_18_4
+//
+// For DSDR GPIO33_2 / GPIO33_3 must be configured as Inputs
 
 enum {
     GPIO_1PPS     = GPIO2,
@@ -73,6 +74,8 @@ enum i2c_idx_extra {
 
 enum {
     RX_DSA_MAX_ATTN = 15,
+
+    TX_GAIN_1ST = 20,
 };
 
 static const uint64_t s_filerbank_ranges[] = {
@@ -235,8 +238,8 @@ static void _ext_fe_antenna_sw_map_exp(unsigned antenna, bool rxen, bool txen,
         *exp_tx_onoff = EXP_TX_ONOFF_P1_TRX_SW;
         *exp_rxtx = EXP_RXTX_SW_P1_TX;
         *exp_tddfdd = EXP_TDDFDD_P3_ANT_RX;
-        *exp_led_trx = LED_TRX_TXO;
-        *exp_led_rx = LED_RX_ON;
+        *exp_led_trx = txen ? LED_TRX_TXO : LED_TRX_OFF;
+        *exp_led_rx = rxen ? LED_RX_ON : LED_RX_OFF;
         *arx = rxen;
         *atx = txen;
         break;
@@ -245,7 +248,7 @@ static void _ext_fe_antenna_sw_map_exp(unsigned antenna, bool rxen, bool txen,
         *exp_tx_onoff = EXP_TX_ONOFF_P2_LB_SW;
         *exp_rxtx = EXP_RXTX_SW_P2_RX;
         *exp_tddfdd = EXP_TDDFDD_P2_TRX_SW;
-        *exp_led_trx = LED_TRX_RXO;
+        *exp_led_trx = rxen ? LED_TRX_RXO : LED_TRX_OFF;
         *exp_led_rx = LED_RX_OFF;
         *arx = rxen;
         *atx = 0;
@@ -256,7 +259,7 @@ static void _ext_fe_antenna_sw_map_exp(unsigned antenna, bool rxen, bool txen,
         *exp_rxtx = EXP_RXTX_SW_P1_TX;
         *exp_tddfdd = EXP_TDDFDD_P3_ANT_RX;
         *exp_led_trx = LED_TRX_OFF;
-        *exp_led_rx = LED_RX_ON;
+        *exp_led_rx = rxen ? LED_RX_ON : LED_RX_OFF;
         *arx = rxen;
         *atx = 0;
         break;
@@ -273,7 +276,7 @@ static void _ext_fe_antenna_sw_map_exp(unsigned antenna, bool rxen, bool txen,
 
     case ANT_HW_TDD:
         // TODO
-        *exp_led_trx = LED_TRX_TRX;
+        *exp_led_trx = (rxen && txen) ? LED_TRX_TRX : txen ? LED_TRX_TXO : rxen ? LED_TRX_RXO : LED_TRX_OFF;
         *exp_led_rx = LED_RX_OFF;
         *arx = rxen;
         *atx = txen;
@@ -448,6 +451,21 @@ int ext_fe_rx_gain_set(ext_fe_ch4_400_7200_t* def, unsigned chno, unsigned gain,
     return ext_fe_update_user(def);
 }
 
+int ext_fe_tx_gain_set(ext_fe_ch4_400_7200_t* def, unsigned chno, unsigned gain, unsigned* actual_gain)
+{
+    if (chno >= FE_MAX_HW_CHANS)
+        return -EINVAL;
+    if (!def->ucfg[chno].tx_en)
+        return 0;
+
+    def->ucfg[chno].tx_ss = (gain <= TX_GAIN_1ST);
+
+    if (actual_gain) {
+        *actual_gain = (gain > TX_GAIN_1ST) ? TX_GAIN_1ST : 0;
+    }
+
+    return ext_fe_update_user(def);
+}
 
 
 int ext_fe_ch4_sens_get(ext_fe_ch4_400_7200_t* fe, uint64_t *ovalue)
@@ -457,8 +475,6 @@ int ext_fe_ch4_sens_get(ext_fe_ch4_400_7200_t* fe, uint64_t *ovalue)
     *ovalue = (int64_t)temp256;
     return res;
 }
-
-
 
 
 static int ext_fe_ch4_400_7200_ctrl_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -602,7 +618,6 @@ static const usdr_dev_param_func_t s_fe_parameters[] = {
 };
 
 
-
 int ext_fe_ch4_400_7200_init(lldev_t dev,
                              unsigned subdev,
                              unsigned gpio_base,
@@ -645,19 +660,51 @@ int ext_fe_ch4_400_7200_init(lldev_t dev,
                  val16[0], val16[1], val16[2], val16[3]);
     }
 
-    if (res || val != TMP114_DEVICE_ID)
+    if (res)
         return res;
+    if (val != TMP114_DEVICE_ID)
+        return -ENODEV;
 
     //res = (res) ? res : tmp114_config_set(dev, subdev, I2C_TEMP_U69, 0x4);
     //res = (res) ? res : tmp114_temp_get(dev, subdev, I2C_TEMP_U69, &val);
+    enum {
+        TEST_OUT_U114 = 0xf070,
+        TEST_OUT_U110 = 0x00e0,
+        TEST_OUT_U300 = 0x001e,
+        TEST_OUT_U301 = 0x003c,
+    };
 
     res = (res) ? res : gpio_config(dev, subdev, gpio_base, GPIO_1PPS, GPIO_CFG_ALT0);
 
-    res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, 0);
+    res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, TEST_OUT_U114);
     res = (res) ? res : tca6424a_reg8_set(dev, subdev, I2C_TCA6424AR_U114, TCA6424_OUT0 + 2, 0);
-    res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U110, TCA6424_OUT0, 0);
+    res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U110, TCA6424_OUT0, TEST_OUT_U110);
     res = (res) ? res : tca6424a_reg8_set(dev, subdev, I2C_TCA6424AR_U110, TCA6424_OUT0 + 2, 0);
 
+    res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U300, TCA6424_OUT0, TEST_OUT_U300);
+    res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U301, TCA6424_OUT0, TEST_OUT_U301);
+
+    // Readback test vectors to test expanders
+    res = (res) ? res : tca6424a_reg16_get(dev, subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, &val16[0]);
+    res = (res) ? res : tca6424a_reg16_get(dev, subdev, I2C_TCA6424AR_U110, TCA6424_OUT0, &val16[1]);
+    res = (res) ? res : tca6424a_reg16_get(dev, subdev, I2C_TCA6424AR_U300, TCA6424_OUT0, &val16[2]);
+    res = (res) ? res : tca6424a_reg16_get(dev, subdev, I2C_TCA6424AR_U301, TCA6424_OUT0, &val16[3]);
+
+    // Set default
+    res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U114, TCA6424_OUT0, 0);
+    res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U110, TCA6424_OUT0, 0);
+
+    if (res)
+        return res;
+    if (val16[0] != TEST_OUT_U114 || val16[1] != TEST_OUT_U110 || val16[2] != TEST_OUT_U300 || val16[3] != TEST_OUT_U301) {
+        USDR_LOG("FE4C", USDR_LOG_ERROR, "Expander test vectors failed: %04x.%04x.%04x.%04x, giving up!\n",
+                 val16[0], val16[1], val16[2], val16[3]);
+
+       return -ENODEV;
+    }
+
+
+    // Enable outputs
     res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U114, TCA6424_CFG0, 0);
     res = (res) ? res : tca6424a_reg8_set(dev, subdev, I2C_TCA6424AR_U114, TCA6424_CFG0 + 2, 0);
     res = (res) ? res : tca6424a_reg16_set(dev, subdev, I2C_TCA6424AR_U110, TCA6424_CFG0, 0);
@@ -669,7 +716,7 @@ int ext_fe_ch4_400_7200_init(lldev_t dev,
     for (unsigned ch = 0; ch < FE_MAX_HW_CHANS; ch++) {
         ob->ucfg[ch].rx_fb_sel = RX_FB_AUTO; // rx_filterbank
         ob->ucfg[ch].rx_dsa = 0;
-        ob->ucfg[ch].ant_sel = ANT_OFF;
+        ob->ucfg[ch].ant_sel = ANT_RX_TRX; // ANT_OFF;
         ob->ucfg[ch].tx_ss = 0; // Single stage PA
         ob->ucfg[ch].tx_en = 0; // Channel enabled on device side
         ob->ucfg[ch].rx_en = 0; // Channel enabled on device side
@@ -726,6 +773,14 @@ int ext_fe_destroy(ext_fe_ch4_400_7200_t* dfe)
 
 int ext_fe_set_dac(ext_fe_ch4_400_7200_t* brd, unsigned value)
 {
-    USDR_LOG("M2PE", USDR_LOG_ERROR, "DAC set to: %d\n", value);
+    USDR_LOG("M2PE", USDR_LOG_WARNING, "DAC set to: %d\n", value);
     return dac80501_dac_set(brd->dev, brd->subdev, I2C_DAC, value);
+}
+
+int ext_fe_get_temp_max(ext_fe_ch4_400_7200_t* dfe, uint64_t* temp_max)
+{
+    int temp = 0;
+    int res = tmp114_temp_get(dfe->dev, dfe->subdev, I2C_TEMP_U69, &temp);
+    *temp_max = temp;
+    return res;
 }

@@ -1932,6 +1932,8 @@ int dsdr_hiper_fe_tx_gain_set(dsdr_hiper_fe_t* def, unsigned chno, unsigned gain
     if (!def->ucfg[chno].tx_en)
         return 0;
 
+    // TODO check bypass path
+
     unsigned lms8pa_gain = (gain >= RX_LMS8B_MIX_LOSS) ? RX_LMS8B_MIX_LOSS : gain;
     def->ucfg[chno].lms8_tx_hlmix_gain = lms8pa_gain;
     if (actual_gain) {
@@ -1941,4 +1943,11 @@ int dsdr_hiper_fe_tx_gain_set(dsdr_hiper_fe_t* def, unsigned chno, unsigned gain
     USDR_LOG("HIPR", USDR_LOG_WARNING, "CH[%d] TX FE_Gain %d decomposed as %d LMS_PA\n",
              chno, gain, lms8pa_gain);
     return dsdr_hiper_lms8001b_gain_update(def, chno, false);
+}
+
+
+int dsdr_hiper_fe_set_dac(dsdr_hiper_fe_t* def, unsigned value)
+{
+    USDR_LOG("HIPR", USDR_LOG_WARNING, "DAC set to: %d\n", value);
+    return dac80501_dac_set(def->dev, def->subdev, I2C_DAC, value);
 }
