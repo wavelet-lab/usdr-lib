@@ -18,7 +18,7 @@ field_macros: True
 
 x-rx-filt-in-opts: &rx-filt-in-opts
     0b000: MUTE0
-    0b011: 400_1000M
+    0b011: 50_1000M
     0b010: 1000_2000M
     0b001: 2000_3500M
     0b101: 2500_5000M
@@ -29,7 +29,7 @@ x-rx-filt-in-opts: &rx-filt-in-opts
 
 x-rx-filt-out-opts: &rx-filt-out-opts
     0b000: MUTE0
-    0b011: 400_1000M
+    0b011: 50_1000M
     0b100: 1000_2000M
     0b101: 2000_3500M
     0b001: 2500_5000M

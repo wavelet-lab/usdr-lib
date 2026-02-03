@@ -79,7 +79,7 @@ enum {
 };
 
 static const uint64_t s_filerbank_ranges[] = {
-    400e6, 1000e6,
+    50e6, 1000e6,
     1000e6, 2000e6,
     2000e6, 3500e6,
     2500e6, 5000e6,
@@ -165,23 +165,23 @@ static int _ext_fe_ch4_400_7200_exp_get(ext_fe_ch4_400_7200_t *fe, unsigned addr
 static void _ext_fe_fbank_map(unsigned filsel, unsigned *bout, unsigned *bin)
 {
     // Sanity check YAML <-> internal ABI constants
-    CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_400_1000M, RX_FB_400_1000M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_50_1000M, RX_FB_50_1000M);
     CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_1000_2000M, RX_FB_1000_2000M);
     CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_2000_3500M, RX_FB_2000_3500M);
     CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_2500_5000M, RX_FB_2500_5000M);
     CHECK_CONSTANT_EQ(RX_FILT_OPTS_FILT_3500_7100M, RX_FB_3500_7100M);
 
-    CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_400_1000M, RX_FB_AUTO | RX_FB_400_1000M);
+    CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_50_1000M, RX_FB_AUTO | RX_FB_50_1000M);
     CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_1000_2000M, RX_FB_AUTO | RX_FB_1000_2000M);
     CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_2000_3500M, RX_FB_AUTO | RX_FB_2000_3500M);
     CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_2500_5000M, RX_FB_AUTO | RX_FB_2500_5000M);
     CHECK_CONSTANT_EQ(RX_FILT_OPTS_AUTO_3500_7100M, RX_FB_AUTO | RX_FB_3500_7100M);
 
-    CHECK_CONSTANT_EQ(SW_RX_FILTER_IN_CHA_400_1000M, SW_RX_FILTER_OUT_CHA_400_1000M);
+    CHECK_CONSTANT_EQ(SW_RX_FILTER_IN_CHA_50_1000M, SW_RX_FILTER_OUT_CHA_50_1000M);
 
     unsigned fb_f_sel = (~RX_FB_AUTO & filsel);
     switch (fb_f_sel) {
-    case RX_FB_400_1000M: *bout = SW_RX_FILTER_OUT_CHA_400_1000M; *bin = SW_RX_FILTER_IN_CHA_400_1000M; break;
+    case RX_FB_50_1000M: *bout = SW_RX_FILTER_OUT_CHA_50_1000M; *bin = SW_RX_FILTER_IN_CHA_50_1000M; break;
     case RX_FB_1000_2000M: *bout = SW_RX_FILTER_OUT_CHA_1000_2000M; *bin = SW_RX_FILTER_IN_CHA_1000_2000M; break;
     case RX_FB_2000_3500M: *bout = SW_RX_FILTER_OUT_CHA_2000_3500M; *bin = SW_RX_FILTER_IN_CHA_2000_3500M; break;
     case RX_FB_2500_5000M: *bout = SW_RX_FILTER_OUT_CHA_2500_5000M; *bin = SW_RX_FILTER_IN_CHA_2500_5000M; break;
@@ -297,7 +297,7 @@ static void _ext_fe_antenna_sw_map_exp(unsigned antenna, bool rxen, bool txen,
 
 void ext_fe_rx_filterbank_upd(ext_fe_ch4_400_7200_t* def, unsigned chno)
 {
-    if (def->ucfg[chno].rx_fb_sel < RX_FILT_OPTS_AUTO_400_1000M)
+    if (def->ucfg[chno].rx_fb_sel < RX_FILT_OPTS_AUTO_50_1000M)
         return;
 
     unsigned best_idx = 0;
@@ -322,7 +322,7 @@ void ext_fe_rx_filterbank_upd(ext_fe_ch4_400_7200_t* def, unsigned chno)
                  i, s_filerbank_ranges[i] / 1.0e6, s_filerbank_ranges[i + 1] / 1.0e6, (unsigned)doff, off);
     }
 
-    def->ucfg[chno].rx_fb_sel = RX_FILT_OPTS_AUTO_400_1000M | best_idx;
+    def->ucfg[chno].rx_fb_sel = RX_FILT_OPTS_AUTO_50_1000M | best_idx;
     USDR_LOG("FE4C", USDR_LOG_WARNING, "RXFBabk[%d] = %d\n", chno, def->ucfg[chno].rx_fb_sel);
 }
 
