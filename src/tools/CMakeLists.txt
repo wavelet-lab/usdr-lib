@@ -33,3 +33,11 @@ list(APPEND WVLT_SCRIPTS
     wvlt_sdr_wrapper.py
 )
 configure_file(${WVLT_SCRIPTS} . USE_SOURCE_PERMISSIONS COPYONLY)
+
+if(WIN32)
+    set_target_properties(usdr_dm_create PROPERTIES WIN32_EXECUTABLE FALSE)
+    set_target_properties(usdr_dm_sensors PROPERTIES WIN32_EXECUTABLE FALSE)
+    set_target_properties(usdr_flash PROPERTIES WIN32_EXECUTABLE FALSE)
+    set_target_properties(usdr_lml7_test PROPERTIES WIN32_EXECUTABLE FALSE)
+    set_target_properties(usdr_dm_gpsdo PROPERTIES WIN32_EXECUTABLE FALSE)
+endif()

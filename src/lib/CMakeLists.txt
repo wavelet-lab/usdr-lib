@@ -7,7 +7,7 @@ project(usdr_lib C)
 # Auto generating register descriptors
 list(APPEND USDR_LIBRARY_FILES "")
 list(APPEND USDR_INCLUDE_FILES "")
-list(APPEND USDR_LINK_FILES    pthread rt)
+list(APPEND USDR_LINK_FILES    pthread)
 list(APPEND USDR_DEPEND_TARGETS "")
 
 include_directories(port)
@@ -32,7 +32,16 @@ include_directories(${USDR_INCLUDE_DIRS})
 
 
 add_library(usdr ${USDR_LIBRARY_FILES})
-target_link_libraries(usdr dl pthread rt ${USDR_LINK_FILES} usdr-dsp)
+
+if(NOT WIN32)
+    set(USDR_PLATFORM_LIBS dl rt)
+else()
+    set(USDR_PLATFORM_LIBS kernel32 ws2_32)
+endif()
+
+message(NOTICE "Usdr link:${USDR_LINK_FILES}")
+
+target_link_libraries(usdr pthread ${USDR_PLATFORM_LIBS} ${USDR_LINK_FILES} usdr-dsp)
 add_dependencies(usdr ${USDR_DEPEND_TARGETS})
 target_compile_options(usdr PRIVATE "-Wall" "-Werror=implicit-function-declaration")
 
