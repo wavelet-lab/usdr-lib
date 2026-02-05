@@ -1,25 +1,31 @@
 #!/usr/bin/python3
 
-# Copyright (c) 2023-2024 Wavelet Lab
+# Copyright (c) 2023-2026 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
 import sys
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QRegExpValidator, QPalette, QColor, QIcon
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, QRegExp
+try:
+    from PySide6.QtWidgets import *
+    from PySide6.QtGui import QRegularExpressionValidator, QPalette, QColor, QIcon
+    from PySide6.QtCore import Qt, QObject, Signal, QRegularExpression
+    QT_VER = 6
+except ImportError:
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtGui import QRegExpValidator, QPalette, QColor, QIcon
+    from PyQt5.QtCore import Qt, QObject, pyqtSignal, QRegExp
+    QT_VER = 5
+
 import math
 import configparser
 import re
 import time
 import os
 
-
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 
-
 class LongSpinBox(QAbstractSpinBox):
-    valueChanged = pyqtSignal(int)
-    clicked = pyqtSignal(Qt.MouseButton)
+    valueChanged = Signal(int) if QT_VER == 6 else pyqtSignal(int)
+    clicked = Signal(Qt.MouseButton)if QT_VER == 6 else pyqtSignal(Qt.MouseButton)
 
     def __init__(self, parent = None):
         super(LongSpinBox, self).__init__(parent)
@@ -28,7 +34,11 @@ class LongSpinBox(QAbstractSpinBox):
         self.setMaximum(255)
         self.lineEdit().setText("0")
         self.lineEdit().textChanged.connect(lambda t: self.setValue(int(t)))
-        self.lineEdit().setValidator(QRegExpValidator(QRegExp("[0-9]*"), self.lineEdit()))
+
+        if QT_VER == 6:
+            self.lineEdit().setValidator(QRegularExpressionValidator(QRegularExpression("[0-9]*"), self.lineEdit()))
+        else:
+            self.lineEdit().setValidator(QRegExpValidator(QRegExp("[0-9]*"), self.lineEdit()))
 
     def setMaximum(self, max_value):
         self.maximum = max_value
@@ -312,11 +322,11 @@ class QtBuilderTop(QWidget):
             if(not line):
                 break
 
-            line = line.rstrip('\n').strip()
+            line = line.rstrip(r'\n').strip()
 
             if(found):
 
-                if re.match('^\[(.*)\]$', line) is not None:
+                if re.match(r'^\[(.*)\]$', line) is not None:
                     break
 
                 parts = line.split('=')
@@ -334,14 +344,14 @@ class QtBuilderTop(QWidget):
                 regcnt += 1
                 #print('loaded 0x%04x=0x%04x' % (addr, val))
             else:
-                found = ('[%s]' % ini_section_name) == line
+                found = (r'[%s]' % ini_section_name) == line
                 if(found):
-                    print('LOAD: found section [%s] in file "%s"' % (ini_section_name, inifile_name))
+                    print(r'LOAD: found section [%s] in file "%s"' % (ini_section_name, inifile_name))
 
         if(not found):
-            print('LOAD: section [%s] not found in file "%s", registers were not loaded!' % (ini_section_name, inifile_name))
+            print(r'LOAD: section [%s] not found in file "%s", registers were not loaded!' % (ini_section_name, inifile_name))
         else:
-            print('LOAD: %d registers were loaded from "%s".[%s]' % (regcnt, inifile_name, ini_section_name))
+            print(r'LOAD: %d registers were loaded from "%s".[%s]' % (regcnt, inifile_name, ini_section_name))
             self.update()
 
         f.close()
