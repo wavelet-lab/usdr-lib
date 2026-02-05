@@ -12,6 +12,9 @@
 #include <endian.h>
 #include <string.h>
 #include <inttypes.h>
+#include <stdlib.h>
+
+#include "portable_fnmatch.h"
 
 #ifdef __cplusplus
 extern "C" {

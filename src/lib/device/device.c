@@ -4,12 +4,12 @@
 #include "device.h"
 #include <string.h>
 #include <usdr_logging.h>
+#include <usdr_port.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 #include "device_vfs.h"
 #include "device_names.h"
-#include <fnmatch.h>
 
 static int _usdr_device_vfs_get_by_path(device_t *base, const char* fullpath, pusdr_vfs_obj_t *obj);
 int usdr_device_base_create(pdevice_t dev, lldev_t lldev)
