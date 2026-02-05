@@ -13,6 +13,9 @@
 #include <string.h>
 #include <inttypes.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define PORT_THREAD __thread
 
@@ -33,5 +36,53 @@
 #endif
 
 #define SAFE_STRCPY(dst, src) ({strncpy((dst), (src), sizeof(dst) - 1); dst[SIZEOF_ARRAY(dst) - 1] = 0; })
+
+#ifdef _WIN32
+static inline int usdr_alignalloc(void **memptr, size_t alignment, size_t size) {
+    *memptr = _aligned_malloc(size, alignment);
+    return (*memptr) ? 0 : ENOMEM;
+}
+static inline void usdr_alignfree(void* ptr) {
+    _aligned_free(ptr);
+}
+
+#define localtime_r(T,Tm) (localtime_s(Tm,T) ? NULL : Tm)
+
+#define ENAVAIL ENOENT
+
+static inline int gettid(void)
+{
+    return GetCurrentThreadId();
+}
+
+#else
+static inline int usdr_alignalloc(void **memptr, size_t alignment, size_t size) {
+    return posix_memalign(memptr, alignment, size);
+}
+static inline void usdr_alignfree(void* ptr) {
+    free(ptr);
+}
+#endif
+
+#ifdef _WIN32
+typedef HANDLE library_hdl_t;
+typedef off64_t off_long_t;
+#define ftell_long ftello64
+#else
+typedef void* library_hdl_t;
+typedef off_t off_long_t;
+#define ftell_long ftello
+#endif
+
+library_hdl_t usdr_lib_load(const char* s);
+void usdr_lib_close(library_hdl_t h);
+void* usdr_lib_sym(library_hdl_t h, const char* proc);
+
+
+#define CACHE_SIZE  64
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

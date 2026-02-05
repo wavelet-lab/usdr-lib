@@ -4,6 +4,7 @@
 #ifndef _LIBUSB_GENERIC_H
 #define _LIBUSB_GENERIC_H
 
+#include <usdr_port.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <libusb-1.0/libusb.h>

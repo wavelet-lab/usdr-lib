@@ -430,19 +430,27 @@ int buffers_realloc(struct buffers* rb, unsigned allocsz)
     int res;
     unsigned i;
 
-    free(rb->rqueuebuf_ptr);
+    usdr_alignfree(rb->rqueuebuf_ptr);
     free(rb->bd);
     rb->allocsz = allocsz;
+
+    rb->rqueuebuf_ptr = NULL;
+    rb->bd = NULL;
 
     // Round up to maximum transfer in Bulk and reserve two more transfer in the case
     rb->allocsz_rounded = (allocsz + 4095) & (~4095u);
 
     rb->bd = (struct buffer_discriptor *)malloc(sizeof(struct buffer_discriptor) * (rb->buf_max + 1));
+    if (rb->bd == NULL)
+        return -ENOMEM;
 
-    res = posix_memalign((void**)&rb->rqueuebuf_ptr, 4096,
+    res = usdr_alignalloc((void**)&rb->rqueuebuf_ptr, 4096,
                          rb->allocsz_rounded * (rb->buf_max + 1));
-    if (res != 0)
+    if (res != 0) {
+        free(rb->bd);
+        rb->bd = NULL;
         return -res;
+    }
 
     for (i = 0; i <= rb->buf_max; i++) {
         rb->bd[i].b = rb;
@@ -450,8 +458,8 @@ int buffers_realloc(struct buffers* rb, unsigned allocsz)
         rb->bd[i].buffer_sz = 0;
     }
 
-    USDR_LOG("USBX", USDR_LOG_ERROR, "RX buffer configured to %d bytes for %d original\n",
-             rb->allocsz_rounded, allocsz);
+    USDR_LOG("USBX", USDR_LOG_ERROR, "RX buffer configured to %d x %d bytes for %d original\n",
+             rb->allocsz_rounded, rb->buf_max, allocsz);
 
     rb->bufno_prod = 0;
     rb->bufno_cons = 0;
@@ -537,6 +545,10 @@ int buffers_usb_transfer_post(struct buffers *prxb, unsigned buffer_idx, unsigne
                               unsigned transfer_idx)
 {
     int res;
+
+    assert(buffer_idx <= prxb->buf_max);
+    assert(transfer_idx < prxb->transfers_count);
+
     prxb->transfers[transfer_idx]->buffer = prxb->rqueuebuf_ptr + buffer_idx * prxb->allocsz_rounded;
     prxb->transfers[transfer_idx]->length = length; //prxb->allocsz_rounded;
     prxb->transfers[transfer_idx]->user_data = &prxb->bd[buffer_idx];
@@ -567,6 +579,7 @@ void LIBUSB_CALL libusb_transfer_buffers_cb(struct libusb_transfer *transfer)
             break;
     }
     assert(idx < rxb->transfers_count);
+    assert(rxbd->bno <= rxb->buf_max);
 
     USDR_LOG("USBX", USDR_LOG_DEBUG, "%s_STRM[%d] transfer %d => %d / %d\n", tr_type,
              idx, transfer->status, transfer->actual_length, transfer->length);
@@ -628,6 +641,10 @@ int buffers_usb_init(libusb_generic_dev_t* gdev, struct buffers *prxb,
         max_reqs = BUFFERS_MAX_TRANS;
     }
 
+    if (max_reqs > max_buffs) {
+        max_reqs = max_buffs;
+    }
+
     res = res ? res : buffers_init(prxb, max_buffs, usb_in ? 0 : max_buffs, eventfd_ntfy);
     res = res ? res : buffers_realloc(prxb, max_blocksize);
     res = res ? res : libusb_generic_prepare_transfer(gdev, NULL, endpoint,
@@ -661,7 +678,7 @@ int buffers_usb_free(struct buffers *prxb)
         prxb->transfers[j] = NULL;
     }
 
-    free(prxb->rqueuebuf_ptr);
+    usdr_alignfree(prxb->rqueuebuf_ptr);
     prxb->rqueuebuf_ptr = NULL;
 
     free(prxb->bd);

@@ -10,7 +10,7 @@ ring_circbuf_t* ring_circbuf_create(size_t max_size)
 {
     size_t sz = sizeof(ring_circbuf_t) + max_size;
     ring_circbuf_t* b;
-    int res = posix_memalign((void**)&b, 16, sz);
+    int res = usdr_alignalloc((void**)&b, CACHE_SIZE, sz);
     if (res) {
         return NULL;
     }
@@ -23,7 +23,7 @@ ring_circbuf_t* ring_circbuf_create(size_t max_size)
 
 void ring_circbuf_destroy(ring_circbuf_t* rb)
 {
-    free(rb);
+    usdr_alignfree(rb);
 }
 
 

@@ -15,7 +15,7 @@ struct ring_buffer* ring_buffer_create(unsigned items, unsigned isize)
     if (items == 0 || isize == 0)
         return NULL;
 
-    int res = posix_memalign((void**)&obj, CACHE_SIZE, sz);
+    int res = usdr_alignalloc((void**)&obj, CACHE_SIZE, sz);
     if (res)
         return NULL;
 
@@ -36,7 +36,7 @@ struct ring_buffer* ring_buffer_create(unsigned items, unsigned isize)
 failed_s1:
     sem_destroy(&obj->producer);
 failed_s0:
-    free(obj);
+    usdr_alignfree(obj);
     return NULL;
 }
 
@@ -44,7 +44,7 @@ void ring_buffer_destroy(struct ring_buffer* rb)
 {
     sem_destroy(&rb->producer);
     sem_destroy(&rb->consumer);
-    free(rb);
+    usdr_alignfree(rb);
 }
 
 char* ring_buffer_at(struct ring_buffer* rb, unsigned idx)
