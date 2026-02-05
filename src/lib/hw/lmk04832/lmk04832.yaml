@@ -27,11 +27,11 @@ pages:
             bits: '4'
             desc: 3 Wire Mode disabled
       - addr: '0x0003'
-        name: DEVICE_TYPE
+        name: LMKDEV_TYPE
         fields:
-          - name: DEVICE_TYPE
+          - name: LMKDEV_TYPE
             bits: '7:0'
-            desc: DEVICE_TYPE
+            desc: LMKDEV_TYPE
       - addr: '0x0004'
         name: PROD_HI
         fields:
