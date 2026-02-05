@@ -399,9 +399,9 @@ int dev_m2_lm7_1_debug_clkinfo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
 int dev_m2_lm7_1_dev_dac_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    board_ext_pciefe_t* board_fe = device_fe_to(d->fe, "pciefe");
-    board_exm2pe_t* board = device_fe_to(d->fe, "exm2pe");
-    ext_fe_ch4_400_7200_t* fe = device_fe_to(d->fe, "fe4ch4007200");
+    board_ext_pciefe_t* board_fe = (board_ext_pciefe_t*)device_fe_to(d->fe, "pciefe");
+    board_exm2pe_t* board = (board_exm2pe_t*)device_fe_to(d->fe, "exm2pe");
+    ext_fe_ch4_400_7200_t* fe = (ext_fe_ch4_400_7200_t*)device_fe_to(d->fe, "fe4ch4007200");
     if (board_fe) {
         return board_ext_pciefe_set_dac(board_fe, value);
     } else if (board) {
@@ -1442,7 +1442,7 @@ static
 int usdr_device_m2_lm7_1_create(lldev_t dev, device_id_t devid)
 {
     int res;
-    unsigned hwid;
+    unsigned hwid, did;
 
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)malloc(sizeof(struct dev_m2_lm7_1_gps));
     res = xsdr_ctor(dev, &d->xdev);
@@ -1459,7 +1459,7 @@ int usdr_device_m2_lm7_1_create(lldev_t dev, device_id_t devid)
     //if (res) {
     //    goto failed_free;
     //}
-    unsigned did = ((hwid >> 16) & 0xff);
+    did = ((hwid >> 16) & 0xff);
 
     if ((res == 0) && (did == SSDR_DEV || did == SSDRPRO_DEV)) {
         res = vfs_add_const_i64_vec(&d->base.rootfs,

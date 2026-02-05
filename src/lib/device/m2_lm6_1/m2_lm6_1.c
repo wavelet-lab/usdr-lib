@@ -889,8 +889,8 @@ usdr_dev_t* get_usdr_dev(pdevice_t udev)
 int dev_m2_lm6_1_sdr_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
-    board_ext_pciefe_t* board_fe = device_fe_to(d->fe, "pciefe");
-    board_exm2pe_t* board = device_fe_to(d->fe, "exm2pe");
+    board_ext_pciefe_t* board_fe = (board_ext_pciefe_t*)device_fe_to(d->fe, "pciefe");
+    board_exm2pe_t* board = (board_exm2pe_t*)device_fe_to(d->fe, "exm2pe");
     if (board_fe) {
         return board_ext_pciefe_set_dac(board_fe, value);
     } else if (board) {

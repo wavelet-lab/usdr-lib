@@ -316,9 +316,9 @@ int lmk05318_dpll_config(lmk05318_state_t* d, lmk05318_dpll_settings_t* dpll)
             USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] %s:enabled FREF:%" PRIu64 " DC_MODE:%u(%s) BUF_MODE:%u(%s) TYPE:%u(%s) RDIV:%u",
                      nm,
                      dpll->fref[i],
-                     dpll->dc_mode[i], lmk05318_dpll_decode_ref_dc_mode(dpll->dc_mode[i]),
-                     dpll->buf_mode[i], lmk05318_dpll_decode_ref_buf_mode(dpll->buf_mode[i]),
-                     dpll->type[i], lmk05318_dpll_decode_ref_type(dpll->type[i]),
+                     dpll->dc_mode[i], lmk05318_dpll_decode_ref_dc_mode((enum lmk05318_ref_dc_mode_t)dpll->dc_mode[i]),
+                     dpll->buf_mode[i], lmk05318_dpll_decode_ref_buf_mode((enum lmk05318_ref_buf_mode_t)dpll->buf_mode[i]),
+                     dpll->type[i], lmk05318_dpll_decode_ref_type((enum lmk05318_ref_input_type_t)dpll->type[i]),
                      d->dpll.rdiv[i]);
         else
             USDR_LOG("5318", USDR_LOG_INFO, "[DPLL] %s:disabled", nm);
@@ -1182,7 +1182,7 @@ int lmk05318_set_xo_fref(lmk05318_state_t* d)
 
     USDR_LOG("5318", USDR_LOG_INFO, "[XO] FREF:%u TYPE:%u(%s) DOUBLER:%u RDIV:%u FDET_BYPASS:%u",
              xo_fref,
-             xo_type_raw, lmk05318_decode_xo_type(xo_type_raw),
+             xo_type_raw, lmk05318_decode_xo_type((enum xo_type_options)xo_type_raw),
              d->xo.doubler_enabled, d->xo.pll1_fref_rdiv, xo_fdet_bypass);
 
     uint32_t regs[] = {
@@ -2199,45 +2199,42 @@ int lmk05318_solver(lmk05318_state_t* d, lmk05318_out_config_t* _outs, unsigned 
                  outs[i].port, outs[i].wanted.freq, outs[i].wanted.freq_delta_minus, outs[i].wanted.freq_delta_plus);
     }
 
-    if(!cnt_to_solve)
-        goto have_complete_solution;
+    if(cnt_to_solve) {
+        static const uint64_t fvco2_pd_min = VCO_APLL2_MIN / APLL2_PDIV_MAX;
+        static const uint64_t fvco2_pd_max = VCO_APLL2_MAX / APLL2_PDIV_MIN;
 
-    static const uint64_t fvco2_pd_min = VCO_APLL2_MIN / APLL2_PDIV_MAX;
-    static const uint64_t fvco2_pd_max = VCO_APLL2_MAX / APLL2_PDIV_MIN;
-
-    //determine valid PD ranges for our frequencies
-    for(unsigned i = 0; i < LMK05318_MAX_REAL_PORTS; ++i)
-    {
-        lmk05318_out_config_t* out = outs + i;
-        if(out->solved)
-            continue;
-
-        const range_t r = lmk05318_get_freq_range(out);
-        const range_t ifreq = {MAX(r.min, fvco2_pd_min) , MIN(r.max * lmk05318_max_odiv(out->port), fvco2_pd_max)};
-
-        if(ifreq.min > ifreq.max)
+        //determine valid PD ranges for our frequencies
+        for(unsigned i = 0; i < LMK05318_MAX_REAL_PORTS; ++i)
         {
-            USDR_LOG("5318", USDR_LOG_ERROR, "port#%d freq:%d (-%d, +%d) is totally out of available range",
-                     out->port, out->wanted.freq, out->wanted.freq_delta_minus, out->wanted.freq_delta_plus);
-            return -EINVAL;
+            lmk05318_out_config_t* out = outs + i;
+            if(out->solved)
+                continue;
+
+            const range_t r = lmk05318_get_freq_range(out);
+            const range_t ifreq = {MAX(r.min, fvco2_pd_min) , MIN(r.max * lmk05318_max_odiv(out->port), fvco2_pd_max)};
+
+            if(ifreq.min > ifreq.max)
+            {
+                USDR_LOG("5318", USDR_LOG_ERROR, "port#%d freq:%d (-%d, +%d) is totally out of available range",
+                        out->port, out->wanted.freq, out->wanted.freq_delta_minus, out->wanted.freq_delta_plus);
+                return -EINVAL;
+            }
+
+            const int pd_min = VCO_APLL2_MAX / ifreq.max;
+            const int pd_max = VCO_APLL2_MAX / ifreq.min;
+
+            out->pd_min = pd_min;
+            out->pd_max = pd_max;
+
+            USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d pre-OD freq range:[%" PRIu64", %" PRIu64"], PD:[%d, %d]",
+                    out->port, ifreq.min, ifreq.max, pd_min, pd_max);
         }
 
-        const int pd_min = VCO_APLL2_MAX / ifreq.max;
-        const int pd_max = VCO_APLL2_MAX / ifreq.min;
-
-        out->pd_min = pd_min;
-        out->pd_max = pd_max;
-
-        USDR_LOG("5318", USDR_LOG_DEBUG, "port:%d pre-OD freq range:[%" PRIu64", %" PRIu64"], PD:[%d, %d]",
-                 out->port, ifreq.min, ifreq.max, pd_min, pd_max);
+        const uint64_t f_mid = (VCO_APLL2_MAX + VCO_APLL2_MIN) / 2;
+        res = lmk05318_solver_helper(outs, cnt_to_solve, f_mid, d);
+        if(res)
+            return res;
     }
-
-    const uint64_t f_mid = (VCO_APLL2_MAX + VCO_APLL2_MIN) / 2;
-    res = lmk05318_solver_helper(outs, cnt_to_solve, f_mid, d);
-    if(res)
-        return res;
-
-have_complete_solution:
 
     //if ok - update the results
 
@@ -2272,7 +2269,7 @@ have_complete_solution:
 
         USDR_LOG("5318", is_freq_ok ? USDR_LOG_DEBUG : USDR_LOG_ERROR, "port:%d solved [OD:%" PRIu64 " freq:%.8f mux:%d(%s) fmt:%u(%s)] %s",
                  out_dst->port, out_dst->result.out_div, out_dst->result.freq, out_dst->result.mux,
-                 lmk05318_decode_mux(out_dst->result.mux), out_dst->wanted.type, lmk05318_decode_fmt_to_string(out_dst->wanted.type),
+                 lmk05318_decode_mux((enum lmk05318_out_pll_sel_t)out_dst->result.mux), out_dst->wanted.type, lmk05318_decode_fmt_to_string(out_dst->wanted.type),
                  is_freq_ok ? "**OK**" : "**BAD**");
     }
 

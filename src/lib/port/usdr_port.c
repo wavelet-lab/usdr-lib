@@ -31,7 +31,11 @@ void* usdr_lib_sym(library_hdl_t h, const char* proc)
 
 library_hdl_t usdr_lib_load(const char* s)
 {
-    return dlopen(s, RTLD_LAZY | RTLD_DEEPBIND | RTLD_GLOBAL);
+    int mode = RTLD_LAZY | RTLD_GLOBAL;
+#ifdef RTLD_DEEPBIND
+    mode |= RTLD_DEEPBIND;
+#endif
+    return dlopen(s, mode);
 }
 
 void usdr_lib_close(library_hdl_t h)
