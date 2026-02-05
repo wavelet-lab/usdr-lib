@@ -7,16 +7,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
 #include <fcntl.h>
-#include <arpa/inet.h>
 #include <string.h>
 #include <stdio.h>
-#include <endian.h>
 #include <semaphore.h>
-#include <signal.h>
-#include <assert.h>
 
 #include "usb_uram_generic.h"
 #include "../device/device.h"
@@ -515,6 +509,10 @@ int _usb_uram_init_rxstream(usb_dev_t* d,
 
     res = buffers_usb_init(&d->gdev, prxb, transfers, params->buffer_count,
                            params->block_size + trailer_sz, EP_IN_DEFSTREAM, eventtype);
+    if (res) {
+        USDR_LOG("USBX", USDR_LOG_ERROR, "Stream RX initialization failed: %d!\n", res);
+        return res;
+    }
 
     prxb->auto_restart = true;
     d->rx_buffer_missed[0] = 0;
@@ -655,8 +653,8 @@ int usb_uram_recv_dma_wait(lldev_t dev, subdev_t subdev, stream_t channel, void*
 
     USDR_LOG("USBX",
              (rxb->allocsz == bd->buffer_sz) ? USDR_LOG_DEBUG : USDR_LOG_ERROR,
-             "Buffer %d / %08x %08x  TO=%d SEQ=%16ld\n",
-             buffer_sz, bursts, skipped, timeout, cnt);
+             "Buffer %d / %08x %08x  TO=%d SEQ=%16lld\n",
+             buffer_sz, bursts, skipped, timeout, (long long)cnt);
 
     if (oob_size && *oob_size >= 8) {
         // memset(oob_ptr, 0, *oob_size);
@@ -709,7 +707,7 @@ int usb_uram_send_dma_get(lldev_t dev, subdev_t subdev, stream_t channel, void**
     unsigned bno = buffers_produce(rxb);
     *buffer = buffers_get_ptr(rxb, bno) + TXSTRM_META_SZ;
 
-    USDR_LOG("USBX", USDR_LOG_DEBUG, "TX Alloc BNO=%d %ld\n", bno, cnt);
+    USDR_LOG("USBX", USDR_LOG_DEBUG, "TX Alloc BNO=%d %lld\n", bno, (long long)cnt);
 
     // Trottle statistics to relax extra load
     if (oob_size) {

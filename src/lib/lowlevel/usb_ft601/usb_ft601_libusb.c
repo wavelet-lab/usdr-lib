@@ -7,16 +7,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
 #include <fcntl.h>
-#include <arpa/inet.h>
 #include <string.h>
 #include <stdio.h>
-#include <endian.h>
 #include <semaphore.h>
-#include <signal.h>
-#include <assert.h>
 #include <usdr_logging.h>
 
 #include "../device/device.h"
@@ -257,8 +251,8 @@ int usbft601_uram_recv_dma_wait(lldev_t dev, subdev_t subdev, stream_t channel, 
 
     USDR_LOG("USBX",
              (rxb->allocsz == bd->buffer_sz) ? USDR_LOG_DEBUG : USDR_LOG_ERROR,
-             "Buffer %d / %08x %08x %08x %08x  TO=%d SEQ=%16ld\n",
-             bd->buffer_sz, pkt[0], pkt[1], pkt[2], pkt[3], timeout, cnt);
+             "Buffer %d / %08x %08x %08x %08x  TO=%d SEQ=%16lld\n",
+             bd->buffer_sz, pkt[0], pkt[1], pkt[2], pkt[3], timeout, (long long)cnt);
 
 
     *buffer = tr_buffer;
@@ -298,7 +292,7 @@ int usbft601_uram_send_dma_get(lldev_t dev, subdev_t subdev, stream_t channel, v
     unsigned bno = buffers_produce(rxb);
     *buffer = buffers_get_ptr(rxb, bno);
 
-    USDR_LOG("USBX", USDR_LOG_DEBUG, "TX Alloc BNO=%d %ld\n", bno, cnt);
+    USDR_LOG("USBX", USDR_LOG_DEBUG, "TX Alloc BNO=%d %lld\n", bno, (long long)cnt);
 
     cnt++;
     return 0;
