@@ -664,6 +664,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
     uint64_t rx_badness = UINT64_MAX;
     uint64_t tx_badness = UINT64_MAX;
     unsigned tx_iqerrs = UINT_MAX;
+    unsigned iqserrs2 = -1;
 
     g_clk_reduce = 0;
 
@@ -692,7 +693,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
         if (!(d->base.rx_run[0] || d->base.rx_run[1])) {
             res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS_PWR, IGPO_LMS_PWR_LDOEN | IGPO_LMS_PWR_NRESET | IGPO_LMS_PWR_RXEN  | IGPO_LMS_PWR_TXEN);
             res = res ? res : usleep(1000);
-            res = res ? res : lms7002m_streaming_up(&d->base, RFIC_LMS7_RX, LMS7_CH_AB, 0, 0, 0);
+            res = res ? res : lms7002m_streaming_up(&d->base, RFIC_LMS7_RX, LMS7_CH_AB, 0, LMS7_CH_NONE, 0);
         }
 
         res = res ? res : xsdr_configure_lml_mmcm_tx(d, mmcm_rx_only_path, 0, 0, 0);
@@ -913,8 +914,6 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
             // Make sure it's a good value
             res = res ? res : _xsdr_calibrate_txlfsr_check(d, check_to, errs, &iqserrs, &badness_m);
 
-            unsigned iqserrs2 = -1;
-
             // Check A/B & I/Q aligment is ok
             res = res ? res : xsdr_phy_en_lfsr_generator_mimo(d, true, false);
             res = res ? res : usleep(10);
@@ -952,7 +951,7 @@ no_tx:
 
     if (rx_badness || (!mmcm_rx_only_path && (tx_badness || tx_iqerrs))) {
         bool severe = (rx_badness > 100) || (!mmcm_rx_only_path && (tx_badness > 100 || tx_iqerrs > 10));
-        USDR_LL_LOG(dev, "XDEV", severe ? USDR_LOG_ERROR : USDR_LOG_WARNING, "LML Calibration failed: RX_BADNESS=%"PRId64" TX_BADNESS=%"PRId64" TX_IQERRS=%d\n",
+        USDR_LL_LOG(dev, "XDEV", severe ? USDR_LOG_ERROR : USDR_LOG_WARNING, "LML Calibration failed: RX_BADNESS=%" PRId64 " TX_BADNESS=%" PRId64 " TX_IQERRS=%d\n",
                  rx_badness, mmcm_rx_only_path ? 0 : tx_badness, mmcm_rx_only_path ? 0 : tx_iqerrs);
 
         if (res == 0 && severe)

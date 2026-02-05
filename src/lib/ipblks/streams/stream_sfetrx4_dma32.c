@@ -876,7 +876,7 @@ static int initialize_stream_rx_32(device_t* device,
 
     strdev->hw_pwr_mask = hw_chan_msk;
     strdev->pack_3x16 = pack_3x16;
-    USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "RX: Samples=%d Bps=%dx%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%"PRIx64" Pack3x16=%d\n",
+    USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "RX: Samples=%d Bps=%dx%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%" PRIx64 " Pack3x16=%d\n",
              strdev->pkt_symbs, strdev->wire_bps, strdev->channels, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask, strdev->pack_3x16);
 
     *outu = strdev;
@@ -1171,7 +1171,7 @@ static int initialize_stream_tx_32(device_t* device,
 
     strdev->hw_pwr_mask = pwr_hw_mask;
     strdev->pack_3x16 = pack_3x16;
-    USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "TX: Samples=%d Bps=%dx%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%"PRIx64" Pack3x16=%d\n",
+    USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "TX: Samples=%d Bps=%dx%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%" PRIx64 " Pack3x16=%d\n",
              strdev->pkt_symbs, strdev->wire_bps, strdev->channels, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask, strdev->pack_3x16);
     *outu = strdev;
     return 0;

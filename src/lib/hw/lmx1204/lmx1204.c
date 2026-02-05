@@ -136,8 +136,8 @@ int lmx1204_read_status(lmx1204_state_t* st, lmx1204_stats_t* status)
 
     USDR_LOG("1204", USDR_LOG_DEBUG, "STATUS> Temp:%.2fC LOCK:%u(%s) VCO_SEL:%u(%s)",
              status->temperature,
-             status->lock_detect_status, lmx1204_decode_lock_status(status->lock_detect_status),
-             status->vco_sel, lmx1204_decode_vco_core(status->vco_sel));
+             status->lock_detect_status, lmx1204_decode_lock_status((enum rb_ld_options)status->lock_detect_status),
+             status->vco_sel, lmx1204_decode_vco_core((enum rb_vco_sel_options)status->vco_sel));
 
     return 0;
 }
@@ -612,7 +612,7 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         st->sysref_div     = div;
 
         USDR_LOG("1204", USDR_LOG_DEBUG, "[SYSREFCLK] SYSREFREQ:%" PRIu64 " SYSREF_MODE:%s(%u) SYSREFOUT:%.4f",
-                 st->sysrefreq, lmx1204_decode_sysref_mode(st->sysref_mode), st->sysref_mode, st->sysrefout);
+                 st->sysrefreq, lmx1204_decode_sysref_mode((enum sysref_mode_options)st->sysref_mode), st->sysref_mode, st->sysrefout);
 
         if(st->sysref_mode != SYSREF_MODE_REPEATER_REPEATER_MODE)
         {
@@ -634,9 +634,9 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         USDR_LOG("1204", USDR_LOG_INFO, "SYSREFOUT%u:%.4f EN:%u", i, st->sysrefout, st->sysref_en && st->ch_en[0] && st->sysrefout_en[0]);
     }
     USDR_LOG("1204", USDR_LOG_INFO, "LOGICLKOUT    :%.4f EN:%u FMT:%s",
-             st->logiclkout, st->ch_en[LMX1204_CH_LOGIC] && st->clkout_en[LMX1204_CH_LOGIC], lmx1204_decode_fmt(st->logiclkout_fmt));
+             st->logiclkout, st->ch_en[LMX1204_CH_LOGIC] && st->clkout_en[LMX1204_CH_LOGIC], lmx1204_decode_fmt((enum logiclkout_fmt_options)st->logiclkout_fmt));
     USDR_LOG("1204", USDR_LOG_INFO, "LOGICSYSREFOUT:%.4f EN:%u FMT:%s",
-             st->sysrefout, st->sysref_en && st->ch_en[LMX1204_CH_LOGIC] && st->sysrefout_en[LMX1204_CH_LOGIC], lmx1204_decode_fmt(st->logisysrefout_fmt));
+             st->sysrefout, st->sysref_en && st->ch_en[LMX1204_CH_LOGIC] && st->sysrefout_en[LMX1204_CH_LOGIC], lmx1204_decode_fmt((enum logiclkout_fmt_options)st->logisysrefout_fmt));
     USDR_LOG("1204", USDR_LOG_INFO, "--------------");
 
     //registers
