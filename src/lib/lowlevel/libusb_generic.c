@@ -379,7 +379,11 @@ int buffers_init(struct buffers* rb, unsigned max, unsigned zerosemval, bool has
     }
 
     if (has_event) {
+#ifdef WIN32
+        rb->fd_event = -ENOTSUP;
+#else
         rb->fd_event = fdevent_create(zerosemval);
+#endif
         if (rb->fd_event < 0) {
             int err = -errno;
             USDR_LOG("USBX", USDR_LOG_ERROR, "Unable to create eventfd! err=%d\n", err);
@@ -415,14 +419,16 @@ void buffers_deinit(struct buffers* rb)
     usleep(10000);
 
     sem_destroy(&rb->buf_ready);
-    free(rb->rqueuebuf_ptr);
-    free(rb->bd);
+  //  usdr_alignfree(rb->rqueuebuf_ptr);
+  //  free(rb->bd);
+#ifndef WIN32
     if (rb->fd_event >= 0)
         fdevent_destroy(rb->fd_event);
+#endif
     rb->fd_event = -101;
 
-    rb->rqueuebuf_ptr = NULL;
-    rb->bd = NULL;
+  //  rb->rqueuebuf_ptr = NULL;
+  //  rb->bd = NULL;
 }
 
 int buffers_realloc(struct buffers* rb, unsigned allocsz)
@@ -474,8 +480,10 @@ void buffers_reset(struct buffers* rb)
     sem_destroy(&rb->buf_ready);
     sem_init(&rb->buf_ready, 0, 0);
 
+#ifndef WIN32
     if (rb->fd_event > 0)
         fdevent_get(rb->fd_event, NULL);
+#endif
 }
 
 // Ready buffer to or from IO
@@ -494,7 +502,11 @@ int buffers_ready_wait(struct buffers *rxb, int64_t timeout_us)
 {
     int res;
     if (rxb->fd_event >= 0) {
+#ifndef WIN32
         res = fdevent_get(rxb->fd_event, NULL);
+#else
+        res = -ENOTSUP;
+#endif
     } else {
         res = sem_wait_ex(&rxb->buf_ready, timeout_us * 1000);
     }
@@ -505,7 +517,11 @@ int buffers_ready_post(struct buffers *rxb)
 {
     int res;
     if (rxb->fd_event >= 0) {
+#ifndef WIN32
         res = fdevent_post(rxb->fd_event, 1);
+#else
+        res = -ENOTSUP;
+#endif
     } else {
         res = sem_post(&rxb->buf_ready);
     }

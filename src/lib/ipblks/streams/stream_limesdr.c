@@ -1,12 +1,12 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
+#include <usdr_port.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include <arpa/inet.h>
 #include <inttypes.h>
 
 #include "stream_limesdr.h"

@@ -4,24 +4,29 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+
+#include <usdr_port.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <memory.h>
-#include <signal.h>
-#ifndef WIN32
-#include <sys/un.h>
-#include <sys/socket.h>
-#endif
-
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <ws2tcpip.h>
+#include <afunix.h>
+#else
+#include <signal.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#endif
 
 #include "dm_dev.h"
-#include "dm_dev_impl.h"
 #include "dm_debug.h"
+
+#include <usdr_logging.h>
 
 static
 int usdr_dif_process_cmd(struct usdr_debug_ctx* ctx, char *cmd, unsigned len,
@@ -76,19 +81,21 @@ int usdr_dif_process_cmd(struct usdr_debug_ctx* ctx, char *cmd, unsigned len,
     }
 }
 
-#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
+#if !defined(__EMSCRIPTEN__)
 static void* usdr_dif_thread(void* param)
 {
     int ret;
     struct sockaddr_un name;
     struct usdr_debug_ctx* ctx = (struct usdr_debug_ctx*)param;
     USDR_LOG("DBGS", USDR_LOG_INFO, "Starting USDR debug thread\n");
+
+#ifndef _WIN32
     sigset_t set;
 
     pthread_setname_np(pthread_self(), "debug_io");
     sigfillset(&set);
     pthread_sigmask(SIG_SETMASK, &set, NULL);
-
+#endif
     pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
     const char* fifoname = "usdr_debug_pipe";
     unlink(fifoname);
@@ -193,9 +200,10 @@ int usdr_dif_init(const char *params,
                   //void *obj,
                   struct usdr_debug_ctx** octx)
 {
-#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
-
+#if !defined(__EMSCRIPTEN__)
     int res;
+
+#ifndef _WIN32
     const char* fifoname = "usdr_debug_pipe";
     int fd = mkfifo(fifoname, 0666);
     if (fd < 0 && errno != EEXIST) {
@@ -204,7 +212,7 @@ int usdr_dif_init(const char *params,
                    fifoname, err);
         return err;
     }
-
+#endif
     struct usdr_debug_ctx* ctx = (struct usdr_debug_ctx*)malloc(sizeof(struct usdr_debug_ctx));
     if (!ctx)
         return -ENOMEM;
@@ -230,7 +238,7 @@ failed_create_thread:
 
 int usdr_dif_free(struct usdr_debug_ctx* ctx)
 {
-#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
+#if !defined(__EMSCRIPTEN__)
     close(ctx->fd);
 
     pthread_cancel(ctx->debug_thread);

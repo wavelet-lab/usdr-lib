@@ -1,5 +1,6 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
+#ifndef _WIN32
 
 #include <stdlib.h>
 #include <string.h>
@@ -620,3 +621,5 @@ failed_create:
     free(obj);
     return res;
 }
+
+#endif

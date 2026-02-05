@@ -1,5 +1,6 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
+#ifndef WIN32
 
 #include "pcie_uram_main.h"
 
@@ -1100,3 +1101,6 @@ const struct lowlevel_plugin *pcie_uram_register()
 {
     return &s_pcie_uram_plugin;
 }
+
+#endif
+

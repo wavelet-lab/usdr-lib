@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <endian.h>
+#include <usdr_port.h>
 #include "lms64c_cmds.h"
 #include "lms64c_proto.h"
 

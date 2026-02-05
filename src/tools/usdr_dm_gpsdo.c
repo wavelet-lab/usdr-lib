@@ -13,8 +13,10 @@
 #include <time.h>
 #include <math.h>
 #include <unistd.h>
+#ifndef WIN32
 #include <sys/timerfd.h>
 #include <poll.h>
+#endif
 
 // PID parameters
 #define KP 0.75    // Proportional gain
@@ -259,7 +261,7 @@ int main(int argc, char **argv)
 
     struct timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
-
+#ifndef WIN32
     // Create timerfd for 100 ms polling
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     if (timer_fd == -1) {
@@ -280,6 +282,7 @@ int main(int argc, char **argv)
     struct pollfd fds[1];
     fds[0].fd = timer_fd;
     fds[0].events = POLLIN;
+#endif
 
     const double holdover_interval = 2 * dt;
     uint32_t dac_offset = dac.center; // initial
@@ -287,6 +290,10 @@ int main(int argc, char **argv)
 
     while (true) {
         // Wait for timer event
+#ifdef WIN32
+        Sleep(100);
+        {
+#else
         int ret = poll(fds, 1, -1);
         if (ret == -1) {
             perror("poll");
@@ -296,7 +303,7 @@ int main(int argc, char **argv)
         if (fds[0].revents & POLLIN) {
             uint64_t expirations;
             read(timer_fd, &expirations, sizeof(expirations)); // Clear timer event
-
+#endif
             res = usdr_dme_get_uint(dev, pps_path, &ppsparm);
             if (res) {
                 fprintf(stderr, "Unable to get pps: errno %d\n", res);
@@ -364,7 +371,9 @@ int main(int argc, char **argv)
         }
     }
 
+#ifndef WIN32
     close(timer_fd);
+#endif
     usdr_dmd_close(dev);
 
     return 0;

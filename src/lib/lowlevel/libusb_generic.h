@@ -7,7 +7,13 @@
 #include <usdr_port.h>
 #include <stdlib.h>
 #include <errno.h>
+
+#ifdef WIN32
+#include <libusb.h>
+#else
 #include <libusb-1.0/libusb.h>
+#endif
+
 #include <string.h>
 #include <semaphore.h>
 #include <time.h>

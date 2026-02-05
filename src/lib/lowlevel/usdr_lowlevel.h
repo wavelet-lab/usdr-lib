@@ -4,10 +4,7 @@
 #ifndef USDR_LOWLEVEL_H
 #define USDR_LOWLEVEL_H
 
-#include <stdint.h>
-#include <stddef.h>
 #include <usdr_port.h>
-
 #include <usdr_logging.h>
 
 

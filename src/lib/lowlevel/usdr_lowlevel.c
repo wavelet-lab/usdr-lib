@@ -62,7 +62,7 @@ unsigned lowlevel_initialize_plugins()
     //TODO driver loading
     plugins[s_driver_count++] = usbft601_uram_register();
     plugins[s_driver_count++] = usb_uram_register();
-#if !defined(__EMSCRIPTEN__) && !defined(WVLT_WEBUSB_BUILD)
+#if !defined(__EMSCRIPTEN__) && !defined(WVLT_WEBUSB_BUILD) && !defined(WIN32)
     plugins[s_driver_count++] = pcie_uram_register();
 #endif
 
