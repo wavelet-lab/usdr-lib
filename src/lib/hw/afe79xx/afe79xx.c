@@ -1,9 +1,7 @@
 #include "afe79xx.h"
 #include <stdlib.h>
+#include <usdr_port.h>
 #include <usdr_logging.h>
-#include <dlfcn.h>
-#include <stdlib.h>
-
 
 enum afe79xx_regs {
     CHIP_TYPE = 3,
@@ -91,9 +89,12 @@ int afe79xx_create_dummy(afe79xx_state_t* out)
 int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipType, afe79xx_state_t* out)
 {
     int res;
-    const char* afe79xxlib = "liblibcapi79xx.so";
-    unsigned g;
-
+    const char* afe79xxlib =
+#ifdef _WIN32
+        "liblibcapi79xx.dll";
+#else
+        "liblibcapi79xx.so";
+#endif
     memset(out, 0, sizeof(*out));
     out->dev = dev;
     out->subdev = subdev;
@@ -121,25 +122,30 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipT
     out->capi.user = NULL;
     out->capi.driver_handle = NULL;
 
-    out->dl_handle = dlopen(afe79xxlib, RTLD_NOW);
+    out->dl_handle = usdr_lib_load(afe79xxlib); // dlopen(afe79xxlib, RTLD_NOW);
     if (out->dl_handle == NULL) {
+#ifdef _WIN32
+        USDR_LOG("79xx", USDR_LOG_ERROR, "Couldn't load CAPI AFE79XX NDA LIB wrapper `%s`!\n",
+                 afe79xxlib);
+#else
         USDR_LOG("79xx", USDR_LOG_ERROR, "Couldn't load CAPI AFE79XX NDA LIB wrapper `%s`: %s!\n",
                  afe79xxlib, dlerror());
+#endif
         return -EFAULT;
     }
 
-    out->libcapi79xx_create = (libcapi79xx_create_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_CREATE_FN);
-    out->libcapi79xx_destroy = (libcapi79xx_destroy_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_DESTROY_FN);
-    out->libcapi79xx_init = (libcapi79xx_init_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_INIT_FN);
+    out->libcapi79xx_create = (libcapi79xx_create_fn_t)usdr_lib_sym(out->dl_handle, LIBCAPI79XX_CREATE_FN);
+    out->libcapi79xx_destroy = (libcapi79xx_destroy_fn_t)usdr_lib_sym(out->dl_handle, LIBCAPI79XX_DESTROY_FN);
+    out->libcapi79xx_init = (libcapi79xx_init_fn_t)usdr_lib_sym(out->dl_handle, LIBCAPI79XX_INIT_FN);
 
-    out->libcapi79xx_upd_nco = (libcapi79xx_upd_nco_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_UPD_NCO_FN);
-    out->libcapi79xx_get_nco = (libcapi79xx_get_nco_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_GET_NCO_FN);
+    out->libcapi79xx_upd_nco = (libcapi79xx_upd_nco_fn_t)usdr_lib_sym(out->dl_handle, LIBCAPI79XX_UPD_NCO_FN);
+    out->libcapi79xx_get_nco = (libcapi79xx_get_nco_fn_t)usdr_lib_sym(out->dl_handle, LIBCAPI79XX_GET_NCO_FN);
 
-    out->libcapi79xx_set_dsa = (libcapi79xx_set_dsa_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_SET_DSA_FN);
+    out->libcapi79xx_set_dsa = (libcapi79xx_set_dsa_fn_t)usdr_lib_sym(out->dl_handle, LIBCAPI79XX_SET_DSA_FN);
 
-    out->libcapi79xx_check_health = (libcapi79xx_check_health_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_CHECK_HEALTH_FN);
+    out->libcapi79xx_check_health = (libcapi79xx_check_health_fn_t)usdr_lib_sym(out->dl_handle, LIBCAPI79XX_CHECK_HEALTH_FN);
 
-    out->libcapi79xx_set_tdd = (libcapi79xx_set_tdd_fn_t)dlsym(out->dl_handle, LIBCAPI79XX_SET_TDD_FN);
+    out->libcapi79xx_set_tdd = (libcapi79xx_set_tdd_fn_t)usdr_lib_sym(out->dl_handle, LIBCAPI79XX_SET_TDD_FN);
 
     if (!out->libcapi79xx_create || !out->libcapi79xx_destroy || !out->libcapi79xx_init ||
         !out->libcapi79xx_set_dsa || !out->libcapi79xx_set_tdd ||
@@ -155,7 +161,7 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipT
                  out->libcapi79xx_check_health != NULL,
                  out->libcapi79xx_set_tdd != NULL);
 
-        dlclose(out->dl_handle);
+        usdr_lib_close(out->dl_handle);
         return -EFAULT;
     }
 

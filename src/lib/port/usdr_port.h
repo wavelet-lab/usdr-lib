@@ -3,13 +3,28 @@
 
 #ifndef USDR_PORT_H
 #define USDR_PORT_H
+
+#define _FILE_OFFSET_BITS 64
+
+#ifdef _WIN32
+#include <Winsock2.h>
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
+
+#ifdef _WIN32
+#define htobe32(x) htonl(x)
+#define be32toh(x) ntohl(x)
+#else
 #include <endian.h>
+#include <dlfcn.h>
+#include <arpa/inet.h>
+#endif
 #include <string.h>
 #include <inttypes.h>
 #include <stdlib.h>
