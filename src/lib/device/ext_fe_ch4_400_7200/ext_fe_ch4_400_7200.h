@@ -22,7 +22,7 @@
 
 #ifndef NO_ECFG_DEFS
 enum ext_fe_rx_filterbank {
-    RX_FB_400_1000M,
+    RX_FB_50_1000M,
     RX_FB_1000_2000M,
     RX_FB_2000_3500M,
     RX_FB_2500_5000M,

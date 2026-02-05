@@ -17,12 +17,12 @@ field_prefix: [ RegName ]
 field_macros: True
 
 x-rx-filt-opts: &rx-filt-opts
-    0b0000: FILT_400_1000M
+    0b0000: FILT_50_1000M
     0b0001: FILT_1000_2000M
     0b0010: FILT_2000_3500M
     0b0011: FILT_2500_5000M
     0b0100: FILT_3500_7100M
-    0b1000: AUTO_400_1000M
+    0b1000: AUTO_50_1000M
     0b1001: AUTO_1000_2000M
     0b1010: AUTO_2000_3500M
     0b1011: AUTO_2500_5000M
