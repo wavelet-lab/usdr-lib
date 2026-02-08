@@ -8,6 +8,7 @@
 
 #ifdef _WIN32
 #include <Winsock2.h>
+#include <sec_api/stdio_s.h>
 #endif
 
 #include <stdint.h>
@@ -24,6 +25,8 @@
 #include <endian.h>
 #include <dlfcn.h>
 #include <arpa/inet.h>
+
+#include <stdio.h>
 #endif
 #include <string.h>
 #include <inttypes.h>
@@ -96,8 +99,14 @@ library_hdl_t usdr_lib_load(const char* s);
 void usdr_lib_close(library_hdl_t h);
 void* usdr_lib_sym(library_hdl_t h, const char* proc);
 
+#ifdef _WIN32
+int vasprintf(char **strp, const char *fmt, va_list ap)  __attribute__ ((format (printf, 2, 0)));
+int asprintf(char **strp, const char *fmt, ...)  __attribute__ ((format (printf, 2, 3)));
+
+#endif
 
 #define CACHE_SIZE  64
+
 
 #ifdef __cplusplus
 };

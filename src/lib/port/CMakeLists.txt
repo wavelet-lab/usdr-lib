@@ -13,6 +13,9 @@ set(USDR_LIBRARY_FILES ${USDR_LIBRARY_FILES} PARENT_SCOPE)
 
 if(NOT EMSCRIPTEN)
     add_executable(test_fnmatch test_fnmatch.c portable_fnmatch.c)
+    if(WIN32)
+        set_target_properties(test_fnmatch PROPERTIES WIN32_EXECUTABLE FALSE)
+    endif()
 endif()
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ DESTINATION include/usdr FILES_MATCHING PATTERN "*.h")
