@@ -51,6 +51,7 @@ int main(int argc, char** argv)
     bool verbose = false;
     uint32_t curfwid;
     bool no_device = false;
+    bool crc_check = true;
     uint64_t master_offset = MASTER_IMAGE_OFF;
     uint64_t qspi_base = 10;
 
@@ -60,7 +61,7 @@ int main(int argc, char** argv)
     usdrlog_setlevel(NULL, USDR_LOG_WARNING);
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCv")) != -1) {
+    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCvk")) != -1) {
         switch (opt) {
         case 'U':
             busname = optarg;
@@ -91,6 +92,9 @@ int main(int argc, char** argv)
             break;
         case 'v':
             verbose = true;
+            break;
+        case 'k':
+            crc_check = false;
             break;
         default:
             fprintf(stderr, "Usage: %s [-U device_bus] [-l loglevel] [-r filename | -w filename | -i filename] [-G]\n",
@@ -215,7 +219,11 @@ int main(int argc, char** argv)
         }
         fclose(w);
 
-        res = xlnx_btstrm_parse_header((const uint32_t* )outa, 256/4, &file);
+        // res = xlnx_btstrm_parse_header((const uint32_t* )outa, 256/4, &file);
+        res = xlnx_btstrm_parse_header_ex((const uint32_t* )outa,
+                                          crc_check ? (total_length / 4) : (256 / 4),
+                                          &file,
+                                          crc_check ? XLNX_BSTRM_PARSE_F_CRC_CHECK : 0);
         if (res) {
             fprintf(stderr, "It looks like the file is corrupted! res=%d\n", res);
             return 4;
