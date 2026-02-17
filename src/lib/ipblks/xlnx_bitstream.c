@@ -21,6 +21,7 @@ enum {
     XLNX_REG_IDCODE = 0x0c,
     XLNX_REG_AXSS = 0x0d,
     XLNX_REG_WBSTAR = 0x10,
+    XLNX_REG_USERID = 0x19,
 };
 
 enum {
@@ -130,8 +131,12 @@ next:
         }
 
         for (unsigned i = 0; i < count; i++) {
-            if (++ptr >= len)
+            if (++ptr >= len) {
+                if (flags & XLNX_BSTRM_ALLOW_CROP)
+                    break;
+
                 return -EINVAL;
+            }
 
             w = be32toh(mem[ptr]);
             if (reg == XLNX_REG_IDCODE) {
@@ -145,6 +150,12 @@ next:
                     stat->iprog = true;
             } else if (reg == XLNX_REG_AXSS) {
                 stat->usr_access2 = w;
+            } else if (reg == XLNX_REG_USERID) {
+                USDR_LOG("BSTR", USDR_LOG_NOTE, "UserID = %x\n", w);
+            }
+
+            if (count == 1 && ptype == 1 && reg != 1 && reg != 4) {
+                USDR_LOG("BSTR", USDR_LOG_NOTE, "Rgister %x: %x\n", reg, w);
             }
 
             if (flags & XLNX_BSTRM_PARSE_F_CRC_CHECK) {

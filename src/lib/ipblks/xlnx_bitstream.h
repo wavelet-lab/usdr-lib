@@ -43,6 +43,7 @@ typedef struct xlnx_image_params xlnx_image_params_t;
 
 enum xlnx_btstrm_parse_flags {
     XLNX_BSTRM_PARSE_F_CRC_CHECK = 1 << 0,
+    XLNX_BSTRM_ALLOW_CROP = 1 << 1,
 };
 
 int xlnx_btstrm_parse_header(const uint32_t* mem, unsigned len, xlnx_image_params_t* stat);

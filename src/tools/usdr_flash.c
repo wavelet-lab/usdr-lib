@@ -36,6 +36,7 @@ enum flash_action {
     ACTION_READBACK,
     ACTION_WRITE,
     ACTION_INFO,
+    ACTION_ERASE_MASTER,
 };
 
 int main(int argc, char** argv)
@@ -61,7 +62,7 @@ int main(int argc, char** argv)
     usdrlog_setlevel(NULL, USDR_LOG_WARNING);
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCvk")) != -1) {
+    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCvkE")) != -1) {
         switch (opt) {
         case 'U':
             busname = optarg;
@@ -95,6 +96,9 @@ int main(int argc, char** argv)
             break;
         case 'k':
             crc_check = false;
+            break;
+        case 'E':
+            rdwr = ACTION_ERASE_MASTER;
             break;
         default:
             fprintf(stderr, "Usage: %s [-U device_bus] [-l loglevel] [-r filename | -w filename | -i filename] [-G]\n",
@@ -172,12 +176,12 @@ int main(int argc, char** argv)
         return 4;
     }
 
-    res = (no_device) ? 0 : xlnx_btstrm_parse_header((const uint32_t* )outb, 256/4, &image);
+    res = (no_device) ? 0 : xlnx_btstrm_parse_header_ex((const uint32_t* )outb, 256/4, &image, XLNX_BSTRM_ALLOW_CROP);
     if (res) {
         fprintf(stderr, "It looks like the FPGA G image is corrupted! res=%d\n", res);
         return 4;
     }
-    res = (no_device) ? 0 : xlnx_btstrm_parse_header((const uint32_t* )(outb + 256), 256/4, &image_master);
+    res = (no_device) ? 0 : xlnx_btstrm_parse_header_ex((const uint32_t* )(outb + 256), 256/4, &image_master, XLNX_BSTRM_ALLOW_CROP);
     if (res) {
         fprintf(stderr, "It looks like the FPGA M image is corrupted! res=%d\n", res);
     } else {
@@ -223,7 +227,7 @@ int main(int argc, char** argv)
         res = xlnx_btstrm_parse_header_ex((const uint32_t* )outa,
                                           crc_check ? (total_length / 4) : (256 / 4),
                                           &file,
-                                          crc_check ? XLNX_BSTRM_PARSE_F_CRC_CHECK : 0);
+                                          crc_check ? XLNX_BSTRM_PARSE_F_CRC_CHECK : XLNX_BSTRM_ALLOW_CROP);
         if (res) {
             fprintf(stderr, "It looks like the file is corrupted! res=%d\n", res);
             return 4;
@@ -306,6 +310,49 @@ int main(int argc, char** argv)
                 fprintf(stderr, "Failed to write header! res=%d", res);
                 return 4;
             }
+        }
+    }
+
+    if (rdwr == ACTION_ERASE_MASTER) {
+        char reply[100];
+        char* term;
+
+        if (!mp) {
+            fprintf(stderr, "Master image is not detected!\n\n");
+        }
+
+        fprintf(stderr, " ===========================================\n");
+        fprintf(stderr, " == YOU'RE GOING TO BLANK MASTER FIRMWARE ==\n");
+        fprintf(stderr, " ===========================================\n");
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Type YES if you know what're doing: ");
+
+        if (fgets(reply, sizeof(reply), stdin) == NULL)
+            return 0;
+
+        term = strstr(reply, "\n");
+        if (term) {
+            *term = 0;
+        }
+
+        if (strcmp(reply, "YES") != 0)
+            return 0;
+
+        if (image.wbstar == 0) {
+            fprintf(stderr, "No Master support detected: WBSTAR is 0!\n");
+            return 7;
+        }
+        if (image.wbstar != master_offset) {
+            fprintf(stderr, "Master trampoline mismatches: WBSTAR is %08x != %08x in the software!\n",
+                    image.wbstar, master_offset);
+            return 8;
+        }
+
+        fprintf(stderr, "Blanking flash starting from %08x...\n", image.wbstar);
+        res = espi_flash_erase(dev, 0, qspi_base, 65536, master_offset);
+        if (res) {
+            fprintf(stderr, "Failed to blank flash header! res=%d", res);
+            return 4;
         }
     }
 
