@@ -65,7 +65,6 @@ struct usdr_dev
     lms6002d_state_t lms;
     unsigned refclkpath;
     unsigned fref;
-    unsigned rawsamplerate;
 
     uint8_t rx_cfg_path;
     uint8_t tx_cfg_path;
@@ -75,18 +74,11 @@ struct usdr_dev
     uint8_t tx_rfic_path;
     uint8_t tx_rfic_band;
 
-    unsigned dsp_clk;
-
-    unsigned rx_lo;
-    unsigned tx_lo;
-
-
     // Gain settings
     uint8_t rx_lna;
     uint8_t rx_vga1;
     uint8_t rx_vga2a;
     uint8_t rx_vga2b;
-
 
     bool rx_run;
     bool tx_run;
@@ -94,6 +86,16 @@ struct usdr_dev
     bool tx_pwren;
 
     bool mexir_en;
+    bool vio_boost;
+
+    unsigned rawsamplerate;
+    unsigned rxbb_decim;
+    unsigned txbb_intr;
+
+    unsigned dsp_clk;
+    unsigned rx_lo;
+    unsigned tx_lo;
+
     unsigned mixer_lo;
     unsigned rfic_rx_lo;
 
@@ -128,6 +130,8 @@ int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob);
 
 int usdr_rfic_fe_set_rxlna(struct usdr_dev *d,
                            const char* lna);
+int usdr_rfic_fe_set_txlna(struct usdr_dev *d,
+                           const char *lna);
 
 int usdr_rfic_fe_set_freq(struct usdr_dev *d,
                           bool dir_tx,
@@ -148,11 +152,6 @@ int usdr_ctor(lldev_t dev, subdev_t sub, struct usdr_dev *d);
 int usdr_init(struct usdr_dev *d, int ext_clk, unsigned int ext_fref);
 
 int usdr_dtor(struct usdr_dev *d);
-
-// int usdr_pwren(struct usdr_dev *d, bool on);
-
-int usdr_lob_set(struct usdr_dev *d, unsigned freq);
-
 
 int usdr_calib_dc(struct usdr_dev *d, bool rx);
 
@@ -178,6 +177,8 @@ enum {
     IGPO_BOOSTER    = 7,
     IGPO_LED        = 8,
     IGPO_DCCORR     = 9,
+
+    IGPO_DSP_RX_CTRL = 10,
 
     IGPO_FRONT      = 15,
     IGPO_CLKMEAS    = 16,

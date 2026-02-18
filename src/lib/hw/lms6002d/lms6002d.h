@@ -94,7 +94,7 @@ int lms6002d_set_rxfe_ip2corr(lms6002d_state_t* obj, int8_t i, int8_t q);
 int lms6002d_cal_lpf(lms6002d_state_t* obj);
 int lms6002d_cal_txrxlpfdc(lms6002d_state_t* obj, bool tx);
 int lms6002d_cal_vga2(lms6002d_state_t* obj);
-int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode);
+int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode, bool do_tune);
 
 
 // For TIA calibration

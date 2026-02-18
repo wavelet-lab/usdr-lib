@@ -21,6 +21,8 @@
 
 #include "../generic_usdr/generic_regs.h"
 
+#include "../ipblks/fgearbox.h"
+
 // Clock configuration
 //          rev4/rev3      rev2         rev1
 //  port0 - LMS_PLLCLK | RXCLK       | RXCLK
@@ -55,6 +57,11 @@ enum usdr_rev000 {
     I2C_BUS_FRONTEND = MAKE_LSOP_I2C_ADDR(0, 1, 0),
 
     SPI_LMS6 = 0,
+};
+
+enum lms6_vios {
+    LMS6_VIO_NORM = 1800,
+    LMS6_VIO_BOOST = 1950,
 };
 
 // RX chain
@@ -243,15 +250,6 @@ static int _usdr_set_lna_rx(usdr_dev_t *d, unsigned cfg_idx)
     int res;
 
     d->rx_cfg_path = cfg_idx;
-    /*
-    if (d->rx_lna_lb_active) {
-        switch (band) {
-        case RFE_LNAL: band = RFE_LBL; txlbband = 2; break;
-        case RFE_LNAW: band = RFE_LBW; txlbband = 1; break;
-        case RFE_LNAH: band = RFE_LBH; txlbband = 1; break;
-        }
-    }
-    */
 
     USDR_LOG("UDEV", USDR_LOG_INFO, "%s: Set RX band to %d (%s/%s) %s [TXLB:%d => ATEEN=%d,%d]\n",
              lowlevel_get_devname(d->base.dev), band,
@@ -260,9 +258,6 @@ static int _usdr_set_lna_rx(usdr_dev_t *d, unsigned cfg_idx)
              txlbband, 0, 0 /* d->trf_lb_atten, d->trf_lb_loss */ );
 
     res = lms6002d_set_rx_path(&d->lms, ((d->rx_rfic_lna = band)));
-    //if (txlbband) {
-    //    res = (res) ? res : lms7_trf_set_path(&d->lmsstate, ((d->tx_rfic_band = txlbband)));
-    //}
     if (res)
         return res;
 
@@ -279,11 +274,6 @@ static int _usdr_set_lna_tx(usdr_dev_t *d, unsigned cfg_idx)
 
     USDR_LOG("XDEV", USDR_LOG_INFO, "%s: Set TX band to %d (%s/%s)\n",
              lowlevel_get_devname(d->base.dev), band, cfg->name0, cfg->name1);
-
-//    if (d->rx_lna_lb_active) {
-//        res = lms7_rfe_set_path(&d->lmsstate, band == 1 ? RFE_LBW : RFE_LBL,
-//                                d->rx_run[0], d->rx_run[1]);
-//    }
 
     res = lms6002d_set_tx_path(&d->lms, ((d->tx_rfic_band = band)));
     if (res)
@@ -346,8 +336,8 @@ static int _usdr_signal_event(usdr_dev_t *d, enum sigtype t)
     case USDR_SAMPLERATE_CHANGED:
         if (d->mexir_en && (d->cfg_auto_rx[d->rx_cfg_path].band == RXPATH_LNA3)) {
             d->rfic_rx_lo = d->mixer_lo + d->rx_lo;
-            USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: RX LO corrected to %.3f Mhz (LNB = %.3f)\n",
-                     lowlevel_get_devname(d->base.dev), d->rfic_rx_lo / 1.0e6, d->mixer_lo / 1.0e6);
+            USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: RX LO corrected to %.3f -> %.3f Mhz (LNB = %.3f)\n",
+                     lowlevel_get_devname(d->base.dev), d->rx_lo / 1.0e6, d->rfic_rx_lo / 1.0e6, d->mixer_lo / 1.0e6);
 
             return lms6002d_tune_pll(&d->lms, false, d->rfic_rx_lo);
         }
@@ -359,6 +349,8 @@ static int _usdr_signal_event(usdr_dev_t *d, enum sigtype t)
 int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob)
 {
     if (d->si_vco_freq == 0 || d->rawsamplerate == 0)
+        return -EINVAL;
+    if (freqlob == 0)
         return -EINVAL;
 
     float ceff = d->si_vco_freq / freqlob;
@@ -384,13 +376,46 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
     unsigned freq = rate << 1; //Link speed x2 sample rate
     struct si5332_layout_info nfo = { d->fref, freq };
     int res = 0;
+    unsigned i = 0;
+    unsigned int_decim[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+
+    /*
+    for (unsigned ii = 0; ii < SIZEOF_ARRAY(int_decim); ii++) {
+        if (rxrate * int_decim[ii] < 60e6)
+            i = ii;
+        else
+            break;
+    }
+    */
+
+    nfo.out *= int_decim[i];
+
+    if (rate >= 60e6 && !d->vio_boost) {
+        USDR_LOG("UDEV", USDR_LOG_WARNING, "Boosting Vio to get stable samplerates over 60Msps\n");
+
+        res = res ? res : lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 3, LMS6_VIO_BOOST);
+        d->vio_boost = true;
+    } else if (rate < 60e6 && d->vio_boost) {
+        res = res ? res : lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 3, LMS6_VIO_NORM);
+        d->vio_boost = false;
+    }
 
     res = res ? res : _usdr_pwr_state(d, false, true);
     res = res ? res : si5332_set_layout(dev, 0, I2C_BUS_SI5332A, &nfo, d->hw_board_rev == USDR_REV_3 ? false : true, d->si_vco_div, &d->si_vco_freq);
 
     // TODO: Add ability to alter it
     d->mixer_lo = d->si_vco_freq / d->si_vco_div;
-    d->rawsamplerate = rate;
+    d->rawsamplerate = nfo.out;
+    /*
+    if (d->rxbb_decim != int_decim[i]) {
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSP_RX_CTRL, 0x0);
+        res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSP_RX_CFG, (fgearbox_firs_t)d->rxbb_decim, DSP_7SERIES);
+        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSP_RX_CTRL, 0x0);
+    }
+    */
+
+    d->rxbb_decim = int_decim[i];
+    d->txbb_intr = int_decim[i];
 
     // Apply automatic RF Freq correction if external mixer is active
     if (d->mexir_en) {
@@ -405,7 +430,7 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
         res = res ? res : lms6002d_set_bandwidth(&d->lms, true, txrate);
     }
 
-    USDR_LOG("UDEV", USDR_LOG_INFO, "RX_RATE %.3f TX_RATE %.3f MXLO %.3f\n", rxrate / 1.0e6, txrate / 1.0e6, d->mixer_lo / 1.0e6);
+    USDR_LOG("UDEV", USDR_LOG_INFO, "INTR %d RX_RATE %.3f TX_RATE %.3f MXLO %.3f\n", int_decim[i], rxrate / 1.0e6, txrate / 1.0e6, d->mixer_lo / 1.0e6);
     return res;
 }
 
@@ -413,19 +438,26 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
 int usdr_rfic_streaming_up(struct usdr_dev *d, unsigned dir)
 {
     int res = 0;
+    bool wakeup_delay = false;
 
     if (dir & RFIC_LMS6_TX) {
+        wakeup_delay |= !d->tx_run;
         d->tx_run = true;
         res = (res) ? res : _usdr_pwr_state(d, true, true);
     }
 
     if (dir & RFIC_LMS6_RX) {
+        wakeup_delay |= !d->rx_run;
         d->rx_run = true;
         res = (res) ? res : _usdr_pwr_state(d, false, true);
     }
 
+    if (wakeup_delay) {
+        usleep(1000);
+    }
+
     // TODO enable clock
-    //return lms6002d_rf_enable(&d->lms, d->tx_run, d->rx_run);
+    // return lms6002d_rf_enable(&d->lms, d->tx_run, d->rx_run);
     return res;
 }
 
@@ -580,8 +612,11 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
         if (res)
             return res;
 
-        if (devid != 0x1114) {
+        if (devid != TMP114_DEVICE_ID) {
             USDR_LOG("UDEV", USDR_LOG_ERROR, "TMP114 DEVID=%x\n", devid);
+            if (!getenv("USDR_IGNORE_TMP")) {
+                return -EIO;
+            }
         }
     }
 
@@ -605,11 +640,11 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
     //res = lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 1,
     //                      d->hw_board_rev == USDR_REV_1 ? 3360 : 1800);
 
+    // Set GPIO bank voltage to 1.8V to be compatible with xSDR
     res = res ? res : lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 1, 1800);
-    // Increase 1.8V rail to get more samplerate
-    // res = lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 3, 2100);
-    // if (res)
-    //     return res;
+
+    // Reset 1.8V rail default VIO
+    res = res ? res : lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 3, LMS6_VIO_NORM);
 
     res = res ? res : lp8758_vout_ctrl(dev, d->subdev, I2C_BUS_LP8758, 0, 1, 1); //1v0 -- less affected
     res = res ? res : lp8758_vout_ctrl(dev, d->subdev, I2C_BUS_LP8758, 1, 1, 1); //2v5 -- less affected
@@ -693,19 +728,6 @@ int usdr_dtor(struct usdr_dev *d)
     return 0;
 }
 
-// We need to enable RX RF to get forward clocking
-#if 0
-int usdr_pwren(struct usdr_dev *d, bool on)
-{
-    // TODO RX / TX selection
-    lms6002d_rf_enable(&d->lms, false, on);
-    // TX off
-    lms6002d_rf_enable(&d->lms, true, on /* false */);
-    return 0;
-}
-#endif
-
-
 static
 int _usdr_lms6002_dc_calib(struct usdr_dev *d)
 {
@@ -714,7 +736,7 @@ int _usdr_lms6002_dc_calib(struct usdr_dev *d)
     res = res ? res : lms6002d_cal_lpf(&d->lms);
 
     for (unsigned i = 0; i < 16; i++) {
-        res = res ? res : lms6002d_cal_lpf_bandwidth(&d->lms, i);
+        res = res ? res : lms6002d_cal_lpf_bandwidth(&d->lms, i, i == 0);
     }
 
     res = res ? res : lms6002d_cal_txrxlpfdc(&d->lms, true);
@@ -725,6 +747,9 @@ int _usdr_lms6002_dc_calib(struct usdr_dev *d)
     res = res ? res : lms6002d_cal_txrxlpfdc(&d->lms, false);
     res = res ? res : lms6002d_cal_vga2(&d->lms);
     res = res ? res : lms6002d_set_rx_extterm(&d->lms, false);
+
+    // Restore initial VGA2 gain values
+    res = res ? res : lms6002d_set_rxvga2ab_gain(&d->lms, d->rx_vga2a, d->rx_vga2b);
 
     return res;
 }
@@ -923,6 +948,21 @@ int usdr_rfic_fe_set_rxlna(struct usdr_dev *d,
 
     d->rx_rfic_path = res;
     return _usdr_set_lna_rx(d, d->rx_rfic_path);
+}
+
+int usdr_rfic_fe_set_txlna(struct usdr_dev *d,
+                           const char *lna)
+{
+    int res = get_antenna_cfg_by_name(lna, d->cfg_auto_tx, SIZEOF_ARRAY(d->cfg_auto_tx));
+    USDR_LOG("UDEV", USDR_LOG_INFO, "TX_PATH set to %s from `%s`\n", (res < 0) ? "AUTO" : d->cfg_auto_tx[res].name0, lna);
+
+    if (res == -1) {
+        d->tx_rfic_path = USDR_TX_AUTO;
+        return _usdr_signal_event(d, USDR_TX_LNA_CHANGED);
+    }
+
+    d->tx_rfic_path = res;
+    return _usdr_set_lna_tx(d, d->tx_rfic_path);
 }
 
 

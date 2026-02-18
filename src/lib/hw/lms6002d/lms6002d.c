@@ -790,7 +790,7 @@ fail_cal:
     return 0;
 }
 
-int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
+int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode, bool do_tune)
 {
     // TURN ON tx, SET tx to 320Mhz
     int res = 0;
@@ -801,7 +801,7 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
     bool txen = GET_LMS6002D_TOP_ENCFG_STXEN(obj->top_encfg);
 
     res = res ? res : lms6002d_trf_enable(obj, 1);
-    res = res ? res : lms6002d_tune_pll(obj, true, 320000000);
+    res = (!do_tune || res) ? res : lms6002d_tune_pll(obj, true, 320000000);
 
     uint16_t regs_0[] = {
         MAKE_LMS6002D_TOP_LPF_CTRL(0, 0, 0, 0),
