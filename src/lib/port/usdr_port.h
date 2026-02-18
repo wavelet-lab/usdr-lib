@@ -21,6 +21,16 @@
 #ifdef _WIN32
 #define htobe32(x) htonl(x)
 #define be32toh(x) ntohl(x)
+#elif defined(__APPLE__)
+#include <machine/endian.h>
+#include <arpa/inet.h>
+#include <dlfcn.h>
+
+#include <mach/mach.h>
+#include <mach/semaphore.h>
+#include <mach/mach_time.h>
+
+#include <stdio.h>
 #else
 #include <endian.h>
 #include <dlfcn.h>
@@ -103,6 +113,11 @@ void* usdr_lib_sym(library_hdl_t h, const char* proc);
 int vasprintf(char **strp, const char *fmt, va_list ap)  __attribute__ ((format (printf, 2, 0)));
 int asprintf(char **strp, const char *fmt, ...)  __attribute__ ((format (printf, 2, 3)));
 
+#endif
+
+#ifdef __APPLE__
+int mach_sem_timedwait(semaphore_t sem, const struct timespec *abs_timeout);
+#define sem_timedwait mach_sem_timedwait
 #endif
 
 #define CACHE_SIZE  64
