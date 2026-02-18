@@ -23,6 +23,7 @@
 #define be32toh(x) ntohl(x)
 #elif defined(__APPLE__)
 #include <machine/endian.h>
+#include <libkern/OSByteOrder.h>
 #include <arpa/inet.h>
 #include <dlfcn.h>
 
@@ -31,6 +32,23 @@
 #include <mach/mach_time.h>
 
 #include <stdio.h>
+
+#define htobe16(x) OSSwapHostToBigInt16(x)
+#define htole16(x) OSSwapHostToLittleInt16(x)
+#define be16toh(x) OSSwapBigToHostInt16(x)
+#define le16toh(x) OSSwapLittleToHostInt16(x)
+
+#define htobe32(x) OSSwapHostToBigInt32(x)
+#define htole32(x) OSSwapHostToLittleInt32(x)
+#define be32toh(x) OSSwapBigToHostInt32(x)
+#define le32toh(x) OSSwapLittleToHostInt32(x)
+
+#define htobe64(x) OSSwapHostToBigInt64(x)
+#define htole64(x) OSSwapHostToLittleInt64(x)
+#define be64toh(x) OSSwapBigToHostInt64(x)
+#define le64toh(x) OSSwapLittleToHostInt64(x)
+
+
 #else
 #include <endian.h>
 #include <dlfcn.h>
@@ -79,8 +97,6 @@ static inline void usdr_alignfree(void* ptr) {
 
 #define localtime_r(T,Tm) (localtime_s(Tm,T) ? NULL : Tm)
 
-#define ENAVAIL ENOENT
-
 static inline int gettid(void)
 {
     return GetCurrentThreadId();
@@ -115,13 +131,46 @@ int asprintf(char **strp, const char *fmt, ...)  __attribute__ ((format (printf,
 
 #endif
 
+/**
+ * Cross-platform semaphore abstraction
+ * Uses Mach semaphores on macOS, POSIX semaphores elsewhere
+ */
 #ifdef __APPLE__
-int mach_sem_timedwait(semaphore_t sem, const struct timespec *abs_timeout);
-#define sem_timedwait mach_sem_timedwait
+typedef semaphore_t usdr_sem_t;
+#else
+#include <semaphore.h>
+typedef sem_t usdr_sem_t;
+#endif
+
+int usdr_sem_init(usdr_sem_t *sem, int pshared, unsigned int value);
+int usdr_sem_destroy(usdr_sem_t *sem);
+int usdr_sem_post(usdr_sem_t *sem);
+int usdr_sem_wait(usdr_sem_t *sem);
+int usdr_sem_trywait(usdr_sem_t *sem);
+int usdr_sem_timedwait(usdr_sem_t *sem, const struct timespec *abs_timeout);
+
+/**
+ * Cross-platform thread naming
+ * Sets the name of the current thread for debugging purposes
+ * @param name Thread name (max 15 characters on Linux, 63 on macOS)
+ * @return 0 on success, -1 on error
+ */
+int usdr_set_thread_name(const char* name);
+
+/**
+ * sincosf - compute sine and cosine simultaneously
+ * Available natively on Linux (GNU extension), needs implementation on macOS/Windows
+ */
+#ifdef __APPLE__
+#include <math.h>
+void sincosf(float x, float *sin_val, float *cos_val);
 #endif
 
 #define CACHE_SIZE  64
 
+#if defined(_WIN32) || defined(__APPLE__)
+#define ENAVAIL ENOENT
+#endif
 
 #ifdef __cplusplus
 };

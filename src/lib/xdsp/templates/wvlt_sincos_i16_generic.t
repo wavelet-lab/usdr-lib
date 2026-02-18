@@ -17,7 +17,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
     {
         const float ph = WVLT_SINCOS_I16_PHSCALE * *phase++;
         float ssin, scos;
-        sincosf(ph, &ssin, &scos);
+        //sincosf(ph, &ssin, &scos);
         *sindata++ = ssin * WVLT_SINCOS_I16_SCALE;
         *cosdata++ = scos * WVLT_SINCOS_I16_SCALE;
         i -= 2;

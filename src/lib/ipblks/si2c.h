@@ -8,7 +8,7 @@
 #ifndef SI2C_H
 #define SI2C_H
 
-#if defined(__EMSCRIPTEN__) || defined(_WIN32)
+#if defined(__EMSCRIPTEN__) || defined(_WIN32) || defined(__APPLE__)
 #include <stdint.h>
 #include <errno.h>
 #else

@@ -1,7 +1,6 @@
 #include "ring_circbuf.h"
 #include <string.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <assert.h>
 
 // Can be MT-safe if rpos and wpos updated atomic

@@ -13,7 +13,7 @@
 #include <time.h>
 #include <math.h>
 #include <unistd.h>
-#ifndef WIN32
+#ifdef __linux__
 #include <sys/timerfd.h>
 #include <poll.h>
 #endif
@@ -261,7 +261,7 @@ int main(int argc, char **argv)
 
     struct timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
-#ifndef WIN32
+#ifdef __linux__
     // Create timerfd for 100 ms polling
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     if (timer_fd == -1) {
@@ -290,8 +290,11 @@ int main(int argc, char **argv)
 
     while (true) {
         // Wait for timer event
-#ifdef WIN32
+#ifdef _WIN32
         Sleep(100);
+        {
+#elif defined(__APPLE__)
+        usleep(100000); // 100 ms
         {
 #else
         int ret = poll(fds, 1, -1);
@@ -371,7 +374,7 @@ int main(int argc, char **argv)
         }
     }
 
-#ifndef WIN32
+#ifdef __linux__
     close(timer_fd);
 #endif
     usdr_dmd_close(dev);

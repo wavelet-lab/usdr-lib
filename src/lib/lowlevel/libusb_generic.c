@@ -48,11 +48,16 @@ unsigned find_usb_match(libusb_device **usbdev, size_t devices,
         struct matched_devs* md = &devs[k];
 
         res = libusb_get_device_descriptor(usbdev[i], &desc);
-        if (res)
+        if (res) {
+            USDR_LOG("USBX", USDR_LOG_ERROR, "Unable to get device descriptor for device %d: %s\n", i, libusb_strerror(res));
             continue;
+        }
 
-        j = libusb_find_dev_index_ex( busname,desc.idProduct, desc.idVendor, known_devices, known_device_count );
-        if( j < 0 ) continue;
+        j = libusb_find_dev_index_ex(busname, desc.idProduct, desc.idVendor, known_devices, known_device_count );
+        if (j < 0) {
+            USDR_LOG("USBX", USDR_LOG_ERROR, "Skipping device %s: %04x:%04x, not in known devices list\n",  busname, desc.idVendor, desc.idProduct);
+            continue;
+        }
         md->uuid_idx = j;
         md->sdrtype = libusb_get_dev_sdrtype(j);
 
@@ -65,7 +70,7 @@ unsigned find_usb_match(libusb_device **usbdev, size_t devices,
         md->devid = (unsigned)bus * 1000000 + (unsigned)port * 1000 + addr;
         snprintf(md->devid_s, sizeof(md->devid_s), "%d/%d/%d", bus, port, addr);
 
-        USDR_LOG("USBX", USDR_LOG_DEBUG, "checking device %04x:%04x %d/%d/%d against %d/%d/%d mask devid=%d\n",
+        USDR_LOG("USBX", USDR_LOG_ERROR, "checking device %04x:%04x %d/%d/%d against %d/%d/%d mask devid=%d\n",
                     desc.idVendor, desc.idProduct,
                     fparams->usb_bus, fparams->usb_port, fparams->usb_addr,
                     bus, port, addr, j);
@@ -214,8 +219,8 @@ int libusb_generic_plugin_create(unsigned pcount, const char** devparam,
         fcnt = find_usb_match(usbdev, devices, &fparams, 1, &md , known_devs, known_devs_cnt, busname);
         if (fcnt == 0) {
             USDR_LOG("USBX", USDR_LOG_NOTE,
-                     "No USB device was found to match %d/%d/%d\n",
-                     fparams.usb_bus, fparams.usb_port, fparams.usb_addr);
+                     "No USB device was found to match %d/%d/%d, total=%d\n",
+                     fparams.usb_bus, fparams.usb_port, fparams.usb_addr, devices);
             libusb_exit(uctx);
             return -ENODEV;
         }
@@ -310,7 +315,7 @@ void* libusb_generic_io_thread(void *arg)
 #if defined(__linux) || defined(__APPLE__)
     sigset_t set;
 
-    pthread_setname_np(pthread_self(), "usb_io");
+    usdr_set_thread_name("usb_io");
 
     sigfillset(&set);
     pthread_sigmask(SIG_SETMASK, &set, NULL);
@@ -374,12 +379,12 @@ int buffers_init(struct buffers* rb, unsigned max, unsigned zerosemval, bool has
 
     rb->buf_available = rb->buf_max = max;
 
-    if (sem_init(&rb->buf_ready, 0, zerosemval)) {
+    if (usdr_sem_init(&rb->buf_ready, 0, zerosemval)) {
         return -errno;
     }
 
     if (has_event) {
-#ifdef WIN32
+#ifndef __linux__
         rb->fd_event = -ENOTSUP;
 #else
         rb->fd_event = fdevent_create(zerosemval);
@@ -418,10 +423,10 @@ void buffers_deinit(struct buffers* rb)
     // TODO Add synchronization to get all outstanging endpoints
     usleep(10000);
 
-    sem_destroy(&rb->buf_ready);
+    usdr_sem_destroy(&rb->buf_ready);
   //  usdr_alignfree(rb->rqueuebuf_ptr);
   //  free(rb->bd);
-#ifndef WIN32
+#ifdef __linux__
     if (rb->fd_event >= 0)
         fdevent_destroy(rb->fd_event);
 #endif
@@ -477,10 +482,10 @@ void buffers_reset(struct buffers* rb)
     rb->bufno_cons = 0;
     rb->bufno_prod = 0;
     rb->buf_available = rb->buf_max;
-    sem_destroy(&rb->buf_ready);
-    sem_init(&rb->buf_ready, 0, 0);
+    usdr_sem_destroy(&rb->buf_ready);
+    usdr_sem_init(&rb->buf_ready, 0, 0);
 
-#ifndef WIN32
+#ifdef __linux__
     if (rb->fd_event > 0)
         fdevent_get(rb->fd_event, NULL);
 #endif
@@ -502,13 +507,13 @@ int buffers_ready_wait(struct buffers *rxb, int64_t timeout_us)
 {
     int res;
     if (rxb->fd_event >= 0) {
-#ifndef WIN32
+#ifdef __linux__
         res = fdevent_get(rxb->fd_event, NULL);
 #else
         res = -ENOTSUP;
 #endif
     } else {
-        res = sem_wait_ex(&rxb->buf_ready, timeout_us * 1000);
+        res = usdr_sem_wait_ex(&rxb->buf_ready, timeout_us * 1000);
     }
     return res;
 }
@@ -517,13 +522,13 @@ int buffers_ready_post(struct buffers *rxb)
 {
     int res;
     if (rxb->fd_event >= 0) {
-#ifndef WIN32
+#ifdef __linux__
         res = fdevent_post(rxb->fd_event, 1);
 #else
         res = -ENOTSUP;
 #endif
     } else {
-        res = sem_post(&rxb->buf_ready);
+        res = usdr_sem_post(&rxb->buf_ready);
     }
     return res;
 }
@@ -706,7 +711,7 @@ int buffers_usb_free(struct buffers *prxb)
 
 // Helpers
 
-int sem_wait_ex(sem_t *s, int64_t timeout_ns)
+int usdr_sem_wait_ex(usdr_sem_t *s, int64_t timeout_ns)
 {
     int res;
     if (timeout_ns > 0) {
@@ -720,17 +725,17 @@ int sem_wait_ex(sem_t *s, int64_t timeout_ns)
         ts.tv_sec += secs;
         timeout_ns -= (int64_t)1000 * 1000 * 1000 * secs;
 
-        ts.tv_nsec += timeout_ns * 1000;
+        ts.tv_nsec += timeout_ns;
         while (ts.tv_nsec > 1000 * 1000 * 1000) {
             ts.tv_nsec -= 1000 * 1000 * 1000;
             ts.tv_sec++;
         }
 
-        res = sem_timedwait(s, &ts);
+        res = usdr_sem_timedwait(s, &ts);
     } else if (timeout_ns < 0) {
-        res = sem_wait(s);
+        res = usdr_sem_wait(s);
     } else {
-        res = sem_trywait(s);
+        res = usdr_sem_trywait(s);
     }
     if (res) {
         // sem_* function on error returns -1, get proper error

@@ -14,6 +14,8 @@ if(NOT EMSCRIPTEN)
     add_subdirectory(pcie_uram)
 endif()
 
+include_directories(${LIBUSB_1_INCLUDE_DIRS})
+
 add_subdirectory(usb_uram)
 add_subdirectory(usb_ft601)
 

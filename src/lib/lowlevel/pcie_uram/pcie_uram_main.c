@@ -1,6 +1,6 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
-#ifndef WIN32
+#ifdef __linux__
 
 #include "pcie_uram_main.h"
 
@@ -14,7 +14,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <stdio.h>
-#include <endian.h>
+#include <usdr_port.h>
 #include <dirent.h>
 
 #include "../device/device.h"

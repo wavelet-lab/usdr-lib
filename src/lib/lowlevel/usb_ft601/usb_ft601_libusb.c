@@ -10,7 +10,6 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
-#include <semaphore.h>
 #include <usdr_logging.h>
 
 #include "../device/device.h"
@@ -31,8 +30,8 @@ struct usbft601_dev
     libusb_generic_dev_t gdev;
     usb_ft601_generic_t ft601_generic;
 
-    sem_t tr_ctrl_out;
-    sem_t tr_ctrl_rb;
+    usdr_sem_t tr_ctrl_out;
+    usdr_sem_t tr_ctrl_rb;
     unsigned len_ctrl_in_rb;
 
     struct libusb_transfer *transfer_in_ctrl[MAX_IN_CTRL_REQS];
@@ -78,7 +77,7 @@ int usbft601_uram_ctrl_out_pkt(lldev_t lld, unsigned pkt_szb, unsigned timeout_m
 {
     usbft601_dev_t* d = (usbft601_dev_t*)lld;
     int res;
-    res = sem_wait_ex(&d->tr_ctrl_out, timeout_ms * 1000 * 1000);
+    res = usdr_sem_wait_ex(&d->tr_ctrl_out, timeout_ms * 1000 * 1000);
     if (res) {
         return res;
     }
@@ -92,7 +91,7 @@ int usbft601_uram_ctrl_out_pkt(lldev_t lld, unsigned pkt_szb, unsigned timeout_m
     res = libusb_to_errno(libusb_submit_transfer(transfer));
     if (res) {
         USDR_LOG("USBX", USDR_LOG_ERROR, "FAILED to post CTRL_OUT %d\n", res);
-        sem_post(&d->tr_ctrl_out);
+        usdr_sem_post(&d->tr_ctrl_out);
         return res;
     }
 
@@ -141,13 +140,13 @@ int usbft601_uram_ctrl_in_pkt(lldev_t lld, unsigned pkt_szb, unsigned timeout_ms
 static int usbft601_sem_ctrl_rb_wait(lldev_t lld, int64_t timeout)
 {
     usbft601_dev_t* d = (usbft601_dev_t*)lld;
-    return sem_wait_ex(&d->tr_ctrl_rb, timeout);
+    return usdr_sem_wait_ex(&d->tr_ctrl_rb, timeout);
 }
 
 static void usbft601_sem_ctrl_out_post(lldev_t lld)
 {
     usbft601_dev_t* d = (usbft601_dev_t*)lld;
-    sem_post(&d->tr_ctrl_out);
+    usdr_sem_post(&d->tr_ctrl_out);
 }
 
 void LIBUSB_CALL libusb_transfer_ctrl_rb(struct libusb_transfer *transfer)
@@ -169,7 +168,7 @@ void LIBUSB_CALL libusb_transfer_ctrl_rb(struct libusb_transfer *transfer)
         return;
     }
 
-    sem_post(&dev->tr_ctrl_rb);
+    usdr_sem_post(&dev->tr_ctrl_rb);
 }
 
 static
@@ -431,12 +430,12 @@ int usbft601_uram_async_start(lldev_t lld)
     int res;
     usbft601_dev_t* dev = (usbft601_dev_t*)lld;
 
-    res = sem_init(&dev->tr_ctrl_out, 0, MAX_OUT_CTRL_REQS);
+    res = usdr_sem_init(&dev->tr_ctrl_out, 0, MAX_OUT_CTRL_REQS);
     if (res) {
         goto failed_prepare;
     }
 
-    res = sem_init(&dev->tr_ctrl_rb, 0, 0);
+    res = usdr_sem_init(&dev->tr_ctrl_rb, 0, 0);
     if (res) {
         goto failed_prepare;
     }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "xlnx_bitstream.h"
+#include <usdr_port.h>
 #include <usdr_logging.h>
 #include <string.h>
 #include <errno.h>

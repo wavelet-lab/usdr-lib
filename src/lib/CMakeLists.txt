@@ -33,7 +33,9 @@ include_directories(${USDR_INCLUDE_DIRS})
 
 add_library(usdr ${USDR_LIBRARY_FILES})
 
-if(NOT WIN32)
+if (APPLE)
+    set(USDR_PLATFORM_LIBS dl)
+elseif(NOT WIN32)
     set(USDR_PLATFORM_LIBS dl rt)
 else()
     set(USDR_PLATFORM_LIBS kernel32 ws2_32)

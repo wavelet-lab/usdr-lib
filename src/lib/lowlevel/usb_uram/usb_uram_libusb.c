@@ -10,7 +10,6 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
-#include <semaphore.h>
 
 #include "usb_uram_generic.h"
 #include "../device/device.h"
@@ -93,13 +92,13 @@ struct usb_dev
     libusb_generic_dev_t gdev;
     usb_uram_generic_t uram_generic;
 
-    sem_t interrupts[MAX_INTERRUPTS];
+    usdr_sem_t interrupts[MAX_INTERRUPTS];
     uint32_t rbvalue[MAX_INTERRUPTS];
 
     bool stop;
-    sem_t tr_regout_a;
-    sem_t tr_rb_a;
-    sem_t rb_valid[MAX_RB_THREADS];
+    usdr_sem_t tr_regout_a;
+    usdr_sem_t tr_rb_a;
+    usdr_sem_t rb_valid[MAX_RB_THREADS];
 
     struct libusb_transfer *transfer_regout[MAX_REGOUT_REQS];
     struct libusb_transfer *transfer_rb[MAX_RB_REQS];
@@ -147,13 +146,13 @@ int usb_async_start(usb_dev_t* dev)
     int res;
     unsigned i;
     for (i = 0; i < MAX_INTERRUPTS; i++) {
-        res = sem_init(&dev->interrupts[i], 0, 0);
+        res = usdr_sem_init(&dev->interrupts[i], 0, 0);
     }
 
-    res = sem_init(&dev->tr_regout_a, 0, MAX_REGOUT_REQS);
-    res = sem_init(&dev->tr_rb_a, 0, MAX_RB_REQS);
+    res = usdr_sem_init(&dev->tr_regout_a, 0, MAX_REGOUT_REQS);
+    res = usdr_sem_init(&dev->tr_rb_a, 0, MAX_RB_REQS);
     for (i = 0; i < MAX_RB_THREADS; i++) {
-        res = sem_init(&dev->rb_valid[i], 0, 0);
+        res = usdr_sem_init(&dev->rb_valid[i], 0, 0);
     }
 
     // Prepare transfer queues
@@ -232,7 +231,7 @@ static int usb_post_regout(usb_dev_t* dev, uint32_t *regoutbuffer, unsigned coun
              dev->gdev.name, count_dw, tot_wrs, tot_rbs, tot_reqlen_dw,
              s_dump_buffer(regoutbuffer, count_dw * 4));
 
-    res = sem_wait(&dev->tr_regout_a);
+    res = usdr_sem_wait(&dev->tr_regout_a);
     if (res) {
         res = -errno;
         return res;
@@ -258,7 +257,7 @@ static int usb_post_regout(usb_dev_t* dev, uint32_t *regoutbuffer, unsigned coun
 static int usb_post_rb(usb_dev_t* dev, uint32_t* buffer, unsigned max_buffer_dw, unsigned* ridx)
 {
     int res;
-    res = sem_wait(&dev->tr_rb_a);
+    res = usdr_sem_wait(&dev->tr_rb_a);
     if (res) {
         res = -errno;
         return res;
@@ -291,7 +290,7 @@ void LIBUSB_CALL libusb_transfer_regout(struct libusb_transfer *transfer)
         return;
     }
 
-    sem_post(&dev->tr_regout_a);
+    usdr_sem_post(&dev->tr_regout_a);
 }
 
 void LIBUSB_CALL libusb_transfer_rb(struct libusb_transfer *transfer)
@@ -308,12 +307,12 @@ void LIBUSB_CALL libusb_transfer_rb(struct libusb_transfer *transfer)
                  transfer->status, transfer->actual_length);
         return;
     }
-    sem_post(&dev->tr_rb_a);
+    usdr_sem_post(&dev->tr_rb_a);
 
     //Signal reply ready
     unsigned pidx = (*arefptr) & (MAX_RB_THREADS - 1);
     *arefptr = alen;
-    sem_post(&dev->rb_valid[pidx]);
+    usdr_sem_post(&dev->rb_valid[pidx]);
 }
 
 void LIBUSB_CALL libusb_transfer_ntfy(struct libusb_transfer *transfer)
@@ -357,7 +356,7 @@ void LIBUSB_CALL libusb_transfer_ntfy(struct libusb_transfer *transfer)
             USDR_LOG("USBX", USDR_LOG_NOTE, "Got notification seq %04x event %d => %08x\n",
                      seqnum, event, buff[i + 1]);
             dev->rbvalue[event] = buff[++i];
-            sem_post(&dev->interrupts[event]);
+            usdr_sem_post(&dev->interrupts[event]);
         } else if ((i + 1 + blen) < packet_len / 4) {
             i += blen + 1;
 
@@ -408,7 +407,7 @@ static int usb_async_regread32(lldev_t d, unsigned addr, uint32_t* data, unsigne
     if (res) {
         return res;
     }
-    res = sem_wait(&dev->rb_valid[idx]);
+    res = usdr_sem_wait(&dev->rb_valid[idx]);
     if (res) {
         res = -errno;
         return res;
@@ -439,7 +438,7 @@ int usb_uram_generic_get(lldev_t dev, int generic_op, const char** pout)
 
 static int usb_uram_wait_msi(usb_dev_t* dev, unsigned i, int timeout_ms)
 {
-    return sem_wait_ex(&dev->interrupts[i], timeout_ms * 1000);
+    return usdr_sem_wait_ex(&dev->interrupts[i], timeout_ms * 1000 * 1000);
 }
 
 static int usb_read_bus(lldev_t dev, unsigned interrupt_number, UNUSED unsigned reg, size_t meminsz, void* pin)
@@ -824,12 +823,12 @@ int usb_uram_destroy(lldev_t dev)
     libusb_close(d->gdev.dh);
 
     for (unsigned i = 0; i < MAX_INTERRUPTS; i++)
-        sem_destroy(&d->interrupts[i]);
+        usdr_sem_destroy(&d->interrupts[i]);
 
-    sem_destroy(&d->tr_regout_a);
-    sem_destroy(&d->tr_rb_a);
+    usdr_sem_destroy(&d->tr_regout_a);
+    usdr_sem_destroy(&d->tr_rb_a);
     for (unsigned i = 0; i < MAX_RB_THREADS; i++)
-        sem_destroy(&d->rb_valid[i]);
+        usdr_sem_destroy(&d->rb_valid[i]);
 
     free(d);
     return 0;
@@ -911,7 +910,7 @@ int usb_uram_plugin_create(unsigned pcount, const char** devparam,
     }
 
     for (unsigned i = 0; i < MAX_INTERRUPTS; i++) {
-        res = sem_init(&dev->interrupts[i], 0, 0);
+        res = usdr_sem_init(&dev->interrupts[i], 0, 0);
         if (res)
             goto usballoc_fail;
     }
@@ -948,7 +947,7 @@ remove_dev:
     //usb_async_stop(dev->mgr);
 usb_astart_fail:
     for (unsigned i = 0; i < MAX_INTERRUPTS; i++) {
-        sem_destroy(&dev->interrupts[i]);
+        usdr_sem_destroy(&dev->interrupts[i]);
     }
 usballoc_fail:
     free(dev);
