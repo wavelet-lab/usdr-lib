@@ -860,3 +860,13 @@ int lms6002d_set_tia_rfb(lms6002d_state_t* obj, uint8_t value)
     };
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
+
+int lms6002d_set_rxfe_ip2corr(lms6002d_state_t* obj, int8_t i, int8_t q)
+{
+    uint16_t regs[] = {
+        MAKE_LMS6002D_RFE_XLD_IP2I(0, i),
+        MAKE_LMS6002D_RFE_IP2Q(q),
+    };
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
+
