@@ -1,11 +1,16 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
-#ifndef _WIN32
+//#ifndef _WIN32
+
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#ifndef _WIN32
 #include <poll.h>
+#else
+//TODO add proper poll emulation
+#endif
 
 #include "device.h"
 #include "device_vfs.h"
@@ -182,7 +187,7 @@ int _mdev_get_obj(pdevice_t dev, const char* fullpath, pusdr_vfs_obj_t *vfsobj)
     vfs_object_t *vfso = &obj->vfs_obj;
 
     vfso->type = VFST_I64;
-    vfso->amask = 0;
+    vfso->flags = 0;
     vfso->eparam[0] = 0;
     vfso->eparam[1] = 0;
     vfso->eparam[2] = 0;
@@ -622,4 +627,3 @@ failed_create:
     return res;
 }
 
-#endif
