@@ -133,7 +133,7 @@ int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objec
 
     unsigned i, cnt;
     for (i = 0, cnt = 0; cnt < max_objects && i < root->eparam[0]; i++) {
-        if (fnmatch(filter, nodes[i].full_path, FNM_NOESCAPE) == 0) {
+        if (fnmatch(filter, nodes[i].full_path, FNM_NOESCAPE) == 0 && !(nodes[i].flags & VFS_FLAG_HIDDEN)) {
             objs[cnt].fullpath = nodes[i].full_path;
             cnt++;
         }
@@ -144,18 +144,11 @@ int usdr_device_vfs_filter(pdevice_t dev, const char* filter, unsigned max_objec
 
 int _usdr_device_vfs_get_by_path(device_t *base, const char* filter, pusdr_vfs_obj_t *obj)
 {
-    vfs_object_t *root = &base->rootfs;
-    vfs_object_t *nodes = (vfs_object_t *)root->data.obj;
-
-    for (unsigned i = 0; i < base->rootfs.eparam[0]; i++) {
-        if (fnmatch(filter, nodes[i].full_path, FNM_NOESCAPE) == 0) {
-            *obj = &nodes[i];
-            return 0;
-        }
+    int res = vfs_get_by_path(&base->rootfs, filter, obj);
+    if (res) {
+        USDR_LOG("UDEV", USDR_LOG_NOTE, "vfs '%s' not found!\n", filter);
     }
-
-    USDR_LOG("UDEV", USDR_LOG_NOTE, "vfs '%s' not found!\n", filter);
-    return -ENOENT;
+    return res;
 }
 
 
@@ -207,6 +200,26 @@ int usdr_vfs_obj_param_init_array_param(pdevice_t dev,
                               (intptr_t)&params[i].ops,
                               &_oapi_vfs_set_i64_func,
                               &_oapi_vfs_get_i64_func);
+        if (res)
+            return res;
+    }
+
+    return 0;
+}
+
+int usdr_vfs_obj_link_init_array_param(pdevice_t dev,
+                                       void *param,
+                                       const usdr_dev_link_t* links,
+                                       unsigned count)
+{
+    unsigned i;
+    int res;
+
+    for (i = 0; i < count; i++) {
+        res = vfs_add_obj_link(&dev->rootfs,
+                               links[i].fullpath,
+                               param == NULL ? dev : param,
+                               links[i].linkpath);
         if (res)
             return res;
     }

@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 #include "device_vfs.h"
+#include <usdr_port.h>
 #include <usdr_logging.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fnmatch.h>
+#include <assert.h>
 
 #define STD_FOLDER_QTY 16
 
@@ -23,7 +24,7 @@ enum {
 int vfs_folder_init(vfs_object_t* o, const char* path, void* user)
 {
     o->type = VFST_FOLDER;
-    o->amask = 0;
+    o->flags = 0;
     o->eparam[RP_USED] = 0;
     o->eparam[RP_TOTAL] = STD_FOLDER_QTY;
     o->eparam[RP_UNUSED] = 0;
@@ -42,10 +43,27 @@ int vfs_folder_init(vfs_object_t* o, const char* path, void* user)
 
 void vfs_folder_destroy(vfs_object_t* o)
 {
+    assert(o->type == VFST_FOLDER);
+
     o->eparam[RP_USED] = 0;
     o->eparam[RP_TOTAL] = 0;
+
     free(o->data.obj);
     o->data.obj = NULL;
+}
+
+int vfs_get_by_path(vfs_object_t* root, const char* path, vfs_object_t** obj)
+{
+    vfs_object_t *nodes = (vfs_object_t *)root->data.obj;
+
+    for (unsigned i = 0; i < root->eparam[RP_USED]; i++) {
+        if (fnmatch(path, nodes[i].full_path, FNM_NOESCAPE) == 0) {
+            *obj = &nodes[i];
+            return 0;
+        }
+    }
+
+    return -ENOENT;
 }
 
 static int _vfs_reserve(vfs_object_t* root, unsigned extra)
@@ -241,6 +259,33 @@ int vfs_add_obj_i64(vfs_object_t* root, const char* fullpath, void* obj, uint64_
     no->ops.gi64 = fg;
     no->ops.gstr = &_vfs_i64_get_str_func;
     no->ops.gai64 = &_vfs_i64_get_ai64_func;
+
+    return 0;
+}
+
+int vfs_add_obj_link(vfs_object_t* root, const char* fullpath, void* obj, const char* link)
+{
+    vfs_object_t* no;
+    vfs_object_t* lnk_obj;
+    int res = vfs_get_by_path(root, link, &lnk_obj);
+    if (res)
+        return res;
+    if (lnk_obj->type == VFST_FOLDER)
+        return -EINVAL;
+
+    // Save found object links, since _vfs_alloc_object may realloc the pool and lnk_obj will be invalid
+    struct vfs_ops orig_ops = lnk_obj->ops;
+    union vfs_variant orig_data = lnk_obj->data;
+
+    res = _vfs_alloc_object(root, &no, lnk_obj->type, fullpath);
+    if (res)
+        return res;
+
+    // Mark that'a a link
+    no->flags = VFS_FLAG_LINK;
+    no->object = obj;
+    no->data = orig_data;
+    no->ops = orig_ops;
 
     return 0;
 }
