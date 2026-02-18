@@ -116,3 +116,43 @@ cd ../src/lib/lowlevel/pcie_uram/driver
 make
 sudo insmod usdr_pcie_uram.ko
 ````
+
+## Finding the installed `usdr` library
+
+You can find and use the installed library in two common ways — with `pkg-config` or with CMake's `find_package`.
+
+- Using pkg-config
+
+```bash
+# set to the install prefix used during `make install`
+export INSTALL_PREFIX=/path/to/install
+export PKG_CONFIG_PATH="$INSTALL_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+# Get version, cflags and libs
+pkg-config --modversion usdr
+pkg-config --cflags usdr   # include flags, e.g. -I/path/to/install/include
+pkg-config --libs usdr     # link flags, e.g. -L/path/to/install/lib -lusdr
+```
+
+- Using CMake `find_package` (CONFIG-mode)
+
+Create a small CMake project that uses the installed package (replace `/path/to/install` with your install prefix):
+
+```cmake
+cmake_minimum_required(VERSION 3.8)
+project(example C)
+find_package(usdr CONFIG REQUIRED)
+add_executable(example main.c)
+target_link_libraries(example PRIVATE usdr::usdr)
+```
+
+Then configure and build:
+
+```bash
+mkdir build && cd build
+cmake -DCMAKE_PREFIX_PATH=/path/to/install ..
+cmake --build .
+```
+
+If `find_package` fails, ensure the file `usdrConfig.cmake` is installed under `<install-prefix>/lib/cmake/usdr/` (or the corresponding `libdir/cmake/usdr` for your system) and pass that prefix via `CMAKE_PREFIX_PATH`.
+
