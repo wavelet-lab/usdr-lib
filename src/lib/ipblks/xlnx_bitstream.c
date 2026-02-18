@@ -16,12 +16,37 @@ enum {
 
 enum {
     XLNX_REG_CRC = 0x00,
+    XLNX_REG_FAR = 0x01,
     XLNX_REG_FDRI = 0x02,
+    XLNX_REG_FDRO = 0x03,
     XLNX_REG_CMD = 0x04,
+    XLNX_REG_CTL0 = 0x05,
+    XLNX_REG_MASK = 0x06,
+    XLNX_REG_STAT = 0x07,
+    XLNX_REG_LOUT = 0x08,
+    XLNX_REG_COR0 = 0x09,
+    XLNX_REG_MFWR = 0x0a,
+    XLNX_REG_CBC = 0x0b,
     XLNX_REG_IDCODE = 0x0c,
     XLNX_REG_AXSS = 0x0d,
+    XLNX_REG_COR1 = 0x0e,
+    XLNX_REG_CSOB = 0x0f,
     XLNX_REG_WBSTAR = 0x10,
-    XLNX_REG_USERID = 0x19,
+    XLNX_REG_TIMER = 0x11,
+    XLNX_REG_UNK12 = 0x12,
+    XLNX_REG_RBCRC_SW = 0x13,
+    XLNX_REG_UNK14 = 0x14,
+    XLNX_REG_UNK15 = 0x15,
+    XLNX_REG_BOOTSTS = 0x16,
+    XLNX_REG_UNK17 = 0x17,
+    XLNX_REG_CTL1 = 0x18,
+    XLNX_REG_UNK19 = 0x19,
+    XLNX_REG_UNK1A = 0x1a,
+    XLNX_REG_UNK1B = 0x1b,
+    XLNX_REG_UNK1C = 0x1c,
+    XLNX_REG_UNK1D = 0x1d,
+    XLNX_REG_UNK1E = 0x1e,
+    XLNX_REG_BSPI = 0x1f
 };
 
 enum {
@@ -43,12 +68,13 @@ static inline uint32_t xlnx_btstrm_crc32_pushbit(uint32_t crc, uint32_t bit)
 
 static uint32_t xlnx_btstrm_crc32_regw(uint32_t crc, uint16_t reg, uint32_t data)
 {
+    // Not sure which ones to skip, but so far it works well
     switch (reg) {
-    case 0x16: // BOOTSTS
-    case 0x0F: // CSOB (undocumented)
-    case 0x12: // unknown, skipped
-    case 0x14: // unknown, skipped
-    case 0x15: // unknown, skipped
+    case XLNX_REG_BOOTSTS:
+    case XLNX_REG_CSOB:
+    case XLNX_REG_UNK12:
+    case XLNX_REG_UNK14:
+    case XLNX_REG_UNK15:
         return crc;
     }
 
@@ -150,11 +176,9 @@ next:
                     stat->iprog = true;
             } else if (reg == XLNX_REG_AXSS) {
                 stat->usr_access2 = w;
-            } else if (reg == XLNX_REG_USERID) {
-                USDR_LOG("BSTR", USDR_LOG_NOTE, "UserID = %x\n", w);
             }
 
-            if (count == 1 && ptype == 1 && reg != 1 && reg != 4) {
+            if (count == 1 && ptype == 1 && reg != 1 && reg != XLNX_REG_CMD) {
                 USDR_LOG("BSTR", USDR_LOG_NOTE, "Rgister %x: %x\n", reg, w);
             }
 
@@ -162,7 +186,7 @@ next:
                 if (reg == XLNX_REG_CRC) {
                     crc_word_cnt++;
 
-                    USDR_LOG("BSTR", USDR_LOG_DEBUG, "CRC BLOCK=%d FILE=%8x STR=%8x\n", crc_word_cnt, w, stream_crc);
+                    USDR_LOG("BSTR", USDR_LOG_NOTE, "CRC BLOCK=%d BIN=%8x STR=%8x\n", crc_word_cnt, w, stream_crc);
                     if (w != stream_crc) {
                         USDR_LOG("BSTR", USDR_LOG_ERROR, "Bitstream CRC mismatch: block=%d stream=%08x infile=%08x\n",
                                  crc_word_cnt, stream_crc, w);

@@ -344,7 +344,7 @@ int main(int argc, char** argv)
         }
         if (image.wbstar != master_offset) {
             fprintf(stderr, "Master trampoline mismatches: WBSTAR is %08x != %08x in the software!\n",
-                    image.wbstar, master_offset);
+                    image.wbstar, (unsigned)master_offset);
             return 8;
         }
 
