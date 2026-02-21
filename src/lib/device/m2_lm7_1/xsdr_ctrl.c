@@ -7,7 +7,7 @@
 #include "../hw/tmp114/tmp114.h"
 #include "../hw/tmp108/tmp108.h"
 #include "../hw/dac80501/dac80501.h"
-
+#include "../hw/at24/at24.h"
 
 #include <usdr_logging.h>
 #include <assert.h>
@@ -1550,7 +1550,7 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
 
     if (hwid == SSDRPRO_DEV) {
         res = lp8758_vout_set(dev, subdev, I2C_BUS_LP8758_FPGA, 3, 2040);
-    } if (hwid == SSDR_DEV) {
+    } else if (hwid == SSDR_DEV) {
         res = lp8758_vout_set(dev, subdev, I2C_BUS_LP8758_FPGA, 1, 2040);
     } else {
         // TODO check if we need this rail
@@ -1631,6 +1631,13 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
             return -EFAULT;
         }
 
+        if (hwid == SSDRPRO_DEV) {
+            uint8_t s[16] = { 0, };
+            res = res ? res : at24_saddr_mem_get(dev, d->base.lmsstate.subdev, I2C_DEV_AT24_SEC, AT24_SECURE_SERIAL_OFF, 16, s);
+
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "AT24_SERIAL: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
+                        s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8], s[9], s[10], s[11], s[12], s[13], s[14], s[15]);
+        }
     }
     return res;
 }
@@ -2027,10 +2034,11 @@ int xsdr_dtor(xsdr_dev_t *d)
 
     res = (res) ? res : _xsdr_mmcm_pd(d);
 
+    // Set LMS8 power to 0.9V
     if (d->ssdr_pro) {
         res = res ? res : lp8758_vout_set(dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA, 3, 900);
         res = res ? res : lp8758_vout_ctrl(dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA, 3, 0, 1);
-    } if (d->ssdr) {
+    } else if (d->ssdr) {
         res = res ? res : lp8758_vout_set(dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA, 1, 900);
         res = res ? res : lp8758_vout_ctrl(dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA, 1, 0, 1);
     }
