@@ -31,6 +31,9 @@ install(TARGETS usdr_dm_gpsdo RUNTIME)
 
 list(APPEND WVLT_SCRIPTS
     wvlt_sdr_wrapper.py
+    python/usdr_bindings.py
+    python/example_minimal.py
+    python/example_fft_rx.py
 )
 configure_file(${WVLT_SCRIPTS} . USE_SOURCE_PERMISSIONS COPYONLY)
 
