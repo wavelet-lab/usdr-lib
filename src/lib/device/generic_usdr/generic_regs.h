@@ -100,17 +100,19 @@ enum RFE_BUS_ADDRS {
 // All I2C devices used accross the famaly
 enum {
     I2C_GENERAL_CALL  = 0x00,
-    I2C_DEV_PMIC_FPGA = 0x60, //7'b110_0000;
-    I2C_DEV_EXTDAC    = 0x48, //7'b100_1000;
-    I2C_DEV_TMP114B   = 0x49, //7'b100_1001;
+    I2C_DEV_AT24_MEM  = 0x50,        //7'b101_0000;
+    I2C_DEV_AT24_SEC  = 0x58,        //7'b101_1000;
+    I2C_DEV_PMIC_FPGA = 0x60,        //7'b110_0000;
+    I2C_DEV_EXTDAC    = 0x48,        //7'b100_1000;
+    I2C_DEV_TMP114B   = 0x49,        //7'b100_1001;
     I2C_DEV_TMP108A_A0_SDA   = 0x4A, //7'b100_1010;
     I2C_DEV_DAC80501M_A0_GND = 0x48, //7'b100_1000;
     I2C_DEV_DAC80501M_A0_VDD = 0x49, //7'b100_1001;
     I2C_DEV_DAC80501M_A0_SDA = 0x4A, //7'b100_1001;
     I2C_DEV_DAC80501M_A0_SCL = 0x4B, //7'b100_1011;
-    I2C_DEV_TMP114NB  = 0x4E, //7'b100_1110;
-    I2C_DEV_CLKGEN    = 0x6A, //7'b110_1010;
-    I2C_DEV_DCDCBOOST = 0x75, //7'b111_0101;
+    I2C_DEV_TMP114NB  = 0x4E,        //7'b100_1110;
+    I2C_DEV_CLKGEN    = 0x6A,        //7'b110_1010;
+    I2C_DEV_DCDCBOOST = 0x75,        //7'b111_0101;
 };
 
 #define MAKE_I2C_LUT(a,b,c,d) \
