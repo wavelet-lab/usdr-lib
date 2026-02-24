@@ -47,7 +47,7 @@ struct stream_limesdr {
     // Streaming parameters
     unsigned burst_count; // Bursts in packet
     unsigned burst_symbs;
-    unsigned burst_bytes;     // Busrt bytes contating samples
+    unsigned burst_bytes;     // Burst bytes containing samples
     unsigned burst_host_bytes;
     unsigned block_samples; // Number samples in one process block (4K)
     unsigned tx_sampl_c;

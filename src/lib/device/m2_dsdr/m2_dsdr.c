@@ -410,6 +410,17 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/sdr/0/tx/gain/6",      { dev_m2_dsdr_gain_tx_set, NULL }},
     { "/dm/sdr/0/tx/gain/7",      { dev_m2_dsdr_gain_tx_set, NULL }},
 
+    { "/dm/sdr/0/rx/frequency",    { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/0",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/1",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/2",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/3",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/4",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/5",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/6",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/7",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/rx/freqency",    { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/freqency/0",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/rx/freqency/1",  { dev_m2_dsdr_sdr_rx_freq_set, NULL }},
@@ -430,6 +441,17 @@ const usdr_dev_param_func_t s_fparams_m2_dsdr_rev000[] = {
     { "/dm/sdr/0/rx/dsa/6",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
     { "/dm/sdr/0/rx/dsa/7",       { dev_m2_dsdr_sdr_rx_dsa_set, NULL }},
 
+    { "/dm/sdr/0/tx/frequency",    { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/0",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/1",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/2",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/3",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/4",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/5",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/6",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/7",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/tx/freqency",    { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency/0",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency/1",  { dev_m2_dsdr_sdr_tx_freq_set, NULL }},
@@ -1248,7 +1270,7 @@ int dev_m2_dsdr_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/freqency", true);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/frequency", true);
 
     return dsdr_set_rx_frequency_chan(d, value, obj->full_path[1]);
 }
@@ -1297,7 +1319,7 @@ int dev_m2_dsdr_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t valu
         return 0;
 
     if (obj->full_path[0])
-        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/tx/freqency", false);
+        return dsdr_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/tx/frequency", false);
 
     return dsdr_set_tx_frequency_chan(d, value, obj->full_path[1]);
 }

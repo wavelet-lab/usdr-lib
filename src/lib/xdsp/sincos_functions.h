@@ -32,7 +32,7 @@ sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl();
  * wvlt_sincos_i16_interleaved_ctrl()
  *
  * int32_t* start_phase: Starting phase.
- *                       Diapazon [-PI..+PI) mapped to int32 range INT32_MIN..INT32_MAX.
+ *                       Range [-PI..+PI) mapped to int32 range INT32_MIN..INT32_MAX.
  *                       The next starting phase for consequent calls is returned by ptr.
  * int32_t delta_phase:  Delta, applying to starting phase. int32_t range is just the same as for start_phase.
  * int16_t gain:         Output max amplitude

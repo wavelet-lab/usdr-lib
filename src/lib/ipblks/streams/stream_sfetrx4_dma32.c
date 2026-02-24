@@ -57,7 +57,7 @@ struct stream_sfetrx_dma32 {
     // Cached values
     unsigned cnf_base;
     unsigned sync_base;  // TODO: for compatibility with OLD APIs
-    unsigned cnfrd_base; // Reabdack address for OLD API
+    unsigned cnfrd_base; // Readback address for OLD API
 
     unsigned pkt_symbs;  // Total number of symbols in a transaction (all bursts)
     unsigned pkt_bytes;  // Wire bytes for a transaction (excl. packing overhead)
@@ -81,7 +81,7 @@ struct stream_sfetrx_dma32 {
     uint8_t  fe_old_tx_mute; // keep OLD TX FE in sync with host state
     uint8_t  fe_old_tx_swap; // keep OLD TX FE in sync with host state
     unsigned fe_chans;       // Number of active channels in frontend
-    unsigned fe_complex;     // Compex data streaming
+    unsigned fe_complex;     // Complex data streaming
     union {
         sfe_cfg_t srx4;
     } storage;
@@ -108,7 +108,7 @@ int _sfetrx4_destroy(stream_handle_t* str)
     int res;
 
     if (stream->type == USDR_ZCPY_RX) {
-        //Grcefull stop
+        //Gracefull stop
         res = lowlevel_reg_wr32(dev, 0,
                                 stream->cnf_base + 1, 0);
         if (res)
@@ -296,7 +296,7 @@ void parse_txcore_stat(uint32_t stat[4], txcore_statistics_t* s)
     // Understanding counters (PCIe mode)
     // usrbuf_posted     --     PCIe Buffer metadata posted
     // usrbuf_requested  --     PCIe Buffer all MemRd requests are sent
-    // usrbuf_completed  --     PCIe Beffer data has been placed into FIFO RAM
+    // usrbuf_completed  --     PCIe Buffer data has been placed into FIFO RAM
     // usrbuf_aired      --     PCIe Buffer has been completly played out (available for reuse)
 
     bool usb = (stat[0] & 0x8);
@@ -529,7 +529,7 @@ static int _sfetrx4_op(stream_handle_t* str,
         if (res)
             return res;
     } else {
-        // Assuming Compex IQ
+        // Assuming Complex IQ
         unsigned lgchcnt = (stream->fe_chans == 1) ? 0 :
                            (stream->fe_chans == 2) ? 1 :
                            (stream->fe_chans == 4) ? 2 : 3;
@@ -1275,7 +1275,7 @@ int sfetrx4_stream_sync(device_t* device,
     stream_sfetrx_dma32_t** pstream = (stream_sfetrx_dma32_t**)pstr;
     res = usdr_device_vfs_obj_val_get_u64(device, "/ll/sync/0/base", &sync_base);
     if (res) {
-        USDR_LL_LOG(device->dev, "DSTR", USDR_LOG_ERROR, "SYNC: Broken device! Coulnd't obtain sync addr: %d\n", res);
+        USDR_LL_LOG(device->dev, "DSTR", USDR_LOG_ERROR, "SYNC: Broken device! Couldn't obtain sync addr: %d\n", res);
         return res;
     }
     retimer_base = sync_base;

@@ -232,9 +232,15 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
 
     { "/dm/sdr/0/calibrate",    { dev_m2_lm6_1_sdr_dc_calib, NULL }},
 
+    { "/dm/sdr/0/rx/frequency/lob",{ dev_m2_lm6_1_sdr_rx_freq_lob_set, NULL }},
+    { "/dm/sdr/0/rx/frequency",  { dev_m2_lm6_1_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency",  { dev_m2_lm6_1_sdr_tx_freq_set, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/rx/freqency/lob",{ dev_m2_lm6_1_sdr_rx_freq_lob_set, NULL }},
     { "/dm/sdr/0/rx/freqency",  { dev_m2_lm6_1_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency",  { dev_m2_lm6_1_sdr_tx_freq_set, NULL }},
+
     { "/dm/sdr/0/rx/gain",      { dev_m2_lm6_1_sdr_rx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain",      { dev_m2_lm6_1_sdr_tx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain/vga1", { dev_m2_lm6_1_sdr_tx_gain_vga1_set, NULL }},

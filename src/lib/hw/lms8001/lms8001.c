@@ -1146,7 +1146,7 @@ int lms8001_smart_tune(lms8001_state_t* m, unsigned tune_flags, uint64_t flo, in
 
 int lms8001_reg_set(lms8001_state_t* m, uint16_t addr, uint16_t val)
 {
-    // Update internal state to syncronze cahce values
+    // Update internal state to synchronize cache values
 
     if (addr >= PLL_CONFIGURATION_PLL_VREG) {
         switch (addr) {

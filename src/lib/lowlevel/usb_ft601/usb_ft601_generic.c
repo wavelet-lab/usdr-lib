@@ -100,7 +100,7 @@ int usbft601_uram_ls_op(lldev_t dev, subdev_t subdev,
             if (memoutsz * 2 > sizeof(tmpbuf_out))
                 return -E2BIG;
 
-            // Rgister write
+            // Register write
             const uint16_t* out_s = (const uint16_t* )pout;
             for (unsigned i = 0; i < memoutsz / 2; i++) {
                 tmpbuf_out[2 * i + 1] = ls_op_addr + i;
@@ -200,8 +200,8 @@ int usbft601_uram_generic_create_and_init(lldev_t lld, unsigned pcount, const ch
     res = usdr_device_create(lld, *pdevid);
     if (res) {
         USDR_LOG(USBG_LOG_TAG, USDR_LOG_ERROR,
-                 "Unable to find device spcec for %s, uuid %s! Update software!\n",
-                 devname, usdr_device_id_to_str(*pdevid));
+             "Unable to find device spec for %s, uuid %s! Update software!\n",
+             devname, usdr_device_id_to_str(*pdevid));
 
         return res;
     }

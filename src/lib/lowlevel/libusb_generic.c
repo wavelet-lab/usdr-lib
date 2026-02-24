@@ -601,7 +601,7 @@ void LIBUSB_CALL libusb_transfer_buffers_cb(struct libusb_transfer *transfer)
              idx, transfer->status, transfer->actual_length, transfer->length);
 
     if (rxb->stop) {
-        // TODO: Syncronize EPs
+        // TODO: Synchronize EPs
         return;
     }
 

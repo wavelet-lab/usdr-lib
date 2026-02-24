@@ -1,7 +1,7 @@
 // Copyright (c) 2023-2024 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
-// Communiction protocol
+// Communication protocol
 #ifndef VPU_H
 #define VPU_H
 

@@ -595,7 +595,7 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
         }
 
         sc->bufavail = res;
-        USDR_LL_LOG(&d->ll, "PCIE", (res > 1) ? USDR_LOG_NOTE : USDR_LOG_DEBUG, "STR[%d]: Alloced %d buffs, BNO=%d (%016lx) seq=%16ld OOB_sz=%d\n",
+        USDR_LL_LOG(&d->ll, "PCIE", (res > 1) ? USDR_LOG_NOTE : USDR_LOG_DEBUG, "STR[%d]: Allocated %d buffs, BNO=%d (%016lx) seq=%16ld OOB_sz=%d\n",
                  channel, res, sc->bno, (oob_ptr) ? (*(uint64_t*)sc->oob_cache) : 0, sc->seq, sc->oob_size);
     }
 
@@ -951,9 +951,9 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     err = usdr_device_create(&dev->ll, did);
     if (err) {
         USDR_LL_LOG(&dev->ll, "PCIE", USDR_LOG_ERROR,
-                 "Unable to find device spcec for %s, uuid %s! Update software!\n",
-                 dev->name,
-                 usdr_device_id_to_str(did));
+             "Unable to find device spec for %s, uuid %s! Update software!\n",
+             dev->name,
+             usdr_device_id_to_str(did));
 
         goto remove_dev;
     }

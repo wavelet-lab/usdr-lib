@@ -356,7 +356,7 @@ int generic_rpc_call(pdm_dev_t dmdev,
         uint64_t actual;
 
         res = set_endpoint_uint_param(dmdev,
-                                      (pcall->call_type == SDR_RX_FREQUENCY) ? "/dm/sdr/0/rx/freqency" : "/dm/sdr/0/tx/freqency",
+                                      (pcall->call_type == SDR_RX_FREQUENCY) ? "/dm/sdr/0/rx/frequency" : "/dm/sdr/0/tx/frequency",
                                       freq,
                                       &actual);
         if (res)

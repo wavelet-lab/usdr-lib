@@ -297,11 +297,20 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/0/rx/phgaincorr",{ dev_m2_lm7_1_sdr_rx_phgaincorr_set, NULL }},
     { "/dm/sdr/0/tx/phgaincorr",{ dev_m2_lm7_1_sdr_tx_phgaincorr_set, NULL }},
 
+    { "/dm/sdr/0/rx/frequency/bb",  { dev_m2_lm7_1_sdr_rx_bbfreq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/bb",  { dev_m2_lm7_1_sdr_tx_bbfreq_set, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/rx/freqency/bb",  { dev_m2_lm7_1_sdr_rx_bbfreq_set, NULL }},
     { "/dm/sdr/0/tx/freqency/bb",  { dev_m2_lm7_1_sdr_tx_bbfreq_set, NULL }},
 
+    { "/dm/sdr/0/rx/frequency",  { dev_m2_lm7_1_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency",  { dev_m2_lm7_1_sdr_tx_freq_set, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/rx/freqency",  { dev_m2_lm7_1_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency",  { dev_m2_lm7_1_sdr_tx_freq_set, NULL }},
+
     { "/dm/sdr/0/rx/gain",      { dev_m2_lm7_1_sdr_rx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain",      { dev_m2_lm7_1_sdr_tx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain/lb",   { dev_m2_lm7_1_sdr_tx_gainlb_set, NULL }},
@@ -325,19 +334,32 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
 
     { "/dm/sdr/0/rxdsp/swapab", { dev_m2_lm7_1_sdr_rxdsp_swapab_set, NULL }},
 
+    { "/dm/sdr/0/tdd/frequency",          { dev_m2_lm7_1_sdr_tdd_freq_set, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/tdd/freqency",          { dev_m2_lm7_1_sdr_tdd_freq_set, NULL }},
+
     { "/dm/sdr/0/tfe/antcfg",            { dev_m2_lm7_1_tx_antennat_port_cfg_set, NULL }},
 
     { "/dm/sdr/0/tfe/generator/enable",  { dev_m2_lm7_1_tfe_gen_en_set, NULL }},
     { "/dm/sdr/0/tfe/generator/const",   { dev_m2_lm7_1_tfe_gen_const_set, NULL }},
     { "/dm/sdr/0/tfe/generator/tone",    { dev_m2_lm7_1_tfe_gen_tone_set, NULL }},
     { "/dm/sdr/0/tfe/nco/enable",        { dev_m2_lm7_1_tfe_nco_enable_set, NULL }},
+
+    { "/dm/sdr/0/tfe/nco/frequency",      { dev_m2_lm7_1_tfe_nco_enable_frequency, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/tfe/nco/freqency",      { dev_m2_lm7_1_tfe_nco_enable_frequency, NULL }},
 
     { "/dm/sdr/0/rfe/throttle",    { dev_m2_lm7_1_rfe_throttle_set, NULL }},
 
     { "/dm/sdr/0/rfe/nco/enable",  { dev_m2_lm7_1_rfe_nco_enable_set, NULL }},
+
+    { "/dm/sdr/0/rfe/nco/frequency",{ dev_m2_lm7_1_rfe_nco_enable_frequency, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/rfe/nco/freqency",{ dev_m2_lm7_1_rfe_nco_enable_frequency, NULL }},
+
     { "/dm/sdr/0/rfe/pwrdc",       { NULL, dev_m2_lm7_1_rfe_nco_pwrdc_get }},
 
     // Debug interface
