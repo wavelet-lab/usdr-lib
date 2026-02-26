@@ -325,7 +325,7 @@ int usbft601_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel
     // Add to senq
     res = buffers_usb_transfer_post(rxb, bno, sz, bno);
     if (res) {
-        USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX%d unable to post busrt to sendq (error %d)\n", channel, res);
+        USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX%d unable to post burst to sendq (error %d)\n", channel, res);
         return res;
     }
 

@@ -114,7 +114,7 @@ int lms64c_fill_packet(uint8_t cmd, uint8_t status, uint8_t id, const uint8_t* d
         } else if (mod == MOD_INT16) {
             const uint16_t* d = (const uint16_t*)&data[off];
             for (unsigned i = 0; i < this_pkt_data; i += 2) {
-                // TODO: Endianess
+                // TODO: Endianness
                 out[k].data[i + 0] = d[i >> 1] >> 8;
                 out[k].data[i + 1] = d[i >> 1] & 0xFF;
             }
@@ -140,7 +140,7 @@ int lms64c_parse_packet(uint8_t cmd, const proto_lms64c_t* in, unsigned in_cnt, 
         unsigned bsz = (remaining > LMS64C_DATA_LENGTH) ? LMS64C_DATA_LENGTH : remaining;
 
         if (mod == MOD_INT32_16) {
-            // TODO: Endianess
+            // TODO: Endianness
             const uint16_t* d = (const uint16_t*)in[i].data;
             for (unsigned j = 0; j < bsz; j += 2) {
                 data[off + j + 0] = d[j + 1] >> 8;

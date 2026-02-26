@@ -179,7 +179,7 @@ next:
             }
 
             if (count == 1 && ptype == 1 && reg != 1 && reg != XLNX_REG_CMD) {
-                USDR_LOG("BSTR", USDR_LOG_NOTE, "Rgister %x: %x\n", reg, w);
+                USDR_LOG("BSTR", USDR_LOG_NOTE, "Register %x: %x\n", reg, w);
             }
 
             if (flags & XLNX_BSTRM_PARSE_F_CRC_CHECK) {

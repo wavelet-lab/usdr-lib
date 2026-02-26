@@ -335,7 +335,7 @@ pll2_configured:;
         MAKE_LMK04832_PLL2_N_LOW(pll2_n),
         0x016959, //PLL2_DLD_EN
 
-        //SYSREF enable in continous from data clock
+        //SYSREF enable in continuous from data clock
         //0x013903,
         //0x013a00,
         //0x013b08,
@@ -432,7 +432,7 @@ int lmk04832_sysref_div_set(lldev_t dev, subdev_t subdev, lsopaddr_t addr,
         0x014310,
         0x0144ff,
 
-        //SYSREF enable in continous from data clock
+        //SYSREF enable in continuous from data clock
         0x013903,
 
         //DDIV

@@ -56,7 +56,7 @@ int create_sfetrx4_stream(device_t* device,
                           stream_handle_t** outu,
                           unsigned *hw_chans_cnt);
 
-// Syncronize streams
+// Synchronize streams
 int sfetrx4_stream_sync(device_t* device,
                         stream_handle_t** pstream, unsigned scount,
                         const char* synctype);

@@ -147,7 +147,7 @@ int find_best_vco(const vco_range_t* pvcos, unsigned vco_count,
         }
     }
 
-    // Freqency can't be delivered
+    // Frequency can't be delivered
     return -1;
 }
 

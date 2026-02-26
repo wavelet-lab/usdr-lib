@@ -657,10 +657,10 @@ int main(UNUSED int argc, UNUSED char** argv)
     //Device parameters
     //                 { endpoint, default_value, ignore flag, stop_on_fail flag }
     struct dme_findsetv_data dev_data[] = {
-        [DD_RX_FREQ] = { "rx/freqency", 900e6, true, true },
-        [DD_TX_FREQ] = { "tx/freqency", 920e6, true, true },
+        [DD_RX_FREQ] = { "rx/frequency", 900e6, true, true },
+        [DD_TX_FREQ] = { "tx/frequency", 920e6, true, true },
 
-        [DD_TDD_FREQ] = { "tdd/freqency", 910e6, true, true },
+        [DD_TDD_FREQ] = { "tdd/frequency", 910e6, true, true },
 
         [DD_RX_BANDWIDTH] = { "rx/bandwidth", 1e6, true, true },
         [DD_TX_BANDWIDTH] = { "tx/bandwidth", 1e6, true, true },

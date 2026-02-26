@@ -593,7 +593,7 @@ void SoapyUSDR::setFrequency(const int direction, const size_t channel, const st
     int res;
 
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
-    const char* pname = get_sdr_param(0, dir, "freqency", (name == "BB") ? "bb" : NULL);
+    const char* pname = get_sdr_param(0, dir, "frequency", (name == "BB") ? "bb" : NULL);
 
     uint64_t val = (((uint64_t)channel) << 32) | (uint32_t)frequency;
 

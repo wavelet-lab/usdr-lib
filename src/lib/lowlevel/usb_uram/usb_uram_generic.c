@@ -301,8 +301,8 @@ int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** 
     res = usdr_device_create(dev, *pdevid);
     if (res) {
         USDR_LOG(USBG_LOG_TAG, USDR_LOG_ERROR,
-                 "Unable to find device spcec for %s, uuid %s! Update software!\n",
-                 devname, usdr_device_id_to_str(*pdevid));
+             "Unable to find device spec for %s, uuid %s! Update software!\n",
+             devname, usdr_device_id_to_str(*pdevid));
 
         return res;
     }

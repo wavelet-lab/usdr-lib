@@ -923,8 +923,8 @@ int verilator_wrap_plugin_create(unsigned pcount, const char** devparam,
     res = usdr_device_create(dev, did, &dev->udev);
     if (res) {
         USDR_LOG("VERI", USDR_LOG_ERROR,
-                 "Unable to find device spcec for %s, uuid %s! Update software!\n",
-                 dev->name, usdr_device_id_to_str(did));
+             "Unable to find device spec for %s, uuid %s! Update software!\n",
+             dev->name, usdr_device_id_to_str(did));
 
         goto remove_dev;
     }

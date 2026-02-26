@@ -180,7 +180,11 @@ const usdr_dev_param_func_t s_fparams_m2_da09_4_ad45_2_rev000[] = {
     { "/dm/sdr/0/rx/gain/vga",  { dev_m2_d09_4_ad45_2_gainvga_set, NULL }},
     { "/dm/sdr/0/rx/gain/lna",  { dev_m2_d09_4_ad45_2_gainlna_set, NULL }},
 
+    { "/dm/sdr/0/rx/frequency",  { dev_m2_d09_4_ad45_2_sdr_rx_freq_set, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/rx/freqency",  { dev_m2_d09_4_ad45_2_sdr_rx_freq_set, NULL }},
+
     { "/dm/sdr/0/rx/bandwidth", { dev_m2_d09_4_ad45_2_sdr_rx_bandwidth_set, NULL }},
 
     { "/dm/sdr/0/rx/path",      { dev_m2_d09_4_ad45_2_dummy, NULL }},
