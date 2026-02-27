@@ -23,7 +23,7 @@ float quadfm_encode(unsigned samples,
         float fi, fq;
 
         iangle += da;
-        //sincosf(iangle, &fq, &fi);
+        sincosf(iangle, &fq, &fi);
 
         int16_t vi, vq;
         vi = (int16_t)(fi * 0.7f * 32767.0f);
