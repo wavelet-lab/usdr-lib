@@ -65,7 +65,11 @@ enum {
 
     // Streams
     IN_STRM_SIZE     = 512,
+#ifdef __APPLE__
+    MAX_IN_STRM_REQS = 64,
+#else
     MAX_IN_STRM_REQS = 8,
+#endif
     MAX_OUT_STRM_REQS = 32,
 
     RX_PKT_TRAILER_EX = 16,
