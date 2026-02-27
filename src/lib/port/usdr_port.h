@@ -9,6 +9,10 @@
 #ifdef _WIN32
 #include <Winsock2.h>
 #include <sec_api/stdio_s.h>
+#else
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #endif
 
 #include <stdint.h>
