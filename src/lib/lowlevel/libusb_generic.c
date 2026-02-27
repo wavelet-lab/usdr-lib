@@ -220,7 +220,7 @@ int libusb_generic_plugin_create(unsigned pcount, const char** devparam,
         if (fcnt == 0) {
             USDR_LOG("USBX", USDR_LOG_NOTE,
                      "No USB device was found to match %d/%d/%d, total=%d\n",
-                     fparams.usb_bus, fparams.usb_port, fparams.usb_addr, devices);
+                     fparams.usb_bus, fparams.usb_port, fparams.usb_addr, (unsigned)devices);
             libusb_exit(uctx);
             return -ENODEV;
         }
