@@ -12,10 +12,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <endian.h>
-#include <semaphore.h>
 #include <pthread.h>
 #include <assert.h>
 
+#include <usdr_port.h>
 #include <usdr_logging.h>
 
 #include <string.h>
@@ -49,8 +49,8 @@ struct rbdata {
 
 
 struct verilator_protocol_unix {
-    sem_t tags[MAX_TAGS];
-    sem_t tags_avail;
+    usdr_sem_t tags[MAX_TAGS];
+    usdr_sem_t tags_avail;
 
     uint32_t tags_free_idx;
 
@@ -68,12 +68,12 @@ int vpu_init(verilator_protocol_unix_t* pvpu, const char* dev)
     int res;
 
     for (unsigned i = 0; i < MAX_INTERRUPTS; i++) {
-        res = sem_init(&pvpu->tags[i], 0, 0);
+        res = usdr_sem_init(&pvpu->tags[i], 0, 0);
         if (res)
             goto sem_tag_fail;
     }
 
-    res = sem_init(&pvpu->tags_avail, 0, 1);
+    res = usdr_sem_init(&pvpu->tags_avail, 0, 1);
     if (res)
         goto sem_tag_avail_fail;
 
@@ -122,7 +122,7 @@ struct verilator_dev
     device_id_t devid;
     device_bus_t db;
 
-    sem_t interrupts[MAX_INTERRUPTS];
+    usdr_sem_t interrupts[MAX_INTERRUPTS];
 
     verilator_protocol_unix_t proto;
     bool terminated;
@@ -184,7 +184,7 @@ int verilator_process_recv(verilator_dev_t* dev)
             USDR_LOG("VERI", USDR_LOG_TRACE, "Readback #%d => %08x\n", hdr.tag, buffer[0]);
 
         memcpy(dev->proto.rb[hdr.tag].data, buffer, hdr.size - sizeof(hdr));
-        res = sem_post(&dev->proto.tags[hdr.tag]);
+        res = usdr_sem_post(&dev->proto.tags[hdr.tag]);
         if (res)
             return res;
 
@@ -195,7 +195,7 @@ int verilator_process_recv(verilator_dev_t* dev)
             return -EFAULT;
         USDR_LOG("VERI", USDR_LOG_TRACE, "Interrupt %d\n", hdr.tag);
 #ifdef OLD_INTERRUPTS
-        res = sem_post(&dev->interrupts[hdr.tag]);
+        res = usdr_sem_post(&dev->interrupts[hdr.tag]);
         if (res)
             return res;
 #else
@@ -259,7 +259,7 @@ int verilator_process_recv(verilator_dev_t* dev)
                 }
 
                 for (;;) {
-                    res = sem_post(&dev->interrupts[irq]);
+                    res = usdr_sem_post(&dev->interrupts[irq]);
                     if (res)
                         return res;
                     if (irq != 0)
@@ -317,7 +317,7 @@ int verilator_process_recv(verilator_dev_t* dev)
         }
 
         for (;;) {
-            res = sem_post(&dev->interrupts[irq]);
+            res = usdr_sem_post(&dev->interrupts[irq]);
             if (res)
                 return res;
             if (irq != 0)
@@ -342,7 +342,7 @@ static
 int verilator_tag_alloc(verilator_protocol_unix_t* dev)
 {
     int res, tag = -1;
-    res = sem_wait(&dev->tags_avail);
+    res = usdr_sem_wait(&dev->tags_avail);
     if (res)
         return res;
 
@@ -362,7 +362,7 @@ static
 int verilator_tag_release(verilator_protocol_unix_t* dev, unsigned tag)
 {
     int res;
-    res = sem_post(&dev->tags_avail);
+    res = usdr_sem_post(&dev->tags_avail);
     if (res)
         return res;
 
@@ -381,7 +381,7 @@ int verilator_in(verilator_dev_t* dev, unsigned addr, uint32_t *pinval, const un
     if (res < 0)
         return res;
 
-    res = sem_wait(&dev->proto.tags[tag]);
+    res = usdr_sem_wait(&dev->proto.tags[tag]);
     if (res)
         return res;
 
@@ -570,11 +570,11 @@ static int verilator_wrap_wait_msi(verilator_dev_t* dev, unsigned i, int timeout
             ts.tv_nsec -= 1000 * 1000 * 1000;
             ts.tv_sec++;
         }
-        res = sem_timedwait(&dev->interrupts[i], &ts);
+        res = usdr_sem_timedwait(&dev->interrupts[i], &ts);
     } else if (timeout_ms < 0) {
-        res = sem_wait(&dev->interrupts[i]);
+        res = usdr_sem_wait(&dev->interrupts[i]);
     } else {
-        res = sem_trywait(&dev->interrupts[i]);
+        res = usdr_sem_trywait(&dev->interrupts[i]);
     }
     if (res) {
         // sem_* function on error returns -1, get proper error
@@ -910,7 +910,7 @@ int verilator_wrap_plugin_create(unsigned pcount, const char** devparam,
     strncpy(dev->devid_str, usdr_device_id_to_str(did), sizeof(dev->devid_str) - 1);
 
     for (unsigned i = 0; i < MAX_INTERRUPTS; i++) {
-        res = sem_init(&dev->interrupts[i], 0, 0);
+        res = usdr_sem_init(&dev->interrupts[i], 0, 0);
         if (res)
             goto alloc_fail;
     }

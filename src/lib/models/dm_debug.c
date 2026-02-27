@@ -92,7 +92,7 @@ static void* usdr_dif_thread(void* param)
 #ifndef _WIN32
     sigset_t set;
 
-    pthread_setname_np(pthread_self(), "debug_io");
+    usdr_set_thread_name("debug_io");
     sigfillset(&set);
     pthread_sigmask(SIG_SETMASK, &set, NULL);
 #endif

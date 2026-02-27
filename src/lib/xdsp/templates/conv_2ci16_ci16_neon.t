@@ -15,8 +15,8 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata_0_p,
 
     while(i >= 32)
     {
-        vst2q_u32((uint32_t*)outdata,
-            (uint32x4x2_t){ {vld1q_u32((uint32_t*)indata_0), vld1q_u32((uint32_t*)indata_1)} });
+        uint32x4x2_t z = {vld1q_u32((uint32_t*)indata_0), vld1q_u32((uint32_t*)indata_1)};
+        vst2q_u32((uint32_t*)outdata, z);
 
         i -= 32;
         indata_0 += 8;

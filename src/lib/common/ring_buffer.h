@@ -5,7 +5,6 @@
 #define RING_BUFFER_H
 
 #include <usdr_port.h>
-#include <semaphore.h>
 
 // Fixed size circular array
 struct ring_buffer
@@ -17,15 +16,15 @@ struct ring_buffer
     unsigned cidx;
 
 #ifdef _WIN32
-    sem_t producer;
-    sem_t consumer;
+    usdr_sem_t producer;
+    usdr_sem_t consumer;
 
-    char reserved[CACHE_SIZE - 4*sizeof(unsigned) - 2*sizeof(sem_t)];
+    char reserved[CACHE_SIZE - 4*sizeof(unsigned) - 2*sizeof(usdr_sem_t)];
 #else
     char reserved[CACHE_SIZE - 4*sizeof(unsigned)];
 
-    sem_t producer;
-    sem_t consumer;
+    usdr_sem_t producer;
+    usdr_sem_t consumer;
 #endif
 
     char data[0];
