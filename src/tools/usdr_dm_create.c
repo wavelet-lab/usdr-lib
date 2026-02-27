@@ -371,6 +371,8 @@ enum {
     DD_TX_GAIN,
     DD_TX_PATH,
     DD_RX_PATH,
+
+    DD_TX_GAIN_LB, //Must be followed by DD_TX_PATH & DD_RX_PATH
 };
 
 /*
@@ -673,6 +675,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         [DD_RX_PATH] = { "rx/path", (uintptr_t)"rx_auto", false, true },
         [DD_TX_PATH] = { "tx/path", (uintptr_t)"tx_auto", false, true },
 
+        [DD_TX_GAIN_LB] = { "tx/gain/lb", 0, true, true },
     };
 
     //primary logging for proper usage() call - may be overriden below
@@ -680,7 +683,8 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:")) != -1) {
+    // Still available: kmMvVL
+    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:K:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -704,6 +708,8 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
         //RX VGA gain
         case 'U': dev_data[DD_RX_GAIN_VGA].value = atoi(optarg); dev_data[DD_RX_GAIN_VGA].ignore = false; break;
+        //TX loopback gain
+        case 'K': dev_data[DD_TX_GAIN_LB].value = atoi(optarg); dev_data[DD_TX_GAIN_LB].ignore = false; break;
         case 'G':
             calibrate = atoi(optarg);
             break;
@@ -1060,7 +1066,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = res ? res : usdr_dms_info(usds_rx, &snfo_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get RX data stream info: errno %d", res);
-            goto dev_close;
+            if (stop_on_error) goto dev_close;
         } else {
             s_rx_blksampl = snfo_rx.pktsyms;
             s_rx_blksz = snfo_rx.pktbszie;
@@ -1084,7 +1090,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = res ? res : usdr_dms_info(usds_tx, &snfo_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get TX data stream info: errno %d", res);
-            goto dev_close;
+            if (stop_on_error) goto dev_close;
         } else {
             s_tx_blksz = snfo_tx.pktbszie;
             s_tx_blksampl = snfo_tx.pktsyms;
@@ -1259,6 +1265,11 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Set device parameters from the dev_data struct (see above)
     if (!noinit) {
+        if (!stop_on_error) {
+            for (unsigned i = 0; i < SIZEOF_ARRAY(dev_data); i++) {
+                dev_data[i].stopOnFail = false;
+            }
+        }
         res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set device parameters: errno %d", res);
