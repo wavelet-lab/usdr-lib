@@ -217,7 +217,8 @@ int mmcm_init_raw(lldev_t dev, subdev_t subdev,
     int res;
     unsigned clkfbdiv = cfg->ports[CLKOUT_PORT_FB].period_h + cfg->ports[CLKOUT_PORT_FB].period_l;
 
-    res = lowlevel_drp_wr16(dev, subdev, drp_port, PowerRegV7, 0xffff);
+    res = lowlevel_drp_wr16(dev, subdev, drp_port,
+                            (cfg->type == MT_7SERIES_MMCM || cfg->type == MT_7SERIES_PLLE2) ? PowerRegV7 : PowerRegUS, 0xffff);
     if (res) {
         USDR_LOG("MMCM", USDR_LOG_ERROR, " unable to turn it on\n");
         return res;

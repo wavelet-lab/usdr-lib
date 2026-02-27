@@ -344,6 +344,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     int res = 0;
     struct mmcm_config_raw cfg_raw;
     memset(&cfg_raw, 0, sizeof(cfg_raw));
+    cfg_raw.type = (d->xilinx_usp) ? MT_USP_MMCM : MT_7SERIES_MMCM;
 
     if (vco_div_io * io_clk < MMCM_VCO_MIN && vco_div_io < 63) {
         if ((vco_div_io + 2) * io_clk > MMCM_VCO_MAX) {
@@ -365,8 +366,6 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     // 6 - FCLK_TX
 
 #define SEP_CLKDIV
-
-    cfg_raw.type = MT_7SERIES_MMCM;
 #ifndef SEP_CLKDIV
     cfg_raw.ports[CLKOUT_PORT_0].period_l = (vco_div_io + 1) / 2; // IO_TX_IQSEL
     cfg_raw.ports[CLKOUT_PORT_0].period_h = vco_div_io / 2;       // IO_TX_IQSEL
@@ -490,11 +489,11 @@ int xsdr_configure_lml_mmcm_rx(xsdr_dev_t *d)
     int res = 0;
     struct mmcm_config_raw cfg_raw;
     memset(&cfg_raw, 0, sizeof(cfg_raw));
+    cfg_raw.type = (d->xilinx_usp) ? MT_USP_MMCM : MT_7SERIES_MMCM;
 
     if (vco_div_io > 63)
         vco_div_io = 63;
 
-    cfg_raw.type = MT_7SERIES_MMCM;
     cfg_raw.ports[CLKOUT_PORT_0].period_l = (vco_div_io + 1) / 2;
     cfg_raw.ports[CLKOUT_PORT_0].period_h = vco_div_io / 2;
     cfg_raw.ports[CLKOUT_PORT_1].period_l = (vco_div_io + 1) / 2;
@@ -669,14 +668,17 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
     g_clk_reduce = 0;
 
     // Fixup for SSDR_PRO
+#if 0
     if (d->ssdr_pro) {
         // RX SISO DDR
         res = res ? res : lowlevel_reg_wr32(d->base.lmsstate.dev, d->base.lmsstate.subdev, REG_CFG_PHY_0,
                                             d->siso_sdr_active_rx ? (1u << 9) : 0);
         return res;
     }
+#endif
 
     if (d->mmcm_tx) {
+        if (!d->ssdr_pro) {
         // Boost IO voltage for stable high speed link
         if (!d->siso_sdr_active_rx && d->new_rev && d->ssdr && (d->s_rxrate > 85e6 || d->s_txrate > 85e6)) {
             res = res ? res : xsdr_set_vio(d, 1910);
@@ -688,6 +690,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
         // Fixup for 53-58 MSPS range, but still 58 to 60 might be unoperable on some chips, and 60+ works fine again
         if (!mmcm_rx_only_path && d->new_rev && !d->ssdr && (d->s_txrate >= 53e6 && d->s_txrate <= 60e6)) {
             res = res ? res : xsdr_set_lms125vdd(d, 1360);
+        }
         }
 
         if (!(d->base.rx_run[0] || d->base.rx_run[1])) {
@@ -767,6 +770,8 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                     badness_m = badness;
                     phase_m = ph;
                 }
+
+                //goto skip_cal;
             }
 
             if (phase_max > phase_min) {
@@ -805,7 +810,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
 
             break;
             }
-
+skip_cal:
             d->lmlcal_rx_phase = phase_m;
 
             if (mmcm_rx_only_path)
@@ -1051,6 +1056,8 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
 
     if (txrate || d->ssdr_pro) {
         res = res ? res : _xsdr_calibrate_lml(d);
+
+        //TODO check tsp/rsp states
     }
 
     return res;
@@ -1886,6 +1893,7 @@ int xsdr_set_lms125vdd(xsdr_dev_t *d, unsigned vdd_mv)
 
 int xsdr_set_vio(xsdr_dev_t *d, unsigned vio_mv)
 {
+
     if (!d->new_rev) {
         if (vio_mv > 3300)
             vio_mv = 3300;
@@ -1979,6 +1987,7 @@ int xsdr_init(xsdr_dev_t *d)
     d->cfg_srate_siso_tx = 0;
     d->dpump = false;
     d->ssdr_pro = false;
+    d->xilinx_usp = false;
 
     res = lms7002m_init(&d->base, dev, 0, XSDR_INT_REFCLK);
     if (res) {
@@ -1989,7 +1998,7 @@ int xsdr_init(xsdr_dev_t *d)
     case XSDR_DEV: d->new_rev = true; d->ssdr = false; break;
     case XTRX_DEV: d->new_rev = false; d->ssdr = false; break;
     case SSDR_DEV: d->new_rev = true; d->ssdr = true; break;
-    case SSDRPRO_DEV: d->new_rev = true; d->ssdr = true; d->ssdr_pro = true; break;
+    case SSDRPRO_DEV: d->new_rev = true; d->ssdr = true; d->ssdr_pro = true; d->xilinx_usp = true; break;
     default:
         USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "unsupported hwcfg_devid=%02x\n", hwcfg_devid);
 

@@ -23,6 +23,13 @@ enum xsdr_devices {
     XTRX_DEV  = 0x2e,
 };
 
+enum xsdr_lml_phy_modes {
+    MODE_INVALID = 0,
+    MODE_SHARED_MMCM_RX_TX = 1, // Single MMCM for RX / TX
+    MODE_MMCM_TX_ONLY = 2,
+    MODE_DUAL_MMCM_RX_TX = 3,
+};
+typedef enum xsdr_lml_phy_modes xsdr_lml_phy_modes_t;
 
 // ===================================================================
 // Frequency       LMS7 DAC/ADC     LML interface        Baseband
@@ -71,6 +78,7 @@ struct xsdr_dev
     bool ssdr;
     bool ssdr_pro;
     bool lms8_alive;
+    bool xilinx_usp;
 
     bool dpump; //Dual pump data
     union {
