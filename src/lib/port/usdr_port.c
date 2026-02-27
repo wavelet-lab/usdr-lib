@@ -249,29 +249,5 @@ int usdr_set_thread_name(const char* name) {
 #endif
 }
 
-/**
- * sincosf implementation for macOS
- * Computes sine and cosine of x simultaneously
- * On Linux this is a GNU extension, but macOS doesn't provide it
- */
-#ifdef __APPLE__
-#include <math.h>
-
-extern void __sincosf(float x, float *s, float *c);
-
-void sincosf(float x, float *sin_val, float *cos_val) {
-
-    // __sincosf exists starting macOS 10.9
-    if (__builtin_available(macOS 10.9, *)) {
-        __sincosf(x, s, c);
-        return;
-    }
-
-    // macOS provides __sincosf_stret on some versions, but it's not reliable
-    // Use the straightforward implementation
-    *sin_val = sinf(x);
-    *cos_val = cosf(x);
-}
-#endif
 
 

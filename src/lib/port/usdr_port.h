@@ -167,7 +167,13 @@ int usdr_set_thread_name(const char* name);
  */
 #ifdef __APPLE__
 #include <math.h>
-void sincosf(float x, float *sin_val, float *cos_val);
+
+// Use straightforward implementation on macOS
+// Note: __sincosf is a private Apple symbol and may cause linker issues
+static inline void sincosf(float x, float *sin_val, float *cos_val) {
+    *sin_val = sinf(x);
+    *cos_val = cosf(x);
+}
 #endif
 
 #define CACHE_SIZE  64
