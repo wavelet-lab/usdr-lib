@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024 Wavelet Lab
+# Copyright (c) 2023-2026 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
 cmake_minimum_required(VERSION 3.8)
@@ -94,3 +94,8 @@ message(STATUS "Install libs: ${CMAKE_INSTALL_LIBDIR}")
 message(STATUS "Shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "Data dir: ${CMAKE_INSTALL_FULL_DATADIR}")
 message(STATUS "######################################################")
+
+include(cmake/UsdrPackage.cmake)
+
+# Use helper to generate/install CMake config, exported targets and pkg-config file
+usdr_install_package(NAME usdr VERSION ${USDR_VERSION} TARGETS usdrTargets PKGCONFIG ON)
