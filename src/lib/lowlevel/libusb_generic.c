@@ -55,7 +55,7 @@ unsigned find_usb_match(libusb_device **usbdev, size_t devices,
 
         j = libusb_find_dev_index_ex(busname, desc.idProduct, desc.idVendor, known_devices, known_device_count );
         if (j < 0) {
-            USDR_LOG("USBX", USDR_LOG_ERROR, "Skipping device %s: %04x:%04x, not in known devices list\n",  busname, desc.idVendor, desc.idProduct);
+            USDR_LOG("USBX", USDR_LOG_DEBUG, "Skipping device %s: %04x:%04x, not in known devices list\n",  busname, desc.idVendor, desc.idProduct);
             continue;
         }
         md->uuid_idx = j;
