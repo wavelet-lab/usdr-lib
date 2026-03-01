@@ -70,7 +70,7 @@ unsigned find_usb_match(libusb_device **usbdev, size_t devices,
         md->devid = (unsigned)bus * 1000000 + (unsigned)port * 1000 + addr;
         snprintf(md->devid_s, sizeof(md->devid_s), "%d/%d/%d", bus, port, addr);
 
-        USDR_LOG("USBX", USDR_LOG_ERROR, "checking device %04x:%04x %d/%d/%d against %d/%d/%d mask devid=%d\n",
+        USDR_LOG("USBX", USDR_LOG_DEBUG, "checking device %04x:%04x %d/%d/%d against %d/%d/%d mask devid=%d\n",
                     desc.idVendor, desc.idProduct,
                     fparams->usb_bus, fparams->usb_port, fparams->usb_addr,
                     bus, port, addr, j);
@@ -339,7 +339,7 @@ void* libusb_generic_io_thread(void *arg)
         // TODO: check res
     }
 
-    USDR_LOG("USBX", USDR_LOG_INFO, "IO thread termitaed with result %d", res);
+    USDR_LOG("USBX", USDR_LOG_INFO, "IO thread terminated with result %d", res);
     return (void*)((intptr_t)res);
 }
 
@@ -469,7 +469,7 @@ int buffers_realloc(struct buffers* rb, unsigned allocsz)
         rb->bd[i].buffer_sz = 0;
     }
 
-    USDR_LOG("USBX", USDR_LOG_ERROR, "RX buffer configured to %d x %d bytes for %d original\n",
+    USDR_LOG("USBX", USDR_LOG_INFO, "RX buffer configured to %d x %d bytes for %d original\n",
              rb->allocsz_rounded, rb->buf_max, allocsz);
 
     rb->bufno_prod = 0;
