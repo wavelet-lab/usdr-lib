@@ -704,7 +704,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
             }
         } else {
             bool boost_vio = (!d->siso_sdr_active_rx) && (d->s_rxrate > 85e6 || d->s_txrate > 85e6);
-            res = res ? res : xsdr_set_vio(d, boost_vio ? 1825 : 1800);
+            res = res ? res : xsdr_set_vio(d, boost_vio ? 1850 : 1800);
         }
 
         if (!(d->base.rx_run[0] || d->base.rx_run[1])) {
@@ -784,8 +784,6 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                     badness_m = badness;
                     phase_m = ph;
                 }
-
-                //goto skip_cal;
             }
 
             if (phase_max > phase_min) {
@@ -824,7 +822,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
 
             break;
             }
-skip_cal:
+
             d->lmlcal_rx_phase = phase_m;
 
             if (mmcm_rx_only_path)
@@ -1939,7 +1937,7 @@ int xsdr_set_vio(xsdr_dev_t *d, unsigned vio_mv)
 
     USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_WARNING, "VIO set to %d mV\n", vio_mv);
     return lp8758_vout_set(d->base.lmsstate.dev, d->base.lmsstate.subdev, I2C_BUS_LP8758_FPGA,
-                           d->ssdr_pro ? 3 : 1, vio_mv);
+                           d->ssdr_pro ? 2 : 1, vio_mv);
 }
 
 int xsdr_pwren(xsdr_dev_t *d, bool on)
