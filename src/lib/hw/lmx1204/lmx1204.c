@@ -152,7 +152,7 @@ int lmx1204_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lmx1204_state_
     st->lsaddr = lsaddr;
 
     //SYSREF individual channel delays defaults (according to TICS Pro)
-    //Could be overriden before solver call (lmx1204_set_sysrefout_ch_delay())
+    //Could be overridden before solver call (lmx1204_set_sysrefout_ch_delay())
     for(unsigned i = 0; i < SIZEOF_ARRAY(st->sysref_indiv_ch_delay); ++i)
     {
         lmx1204_sysrefout_channel_delay_t* d = &st->sysref_indiv_ch_delay[i];

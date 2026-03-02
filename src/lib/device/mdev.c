@@ -105,7 +105,7 @@ int mdev_generic_destroy(lldev_t dev)
     // Destroy underlying lldevs
     for (unsigned i = 0; i < obj->cnt; i++) {
         if (obj->real[i] == NULL) {
-            USDR_LOG("MDEV", USDR_LOG_WARNING, "Uderlying device has been destroyed already!\n");
+            USDR_LOG("MDEV", USDR_LOG_WARNING, "Underlying device has been destroyed already!\n");
             continue;
         }
 

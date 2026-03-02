@@ -281,7 +281,7 @@ int vfs_add_obj_link(vfs_object_t* root, const char* fullpath, void* obj, const 
     if (res)
         return res;
 
-    // Mark that'a a link
+    // Mark that's a link
     no->flags = VFS_FLAG_LINK;
     no->object = obj;
     no->data = orig_data;

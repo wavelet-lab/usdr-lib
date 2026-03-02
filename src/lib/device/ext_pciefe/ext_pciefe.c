@@ -16,8 +16,8 @@
 #include "def_pciefe_cmd.h"
 
 enum {
-    GPIO_SDA     = GPIO0, // Alternatide mode
-    GPIO_SCL     = GPIO1, // Alternatide mode
+    GPIO_SDA     = GPIO0, // Alternative mode
+    GPIO_SCL     = GPIO1, // Alternative mode
 
     GPIO_FATTN_0 = GPIO0, // Fast Attenuator interface
     GPIO_FATTN_1 = GPIO1, // Fast Attenuator interface
@@ -43,7 +43,7 @@ enum {
     // GPIO14, GPIO15  -- DIRCD
 };
 
-// GPIO Translatos
+// GPIO Translators
 // DIRxx 0: PLD -> USDR  (usdr in)
 // DIRxx 1: USDR -> PLD  (usdr out)
 

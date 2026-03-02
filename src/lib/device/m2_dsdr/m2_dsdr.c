@@ -2354,7 +2354,7 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
     res = res ? res : usleep(10000);
     //res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x3); // Enable VIOSYS, hold RESET
     res = res ? res : lp875484_init(dev, d->subdev, I2C_AFE_PMIC);
-    res = res ? res : lp875484_set_vout(dev, d->subdev, I2C_AFE_PMIC, 930); // Recomended 925mV
+    res = res ? res : lp875484_set_vout(dev, d->subdev, I2C_AFE_PMIC, 930); // Recommended 925mV
     res = res ? res : dev_gpo_set(dev, IGPO_PWR_AFE, 0x3); // Enable VIOSYS, release RESET
     if (res)
         return res;
@@ -2607,7 +2607,7 @@ int device_path_to_chmsk(const char* full_path, const char* basename, const chan
     return 0;
 }
 
-static int parse_overriden_cahnnel_info(const char* env_string, const usdr_channel_info_t* orig, const channel_map_info_t* map, const unsigned max_lchan, channel_info_t* override)
+static int parse_overridden_channel_info(const char* env_string, const usdr_channel_info_t* orig, const channel_map_info_t* map, const unsigned max_lchan, channel_info_t* override)
 {
     char chanlist[64*4];
     char* phys_names[DSDR_CHANS_LOGIC];
@@ -2623,7 +2623,7 @@ static int parse_overriden_cahnnel_info(const char* env_string, const usdr_chann
         return res;
 
     if (nfo.count != orig->count) {
-        USDR_LOG("UDEV", USDR_LOG_ERROR, "Overriden channel count %d != requested %d count!\n", nfo.count, orig->count);
+        USDR_LOG("UDEV", USDR_LOG_ERROR, "Overridden channel count %d != requested %d count!\n", nfo.count, orig->count);
         return -EINVAL;
     }
 
@@ -2673,10 +2673,10 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
 
         const char* env_ch = getenv("DSDR_CH_RX");
         if (env_ch) {
-            res = parse_overriden_cahnnel_info(env_ch, channels, d->rx_chmap_info, d->logic_chcnt_rx, &lchans);
+            res = parse_overridden_channel_info(env_ch, channels, d->rx_chmap_info, d->logic_chcnt_rx, &lchans);
             if (res)
                 return res;
-            USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR RX channel mask is overriden to `%s`\n", env_ch);
+            USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR RX channel mask is overridden to `%s`\n", env_ch);
         }
 
         memcpy(d->rx_ordinal_to_logic, lchans.ch_map, sizeof(lchans.ch_map[0]) * channels->count);
@@ -2760,10 +2760,10 @@ int usdr_device_m2_dsdr_create_stream(device_t* dev, const char* sid, const char
 
         const char* env_ch = getenv("DSDR_CH_TX");
         if (env_ch) {
-            res = parse_overriden_cahnnel_info(env_ch, channels, d->tx_chmap_info, d->logic_chcnt_tx, &lchans);
+            res = parse_overridden_channel_info(env_ch, channels, d->tx_chmap_info, d->logic_chcnt_tx, &lchans);
             if (res)
                 return res;
-            USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR TX channel mask is overriden to `%s`\n", env_ch);
+            USDR_LOG("UDEV", USDR_LOG_INFO, "DSDR TX channel mask is overridden to `%s`\n", env_ch);
         }
 
         memcpy(d->tx_ordinal_to_logic, lchans.ch_map, sizeof(lchans.ch_map[0]) * channels->count);

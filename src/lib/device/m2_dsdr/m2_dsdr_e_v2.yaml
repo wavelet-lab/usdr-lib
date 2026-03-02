@@ -197,7 +197,7 @@ pages:
             desc: Rev2 Enable +5v power for (IF Amplifier)
           - bits: "6"
             name: REV2_P5V_EXTLO
-            desc: Rev2 Eanble +5v power for EXT_LO clock distributor
+            desc: Rev2 Enable +5v power for EXT_LO clock distributor
           - bits: "5"
             name: REV2_PG_6P0
             desc: PG signal for 6P0 line

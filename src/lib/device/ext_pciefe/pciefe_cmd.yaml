@@ -51,7 +51,7 @@ pages:
         fields:
           - bits: "2:0"
             name: DUPLSEL
-            desc: Dumplexer path
+            desc: Duplexer path
             opts:
                 0: TRX_BYPASS
                 1: TRX_BAND2

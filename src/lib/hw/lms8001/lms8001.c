@@ -218,7 +218,7 @@ int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out)
     int cal_freq = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_FREQ_FINAL(rb);
 
     if (!(fcst == 0 && vco_sel_v == 1 && freq_sel_v == 1)) {
-        USDR_LOG("8001", USDR_LOG_ERROR, "Can't perform VCO autocalibration! VCO = %.3f Mhz REF = %.3f Mhz\n", st.fvco / 1.0e6, fref / 1.0e6);
+        USDR_LOG("8001", USDR_LOG_ERROR, "Can't perform VCO autocallibration! VCO = %.3f Mhz REF = %.3f Mhz\n", st.fvco / 1.0e6, fref / 1.0e6);
         return -ERANGE;
     }
 
@@ -948,11 +948,11 @@ static int _lms8001_optim_cp_ld(lms8001_state_t* m)
 
     // Calculate OFS and LD_VCT optimal values
     if (INTMOD_EN) {
-        // Set Offset Current and Lock Detector Threashold for IntN - Operating Mode
+        // Set Offset Current and Lock Detector Threshold for IntN - Operating Mode
         LD_VCT = 2;
         OFS = 0;
     } else {
-        // Set Offset Current and Lock Detector Threashold for IntN - Operating Mode
+        // Set Offset Current and Lock Detector Threshold for IntN - Operating Mode
         LD_VCT = 0;
         double Icp = (25.0 * ICT_CP / 16.0) * PULSE;
         // Calculate Target Value for Offset Current, as 3 % of Pulse current value
@@ -1077,7 +1077,7 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
         return res;
     }
 
-    // Step 4 - Optimize CP offset current Lock Detector Threashold depending on operating mode chosen(IntN or FracN)
+    // Step 4 - Optimize CP offset current Lock Detector Threshold depending on operating mode chosen(IntN or FracN)
     res = _lms8001_optim_cp_ld(m);
     if (res) {
         return res;

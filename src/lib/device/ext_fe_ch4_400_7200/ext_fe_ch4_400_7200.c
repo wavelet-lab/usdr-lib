@@ -355,7 +355,7 @@ int ext_fe_update_user(ext_fe_ch4_400_7200_t* fe)
         // RX filterbank
         _ext_fe_fbank_map(fe->ucfg[i].rx_fb_sel, &fbanksel_out[i], &fbanksel_in[i]); // SW_RX_FILTER_OUT_CHA_MUTE1 if not enabled?
 
-        // Antanna switch, RF PA/LNA switch, loopback switch
+        // Antenna switch, RF PA/LNA switch, loopback switch
         _ext_fe_antenna_sw_map_exp(fe->ucfg[i].ant_sel, rxen, txen, &exp_tddfdd[i], &exp_rxtx[i], &exp_tx_onoff[i],
                                    &trx_led[i], &rx_led[i], &act_rx[i], &act_tx[i]);
 
@@ -368,7 +368,7 @@ int ext_fe_update_user(ext_fe_ch4_400_7200_t* fe)
         fbanksel_in[H_CHD], fbanksel_in[H_CHC], fbanksel_in[H_CHB], fbanksel_in[H_CHA],
         fbanksel_out[H_CHA], fbanksel_out[H_CHB], fbanksel_out[H_CHC], fbanksel_out[H_CHD]);
 
-    // Gobal enable
+    // Global enable
     fe->fe_exp_regs[1] = MAKE_EXT_FE_CH4_400_7200_E_ENABLE(
         fe->ucfg[H_CHD].tx_ss, fe->ucfg[H_CHC].tx_ss, fe->ucfg[H_CHB].tx_ss, fe->ucfg[H_CHA].tx_ss,
         fe->if_vbyp, fe->ref_gps, enanble_tx, enanble_rx);

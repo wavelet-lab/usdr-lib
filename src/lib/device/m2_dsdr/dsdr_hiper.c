@@ -1493,7 +1493,7 @@ int dsdr_hiper_update_fe_user(dsdr_hiper_fe_t* fe)
         // RX filterbank
         _hiper_fbank_map(fe->ucfg[i].rx_fb_sel, &fbanksel_out[i], &fbanksel_in[i]); // SW_RX_FILTER_OUT_CHA_MUTE1 if not enabled?
 
-        // Antanna switch, RF PA/LNA switch, loopback switch
+        // Antenna switch, RF PA/LNA switch, loopback switch
         _hiper_antenna_sw_map(rev2, fe->ucfg[i].ant_sel, rxen, txen, &fe->fe_gpo_regs[CHA - REFCTRL + i], &lbrxtx[i], &act_rx[i], &act_tx[i], &exp_led_trx[i], &exp_led_rx[i]);
 
         // Update RX DSA

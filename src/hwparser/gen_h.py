@@ -36,7 +36,7 @@ class GenH:
                 name = "%s_%s" % (pname, r.name) if self.page_prefix else r.name
 
                 if name in self.regs.keys():
-                    raise (Exception("Rigester `%s` is already in flat map! Rename it" % name))
+                    raise (Exception("Register `%s` is already in flat map! Rename it" % name))
 
                 # TODO: parse ucnt
                 if r.ucnt == 1:
