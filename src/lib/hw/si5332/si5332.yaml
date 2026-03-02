@@ -18,8 +18,8 @@ field_prefix:
 field_macros: true
 
 x-opt-1: &id001
-  0b00: PLL reference clock before prescaler
-  0b01: PLL reference clock after prescaler
+  0b00: PLL reference clock before prescaller
+  0b01: PLL reference clock after prescaller
   0b10: Clock from input buffer CLKIN_2
   0b11: Clock from input buffer CLKIN_3
 x-opt-2: &id002

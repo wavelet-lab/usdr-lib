@@ -84,7 +84,7 @@ int vpu_init(verilator_protocol_unix_t* pvpu, const char* dev)
 
     res = vll_chan_connect(&pvpu->vch, dev);
     if (res) {
-        USDR_LOG("VERI", USDR_LOG_CRITICAL_WARNING, "Connecton to verilator filed: error %d\n", res);
+        USDR_LOG("VERI", USDR_LOG_CRITICAL_WARNING, "Connection to verilator failed: error %d\n", res);
         goto conn_failed;
     }
 
@@ -92,7 +92,7 @@ int vpu_init(verilator_protocol_unix_t* pvpu, const char* dev)
     snprintf(mmapfile, sizeof (mmapfile), "%s.mmap", dev);
     res = vll_mem_open(&pvpu->vchm, mmapfile, MMAP_SIZE);
     if (res) {
-        USDR_LOG("VERI", USDR_LOG_CRITICAL_WARNING, "Openning MMAP area failed: error %d\n", res);
+        USDR_LOG("VERI", USDR_LOG_CRITICAL_WARNING, "Opening MMAP area failed: error %d\n", res);
         goto conn_failed;
     }
 

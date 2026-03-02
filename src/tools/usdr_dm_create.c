@@ -678,7 +678,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         [DD_TX_GAIN_LB] = { "tx/gain/lb", 0, true, true },
     };
 
-    //primary logging for proper usage() call - may be overriden below
+    //primary logging for proper usage() call - may be overridden below
     usdrlog_setlevel(NULL, loglevel);
     //set colored log output
     usdrlog_enablecolorize(NULL);

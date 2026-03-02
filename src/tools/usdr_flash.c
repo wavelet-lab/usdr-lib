@@ -202,23 +202,23 @@ int main(int argc, char** argv)
     if (rdwr == ACTION_WRITE || rdwr == ACTION_INFO) {
         FILE* w = fopen(filename, "rb");
         if (w == NULL) {
-            fprintf(stderr, "Unabe to read file '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Unable to read file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
         res = fseek(w, 0, SEEK_END);
         if (res) {
-            fprintf(stderr, "Unabe to seek file '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Unable to seek file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
         total_length = ftell(w);
         res = fseek(w, 0, SEEK_SET);
         if (res) {
-            fprintf(stderr, "Unabe to seek file '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Unable to seek file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
         res = fread(outa, 1, total_length, w);
         if ((unsigned)res != total_length) {
-            fprintf(stderr, "Unabe to read file '%s': %d read\n", filename, res);
+            fprintf(stderr, "Unable to read file '%s': %d read\n", filename, res);
             return 3;
         }
         fclose(w);
@@ -385,7 +385,7 @@ int main(int argc, char** argv)
     } else if (rdwr == ACTION_READBACK) {
         FILE* w = fopen(filename, "wb");
         if (w == NULL) {
-            fprintf(stderr, "Unabe to create file '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Unable to create file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
         fwrite(outb, 1, total_length, w);

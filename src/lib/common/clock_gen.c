@@ -108,7 +108,7 @@ int find_best_vco(const vco_range_t* pvcos, unsigned vco_count,
     }
 
     // find which VCO fits the capable dividers
-    // we need to be first deviders to be max (prescalers)
+    // we need to be first deviders to be max (prescallers)
     for (i = 0; i < vco_count; i++) {
         const struct div_range* div_next = (div_cascade_count > 1) ? &div[1] : &nodiv;
         unsigned nxt_cmb_div = pvcos[i].vcomin / lcm_freq / div[0].maxdiv;

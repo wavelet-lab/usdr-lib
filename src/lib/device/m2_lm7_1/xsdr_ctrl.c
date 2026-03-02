@@ -485,7 +485,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
         usleep(10);
     }
 
-    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "MMCM Redy flag timed out!\n");
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "MMCM Ready flag timed out!\n");
     return -EIO;
 }
 
@@ -720,7 +720,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
         if (res)
             return res;
 
-        // Autocalibration if RX phase wasn't set
+        // Autocallibration if RX phase wasn't set
         if (d->rx_override_phase == 0) {
             const unsigned check_to = 10;
             unsigned phase_m;
@@ -790,7 +790,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                 phase_m = (phase_max + phase_min) / 2;
             }
 
-            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Restoring RX pahse to %d (bandness=%" PRId64 ")  PH_MIN=%d PH_MAX=%d\n",
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Restoring RX phase to %d (bandness=%" PRId64 ")  PH_MIN=%d PH_MAX=%d\n",
                      phase_m - 1, badness_m, phase_min, phase_max);
 
             // Try our best at least
@@ -936,7 +936,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                 res = res ? res : lms7002m_limelight_toggle_ntx(&d->base.lmsstate);
                 check_rx = true;
             }
-            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Restoring TX pahse to %d (bandness=%" PRId64 ")\n",
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Restoring TX phase to %d (bandness=%" PRId64 ")\n",
                      phase_m, badness_m);
 
             // Try our best at least
@@ -1894,7 +1894,7 @@ int _xsdr_pwren_revx(xsdr_dev_t *d, bool on)
         return res;
 
     if (d->ssdr) {
-        // Haevy load on 1.8VA
+        // Heavy load on 1.8VA
         usleep(100000);
     }
     usleep(1000);
@@ -1945,7 +1945,7 @@ int xsdr_pwren(xsdr_dev_t *d, bool on)
     int res;
     lldev_t dev = d->base.lmsstate.dev;
 
-    res = dev_gpo_set(dev, IGPO_LMS_PWR, 0); //Disble, put into reset
+    res = dev_gpo_set(dev, IGPO_LMS_PWR, 0); //Disable, put into reset
     if (res)
         return res;
     usleep(5000);
