@@ -611,9 +611,6 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
     const char* sxxn = path == SXX_RX ? "SXR" : "SXT";
     int res;
 
-    SET_LMS7002M_LML_0X0020_MAC(mac, path == SXX_RX ? LMS7_CH_A : LMS7_CH_B);
-    SET_LMS7002M_SXX_0X0124_EN_DIR_SXX(m->reg_en_dir[dir_idx], 1);
-
     if (vco > SXX_VCOH_MAX) {
         USDR_LOG("7002", USDR_LOG_WARNING, "%s: VCO=%u is out of range\n", sxxn, lofreq);
         return -ERANGE;
@@ -628,6 +625,9 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
         vco <<= 1;
     }
 
+    SET_LMS7002M_LML_0X0020_MAC(mac, path == SXX_RX ? LMS7_CH_A : LMS7_CH_B);
+    bool pwr = GET_LMS7002M_SXX_0X0124_EN_DIR_SXX(m->reg_en_dir[dir_idx]);
+    SET_LMS7002M_SXX_0X0124_EN_DIR_SXX(m->reg_en_dir[dir_idx], 1);
     uint32_t sxx_regs[] = {
         MAKE_LMS7002M_REG_WR(LML_0x0020, mac),
         MAKE_LMS7002M_REG_WR(SXX_0x0124, m->reg_en_dir[dir_idx]),
@@ -654,6 +654,11 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
     res = lms7002m_spi_post(m, sxx_regs, SIZEOF_ARRAY(sxx_regs));
     if (res)
         return res;
+
+    if (!pwr) {
+        // Wait for 1st start to settle LDOs & PLL
+        usleep(10000);
+    }
 
     bool vcoit[4] = {
         (SXX_VCOL_MIN < vco) && (vco < SXX_VCOL_MAX),
