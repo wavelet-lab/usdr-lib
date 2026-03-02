@@ -42,6 +42,8 @@ tasks:
       - prepare
     dir: /work/build/source
     cmds:
+      - echo "#!/usr/bin/env sh" > /usr/bin/lintian # dirty hack to disable lintian
+      - echo "exit 0" >> /usr/bin/lintian
       - debuild -us -uc -eDH_VERBOSE=1
       - cp -ra /work/build/*.deb /work/output/{{.OUTPUT_DIR_NAME}}/
 

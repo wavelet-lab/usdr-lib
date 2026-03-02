@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(usdr_lib C)
 
-# Auto generating register descriptors
+# Auto generating registor descriptors
 list(APPEND USDR_LIBRARY_FILES "")
 list(APPEND USDR_INCLUDE_FILES "")
 list(APPEND USDR_LINK_FILES    pthread)
@@ -27,8 +27,7 @@ message("INC - ${USDR_INCLUDE_FILES}")
 message("LNK - ${USDR_LINK_FILES}")
 message("DEP - ${USDR_DEPEND_TARGETS}")
 
-
-add_library(usdr ${USDR_LIBRARY_FILES})
+add_library(usdr SHARED ${USDR_LIBRARY_FILES})
 
 if (APPLE)
     set(USDR_PLATFORM_LIBS dl)
