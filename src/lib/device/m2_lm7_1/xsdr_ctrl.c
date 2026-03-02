@@ -327,18 +327,24 @@ static int _xsdr_mmcm_pd(xsdr_dev_t *d)
 static int g_clk_reduce = 0;
 int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, unsigned txphase, unsigned txphase_off)
 {
+    const unsigned VCO_MIN = d->ssdr_pro ? MMCM_VCO_MIN : MMCM_VCO_MIN_USP;
+    const unsigned VCO_MAX = d->ssdr_pro ? MMCM_VCO_MAX : MMCM_VCO_MAX_USP;
+
     bool nomul = d->dpump ? false :
         (rx_master) ? d->base.lml_mode.rxsisoddr || (d->base.rxtsp_div > 1) :
                       d->base.lml_mode.txsisoddr || (d->base.txtsp_div > 1);
+
     unsigned mmcm_ctrl_sel = (rx_master) ? 0 : 4;
     unsigned tx_mclk = d->base.cgen_clk / d->base.txcgen_div / d->base.lml_mode.txdiv;
     unsigned rx_mclk = d->base.cgen_clk / d->base.rxcgen_div / d->base.lml_mode.rxdiv;
     unsigned io_mclk = (rx_master) ? rx_mclk : tx_mclk;
     unsigned io_clk  = (nomul) ? io_mclk : io_mclk * 2;
-    unsigned vco_div_io = (MMCM_VCO_MAX  + io_clk - 1) / io_clk;
+    unsigned vco_div_io = (VCO_MAX  + io_clk - 1) / io_clk;
     bool sep_clkdiv = d->sep_clkdiv;
 
     vco_div_io += g_clk_reduce;
+
+    vco_div_io += (txphase_off > 2) ? 2 : txphase_off;
 
     if (vco_div_io > 63) {
         vco_div_io = 63;
@@ -349,9 +355,9 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     memset(&cfg_raw, 0, sizeof(cfg_raw));
     cfg_raw.type = (d->xilinx_usp) ? MT_USP_MMCM : MT_7SERIES_MMCM;
 
-    if (vco_div_io * io_clk < MMCM_VCO_MIN) {
+    if (vco_div_io * io_clk < VCO_MIN) {
         if (nomul && !sep_clkdiv) {
-            vco_div_io = (MMCM_VCO_MAX  + io_clk - 1) / io_clk;
+            vco_div_io = (VCO_MAX  + io_clk - 1) / io_clk;
             if (vco_div_io % 2)
                 vco_div_io++;
 
@@ -360,7 +366,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
         }
 
         if (vco_div_io < 63) {
-            if ((vco_div_io + 2) * io_clk > MMCM_VCO_MAX) {
+            if ((vco_div_io + 2) * io_clk > VCO_MAX) {
                 vco_div_io += 1;
             } else {
                 vco_div_io += 2;
