@@ -465,7 +465,7 @@ pages:
                 1: OSC_FREQ_63_127
           - name: PLL2_P
             bits: '7:5'
-            desc: The PLL2 N Prescaller divides the output of the VCO as selected
+            desc: The PLL2 N Prescaler divides the output of the VCO as selected
                 by Mode_MUX1 and is connected to the PLL2 N divider
           - name: PLL2_REF_2X_EN
             bits: '0'
@@ -521,4 +521,4 @@ pages:
                 16: PLL2_PD_RESERVED
           - name: PLL2_PRE_PD
             bits: '6'
-            desc: Powerdown PLL2 prescaller
+            desc: Powerdown PLL2 prescaler

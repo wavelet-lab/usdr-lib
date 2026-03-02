@@ -22,7 +22,7 @@ struct div_range {
     unsigned mindiv;
     unsigned maxdiv;
     unsigned step;
-    unsigned count;    // number of div devices in the group, e.g. number of VCO prescallers you can choise from the next stage
+    unsigned count;    // number of div devices in the group, e.g. number of VCO prescalers you can choise from the next stage
     const unsigned *pinvlid; // pointer to sorted array of invalid dividers if any
 };
 typedef struct div_range div_range_t;

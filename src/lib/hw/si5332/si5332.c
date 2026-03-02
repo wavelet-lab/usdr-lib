@@ -600,7 +600,7 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
         IDPA_DEN_H, idpa_den,
         IDPA_DEN_L, idpa_den >> 8,
 
-        PDIV_DIV, prescaler, //Prescaller
+        PDIV_DIV, prescaler, //Prescaler
         PLL_MODE,  (pllfreq > 30e6) ? 8 : 4, // 4 - 500kHz  | 7 - 175khz
 
         HSDIV0A_DIV, hsdiv,

@@ -189,7 +189,7 @@ int lmk04832_configure_layout(lldev_t dev, subdev_t subdev, lsopaddr_t addr,
                      pcfg->distribution_frequency);
             return  -ERANGE;
         }
-        // PLL2 N Prescaller from 2 to 8
+        // PLL2 N Prescaler from 2 to 8
         // PLL2 PFD up to 320Mhz
         // Fin
         // Fpfd = Fin / R

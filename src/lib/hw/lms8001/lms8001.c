@@ -127,7 +127,7 @@ static int _lms8001_calc_vco(lms8001_state_t* obj, uint64_t outfreq, lms8001_vco
 struct lms8001_pll_settings {
     unsigned nint;
     unsigned nfrac;
-    unsigned nfix; // /2 prescaller activated
+    unsigned nfix; // /2 prescaler activated
 };
 typedef struct lms8001_pll_settings lms8001_pll_settings_t;
 
@@ -168,7 +168,7 @@ int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out)
     USDR_LOG("8001", USDR_LOG_ERROR, "OUT=%.3f VCO=%.3f PLL NINT=%d FRAC=%d DIV=%d\n",
              out / 1.0e6, st.fvco / 1.0e6, pll.nint, pll.nfrac, (1 << st.divi));
 
-    // TODO: Prescaller DIV
+    // TODO: Prescaler DIV
     uint32_t pll_regs[] = {
         MAKE_LMS8001_PLL_PROFILE_0_PLL_LPF_CFG1_n(1, 1, 8, 8),
         MAKE_LMS8001_PLL_PROFILE_0_PLL_LPF_CFG2_n(1, 0, 8),
