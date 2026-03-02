@@ -73,6 +73,7 @@ struct xsdr_dev
     bool rx_port_is_1;
     bool mmcm_tx;
     bool mmcm_rx;
+    bool sep_clkdiv;
     bool pwr_en;
     bool new_rev;
     bool ssdr;

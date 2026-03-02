@@ -323,6 +323,7 @@ static int _xsdr_mmcm_pd(xsdr_dev_t *d)
     return xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, 2);
 }
 
+// sep_clkdiv -- experimental mode with dual MMCM path to CLK/CLKDIV
 static int g_clk_reduce = 0;
 int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, unsigned txphase, unsigned txphase_off)
 {
@@ -335,11 +336,17 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     unsigned io_mclk = (rx_master) ? rx_mclk : tx_mclk;
     unsigned io_clk  = (nomul) ? io_mclk : io_mclk * 2;
     unsigned vco_div_io = (MMCM_VCO_MAX  + io_clk - 1) / io_clk;
+    bool sep_clkdiv = d->sep_clkdiv;
 
     vco_div_io += g_clk_reduce;
 
-    if (vco_div_io > 63)
-        vco_div_io = 63;
+    if (nomul && !sep_clkdiv) {
+        if (vco_div_io > 127)
+            vco_div_io = 127;
+    } else {
+        if (vco_div_io > 63)
+            vco_div_io = 63;
+    }
 
     int res = 0;
     struct mmcm_config_raw cfg_raw;
@@ -357,32 +364,33 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 0);
     res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : 0b1100);
 
-    // 0 - IO_TX_DIV    ( was IO_TX_IQSEL -- individual phase delay )
+    // 0 - n/a or    IO_TX_DIV ( was IO_TX_IQSEL -- individual phase delay )
     // 1 - IO_TX
     // 2 - IO_RX
-    // 3 - n/a ( was LOGIC_TX )
+    // 3 - n/a                 ( was LOGIC_TX )
     // 4 - n/a
     // 5 - FCLK_RX
     // 6 - FCLK_TX
 
-#define SEP_CLKDIV
-#ifndef SEP_CLKDIV
-    cfg_raw.ports[CLKOUT_PORT_0].period_l = (vco_div_io + 1) / 2; // IO_TX_IQSEL
-    cfg_raw.ports[CLKOUT_PORT_0].period_h = vco_div_io / 2;       // IO_TX_IQSEL
-#else
-    cfg_raw.ports[CLKOUT_PORT_0].period_l = vco_div_io;           // IO_TX CLKDIV
-    cfg_raw.ports[CLKOUT_PORT_0].period_h = vco_div_io;           // IO_TX CLKDIV
-#endif
+    if (!sep_clkdiv) {
+        cfg_raw.ports[CLKOUT_PORT_0].period_l = (vco_div_io + 1) / 2; // IO_TX_IQSEL or unused
+        cfg_raw.ports[CLKOUT_PORT_0].period_h = vco_div_io / 2;       // IO_TX_IQSEL or unused
+    } else {
+        cfg_raw.ports[CLKOUT_PORT_0].period_l = vco_div_io;           // IO_TX CLKDIV
+        cfg_raw.ports[CLKOUT_PORT_0].period_h = vco_div_io;           // IO_TX CLKDIV
+    }
     cfg_raw.ports[CLKOUT_PORT_1].period_l = (vco_div_io + 1) / 2; // IO_TX
     cfg_raw.ports[CLKOUT_PORT_1].period_h = vco_div_io / 2;       // IO_TX
 
     cfg_raw.ports[CLKOUT_PORT_2].period_l = (vco_div_io + 1) / 2; // IO_RX
     cfg_raw.ports[CLKOUT_PORT_2].period_h = vco_div_io / 2;       // IO_RX
-    cfg_raw.ports[CLKOUT_PORT_3].period_l = vco_div_io;           // not used
-    cfg_raw.ports[CLKOUT_PORT_3].period_h = vco_div_io;           // not used
 
-    cfg_raw.ports[CLKOUT_PORT_4].period_l = vco_div_io;           // not used
-    cfg_raw.ports[CLKOUT_PORT_4].period_h = vco_div_io;           // not used
+    cfg_raw.ports[CLKOUT_PORT_3].period_l = (vco_div_io + 1) / 2;           // not used
+    cfg_raw.ports[CLKOUT_PORT_3].period_h = vco_div_io / 2;                 // not used
+
+    cfg_raw.ports[CLKOUT_PORT_4].period_l = (vco_div_io + 1) / 2;           // not used
+    cfg_raw.ports[CLKOUT_PORT_4].period_h = vco_div_io / 2;                 // not used
+
     cfg_raw.ports[CLKOUT_PORT_5].period_l = (vco_div_io + 1) / 2;
     cfg_raw.ports[CLKOUT_PORT_5].period_h = vco_div_io / 2;
     cfg_raw.ports[CLKOUT_PORT_6].period_l = (vco_div_io + 1) / 2;
@@ -395,21 +403,23 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     cfg_raw.ports[CLKOUT_PORT_6].phase = phase % 8;
     cfg_raw.ports[CLKOUT_PORT_6].delay = phase / 8;
 
-#ifndef SEP_CLKDIV
-    cfg_raw.ports[CLKOUT_PORT_0].phase = phase_iq % 8;
-    cfg_raw.ports[CLKOUT_PORT_0].delay = phase_iq / 8;
+    if (!sep_clkdiv) {
+#if 0
+        cfg_raw.ports[CLKOUT_PORT_0].phase = phase_iq % 8;
+        cfg_raw.ports[CLKOUT_PORT_0].delay = phase_iq / 8;
 
-    if (d->tx_override_phase_iq || txphase || txphase_off) {
-        //unsigned raw = (txphase != 0) ? txphase - 1 : d->tx_override_phase_iq - 1;
+        if (d->tx_override_phase_iq || txphase || txphase_off) {
+            //unsigned raw = (txphase != 0) ? txphase - 1 : d->tx_override_phase_iq - 1;
 
-        unsigned raw = (txphase != 0) ? txphase_off : d->tx_override_phase_iq - 1;
-        cfg_raw.ports[CLKOUT_PORT_0].phase = raw % 8;
-        cfg_raw.ports[CLKOUT_PORT_0].delay = raw / 8;
-    }
-#else
-    cfg_raw.ports[CLKOUT_PORT_0].phase = 0;
-    cfg_raw.ports[CLKOUT_PORT_0].delay = 0;
+            unsigned raw = (txphase != 0) ? txphase_off : d->tx_override_phase_iq - 1;
+            cfg_raw.ports[CLKOUT_PORT_0].phase = raw % 8;
+            cfg_raw.ports[CLKOUT_PORT_0].delay = raw / 8;
+        }
 #endif
+    } else {
+        cfg_raw.ports[CLKOUT_PORT_0].phase = 0;
+        cfg_raw.ports[CLKOUT_PORT_0].delay = 0;
+    }
     // if (d->tx_override_phase || txphase) {
     //     unsigned raw = (txphase != 0) ? txphase - 1 : d->tx_override_phase - 1;
     //     cfg_raw.ports[CLKOUT_PORT_1].phase = raw % 8;
@@ -590,7 +600,8 @@ int xsdr_hwchans_cnt(xsdr_dev_t *d, bool rx, unsigned chans)
 }
 
 enum {
-    PHY_CFG_VALID_MSK = 0x80,
+    //PHY_CFG_VALID_MSK = 0x80,
+    PHY_CFG_SEP_CLKDIV_MSK = 0x80,
     PHY_CFG_LML2_IS_RX = 0x40,
     PHY_CFG_TX_MMCM = 0x20,
     PHY_CFG_RX_MMCM = 0x10,
@@ -679,18 +690,21 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
 
     if (d->mmcm_tx) {
         if (!d->ssdr_pro) {
-        // Boost IO voltage for stable high speed link
-        if (!d->siso_sdr_active_rx && d->new_rev && d->ssdr && (d->s_rxrate > 85e6 || d->s_txrate > 85e6)) {
-            res = res ? res : xsdr_set_vio(d, 1910);
-        } else if (!d->siso_sdr_active_rx && d->new_rev && !d->ssdr && (d->s_rxrate > 70e6 || d->s_txrate > 70e6)) {
-            res = res ? res : xsdr_set_vio(d, 1940);
-            res = res ? res : xsdr_set_lms125vdd(d, 1320);
-        }
+            // Boost IO voltage for stable high speed link
+            if (!d->siso_sdr_active_rx && d->new_rev && d->ssdr && (d->s_rxrate > 85e6 || d->s_txrate > 85e6)) {
+                res = res ? res : xsdr_set_vio(d, 1910);
+            } else if (!d->siso_sdr_active_rx && d->new_rev && !d->ssdr && (d->s_rxrate > 70e6 || d->s_txrate > 70e6)) {
+                res = res ? res : xsdr_set_vio(d, 1940);
+                res = res ? res : xsdr_set_lms125vdd(d, 1320);
+            }
 
-        // Fixup for 53-58 MSPS range, but still 58 to 60 might be unoperable on some chips, and 60+ works fine again
-        if (!mmcm_rx_only_path && d->new_rev && !d->ssdr && (d->s_txrate >= 53e6 && d->s_txrate <= 60e6)) {
-            res = res ? res : xsdr_set_lms125vdd(d, 1360);
-        }
+            // Fixup for 53-58 MSPS range, but still 58 to 60 might be unoperable on some chips, and 60+ works fine again
+            if (!mmcm_rx_only_path && d->new_rev && !d->ssdr && (d->s_txrate >= 53e6 && d->s_txrate <= 60e6)) {
+                res = res ? res : xsdr_set_lms125vdd(d, 1360);
+            }
+        } else {
+            bool boost_vio = (!d->siso_sdr_active_rx) && (d->s_rxrate > 85e6 || d->s_txrate > 85e6);
+            res = res ? res : xsdr_set_vio(d, boost_vio ? 1825 : 1800);
         }
 
         if (!(d->base.rx_run[0] || d->base.rx_run[1])) {
@@ -884,8 +898,22 @@ skip_cal:
                                 res = res ? res : usleep(10);
 
                             } else if (g > 0) {
-                                USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX=%2d ABIQ=%d\n", ph - 1, iqserrs);
-                                break;
+                                // sometimes IQ err reports 0 while it's out of sync, check if LFSR still intact
+
+                                res = res ? res : xsdr_phy_en_lfsr_generator_mimo(d, true, true);
+                                res = res ? res : usleep(10);
+                                res = res ? res : xsdr_phy_en_lfsr_checker_mimo(d, true);
+                                res = res ? res : usleep(100);
+                                res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
+
+                                USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX=%2d ABIQ=%d [%6d/%6d/%6d/%6d] \n", ph - 1, iqserrs,
+                                            errs[0], errs[1], errs[2], errs[3]);
+
+                                if (d->dpump ? !noerrors_v2(errs, &badness) : !noerrors_v4(errs, &badness)) {
+                                    iqserrs = 500;
+                                } else {
+                                    break;
+                                }
                             }
                         }
 
@@ -975,10 +1003,10 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
     // unsigned sisosdrflag;
     int res;
 
-    if (!(((d->hwid) & 0xff) & PHY_CFG_VALID_MSK)) {
-        USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "Incompatible firmware, please update to 20250501 at least!\n");
-        return -ENOTSUP;
-    }
+    //if (!(((d->hwid) & 0xff) & PHY_CFG_VALID_MSK)) {
+    //    USDR_LL_LOG(dev, "XDEV", USDR_LOG_ERROR, "Incompatible firmware, please update to 20250501 at least!\n");
+    //    return -ENOTSUP;
+    //}
 
     res = _xsdr_checkpwr(d);
     if (res)
@@ -1974,6 +2002,7 @@ int xsdr_init(xsdr_dev_t *d)
     const bool rx_port_is_1 = ((phycfg_id & PHY_CFG_LML2_IS_RX) != PHY_CFG_LML2_IS_RX);
     const bool tx_mmcm = ((phycfg_id & PHY_CFG_TX_MMCM) == PHY_CFG_TX_MMCM);
     const bool rx_mmcm = ((phycfg_id & PHY_CFG_RX_MMCM) == PHY_CFG_RX_MMCM);
+    const bool sep_clkdiv = ((phycfg_id & PHY_CFG_SEP_CLKDIV_MSK) == PHY_CFG_SEP_CLKDIV_MSK);
 
     d->hwid = hwid;
     d->hwchans_rx = 2; // Defaults to MIMO;
@@ -1983,6 +2012,7 @@ int xsdr_init(xsdr_dev_t *d)
     d->rx_port_is_1 = rx_port_is_1;
     d->mmcm_rx = rx_mmcm;
     d->mmcm_tx = tx_mmcm;
+    d->sep_clkdiv = sep_clkdiv;
     d->cfg_srate_siso_rx = 0;
     d->cfg_srate_siso_tx = 0;
     d->dpump = false;
