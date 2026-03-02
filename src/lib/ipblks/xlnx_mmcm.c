@@ -227,8 +227,11 @@ int mmcm_init_raw(lldev_t dev, subdev_t subdev,
     for (unsigned i = 0; i < MAX_MMCM_PORTS; i++) {
         res = mmcm_init_raw_clkout(dev, subdev, drp_port, CLKOUT5_ClkReg1 + 2 * i,
                                    &cfg->ports[i]);
-        if (res)
+        if (res) {
+            USDR_LOG("MMCM", USDR_LOG_ERROR, "Port%d: H/L=%d/%d DLY=%d Error=%d\n",
+                     i, cfg->ports[i].period_h, cfg->ports[i].period_l, cfg->ports[i].delay, res);
             return res;
+        }
     }
 
     // Input divide

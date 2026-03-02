@@ -340,12 +340,8 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
 
     vco_div_io += g_clk_reduce;
 
-    if (nomul && !sep_clkdiv) {
-        if (vco_div_io > 127)
-            vco_div_io = 127;
-    } else {
-        if (vco_div_io > 63)
-            vco_div_io = 63;
+    if (vco_div_io > 63) {
+        vco_div_io = 63;
     }
 
     int res = 0;
@@ -353,16 +349,27 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     memset(&cfg_raw, 0, sizeof(cfg_raw));
     cfg_raw.type = (d->xilinx_usp) ? MT_USP_MMCM : MT_7SERIES_MMCM;
 
-    if (vco_div_io * io_clk < MMCM_VCO_MIN && vco_div_io < 63) {
-        if ((vco_div_io + 2) * io_clk > MMCM_VCO_MAX) {
-            vco_div_io += 1;
-        } else {
-            vco_div_io += 2;
+    if (vco_div_io * io_clk < MMCM_VCO_MIN) {
+        if (nomul && !sep_clkdiv) {
+            vco_div_io = (MMCM_VCO_MAX  + io_clk - 1) / io_clk;
+            if (vco_div_io % 2)
+                vco_div_io++;
+
+            if (vco_div_io > 126)
+                vco_div_io = 126;
+        }
+
+        if (vco_div_io < 63) {
+            if ((vco_div_io + 2) * io_clk > MMCM_VCO_MAX) {
+                vco_div_io += 1;
+            } else {
+                vco_div_io += 2;
+            }
         }
     }
 
-    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 0);
-    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : 0b1100);
+    // res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 0);
+    // res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : 0b1100);
 
     // 0 - n/a or    IO_TX_DIV ( was IO_TX_IQSEL -- individual phase delay )
     // 1 - IO_TX
@@ -397,7 +404,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     cfg_raw.ports[CLKOUT_PORT_6].period_h = vco_div_io / 2;       // FCLK_TX
 
     unsigned total_budget = 8 * vco_div_io;
-    unsigned phase = (((tx_mclk < 2*35e6) || (tx_mclk > 2*60e6)) ? 4 : 5) * total_budget / 6;
+    unsigned phase = (((tx_mclk < 2*35e6) || (tx_mclk > 2*60e6)) ? 4 : 5) * total_budget / (vco_div_io > 63 ? 12 : 6);
     // unsigned phase_iq = 0; //4;
 
     cfg_raw.ports[CLKOUT_PORT_6].phase = phase % 8;
@@ -458,11 +465,17 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
              tx_mclk * (cfg_raw.ports[CLKOUT_PORT_FB].period_l + cfg_raw.ports[CLKOUT_PORT_FB].period_h) / 1.0e6,
              txphase_off, rx_master ? "RX" : "TX");
 
+
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 1);
+    res = res ? res : usleep(10);
     res = res ? res : mmcm_init_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_TX, &cfg_raw);
 
+    // Set IQSEL vector
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : 0b1100);
+
     // Reset MMCM
-    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 1);
-    usleep(10);
+    // res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 1);
+    res = res ? res : usleep(10);
     res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 0);
     if (res)
         return res;
@@ -478,12 +491,13 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
 
         USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_DEBUG, "MMCM FLAGS:%08x\n", rb);
         if (rb & (1 << 8)) {
-             g_tx_cfg_raw = cfg_raw;
+            g_tx_cfg_raw = cfg_raw;
             return 0;
         }
 
-        usleep(10);
+        usleep(50);
     }
+
 
     USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "MMCM Ready flag timed out!\n");
     return -EIO;
@@ -738,7 +752,6 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
             int phase_min;
             int phase_max;
 
-            //for (unsigned rty = 0; rty < 3; rty++) {
             phase_min = 65;
             phase_max = 0;
 
@@ -774,7 +787,8 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                         phase_max = ph;
 
                     // Got more than 7 phases, we're safe; skip searching
-                    if (phase_max - phase_min > 7)
+                    unsigned sphase = (rxrty == 0) ? 8 : (rxrty == 1) ? 4 : (rxrty == 2) ? 1 : 0;
+                    if (phase_max - phase_min >= sphase)
                         break;
                 } else if (phase_max >= phase_min) {
                     break;
