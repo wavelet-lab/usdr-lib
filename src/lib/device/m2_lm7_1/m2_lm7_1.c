@@ -265,6 +265,7 @@ static int dev_m2_lm7_1_sdr_rx_phase_ovr_set(pdevice_t ud, pusdr_vfs_obj_t obj, 
 static int dev_m2_lm7_1_sdr_tx_phase_ovr_iq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_phase_ovr_rc_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
+static int dev_m2_lm7_1_lnb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_sdr_vio_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -287,6 +288,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
 
 
     { "/dm/sdr/0/vio",          { dev_m2_lm7_1_sdr_vio_set, NULL }},
+    { "/dm/sdr/0/lnb",          { dev_m2_lm7_1_lnb_set, NULL }},
     { "/dm/sdr/0/tx/phase_ovr", { dev_m2_lm7_1_sdr_tx_phase_ovr_set, NULL }},
     { "/dm/sdr/0/tx/phase_ovr_iq", { dev_m2_lm7_1_sdr_tx_phase_ovr_iq_set, NULL }},
     { "/dm/sdr/0/tx/phase_ovr_rc", { dev_m2_lm7_1_sdr_tx_phase_ovr_rc_set, NULL }},
@@ -542,6 +544,17 @@ int dev_m2_lm7_1_sdr_vio_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
     return xsdr_set_vio(&d->xdev, value);
+}
+
+int dev_m2_lm7_1_lnb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    if (value < 300e6 || value > 3800e6) {
+        return -ERANGE;
+    }
+
+    d->xdev.lms7_lob = value;
+    return 0;
 }
 
 int dev_m2_lm7_1_debug_lms7002m_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -1448,11 +1461,15 @@ int usdr_device_m2_lm7_1_unregister_stream(device_t* dev, stream_handle_t* strea
 
         d->tx->ops->destroy(d->tx);
         d->tx = NULL;
+
+        d->xdev.lms7_txlo_last = 0;
     } else if (stream == d->rx) {
         xsdr_rfic_streaming_down(&d->xdev, RFIC_LMS7_RX);
 
         d->rx->ops->destroy(d->rx);
         d->rx = NULL;
+
+        d->xdev.lms7_rxlo_last = 0;
     } else {
         return -EINVAL;
     }

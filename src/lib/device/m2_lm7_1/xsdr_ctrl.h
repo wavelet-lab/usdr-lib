@@ -57,6 +57,8 @@ struct xsdr_dev
     unsigned s_flags;
 
     unsigned lms7_lob;
+    unsigned lms7_rxlo_last;
+    unsigned lms7_txlo_last;
 
     int tx_override_phase;
     int tx_override_phase_iq;
