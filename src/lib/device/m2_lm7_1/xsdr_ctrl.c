@@ -836,6 +836,8 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                              errs[0], errs[1], errs[2], errs[3], (long long)badness);
 
                     g_clk_reduce++;
+                    phase_min = 65;
+                    phase_max = 0;
                     continue;
                 }
             }
