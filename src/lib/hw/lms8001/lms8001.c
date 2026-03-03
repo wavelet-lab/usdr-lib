@@ -563,6 +563,10 @@ static int _lms8001_vco_tune(lms8001_state_t* m, uint64_t fvco, int fref, uint32
     }
 
     USDR_LOG("8001", USDR_LOG_NOTE, "VCO Calibration finished, VCO:%d CAP:%d\n", VCO_final, freq_final);
+    USDR_LOG("8001", USDR_LOG_INFO, "VCO Calibration finished, VCO:%d CAP:%d\n", VCO_final, freq_final);
+
+    if (freq_final == 0 || freq_final == 255)
+        return -ERANGE;
 
     if (actual) *actual = actual_freq;
     return res;
@@ -1032,6 +1036,7 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
     SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AMP_n(curr->VCO_CFG, 3);
     SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AAC_EN_n(curr->VCO_CFG, 1);
 
+restart:
     // Sets FF-DIV Modulus (former setFFDIV)
     SET_LMS8001_PLL_PROFILE_0_PLL_FF_CFG_N_FF_MOD_n(curr->FF_CFG, pll_s.divi);
     SET_LMS8001_PLL_PROFILE_0_PLL_FF_CFG_N_FFCORE_MOD_n(curr->FF_CFG, pll_s.divi);
@@ -1056,10 +1061,18 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
     _lms80001_tune_settings_def(m, &vco_settings);
 
     USDR_LOG("8001", USDR_LOG_NOTE, "PLL Tuning to F_VCO=%.3f GHz DIV=%d\n", fvco / 1.0e9, pll_s.divi);
+    USDR_LOG("8001", USDR_LOG_INFO, "PLL Tuning to F_VCO=%.3f GHz DIV=%d\n", fvco / 1.0e9, pll_s.divi);
 
     // Step 1 - Tune PLL to generate F_LO frequency at LODIST outputs that should be manualy enabled
     // outside this method
     res = _lms8001_vco_tune(m, fvco, fref, tune_flags, &vco_settings, &actual_vco);
+
+    if (res == -ERANGE) {
+        pll_s.divi ++;
+        pll_s.fvco *= 2;
+        goto restart;
+    }
+
     if (res) {
         USDR_LOG("8001", USDR_LOG_WARNING, "PLL Tuning to F_LO=%.3f GHz failed!\n", flo / 1.0e9);
         return res;
