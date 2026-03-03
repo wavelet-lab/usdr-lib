@@ -996,6 +996,9 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
             res = res ? res : xsdr_phy_en_lfsr_generator_mimo(d, false, false);
             res = res ? res : xsdr_phy_en_lfsr_checker_mimo(d, false);
             res = res ? res : lms7002m_set_lmlrx_mode(&d->base, XSDR_LMLRX_NORMAL);
+
+            // Sometimes TxTSP can get off by 1TSP clock, we need to preventevly reset the path
+            res = res ? res : lms7002m_xxtsp_bst(&d->base.lmsstate, LMS_TXTSP);
         }
     } else {
 
