@@ -695,6 +695,7 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
     uint64_t tx_badness = UINT64_MAX;
     unsigned tx_iqerrs = UINT_MAX;
     unsigned iqserrs2 = -1;
+    const unsigned MAX_RTY = 5;
 
     g_clk_reduce = 0;
 
@@ -747,79 +748,88 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
             int ph_ty_m = 0;
             unsigned iqserrs;
             unsigned errs[4] = { UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
+            bool last_noerrs = false;
 
+            for (unsigned rxrty = 0; rxrty < MAX_RTY; rxrty++) {
+                uint64_t badness_m = UINT64_MAX;
 
-            for (unsigned rxrty = 0; rxrty < 4; rxrty++) {
-            uint64_t badness_m = UINT64_MAX;
+                phase_m = 0;
+                res = res ? res : lms7002m_set_lmlrx_mode(&d->base, XSDR_LMLRX_LFSR);
 
-            phase_m = 0;
-            res = res ? res : lms7002m_set_lmlrx_mode(&d->base, XSDR_LMLRX_LFSR);
+                int phase_min;
+                int phase_max;
+                int phase_last = -1;
 
-            int phase_min;
-            int phase_max;
+                phase_min = 65;
+                phase_max = 0;
 
-            phase_min = 65;
-            phase_max = 0;
+                badness_m = UINT64_MAX;
 
-            badness_m = UINT64_MAX;
+                for (unsigned ph = 1; ph < 65; ph++) {
+                    unsigned w;
+                    uint64_t badness = UINT64_MAX;
 
-            for (unsigned ph = 1; ph < 65; ph++) {
-                unsigned w;
-                uint64_t badness = UINT64_MAX;
+                    res = res ? res : usleep(10);
+                    res = res ? res : xsdr_configure_lml_mmcm_tx(d, mmcm_rx_only_path, ph, 0, 0);
+                    res = res ? res : lms7002m_limelight_fifo_reset(&d->base.lmsstate, true, true);
+                    res = res ? res : _xsdr_rxserdes_reset(d);
+                    res = res ? res : usleep(10);
+                    res = res ? res : xsdr_phy_en_lfsr_checker_mimo(d, true);
 
-                res = res ? res : usleep(10);
-                res = res ? res : xsdr_configure_lml_mmcm_tx(d, mmcm_rx_only_path, ph, 0, 0);
+                    for (w = 0; w < check_to; w++) {
+                        res = res ? res : usleep(100);
+                        res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
+                        if (res || (d->dpump ? !noerrors_v2(errs, &badness) : !noerrors_v4(errs, &badness))) {
+                            break;
+                        }
+                    }
+
+                    badness *= 1.0 * check_to / (w + 1); // Rescale
+                    phase_last = ph;
+                    last_noerrs = false;
+                    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_RX/%d=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", rxrty, ph - 1, w,
+                                errs[0], errs[1], errs[2], errs[3], (long long)badness);
+                    if (res) {
+                        break;
+                    } else if ((last_noerrs = (d->dpump ? noerrors_v2(errs, &badness) : noerrors_v4(errs, &badness)))) {
+                        phase_m = ph;
+                        if (ph < phase_min)
+                            phase_min = ph;
+                        if (ph > phase_max)
+                            phase_max = ph;
+
+                        // Got more than 7 phases, we're safe; skip searching
+                        unsigned sphase = (rxrty == 0) ? 8 : (rxrty == 1) ? 4 : (rxrty == 2) ? 1 : 0;
+                        if (phase_max - phase_min >= sphase)
+                            break;
+                    } else if (phase_max >= phase_min) {
+                        break;
+                    }
+
+                    if (badness_m > badness) {
+                        badness_m = badness;
+                        phase_m = ph;
+                    }
+                }
+
+                if (phase_max >= phase_min) {
+                    phase_m = (phase_max + phase_min) / 2;
+                }
+
+                if (phase_last == phase_m && last_noerrs) {
+                    USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "Took PHASE_RX=%2d [%6d/%6d/%6d/%6d] BD=0\n", phase_m - 1,
+                               errs[0], errs[1], errs[2], errs[3]);
+                    rx_badness = 0;
+                    break;
+                }
+
+                // Try our best at least
+                res = res ? res : xsdr_configure_lml_mmcm_tx(d, mmcm_rx_only_path, phase_m, 0, 0);
                 res = res ? res : lms7002m_limelight_fifo_reset(&d->base.lmsstate, true, true);
                 res = res ? res : _xsdr_rxserdes_reset(d);
                 res = res ? res : usleep(10);
                 res = res ? res : xsdr_phy_en_lfsr_checker_mimo(d, true);
 
-                for (w = 0; w < check_to; w++) {
-                    res = res ? res : usleep(100);
-                    res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
-                    if (res || (d->dpump ? !noerrors_v2(errs, &badness) : !noerrors_v4(errs, &badness))) {
-                        break;
-                    }
-                }
-                badness *= 1.0 * check_to / (w + 1); // Rescale
-
-                USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_RX=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", ph - 1, w,
-                         errs[0], errs[1], errs[2], errs[3], (long long)badness);
-                if (res || (d->dpump ? noerrors_v2(errs, &badness) : noerrors_v4(errs, &badness))) {
-                    phase_m = ph;
-                    if (ph < phase_min)
-                        phase_min = ph;
-                    if (ph > phase_max)
-                        phase_max = ph;
-
-                    // Got more than 7 phases, we're safe; skip searching
-                    unsigned sphase = (rxrty == 0) ? 8 : (rxrty == 1) ? 4 : (rxrty == 2) ? 1 : 0;
-                    if (phase_max - phase_min >= sphase)
-                        break;
-                } else if (phase_max >= phase_min) {
-                    break;
-                }
-
-                if (badness_m > badness) {
-                    badness_m = badness;
-                    phase_m = ph;
-                }
-            }
-
-            if (phase_max > phase_min) {
-                phase_m = (phase_max + phase_min) / 2;
-            }
-
-            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Restoring RX phase to %d (bandness=%" PRId64 ")  PH_MIN=%d PH_MAX=%d\n",
-                     phase_m - 1, badness_m, phase_min, phase_max);
-
-            // Try our best at least
-            res = res ? res : xsdr_configure_lml_mmcm_tx(d, mmcm_rx_only_path, phase_m, 0, 0);
-            res = res ? res : lms7002m_limelight_fifo_reset(&d->base.lmsstate, true, true);
-            res = res ? res : _xsdr_rxserdes_reset(d);
-            res = res ? res : usleep(10);
-            res = res ? res : xsdr_phy_en_lfsr_checker_mimo(d, true);
-            {
                 uint64_t badness = UINT64_MAX;
                 unsigned w;
                 for (w = 0; w < check_to; w++) {
@@ -829,20 +839,19 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
                         break;
                     }
                 }
+
                 badness *= 1.0 * check_to / (w + 1); // Rescale
                 rx_badness = badness;
-                if (badness > 100 /*badness_m * 2*/) {
-                    USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "RePHASE_RX=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", phase_m - 1, w,
-                             errs[0], errs[1], errs[2], errs[3], (long long)badness);
 
+                bool warn_badness = (rxrty == MAX_RTY - 1);
+                USDR_LL_LOG(dev, "XDEV", warn_badness ? USDR_LOG_WARNING : USDR_LOG_INFO, "RePHASE_RX=%2d I=%2d [%6d/%6d/%6d/%6d] BD=%lld\n", phase_m - 1, w,
+                            errs[0], errs[1], errs[2], errs[3], (long long)badness);
+
+                if (badness == 0)
+                    break;
+
+                if (g_clk_reduce < 2)
                     g_clk_reduce++;
-                    phase_min = 65;
-                    phase_max = 0;
-                    continue;
-                }
-            }
-
-            break;
             }
 
             d->lmlcal_rx_phase = phase_m;
