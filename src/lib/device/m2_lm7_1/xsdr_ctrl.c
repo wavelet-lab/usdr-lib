@@ -467,7 +467,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
             return 0;
         }
 
-        usleep(50);
+        usleep(10);
     }
 
     USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "MMCM Ready flag timed out!\n");
@@ -728,7 +728,7 @@ recalibrate_rx:
                 int phase_max;
                 int phase_last = -1;
 
-                phase_min = 65;
+                phase_min = 4*63 + 1;
                 phase_max = 0;
 
                 badness_m = UINT64_MAX;
