@@ -56,10 +56,11 @@ struct xsdr_dev
     unsigned s_dacclk;
     unsigned s_flags;
 
-    int64_t lms8_lo_freq;
     unsigned lms7_lob;
     unsigned lms7_rxlo_last;
     unsigned lms7_txlo_last;
+    int64_t lms8_lo_freq;
+    unsigned lms8_switchover_freq;
 
     int tx_override_phase;
     int tx_override_phase_iq;
@@ -82,6 +83,7 @@ struct xsdr_dev
     bool ssdr;
     bool ssdr_pro;
     bool lms8_alive;
+    bool lms8_int_mode;
     bool xilinx_usp;
 
     bool dpump; //Dual pump data

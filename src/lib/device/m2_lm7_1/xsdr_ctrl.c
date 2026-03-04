@@ -1389,7 +1389,7 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
 {
     int res = 0;
 
-    if (d->ssdr && freq > 3.0e9) {
+    if (d->ssdr && freq > d->lms8_switchover_freq) {
         float bwef = d->lms8st_bwef_1000 / 1000.0;
         unsigned lob = (d->lms7_lob == 0) ? 2.01e9 : d->lms7_lob;
         unsigned pwr_msk =
@@ -1398,8 +1398,13 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
             (d->base.rx_run[0] ? 1 << LMS8_RXA_CHIDX : 0) |
             (d->base.rx_run[1] ? 1 << LMS8_RXB_CHIDX : 0);
 
-        int64_t lms8_freq = (freq - lob + d->base.fref / 2) / d->base.fref;
-        lms8_freq *= d->base.fref;
+        int64_t lms8_freq;
+        if (d->lms8_int_mode) {
+            lms8_freq = (freq - lob + d->base.fref / 2) / d->base.fref;
+            lms8_freq *= d->base.fref;
+        } else {
+            lms8_freq = freq - lob;
+        }
 
         lob = freq - lms8_freq;
         if (d->lms8_lo_freq != lms8_freq) {
@@ -1414,7 +1419,9 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
             res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXB_CHIDX, d->base.rx_run[1] ? 0 : ~0, d->base.rx_run[1] ? 0 : ~0);
 #endif
             if (!d->ssdr_pro) {
-                res = res ? res : lms8001_core_enable(&d->lms8, 0, 0, 1);
+                res = res ? res : lms8001_core_enable(&d->lms8, 1, 1, 1);
+            } else {
+                res = res ? res : lms8001_core_enable(&d->lms8, 0, 0, 0);
             }
             res = res ? res : lms8001_ch_enable(&d->lms8, pwr_msk);
 
@@ -1513,6 +1520,9 @@ int xsdr_ctor(lldev_t dev, xsdr_dev_t *d)
     d->lms8st_int_mod = 0;
     d->lms8st_enabled = 1;
 
+    // Use integer mode for LMS8001 by default
+    d->lms8_int_mode = true;
+    d->lms8_switchover_freq = 3e9;
     return 0;
 }
 

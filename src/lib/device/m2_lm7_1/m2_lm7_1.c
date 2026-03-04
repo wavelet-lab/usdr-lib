@@ -266,6 +266,11 @@ static int dev_m2_lm7_1_sdr_tx_phase_ovr_iq_set(pdevice_t ud, pusdr_vfs_obj_t ob
 static int dev_m2_lm7_1_sdr_tx_phase_ovr_rc_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_lnb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_lnb_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
+static int dev_m2_lm7_1_lms8_intmode_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_lms8_intmode_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
+static int dev_m2_lm7_1_lms8_switchover_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_lms8_switchover_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 
 static int dev_m2_lm7_1_sdr_vio_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -287,8 +292,11 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/refclk/path",      {dev_m2_lm7_1_sdr_refclk_path_set, NULL}},
 
 
-    { "/dm/sdr/0/vio",          { dev_m2_lm7_1_sdr_vio_set, NULL }},
-    { "/dm/sdr/0/lnb",          { dev_m2_lm7_1_lnb_set, NULL }},
+    { "/dm/sdr/0/vio",             { dev_m2_lm7_1_sdr_vio_set, NULL }},
+    { "/dm/sdr/0/lnb",             { dev_m2_lm7_1_lnb_set, dev_m2_lm7_1_lnb_get }},
+    { "/dm/sdr/0/lms8_intmode",    { dev_m2_lm7_1_lms8_intmode_set, dev_m2_lm7_1_lms8_intmode_get }},
+    { "/dm/sdr/0/lms8_switchover", { dev_m2_lm7_1_lms8_switchover_set, dev_m2_lm7_1_lms8_switchover_get }},
+
     { "/dm/sdr/0/tx/phase_ovr", { dev_m2_lm7_1_sdr_tx_phase_ovr_set, NULL }},
     { "/dm/sdr/0/tx/phase_ovr_iq", { dev_m2_lm7_1_sdr_tx_phase_ovr_iq_set, NULL }},
     { "/dm/sdr/0/tx/phase_ovr_rc", { dev_m2_lm7_1_sdr_tx_phase_ovr_rc_set, NULL }},
@@ -554,6 +562,42 @@ int dev_m2_lm7_1_lnb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     }
 
     d->xdev.lms7_lob = value;
+    return 0;
+}
+
+int dev_m2_lm7_1_lnb_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue)
+{
+    *ovalue = ((struct dev_m2_lm7_1_gps *)ud)->xdev.lms7_lob;
+    return 0;
+}
+
+int dev_m2_lm7_1_lms8_intmode_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    d->xdev.lms8_int_mode = value ? true : false;
+    return 0;
+}
+
+int dev_m2_lm7_1_lms8_intmode_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue)
+{
+    *ovalue = ((struct dev_m2_lm7_1_gps *)ud)->xdev.lms8_int_mode;
+    return 0;
+}
+
+int dev_m2_lm7_1_lms8_switchover_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    if (value < 1500e6 || value > 3800e6) {
+        return -ERANGE;
+    }
+
+    d->xdev.lms8_switchover_freq = value;
+    return 0;
+}
+
+int dev_m2_lm7_1_lms8_switchover_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue)
+{
+    *ovalue = ((struct dev_m2_lm7_1_gps *)ud)->xdev.lms8_switchover_freq;
     return 0;
 }
 
