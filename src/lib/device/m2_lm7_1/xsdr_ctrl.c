@@ -988,6 +988,7 @@ recalibrate_rx:
             // Sometimes TxTSP can get off by 1TSP clock, we need to preventevly reset the path
             res = res ? res : lms7002m_mac_set(&d->base.lmsstate, LMS7_CH_AB);
             res = res ? res : lms7002m_xxtsp_bst(&d->base.lmsstate, LMS_TXTSP);
+            res = res ? res : lms7002m_xxtsp_bst(&d->base.lmsstate, LMS_RXTSP);
         }
     } else {
 
