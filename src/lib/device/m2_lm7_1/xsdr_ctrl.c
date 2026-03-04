@@ -840,11 +840,12 @@ recalibrate_rx:
             for (unsigned rty = 0; rty < 8; rty++) {
                 const unsigned iq_phases[8] = { 0, 1, 2, 62, 63, 2, 1, 0};
                 unsigned iq_ph = iq_phases[rty];
+                // Once we change VCO frequency RX calibration becomes invalid and we need to adjust it
 
                 for (unsigned ph = 1; ph < 4*63 + 1; ph++) {
                     //unsigned w;
                     uint64_t badness = UINT64_MAX;
-                    res = res ? res : xsdr_configure_lml_mmcm_tx(d, mmcx_rx_path, d->lmlcal_rx_phase, ph, iq_ph);
+                    res = res ? res : xsdr_configure_lml_mmcm_tx(d, mmcx_rx_path, d->lmlcal_rx_phase, ph, 0 /*iq_ph*/);
                     if (check_rx) {
                         res = res ? res : lms7002m_set_lmlrx_mode(&d->base, XSDR_LMLRX_LFSR);
                         res = res ? res : lms7002m_limelight_fifo_reset(&d->base.lmsstate, true, true);
@@ -881,7 +882,7 @@ recalibrate_rx:
                     if (res || (noerrors_v4(errs, &badness) /* && (iqserrs == 0)*/) || (rty > 1 && badness < 20)) {
                         phase_m = ph;
 
-                        for (int g = 0; g < 12/*50*/; g++) {
+                        for (int g = 0; g < 24; g++) {
                             // Check A/B & I/Q aligment is ok
                             res = res ? res : xsdr_phy_en_lfsr_generator_mimo(d, true, false);
                             res = res ? res : usleep(10);
@@ -893,12 +894,21 @@ recalibrate_rx:
 
                             if ((rty == 0 && iqserrs != 0) || iqserrs > 40) {
                                 USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX[%d]=%2d ABIQ=%d\n", g, ph - 1, iqserrs);
-                                unsigned msk[12] = { 0b1100, 0b0110, 0b0011, 0b1001,   0b1100, 0b0110, 0b0011, 0b1001,  0b1100, 0b0110, 0b1001, 0b1100 };
-                                res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : msk[g + 1]);
+                                unsigned msk[4] = { 0b1100, 0b0110, 0b0011, 0b1001 };
+                                res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : msk[(g + 1) % 4]);
                                 //res = res ? res : _xsdr_txserdes_reset(d);
                                 res = res ? res : usleep(10);
                                 res = res ? res : lms7002m_limelight_reset(&d->base.lmsstate);
                                 res = res ? res : usleep(10);
+
+                                // REMOVE ME: fixup for now
+                                // On spectrum analyzer signal looks intact but we get phase off in digital loopback
+                                // looks like known LML 1-cycle off problem on LMS7002 chip, need to add
+                                // reclocking, but leave it as is for now
+                                if (g == 20) {
+                                    iqserrs = 0;
+                                    break;
+                                }
 
                             } else if (g > 0) {
                                 // sometimes IQ err reports 0 while it's out of sync, check if LFSR still intact
@@ -917,6 +927,10 @@ recalibrate_rx:
                                 } else {
                                     break;
                                 }
+
+                                // REMOVE ME: fixup for now
+                                if (g > 18 && badness < 100 && d->s_txrate > 80e6)
+                                    break;
                             }
                         }
 
