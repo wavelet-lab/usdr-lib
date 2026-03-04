@@ -56,6 +56,7 @@ struct xsdr_dev
     unsigned s_dacclk;
     unsigned s_flags;
 
+    int64_t lms8_lo_freq;
     unsigned lms7_lob;
     unsigned lms7_rxlo_last;
     unsigned lms7_txlo_last;

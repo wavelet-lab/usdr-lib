@@ -335,14 +335,14 @@ int lms8001b_hlmix_loss_set(lms8001_state_t* state, unsigned chan, unsigned loss
     return lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
 }
 
-int lms8001_core_enable(lms8001_state_t* out, bool en)
+int lms8001_core_enable(lms8001_state_t* state, bool enbuf, bool endiv, bool encp)
 {
     uint32_t lms_init[] = {
-        MAKE_LMS8001_BIASLDOCONFIG_CLK_BUF_LDO_Config(0, 0, en ? 1 : 0, out->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_CLKBUF : LMS_LDO_1P25),
-        MAKE_LMS8001_BIASLDOCONFIG_PLL_DIV_LDO_Config(0, 0, en ? 1 : 0, out->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_DIV : LMS_LDO_1P25),
-        MAKE_LMS8001_BIASLDOCONFIG_PLL_CP_LDO_Config(0, 0, en ? 1 : 0, out->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_CP : LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_CLK_BUF_LDO_Config(0, 0, enbuf ? 1 : 0, state->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_CLKBUF : LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_DIV_LDO_Config(0, 0, endiv ? 1 : 0, state->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_DIV : LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_CP_LDO_Config(0, 0, encp ? 1 : 0, state->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_CP : LMS_LDO_1P25),
     };
-    return lms8001_spi_post(out, lms_init, SIZEOF_ARRAY(lms_init));
+    return lms8001_spi_post(state, lms_init, SIZEOF_ARRAY(lms_init));
 }
 
 int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int stepping, lms8001_state_t *out)

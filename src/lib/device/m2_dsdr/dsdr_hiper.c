@@ -1780,7 +1780,7 @@ int dsdr_hiper_fe_txlo_upd(dsdr_hiper_fe_t* def, unsigned chno, bool* p_swap_txi
                          (def->ucfg[chno].tx_en << 3) | (def->ucfg[chno - 1].tx_en << 2) :
                          (def->ucfg[chno + 1].tx_en << 3) | (def->ucfg[chno].tx_en << 2);
 
-    res = res ? res : lms8001_core_enable(&def->lms8[idx], high_path);
+    res = res ? res : lms8001_core_enable(&def->lms8[idx], high_path, high_path, high_path);
     res = res ? res : lms8001_ch_enable(&def->lms8[idx], high_path ? chmsk : 0);
     if (fLO > 0) {
         if (def->lms8_lo[idx].set && def->lms8_lo[idx].value == fLO) {

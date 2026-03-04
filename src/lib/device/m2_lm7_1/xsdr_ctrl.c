@@ -1398,26 +1398,35 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
             (d->base.rx_run[0] ? 1 << LMS8_RXA_CHIDX : 0) |
             (d->base.rx_run[1] ? 1 << LMS8_RXB_CHIDX : 0);
 
-        res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS8_CTRL, 0x81);
+        int64_t lms8_freq = (freq - lob + d->base.fref / 2) / d->base.fref;
+        lms8_freq *= d->base.fref;
 
+        lob = freq - lms8_freq;
+        if (d->lms8_lo_freq != lms8_freq) {
+            res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS8_CTRL, 0x81);
 #if 0
-        res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, 2, 0);
-        res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, 3, 0);
+            res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, 2, 0);
+            res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, 3, 0);
 #else
-        res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_TXA_CHIDX, d->base.tx_run[0] ? 0 : ~0, d->base.tx_run[0] ? 0 : ~0);
-        res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_TXB_CHIDX, d->base.tx_run[1] ? 0 : ~0, d->base.tx_run[1] ? 0 : ~0);
-        res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXA_CHIDX, d->base.rx_run[0] ? 0 : ~0, d->base.rx_run[0] ? 0 : ~0);
-        res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXB_CHIDX, d->base.rx_run[1] ? 0 : ~0, d->base.rx_run[1] ? 0 : ~0);
+            res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_TXA_CHIDX, d->base.tx_run[0] ? 0 : ~0, d->base.tx_run[0] ? 0 : ~0);
+            res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_TXB_CHIDX, d->base.tx_run[1] ? 0 : ~0, d->base.tx_run[1] ? 0 : ~0);
+            res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXA_CHIDX, d->base.rx_run[0] ? 0 : ~0, d->base.rx_run[0] ? 0 : ~0);
+            res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXB_CHIDX, d->base.rx_run[1] ? 0 : ~0, d->base.rx_run[1] ? 0 : ~0);
 #endif
-        res = res ? res : lms8001_core_enable(&d->lms8, 1);
-        res = res ? res : lms8001_ch_enable(&d->lms8, pwr_msk);
+            if (!d->ssdr_pro) {
+                res = res ? res : lms8001_core_enable(&d->lms8, 0, 0, 1);
+            }
+            res = res ? res : lms8001_ch_enable(&d->lms8, pwr_msk);
 
-        res = res ? res : lms8001_smart_tune(&d->lms8, 0, freq - lob, d->base.fref,
-                                             d->lms8st_loopbw, d->lms8st_phasemargin, bwef, d->lms8st_flock_n);
+            res = res ? res : lms8001_smart_tune(&d->lms8, 0, freq - lob, d->base.fref,
+                                                 d->lms8st_loopbw, d->lms8st_phasemargin, bwef, d->lms8st_flock_n);
 
-        res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS8_CTRL, 0x80);
-        if (res)
-            return res;
+            res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS8_CTRL, 0x80);
+            if (res)
+                return res;
+
+            d->lms8_lo_freq = freq - lob;
+        }
 
         USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "Setting FREQ  %.3f Mhz, LNB %.3f Mhz\n", freq / 1.0e6, lob / 1.0e6);
         freq = lob;
@@ -2078,7 +2087,7 @@ int xsdr_dtor(xsdr_dev_t *d)
     if (d->ssdr) {
         // Turn off LMS8
         res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS8_CTRL, 0x81);
-        res = res ? res : lms8001_core_enable(&d->lms8, 0);
+        res = res ? res : lms8001_core_enable(&d->lms8, 0, 0, 0);
         res = res ? res : lms8001_ch_enable(&d->lms8, 0);
         res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS8_CTRL, 0x80);
     }
