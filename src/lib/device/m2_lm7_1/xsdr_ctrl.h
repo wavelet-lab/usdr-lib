@@ -219,9 +219,6 @@ int xsdr_override_drp(xsdr_dev_t *d, lsopaddr_t ls_op_addr,
                       size_t meminsz, void* pin, size_t memoutsz,
                       const void* pout);
 
-
-int xsdr_upd_phase(xsdr_dev_t *d);
-
 int xsdr_config_rcvdly(xsdr_dev_t *d, unsigned type, unsigned val);
 
 enum {
