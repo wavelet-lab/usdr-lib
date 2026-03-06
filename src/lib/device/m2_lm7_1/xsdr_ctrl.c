@@ -1410,15 +1410,19 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
         lob = freq - lms8_freq;
         if (d->lms8_lo_freq != lms8_freq) {
             res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS8_CTRL, 0x81);
-#if 0
-            res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, 2, 0);
-            res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, 3, 0);
-#else
-            res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_TXA_CHIDX, d->base.tx_run[0] ? 0 : ~0, d->base.tx_run[0] ? 0 : ~0);
-            res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_TXB_CHIDX, d->base.tx_run[1] ? 0 : ~0, d->base.tx_run[1] ? 0 : ~0);
-            res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXA_CHIDX, d->base.rx_run[0] ? 0 : ~0, d->base.rx_run[0] ? 0 : ~0);
-            res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXB_CHIDX, d->base.rx_run[1] ? 0 : ~0, d->base.rx_run[1] ? 0 : ~0);
-#endif
+
+            if (d->lms8_mode_b) {
+                res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, LMS8_TXA_CHIDX, d->base.tx_run[0] ? 0 : 0xf);
+                res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, LMS8_TXB_CHIDX, d->base.tx_run[1] ? 0 : 0xf);
+                res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, LMS8_RXA_CHIDX, d->base.rx_run[0] ? 0 : 0xf);
+                res = res ? res : lms8001b_hlmix_loss_set(&d->lms8, LMS8_RXB_CHIDX, d->base.rx_run[1] ? 0 : 0xf);
+            } else {
+                res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_TXA_CHIDX, d->base.tx_run[0] ? 0 : ~0, d->base.tx_run[0] ? 0 : ~0);
+                res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_TXB_CHIDX, d->base.tx_run[1] ? 0 : ~0, d->base.tx_run[1] ? 0 : ~0);
+                res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXA_CHIDX, d->base.rx_run[0] ? 0 : ~0, d->base.rx_run[0] ? 0 : ~0);
+                res = res ? res : lms8001a_ch_lna_pa_set(&d->lms8, LMS8_RXB_CHIDX, d->base.rx_run[1] ? 0 : ~0, d->base.rx_run[1] ? 0 : ~0);
+            }
+
             if (!d->ssdr_pro) {
                 res = res ? res : lms8001_core_enable(&d->lms8, 1, 1, 1);
             } else {
@@ -1530,6 +1534,7 @@ int xsdr_ctor(lldev_t dev, xsdr_dev_t *d)
 int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
 {
     lldev_t dev = d->base.lmsstate.dev;
+    unsigned hwid_rev = (d->hwid >> 8) & 0xff;
     unsigned subdev = 0;
     int res = 0;
     bool pg = false;
@@ -1597,6 +1602,10 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
     if (res)
         return res;
 
+    if (getenv("USDR_BARE_DEV")) {
+        return 0;
+    }
+
     uint16_t rev = 0xffff;
     res = lp8758_get_rev(dev, subdev, I2C_BUS_LP8758_FPGA, &rev);
     if (res)
@@ -1652,12 +1661,31 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
     if (hwid == SSDR_DEV || hwid == SSDRPRO_DEV) {
         uint32_t chipver = ~0;
         unsigned lms8_step = LMS8_MPW2024;
+        unsigned ssdr_rev;
+
+        if (hwid == SSDR_DEV && hwid_rev == 0xff) {
+            lms8_step = LMS8_MPW2015;
+            d->lms8_mode_b = true;
+            ssdr_rev = 0;
+        } else if (hwid == SSDR_DEV && hwid_rev == 0x00) {
+            // This revision can be with A and B chips, need to set SSDR_LMS8B enviroment for B variant
+            ssdr_rev = 2; // Technically it's 1 but we use 2 in all documentation
+        } else {
+            ssdr_rev = 3;
+        }
+
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "sSDR Rev%d\n", ssdr_rev);
+
+        // Override chip settings if LMS8 was reworked to non-stadard
         if (getenv("LMS8_MPW2015")) {
             lms8_step = LMS8_MPW2015;
         }
+        if (getenv("SSDR_LMS8B")) {
+            d->lms8_mode_b = true;
+        }
 
         // Check LMS8 presence
-        res = res ? res : dev_gpo_set(dev, IGPO_LMS8_CTRL, 0x0);
+        res = res ? res : dev_gpo_set(dev, IGPO_LMS8_CTRL, 0x00);
         res = res ? res : dev_gpo_set(dev, IGPO_LDOLMS_EN, 1); // Enable LDOs
         res = res ? res : dev_gpo_set(dev, IGPO_LMS_PWR, 9);   // LMS
         usleep(100000);
@@ -1671,14 +1699,11 @@ int _xsdr_init_revx(xsdr_dev_t *d, unsigned hwid)
 
             res = res ? res : lowlevel_spi_tr32(dev, d->base.lmsstate.subdev, 0, 0x800000ff, &chipver);
             res = res ? res : lowlevel_spi_tr32(dev, d->base.lmsstate.subdev, 0, 0x000f0000, &chipver);
-            USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "LMS8001 version %08x\n", chipver);
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "LMS8001 version %08x, assume chip is LMS8001%c-MPW%d\n",
+                        chipver, d->lms8_mode_b ? 'B' : 'A', lms8_step == LMS8_MPW2015 ? 2015 : 2024);
 
             res = res ? res : lms8001_create(dev, d->base.lmsstate.subdev, 0, lms8_step, &d->lms8);
-
             res = res ? res : dev_gpo_set(dev, IGPO_LMS8_CTRL, 0x80);
-            //res = res ? res : dev_gpo_set(dev, IGPO_LMS8_CTRL, 0x00);
-            // res = res ? res : dev_gpo_set(dev, IGPO_LDOLMS_EN, 0); // Enable LDOs
-            // res = res ? res : dev_gpo_set(dev, IGPO_LMS_PWR, 0);
 
             if (chipver != 0x00004040) {
                 usleep(100000);
@@ -2045,6 +2070,7 @@ int xsdr_init(xsdr_dev_t *d)
     d->dpump = false;
     d->ssdr_pro = false;
     d->xilinx_usp = false;
+    d->lms8_mode_b = false;
 
     res = lms7002m_init(&d->base, dev, 0, XSDR_INT_REFCLK);
     if (res) {
@@ -2095,7 +2121,7 @@ int xsdr_dtor(xsdr_dev_t *d)
         res = (res) ? res : lms7002m_destroy(&d->base.lmsstate);
     }
 
-    if (d->ssdr) {
+    if (d->ssdr && d->lms8.dev) {
         // Turn off LMS8
         res = res ? res : dev_gpo_set(d->base.lmsstate.dev, IGPO_LMS8_CTRL, 0x81);
         res = res ? res : lms8001_core_enable(&d->lms8, 0, 0, 0);

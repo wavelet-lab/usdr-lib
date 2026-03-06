@@ -84,6 +84,7 @@ struct xsdr_dev
     bool ssdr_pro;
     bool lms8_alive;
     bool lms8_int_mode;
+    bool lms8_mode_b;
     bool xilinx_usp;
 
     bool dpump; //Dual pump data
