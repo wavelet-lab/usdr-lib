@@ -218,10 +218,27 @@ int lms7002m_sxx_trim_vco(lms7002m_state_t* m, int vco_cap)
                   GET_LMS7002M_SXX_0X0123_VCO_CMPLO(reg));
 }
 
+int lms7002m_sxx_trim_vco_slow(lms7002m_state_t* m, int vco_cap)
+{
+    uint16_t reg;
+    uint32_t cgen_regs[] = { MAKE_LMS7002M_SXX_0x0121(16, (unsigned)vco_cap, m->temp, 0) };
+    int res = lms7002m_spi_post(m, cgen_regs, SIZEOF_ARRAY(cgen_regs));
+    if (res)
+        return res;
+
+    usleep(1000);
+
+    res = lms7002m_spi_rd(m, SXX_0x0123, &reg);
+    if (res)
+        return res;
+
+    return (int)((GET_LMS7002M_SXX_0X0123_VCO_CMPHO(reg) << 1) |
+                  GET_LMS7002M_SXX_0X0123_VCO_CMPLO(reg));
+}
 
 static int _lms7002m_vco_range(lms7002m_state_t* m, lms7002m_trim_vco_func_t f,
                                unsigned start, uint8_t* phi, uint8_t* plo,
-                               const char *name)
+                               const char *name, unsigned extend_range)
 {
     int i;
     int lo = 0, hi = -1;
@@ -248,28 +265,50 @@ static int _lms7002m_vco_range(lms7002m_state_t* m, lms7002m_trim_vco_func_t f,
 
         // Backup by one just to be sure we don't miss it
         lo = i;
-        i = i > 1 ? i - 1 : 0;
+        if (lo > 255)
+            lo = 255;
+        i = i - 1 - extend_range;
+        if (i < 0)
+            i = 0;
     } else {
         i = (int)start;
     }
 
     unsigned log_s = i;
     unsigned log_b = lo;
+    unsigned hi_cnt = 0;
+    unsigned r = 0;
 
-    for (; i < 256; i++) {
-        switch ((res = f(m, i))) {
+    struct vco_ranges {
+        uint8_t lo;
+        uint8_t hi;
+    } ranges[4] = {{ 255, 0}, { 255, 0}, { 255, 0}, { 255, 0}};
+
+    for (; i < 256 && r < 4; i++) {
+        res = f(m, i);
+        if (res != LMS7002M_VCO_HIGH) {
+            hi_cnt = 0;
+        }
+
+        switch (res) {
         case LMS7002M_VCO_OK:
-            hi = i;
-            if (lo > i)
-                lo = i;
+            if (ranges[r].lo > i)
+                ranges[r].lo = i;
+            ranges[r].hi = i;
             break;
         case LMS7002M_VCO_HIGH:
-            if (hi == -1) {
-                hi = (i == 0) ? 0 : i - 1;
+            if (ranges[r].lo <= ranges[r].hi) {
+                r++;
             }
-            goto find_high;
+            if (hi_cnt > extend_range) {
+                goto find_high;
+            }
+            hi_cnt++;
+            break;
         case LMS7002M_VCO_LOW:
-            lo = i + 1;
+            if (ranges[r].lo <= ranges[r].hi) {
+                r++;
+            }
             break;
         case LMS7002M_VCO_FAIL:
             return -EIO;
@@ -278,16 +317,23 @@ static int _lms7002m_vco_range(lms7002m_state_t* m, lms7002m_trim_vco_func_t f,
         }
     }
 
-find_high:
-    if (hi == -1)
-        hi = 0;
-
-    USDR_LOG("7002", USDR_LOG_INFO, "%s binary result: %d; Probed range [%d .. %d] => Good range [%d; %d]",
-             name, log_b, log_s, i, lo, hi);
-
-    if (lo > 255) {
-        lo = 255;
+find_high:;
+    int ldelta = -1;
+    int idx = -1;
+    for (unsigned p = 0; p < r; p++) {
+        int delta = ranges[p].hi - ranges[p].lo;
+        if (delta > ldelta) {
+            idx = p;
+            ldelta = delta;
+        }
     }
+
+    USDR_LOG("7002", USDR_LOG_INFO, "%s binary result: %d; Probed range [%d .. %d] => Good ranges %d: [%d; %d] / [%d; %d] / [%d; %d] / [%d; %d] took %d\n",
+             name, log_b, log_s, i, r, ranges[0].lo, ranges[0].hi, ranges[1].lo, ranges[1].hi, ranges[2].lo, ranges[2].hi, ranges[3].lo, ranges[3].hi, idx);
+
+
+    hi = (idx == -1) ? 0   : ranges[idx].hi;
+    lo = (idx == -1) ? 255 : ranges[idx].lo;
 
     *phi = (uint8_t)hi;
     *plo = (uint8_t)lo;
@@ -546,7 +592,7 @@ int lms7002m_cgen_tune(lms7002m_state_t* m, unsigned fref, unsigned outfreq, uns
     usleep(20);
 
     uint8_t hi = 255, lo = 0;
-    res = _lms7002m_vco_range(m, &lms7002m_cgen_trim_vco, (unsigned)-1, &hi, &lo, "CGEN");
+    res = _lms7002m_vco_range(m, &lms7002m_cgen_trim_vco, (unsigned)-1, &hi, &lo, "CGEN", 0);
     if (res < 0)
         return res;
 
@@ -693,7 +739,7 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
                 return res;
 
             m->temp = vcono[i];
-            res = _lms7002m_vco_range(m, &lms7002m_sxx_trim_vco, (unsigned)-1, &phi, &plo, sxxn);
+            res = _lms7002m_vco_range(m, t > 1 ? &lms7002m_sxx_trim_vco_slow : &lms7002m_sxx_trim_vco, (unsigned)-1, &phi, &plo, sxxn, 2 * t);
             if (res != 0)
                 return res;
 
