@@ -1146,15 +1146,15 @@ int main(UNUSED int argc, UNUSED char** argv)
             fn_rxtx_thread_t thread_func;
             if(tx_from_file)
                 thread_func = disk_read_thread;
-            else if(strcmp(fmt_rx, SFMT_CI16) == 0 || strcmp(fmt_rx, SFMT_CI16_CI12) == 0)
+            else if(strcmp(fmt_tx, SFMT_CI16) == 0 || strcmp(fmt_tx, SFMT_CI16_CI12) == 0)
                 thread_func = (use_lut) ? freq_gen_thread_ci16_lut : freq_gen_thread_ci16;
-            else if(strcmp(fmt_rx, SFMT_CF32) == 0 || strcmp(fmt_rx, SFMT_CF32_CI12) == 0)
+            else if(strcmp(fmt_tx, SFMT_CF32) == 0 || strcmp(fmt_tx, SFMT_CF32_CI12) == 0)
                 thread_func = freq_gen_thread_cf32;
             else
             {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: invalid format '%s', "
-                                                  "use -I option to read from file or specify %s/%s data format (-F option) for sine generator",
-                         i, fmt_rx, SFMT_CI16, SFMT_CF32);
+                                                  "use -I option to read from file or specify %s/%s data format (-i option) for sine generator",
+                         i, fmt_tx, SFMT_CI16, SFMT_CF32);
                 goto dev_close;
             }
 
