@@ -166,13 +166,13 @@ int usb_uram_ls_op(lldev_t dev, subdev_t subdev,
         if (SPIEXT_LSOP_GET_BUS(ls_op_addr) >= pdb->spi_count)
             return -EINVAL;
 
-        if (pdb->spi_core[ls_op_addr] == SPI_CORE_32W) {
+        if (pdb->spi_core[SPIEXT_LSOP_GET_BUS(ls_op_addr)] == SPI_CORE_32W) {
             if (((meminsz != 4) && (meminsz != 0)) || (memoutsz != 4))
                 return -EINVAL;
 
             res = usb_uram_reg_out(dev, pdb->spi_base[SPIEXT_LSOP_GET_BUS(ls_op_addr)],
                                    *(const uint32_t*)pout);
-        } else if (pdb->spi_core[ls_op_addr] == SPI_CORE_CFGW_CS8) {
+        } else if (pdb->spi_core[SPIEXT_LSOP_GET_BUS(ls_op_addr)] == SPI_CORE_CFGW_CS8) {
             uint32_t spi_tr[2] = {
                 SPIEXT_LSOP_GET_CFG(ls_op_addr),
                 spiext_make_data_reg(memoutsz, pout)
@@ -265,8 +265,8 @@ int usb_uram_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_addr, size_t
     switch(lsop)
     {
     case USDR_LSOP_SPI:
-        int_number = gen->spi_int_number[ls_op_addr];
-        reg = gen->db.spi_core[ls_op_addr];
+        int_number = gen->spi_int_number[SPIEXT_LSOP_GET_BUS(ls_op_addr)];
+        reg = gen->db.spi_core[SPIEXT_LSOP_GET_BUS(ls_op_addr)];
         strcpy(busname, "SPI");
         break;
     case USDR_LSOP_I2C_DEV:
