@@ -3,7 +3,7 @@
 
 Example:
     python3 example_soapy_rx.py \
-        --device "" \
+        --device "driver=usdr" \
         --rx-frequency 900e6 \
         --rx-bandwidth 1e6 \
         --rx-gain 80 \
@@ -12,6 +12,11 @@ Example:
         --fft-size 4096 \
         --window hann \
         --loglevel 3
+        
+    Parameter `device` can be any SoapySDR device string, e.g. "driver=usdr" or "driver=usdr,bus=<device_bus>"
+    device_bus can be:
+        - bus=pci,device=<device_path>, where <device_path> is the PCI device Path (e.g. /dev/usdr0)
+        - bus=usb@<usb_address>, where <usb_address> is the USB address (e.g. 3/3/6 for bus 3, device 3, function 6)
 """
 
 from __future__ import annotations
