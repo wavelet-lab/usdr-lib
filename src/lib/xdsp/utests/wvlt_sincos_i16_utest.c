@@ -475,12 +475,11 @@ Suite * wvlt_sincos_i16_suite(void)
     max_opt = cpu_vcap_get();
 
     Suite* s = suite_create("wvlt_sincos_i16");
-/*
+
     ADD_REGRESS_TEST(s, wvlt_sincos_i16_check_simd);
     ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_speed, 60, 0, 3);
     ADD_REGRESS_TEST(s, wvlt_sincos_i16_interleaved_ctrl_check_simd);
     ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_interleaved_ctrl_speed, 60, 0, 3);
-*/
     ADD_REGRESS_TEST(s, wvlt_sincos_i16_interleaved_chirp_check_simd);
     ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_interleaved_chirp_speed, 60, 0, 3);
 
