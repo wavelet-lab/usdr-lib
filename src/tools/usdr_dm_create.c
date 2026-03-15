@@ -68,6 +68,10 @@ struct tx_thread_input_s
     float gain;
     double start_phase;
     double delta_phase;
+
+    //chirp_gen params
+    double chirp_freq0, chirp_freq1;
+    int32_t chirp_steps;
 };
 typedef struct tx_thread_input_s tx_thread_input_t;
 
@@ -239,12 +243,65 @@ void* freq_gen_thread_ci16_lut(void* obj)
 #define USE_WVLT_SINCOS
 #define MAX_TXGEN_CI16_AMPL 32760
 
+static void* chirp_gen_thread_ci16(void* obj)
+{
+#ifndef USE_WVLT_SINCOS
+    USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Not implemented");
+    return NULL;
+#endif
+
+    tx_thread_input_t* inp = (tx_thread_input_t*)obj;
+
+    const unsigned p = inp->chan;
+    const unsigned tx_get_samples = inp->samples_count;
+    const int16_t gain = DBFS_TO_AMPLITUDE(inp->gain, MAX_TXGEN_CI16_AMPL);
+
+    const bool upchirp = inp->chirp_steps > 0;
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 CHIRP sinus generator with USE_WVLT_SINCOS opt @ ch#%d F1:%.6f MHz F2:%.6f MHz GAIN:(%.2fdBFS = %d)",
+             p, inp->chirp_freq0 / 1000000.f, inp->chirp_freq1 / 1000000.f, inp->gain, gain);
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CHIRP steps count: %d [%s]", inp->chirp_steps, (upchirp ? "UP_CHIRP":"DOWN_CHIRP"));
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CHIRP period: %.6f s (having sr:%u Ms)", (double)inp->chirp_steps / (double)inp->samplerate, inp->samplerate / 1000000);
+
+    int32_t phase = WVLT_CONVPHASE_F32_I32(inp->start_phase);
+
+    const int32_t dp0 = WVLT_CONVPHASE_F32_I32(inp->chirp_freq0 / inp->samplerate);
+    const int32_t dp1 = WVLT_CONVPHASE_F32_I32(inp->chirp_freq1 / inp->samplerate);
+    int32_t delta_phase_arr[] = { dp0, dp1 };
+    int32_t delta_phase = inp->chirp_steps >= 0 ? dp0 : dp1;
+
+    while (!s_stop && !thread_stop)
+    {
+        unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
+        if (idx == IDX_TIMEDOUT)
+            continue;
+
+        char* data = ring_buffer_at(tbuff[p], idx);
+
+        tx_header_t* hdr = (tx_header_t*)data;
+        hdr->len = tx_get_samples * sizeof(uint16_t) * 2;
+        hdr->flags = TXF_NONE;
+
+        int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
+
+        wvlt_sincos_i16_interleaved_chirp(&phase, &delta_phase, delta_phase_arr, inp->chirp_steps,
+                                          gain, true/*invert sin*/, false/*invert cos*/, iqp, tx_get_samples);
+        ring_buffer_ppost(tbuff[p]);
+    }
+
+    return NULL;
+}
+
 /*
  *   Thread function - Sine generator to TX stream (ci16)
  */
 void* freq_gen_thread_ci16(void* obj)
 {
     tx_thread_input_t* inp = (tx_thread_input_t*)obj;
+    if(inp->chirp_steps)
+    {
+        return chirp_gen_thread_ci16(obj);
+    }
+
     const unsigned p = inp->chan;
     const unsigned tx_get_samples = inp->samples_count;
     const int16_t gain = DBFS_TO_AMPLITUDE(inp->gain, MAX_TXGEN_CI16_AMPL);
@@ -423,6 +480,8 @@ static void usage(int severity, const char* me)
                                 "\t[-l loglevel [3(INFO)]] \n"
                                 "\t[-G calibration [algo#]] \n"
                                 "\t[-Z param1=value1,param2=value2,...] \n"
+                                "\t[-m <flag: Enable chirp TX generator mode>] \n"
+                                "\t[-M comma-separated list of CHIRP generator params (each channel specified as <steps_count(int)>:<freq0(float)>:<freq1(float)>)] \n"
                                 "\t[-h <flag: This help>]",
              me);
 }
@@ -642,6 +701,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     param_list_t extra_params[32];
     unsigned extra_param_len = 0;
     int tx_pkt_precharge = 16;
+    bool use_chirp_gen = false;
 
     memset(rx_thread_inputs, 0, sizeof(rx_thread_inputs));
     memset(tx_thread_inputs, 0, sizeof(tx_thread_inputs));
@@ -651,6 +711,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         inp->start_phase = -10;
         inp->delta_phase = -10;
         inp->gain = INT16_MIN;
+        inp->chirp_freq0 = 0.f;
+        inp->chirp_freq1 = 0.f;
+        inp->chirp_steps = 0;
     }
 
     channel_info_init(&chl_rx);
@@ -683,8 +746,8 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    // Still available: kmMvVL
-    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:K:")) != -1) {
+    // Still available: kvVL
+    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:K:mM:")) != -1) {
         switch (opt) {
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
@@ -909,6 +972,42 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'Z':
             extra_param_len = parse_param_list(optarg, SIZEOF_ARRAY(extra_params), extra_params);
             break;
+        case 'm':
+            use_chirp_gen = true;
+            break;
+        case 'M':
+        {
+            char* pt_end;
+            char *pt = strtok_r(optarg, ",", &pt_end);
+            unsigned i = 0;
+
+            while(pt && i < MAX_CHS)
+            {
+                char *chirp_pt_end;
+                char *chirp_pt = strtok_r(pt, ":", &chirp_pt_end);
+                if(!chirp_pt)
+                    exit(EXIT_FAILURE);
+                else
+                    tx_thread_inputs[i].chirp_steps = atoi(chirp_pt);
+
+                chirp_pt = strtok_r(NULL, ":", &chirp_pt_end);
+                if(!chirp_pt)
+                    exit(EXIT_FAILURE);
+                else
+                    tx_thread_inputs[i].chirp_freq0 = atof(chirp_pt);
+
+                chirp_pt = strtok_r(NULL, ":", &chirp_pt_end);
+                if(!chirp_pt)
+                    exit(EXIT_FAILURE);
+                else
+                    tx_thread_inputs[i].chirp_freq1 = atof(chirp_pt);
+
+                ++i;
+                pt = strtok_r(NULL, ",", &pt_end);
+            }
+
+            break;
+        }
         //Show usage
         case 'h':
             usdrlog_disablecolorize(NULL);
@@ -1117,6 +1216,9 @@ int main(UNUSED int argc, UNUSED char** argv)
     static double start_phase[]  = { 0, 0.5, 0.25, 0.125 };
     static double start_dphase[] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
     static int16_t gains[] = {0.0, 0.0, 0.0, 0.0};
+    static int32_t chirp_steps[] = { -100007, 100007, -1000007, 1000007 };
+    static int32_t chirp_freq0[] = { -333333, -666666, -1E6, -10E6 };
+    static int32_t chirp_freq1[] = {  333333,  666666,  1E6,  10E6 };
 
     for(unsigned i = 0; i < tx_bufcnt; ++i) {
         tx_thread_input_t* inp = &tx_thread_inputs[i];
@@ -1126,11 +1228,37 @@ int main(UNUSED int argc, UNUSED char** argv)
         inp->start_phase = inp->start_phase > -1 ? inp->start_phase : start_phase[i % (sizeof(start_phase) / sizeof(*start_phase))];
         inp->delta_phase = inp->delta_phase > -1 ? inp->delta_phase : start_dphase[i % (sizeof(start_dphase) / sizeof(*start_dphase))];
         inp->gain = inp->gain != INT16_MIN ? inp->gain : gains[i % (sizeof(gains) / sizeof(*gains))];
+
+        if(use_chirp_gen)
+        {
+            inp->chirp_steps = inp->chirp_steps ? inp->chirp_steps : chirp_steps[i % (sizeof(chirp_steps) / sizeof(*chirp_steps))];
+            inp->chirp_freq0 = (inp->chirp_freq0 != 0.f) ? inp->chirp_freq0 : chirp_freq0[i % (sizeof(chirp_freq0) / sizeof(*chirp_freq0))];
+            inp->chirp_freq1 = (inp->chirp_freq1 != 0.f) ? inp->chirp_freq1 : chirp_freq1[i % (sizeof(chirp_freq1) / sizeof(*chirp_freq1))];
+        }
     }
 
     for(unsigned i = 0; i < MAX_CHS; ++i) {
         USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX SINGEN CH#%2d PHASE_START:%.4f PHASE_DELTA:%.4f",
                  i, tx_thread_inputs[i].start_phase, tx_thread_inputs[i].delta_phase);
+    }
+
+    for(unsigned i = 0; i < tx_bufcnt && use_chirp_gen; ++i) {
+        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX CHIRP_GEN CH#%2d FROM_FREQ:%.4f TO_FREQ:%.4f STEPS:%d",
+                 i, tx_thread_inputs[i].chirp_freq0, tx_thread_inputs[i].chirp_freq1, tx_thread_inputs[i].chirp_steps);
+
+        if(tx_thread_inputs[i].chirp_freq0 >= tx_thread_inputs[i].chirp_freq1)
+        {
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "CH#%2d CHIRP params error: freq0 >= freq1 [%.2f >= %.2f]",
+                     i, tx_thread_inputs[i].chirp_freq0, tx_thread_inputs[i].chirp_freq1);
+            goto dev_close;
+        }
+
+        if(abs(tx_thread_inputs[i].chirp_steps % 8) != 7)
+        {
+            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CH#%2d CHIRP steps count[%d]: recommended condition - step %% 8 = 7(-1)",
+                     i, tx_thread_inputs[i].chirp_steps);
+            tx_thread_inputs[i].chirp_steps = (tx_thread_inputs[i].chirp_steps / 8 ) * 8 + 7;
+        }
     }
 
     //Create TX buffers and threads
