@@ -125,7 +125,7 @@ int calibrate_txlo(struct calibrate_ops* ops)
     if (res)
         return res;
 
-    res = ops->set_nco_offset(ops->param, ops->channel, ((-ops->rxtxlo_frac) << 1));
+    res = ops->set_nco_offset(ops->param, ops->channel, -freqoff);
     if (res)
         return res;
 
@@ -169,7 +169,7 @@ int _calibrate_iqimb_generic(struct calibrate_ops* ops, int32_t freqoffset,
     int a, giq, b;
     struct opt_iteration2d o[3];
 
-    res = ops->set_nco_offset(ops->param, ops->channel, (rxreoff << 1));
+    res = ops->set_nco_offset(ops->param, ops->channel, rxreoff);
     if (res)
         return res;
 
@@ -177,7 +177,7 @@ int _calibrate_iqimb_generic(struct calibrate_ops* ops, int32_t freqoffset,
     if (res)
         return res;
 
-    res = ops->set_nco_offset(ops->param, ops->channel, (rximoff << 1));
+    res = ops->set_nco_offset(ops->param, ops->channel, rximoff);
     if (res)
         return res;
 
@@ -218,12 +218,7 @@ int _calibrate_iqimb_generic(struct calibrate_ops* ops, int32_t freqoffset,
 int calibrate_rxiqimb(struct calibrate_ops* ops)
 {
     int res;
-#if 0
-    int pwr_r;
-    int pwr_i;
-    int a, giq, b;
-    struct opt_iteration2d o[3];
-#endif
+
     // Set RX to be TXLO - sampl
     int32_t freqoff = (((int64_t)ops->rxsamplerate * ops->rxiqimb_frac) >> 31);
 
@@ -236,54 +231,6 @@ int calibrate_rxiqimb(struct calibrate_ops* ops)
         return res;
 
     return _calibrate_iqimb_generic(ops, 0, ops->rxiqimb_frac, -ops->rxiqimb_frac, _evaluate_rxaiq);
-#if 0
-    res = ops->set_corr_param(ops->param, ops->channel, CORR_DIR_TX | CORR_OP_SET_FREQ,
-                              ops->rxfrequency + freqoff);
-    if (res)
-        return res;
-
-    res = ops->set_nco_offset(ops->param, ops->channel, ((-ops->rxiqimb_frac) << 1));
-    if (res)
-        return res;
-
-    res = _calibrate_txpwr(ops, &pwr_r);
-
-    res = ops->set_nco_offset(ops->param, ops->channel, ((ops->rxiqimb_frac) << 1));
-    if (res)
-        return res;
-
-    res = ops->do_meas_nco_avg(ops->param, ops->channel, 0, &pwr_i);
-    if (res)
-        return res;
-
-    USDR_LOG("UDEV", USDR_LOG_WARNING, "CAL_IQIMB: Imbalance %d pwr (%d)\n", pwr_i, pwr_r - pwr_i);
-    // Probe AI and AQ, choice what path to go
-
-    o[0].limit[0] = ops->rximb_ang_corr;
-    o[0].limit[1] = ops->rximb_iq_corr;
-    o[0].func = _evaluate_rxaiq;
-    o[0].sf = &find_golden_min;
-    o[0].exparam = 0;
-    o[1].limit[0] = ops->rximb_ang_corr;
-    o[1].limit[1] = ops->rximb_iq_corr;
-    o[1].func = _evaluate_rxaiq;
-    o[1].sf = &find_golden_min;
-    o[1].exparam = 0;
-    o[2].limit[0].max = 8;
-    o[2].limit[0].min = -8;
-    o[2].limit[1].max = 8;
-    o[2].limit[1].min = -8;
-    o[2].func = _evaluate_rxaiq;
-    o[2].sf = &find_golden_min;
-    o[2].exparam = 0;
-
-    res = find_best_2d(&o[0], SIZEOF_ARRAY(o), ops, ops->defstop, &a, &giq, &b);
-    if (res)
-        return res;
-
-    USDR_LOG("UDEV", USDR_LOG_WARNING, "CAL_IQIMB: Imbalance %d pwr (%d) improvement %d\n", b, pwr_r - b, pwr_i - b);
-    return 0;
-#endif
 }
 
 

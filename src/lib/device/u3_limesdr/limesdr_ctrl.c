@@ -398,7 +398,7 @@ int limesdr_set_samplerate(limesdr_dev_t *d, unsigned rx_rate, unsigned tx_rate,
     // LML2 - RX
     // LML1 - TX
     res = lms7002m_samplerate(&d->base, rx_rate, tx_rate, adc_rate, dac_rate,
-                              XSDR_SR_MAXCONVRATE | XSDR_LML_SISO_DDR_RX | XSDR_LML_SISO_DDR_TX, false);
+                              XSDR_SR_MAXCONVRATE | XSDR_LML_SISO_DDR_RX | XSDR_LML_SISO_DDR_TX, false, 1, 1);
 
     // TODO set direct mode or do PLL with phase search
     res = res ? res : limesdr_set_direct_clocking(d, 0);

@@ -202,6 +202,25 @@ int lms7002m_cgen_trim_vco(lms7002m_state_t* m, int vco_cap)
                   GET_LMS7002M_CGEN_0X008C_VCO_CMPLO(reg));
 }
 
+int lms7002m_cgen_trim_vco_slow(lms7002m_state_t* m, int vco_cap)
+{
+    uint16_t reg;
+    uint32_t cgen_regs[] = { MAKE_LMS7002M_CGEN_0x008B(15, (unsigned)vco_cap, 0) };
+    int res = lms7002m_spi_post(m, cgen_regs, SIZEOF_ARRAY(cgen_regs));
+    if (res)
+        return res;
+
+    res = lms7002m_spi_rd(m, CGEN_0x008C, &reg);
+    if (res)
+        return res;
+
+    usleep(1000);
+
+    return (int)((GET_LMS7002M_CGEN_0X008C_VCO_CMPHO(reg) << 1) |
+                  GET_LMS7002M_CGEN_0X008C_VCO_CMPLO(reg));
+}
+
+
 int lms7002m_sxx_trim_vco(lms7002m_state_t* m, int vco_cap)
 {
     uint16_t reg;
@@ -592,9 +611,14 @@ int lms7002m_cgen_tune(lms7002m_state_t* m, unsigned fref, unsigned outfreq, uns
     usleep(20);
 
     uint8_t hi = 255, lo = 0;
-    res = _lms7002m_vco_range(m, &lms7002m_cgen_trim_vco, (unsigned)-1, &hi, &lo, "CGEN", 0);
-    if (res < 0)
-        return res;
+    for (unsigned a = 0; a < 2; a++) {
+        res = _lms7002m_vco_range(m, a == 0 ? &lms7002m_cgen_trim_vco : &lms7002m_cgen_trim_vco_slow, (unsigned)-1, &hi, &lo, "CGEN", 0);
+        if (res < 0)
+            return res;
+
+        if (hi >= lo)
+            break;
+    }
 
     if (hi < lo) {
         USDR_LOG("7002", USDR_LOG_WARNING, "CGEN: Can't find sutable VCO cap!");
@@ -697,7 +721,9 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
                                  1),
         MAKE_LMS7002M_SXX_0x011F(3, 3, 6, 0, 0, 0, 0),
     };
-    res = lms7002m_spi_post(m, sxx_regs, SIZEOF_ARRAY(sxx_regs));
+
+     //Select only MAC if VCO was powered before
+    res = lms7002m_spi_post(m, sxx_regs, pwr ? 1 : SIZEOF_ARRAY(sxx_regs));
     if (res)
         return res;
 
@@ -1205,15 +1231,18 @@ int lms7002m_rfe_gain(lms7002m_state_t* m, lms7002m_rfe_gain_t gain, int gainx10
     switch (gain) {
     case RFE_GAIN_LNA:
         idx = _find_idx(-gainx10, lna_attens, SIZEOF_ARRAY(lna_attens) - 1);
-        *goutx10 = -lna_attens[idx];
+        if (goutx10)
+            *goutx10 = -lna_attens[idx];
         goto update_vals;
     case RFE_GAIN_TIA:
         idx = _find_idx(-gainx10, tia_attens, SIZEOF_ARRAY(tia_attens) - 1);
-        *goutx10 = -tia_attens[idx];
+        if (goutx10)
+            *goutx10 = -tia_attens[idx];
         goto update_vals;
     case RFE_GAIN_RFB:
         idx = _find_idx(-gainx10, lb_attens, SIZEOF_ARRAY(lb_attens) - 1);
-        *goutx10 = -lb_attens[idx];
+        if (goutx10)
+            *goutx10 = -lb_attens[idx];
         goto update_vals;
     update_vals:
         for (unsigned i = 0; i < 2; i++) {
@@ -1329,17 +1358,43 @@ int lms7002m_trf_gain(lms7002m_state_t* m, lms7002m_trf_gain_t gt, int gainx10, 
     for (unsigned i = 0; i < 2; i++) {
         uint16_t mac = m->reg_mac;
         unsigned lb_loss = m->trf[i].lb ? m->trf[i].lbloss : LB_LOSS_24;
+        unsigned main_gain = m->trf[i].lb ? m->trf[i].gain : m->trf[i].gain;
+        SET_LMS7002M_LML_0X0020_MAC(mac, i + 1);
+        regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, mac);
+        regs[j++] = MAKE_LMS7002M_TRF_0x0101(
+            3,              // F_TXPAD_TRF,
+            lb_loss,        // L_LOOPB_TXPAD_TRF,
+            main_gain,      // LOSS_LIN_TXPAD_TRF,
+            main_gain,      // LOSS_MAIN_TXPAD_TRF,
+            m->trf[i].lb);  // EN_LOOPB_TXPAD_TRF
+
+        USDR_LOG("7002", USDR_LOG_INFO, "trf_gain[%d] lb_loss=%d loss=%d en_lb=%d\n",
+                 i,  lb_loss, main_gain, m->trf[i].lb);
+    };
+    regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac);
+
+    return lms7002m_spi_post(m, regs, j);
+}
+
+int lms7002m_trf_gain_lb_off(lms7002m_state_t* m)
+{
+    if (_lms7002m_is_none(m))
+        return -EINVAL;
+
+    uint32_t regs[2 * 3 + 2], j = 0;
+    for (unsigned i = 0; i < 2; i++) {
+        uint16_t mac = m->reg_mac;
         SET_LMS7002M_LML_0X0020_MAC(mac, i + 1);
         regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, mac);
         regs[j++] = MAKE_LMS7002M_TRF_0x0101(
             3,     //F_TXPAD_TRF,
-            lb_loss,  //L_LOOPB_TXPAD_TRF,
+            LB_LOSS_24,        //L_LOOPB_TXPAD_TRF,
             m->trf[i].gain,    //LOSS_LIN_TXPAD_TRF,
             m->trf[i].gain,    //LOSS_MAIN_TXPAD_TRF,
             m->trf[i].lb);     //EN_LOOPB_TXPAD_TRF
 
         USDR_LOG("7002", USDR_LOG_INFO, "trf_gain[%d] lb_loss=%d loss=%d en_lb=%d\n",
-                 i,  lb_loss, m->trf[i].gain, m->trf[i].lb);
+                 i,  LB_LOSS_24, m->trf[i].gain, m->trf[i].lb);
     };
     regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac);
 

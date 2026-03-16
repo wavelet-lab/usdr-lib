@@ -50,6 +50,8 @@ struct xsdr_dev
     uint8_t hwchans_rx;
     uint8_t hwchans_tx;
 
+    unsigned s_rx_dec;
+    unsigned s_tx_int;
     unsigned s_rxrate;
     unsigned s_txrate;
     unsigned s_adcclk;
@@ -86,6 +88,7 @@ struct xsdr_dev
     bool lms8_int_mode;
     bool lms8_mode_b;
     bool xilinx_usp;
+    bool has_duc_ddc;
 
     bool dpump; //Dual pump data
     union {
@@ -107,6 +110,9 @@ struct xsdr_dev
     uint32_t lms8st_int_mod;
     uint32_t lms8st_enabled;
 
+    // Statistics
+    double actual_rx_freq;
+    double actual_tx_freq;
 };
 
 typedef struct xsdr_dev xsdr_dev_t;
@@ -237,6 +243,7 @@ enum {
     XSDR_DONT_SETBACK = 65536,
 };
 
+int xsdr_rxdccorr(xsdr_dev_t *d, uint64_t *ov);
 
 int xsdr_usbclk(xsdr_dev_t *d, bool uclk);
 
@@ -271,6 +278,12 @@ enum {
     IGPO_LDOLMS_EN  = 17,
     IGPO_LED        = 18,
     IGPO_PHYCAL     = 19,
+
+    IGPO_DSPCHAIN_RX_PRG = 20,
+    IGPO_DSPCHAIN_RX_RST = 21,
+    IGPO_DSPCHAIN_TX_PRG = 22,
+    IGPO_DSPCHAIN_TX_RST = 23,
+
 };
 
 enum {

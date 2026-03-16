@@ -249,6 +249,7 @@ enum lms7002m_lb_loss {
 };
 
 int lms7002m_trf_gain(lms7002m_state_t* m, lms7002m_trf_gain_t gt, int gainx10, int *goutx10);
+int lms7002m_trf_gain_lb_off(lms7002m_state_t* m);
 
 // RBB
 enum lms7002m_rbb_path {

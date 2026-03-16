@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 
 #include "../device.h"
 #include "../device_ids.h"
@@ -204,6 +205,8 @@ static int dev_m2_lm7_1_debug_lms8001_reg_get(pdevice_t ud, pusdr_vfs_obj_t obj,
 
 
 static int dev_m2_lm7_1_sdr_rx_dccorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_sdr_rx_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
+
 static int dev_m2_lm7_1_sdr_tx_dccorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_sdr_rx_dccorrmode_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -216,8 +219,6 @@ static int dev_m2_lm7_1_sdr_refclk_frequency_get(pdevice_t ud, pusdr_vfs_obj_t o
 
 static int dev_m2_lm7_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
-static int dev_m2_lm7_1_usb_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
-
 static int dev_m2_lm7_1_sdr_rxdsp_swapab_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_tx_antennat_port_cfg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -226,13 +227,9 @@ static int dev_m2_lm7_1_rfe_throttle_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint
 static int dev_m2_lm7_1_sensor_freqpps_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value);
 static int dev_m2_lm7_1_rfe_nco_pwrdc_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value);
 
-static int dev_m2_lm7_1_rfe_nco_enable_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-static int dev_m2_lm7_1_rfe_nco_enable_frequency(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-
 static int dev_m2_lm7_1_tfe_gen_en_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_tfe_gen_const_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_tfe_gen_tone_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
-static int dev_m2_lm7_1_tfe_nco_enable_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_tfe_nco_enable_frequency(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -276,21 +273,20 @@ static int dev_m2_lm7_1_sdr_vio_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t 
 
 static
 const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
-    { "/dm/rate/master",        { dev_m2_lm7_1_rate_set, NULL }},
-    { "/dm/rate/rxtxadcdac",    { dev_m2_lm7_1_rate_m_set, NULL }},
+    { "/dm/rate/master",          { dev_m2_lm7_1_rate_set, NULL }},
+    { "/dm/rate/rxtxadcdac",      { dev_m2_lm7_1_rate_m_set, NULL }},
 
-    { "/dm/debug/all",          { NULL, dev_m2_lm7_1_debug_all_get }},
-    { "/dm/power/en",           { dev_m2_lm7_1_pwren_set, NULL }},
+    { "/dm/debug/all",            { NULL, dev_m2_lm7_1_debug_all_get }},
+    { "/dm/power/en",             { dev_m2_lm7_1_pwren_set, NULL }},
 
-    { "/dm/sdr/channels",       { NULL, NULL }},
-    { "/dm/sensor/temp",        { NULL, dev_m2_lm7_1_senstemp_get }},
+    { "/dm/sdr/channels",         { NULL, NULL }},
+    { "/dm/sensor/temp",          { NULL, dev_m2_lm7_1_senstemp_get }},
 
     { "/dm/sdr/0/usbclk",         { dev_m2_lm7_1_usbclk_set,  NULL }},
     { "/dm/sdr/0/calibrate",      { dev_m2_lm7_1_calibrate_set, dev_m2_lm7_1_calibrate_get }},
 
-    { "/dm/sdr/refclk/frequency", {dev_m2_lm7_1_sdr_refclk_frequency_set, dev_m2_lm7_1_sdr_refclk_frequency_get}},
-    { "/dm/sdr/refclk/path",      {dev_m2_lm7_1_sdr_refclk_path_set, NULL}},
-
+    { "/dm/sdr/refclk/frequency", { dev_m2_lm7_1_sdr_refclk_frequency_set, dev_m2_lm7_1_sdr_refclk_frequency_get }},
+    { "/dm/sdr/refclk/path",      { dev_m2_lm7_1_sdr_refclk_path_set, NULL }},
 
     { "/dm/sdr/0/vio",             { dev_m2_lm7_1_sdr_vio_set, NULL }},
     { "/dm/sdr/0/lnb",             { dev_m2_lm7_1_lnb_set, dev_m2_lm7_1_lnb_get }},
@@ -302,7 +298,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/0/tx/phase_ovr_rc", { dev_m2_lm7_1_sdr_tx_phase_ovr_rc_set, NULL }},
     { "/dm/sdr/0/rx/phase_ovr", { dev_m2_lm7_1_sdr_rx_phase_ovr_set, NULL }},
 
-    { "/dm/sdr/0/rx/dccorr",    { dev_m2_lm7_1_sdr_rx_dccorr_set, NULL }},
+    { "/dm/sdr/0/rx/dccorr",    { dev_m2_lm7_1_sdr_rx_dccorr_set, dev_m2_lm7_1_sdr_rx_dccorr_get }},
     { "/dm/sdr/0/tx/dccorr",    { dev_m2_lm7_1_sdr_tx_dccorr_set, NULL }},
     { "/dm/sdr/0/rx/phgaincorr",{ dev_m2_lm7_1_sdr_rx_phgaincorr_set, NULL }},
     { "/dm/sdr/0/tx/phgaincorr",{ dev_m2_lm7_1_sdr_tx_phgaincorr_set, NULL }},
@@ -344,7 +340,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
 
     { "/dm/sdr/0/rxdsp/swapab", { dev_m2_lm7_1_sdr_rxdsp_swapab_set, NULL }},
 
-    { "/dm/sdr/0/tdd/frequency",          { dev_m2_lm7_1_sdr_tdd_freq_set, NULL }},
+    { "/dm/sdr/0/tdd/frequency",         { dev_m2_lm7_1_sdr_tdd_freq_set, NULL }},
 
     /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/tdd/freqency",          { dev_m2_lm7_1_sdr_tdd_freq_set, NULL }},
@@ -354,38 +350,25 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/0/tfe/generator/enable",  { dev_m2_lm7_1_tfe_gen_en_set, NULL }},
     { "/dm/sdr/0/tfe/generator/const",   { dev_m2_lm7_1_tfe_gen_const_set, NULL }},
     { "/dm/sdr/0/tfe/generator/tone",    { dev_m2_lm7_1_tfe_gen_tone_set, NULL }},
-    { "/dm/sdr/0/tfe/nco/enable",        { dev_m2_lm7_1_tfe_nco_enable_set, NULL }},
 
-    { "/dm/sdr/0/tfe/nco/frequency",      { dev_m2_lm7_1_tfe_nco_enable_frequency, NULL }},
+    { "/dm/sdr/0/tfe/nco/frequency",     { dev_m2_lm7_1_tfe_nco_enable_frequency, NULL }},
 
     /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/tfe/nco/freqency",      { dev_m2_lm7_1_tfe_nco_enable_frequency, NULL }},
 
-    { "/dm/sdr/0/rfe/throttle",    { dev_m2_lm7_1_rfe_throttle_set, NULL }},
-
-    { "/dm/sdr/0/rfe/nco/enable",  { dev_m2_lm7_1_rfe_nco_enable_set, NULL }},
-
-    { "/dm/sdr/0/rfe/nco/frequency",{ dev_m2_lm7_1_rfe_nco_enable_frequency, NULL }},
-
-    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
-    { "/dm/sdr/0/rfe/nco/freqency",{ dev_m2_lm7_1_rfe_nco_enable_frequency, NULL }},
-
-    { "/dm/sdr/0/rfe/pwrdc",       { NULL, dev_m2_lm7_1_rfe_nco_pwrdc_get }},
+    { "/dm/sdr/0/rfe/throttle",     { dev_m2_lm7_1_rfe_throttle_set, NULL }},
+    { "/dm/sdr/0/rfe/pwrdc",        { NULL, dev_m2_lm7_1_rfe_nco_pwrdc_get }},
 
     // Debug interface
-    { "/debug/hw/lms7002m/0/reg",  { dev_m2_lm7_1_debug_lms7002m_reg_set, dev_m2_lm7_1_debug_lms7002m_reg_get }},
-    { "/debug/hw/lms8001/0/reg" ,  { dev_m2_lm7_1_debug_lms8001_reg_set, dev_m2_lm7_1_debug_lms8001_reg_get }},
-
-
-    // USB debug interface
-    { "/dm/usb",                   { NULL, dev_m2_lm7_1_usb_get }},
+    { "/debug/hw/lms7002m/0/reg",   { dev_m2_lm7_1_debug_lms7002m_reg_set, dev_m2_lm7_1_debug_lms7002m_reg_get }},
+    { "/debug/hw/lms8001/0/reg" ,   { dev_m2_lm7_1_debug_lms8001_reg_set, dev_m2_lm7_1_debug_lms8001_reg_get }},
 
     // Get sampled amount of ticks between GPS
-    { "/dm/sensor/freqpps",        { NULL, dev_m2_lm7_1_sensor_freqpps_get }},
+    { "/dm/sensor/freqpps",         { NULL, dev_m2_lm7_1_sensor_freqpps_get }},
 
-    { "/dm/sdr/0/core/atcrbs/reg",        { dev_m2_lm7_1_dev_atcrbs_set, dev_m2_lm7_1_dev_atcrbs_get }},
+    { "/dm/sdr/0/core/atcrbs/reg",  { dev_m2_lm7_1_dev_atcrbs_set, dev_m2_lm7_1_dev_atcrbs_get }},
 
-    { "/dm/sdr/0/dac_vctcxo",      { dev_m2_lm7_1_dev_dac_vctcxo_set, NULL }},
+    { "/dm/sdr/0/dac_vctcxo",       { dev_m2_lm7_1_dev_dac_vctcxo_set, NULL }},
 
     { "/dm/sdr/0/phy_rx_dly",       { dev_m2_lm7_1_phy_rx_dly_set, NULL }},
     { "/dm/sdr/0/phy_rx_lfsr",      { dev_m2_lm7_1_phy_rx_lfsr_set, dev_m2_lm7_1_phy_rx_lfsr_get }},
@@ -399,6 +382,59 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/revision",               { NULL, dev_m2_lm7_1_revision_get }},
 
     { "/ll/qspi_flash/master_off",  { NULL, dev_m2_lm7_1_qspi_flash_master_off_get }},
+};
+
+static const usdr_dev_link_t s_links[] = {
+    { "/dm/sdr/0/rx/frequency/0",    "/dm/sdr/0/rx/frequency" },
+    { "/dm/sdr/0/rx/frequency/1",    "/dm/sdr/0/rx/frequency" },
+    { "/dm/sdr/0/tx/frequency/0",    "/dm/sdr/0/tx/frequency" },
+    { "/dm/sdr/0/tx/frequency/1",    "/dm/sdr/0/tx/frequency" },
+    { "/dm/sdr/0/rx/frequency/bb/0", "/dm/sdr/0/rx/frequency/bb" },
+    { "/dm/sdr/0/rx/frequency/bb/1", "/dm/sdr/0/rx/frequency/bb" },
+    { "/dm/sdr/0/tx/frequency/bb/0", "/dm/sdr/0/tx/frequency/bb" },
+    { "/dm/sdr/0/tx/frequency/bb/1", "/dm/sdr/0/tx/frequency/bb" },
+
+    { "/dm/sdr/0/rx/gain/0",      "/dm/sdr/0/rx/gain" },
+    { "/dm/sdr/0/tx/gain/0",      "/dm/sdr/0/tx/gain" },
+    { "/dm/sdr/0/tx/gain/lb/0",   "/dm/sdr/0/tx/gain/lb" },
+    { "/dm/sdr/0/tx/gain/vga1/0", "/dm/sdr/0/tx/gain/vga1" },
+    { "/dm/sdr/0/rx/gain/pga/0",  "/dm/sdr/0/rx/gain/pga" },
+    { "/dm/sdr/0/rx/gain/vga/0",  "/dm/sdr/0/rx/gain/vga" },
+    { "/dm/sdr/0/rx/gain/lna/0",  "/dm/sdr/0/rx/gain/lna" },
+    { "/dm/sdr/0/rx/gain/lb/0",   "/dm/sdr/0/rx/gain/lb" },
+    { "/dm/sdr/0/rx/gain/1",      "/dm/sdr/0/rx/gain" },
+    { "/dm/sdr/0/tx/gain/1",      "/dm/sdr/0/tx/gain" },
+    { "/dm/sdr/0/tx/gain/lb/1",   "/dm/sdr/0/tx/gain/lb" },
+    { "/dm/sdr/0/tx/gain/vga1/1", "/dm/sdr/0/tx/gain/vga1" },
+    { "/dm/sdr/0/rx/gain/pga/1",  "/dm/sdr/0/rx/gain/pga" },
+    { "/dm/sdr/0/rx/gain/vga/1",  "/dm/sdr/0/rx/gain/vga" },
+    { "/dm/sdr/0/rx/gain/lna/1",  "/dm/sdr/0/rx/gain/lna" },
+    { "/dm/sdr/0/rx/gain/lb/1",   "/dm/sdr/0/rx/gain/lb" },
+
+    { "/dm/sdr/0/rx/bandwidth/0", "/dm/sdr/0/rx/bandwidth" },
+    { "/dm/sdr/0/tx/bandwidth/0", "/dm/sdr/0/tx/bandwidth" },
+    { "/dm/sdr/0/rx/bandwidth/1", "/dm/sdr/0/rx/bandwidth" },
+    { "/dm/sdr/0/tx/bandwidth/1", "/dm/sdr/0/tx/bandwidth" },
+
+    { "/dm/sdr/0/rx/rfic_path/0", "/dm/sdr/0/rx/rfic_path" },
+    { "/dm/sdr/0/rx/rfic_path/1", "/dm/sdr/0/rx/rfic_path" },
+    { "/dm/sdr/0/tx/rfic_path/0", "/dm/sdr/0/tx/rfic_path" },
+    { "/dm/sdr/0/tx/rfic_path/1", "/dm/sdr/0/tx/rfic_path" },
+
+    { "/dm/sdr/0/rx/path/0",      "/dm/sdr/0/rx/path" },
+    { "/dm/sdr/0/rx/path/1",      "/dm/sdr/0/rx/path" },
+    { "/dm/sdr/0/tx/path/0",      "/dm/sdr/0/tx/path" },
+    { "/dm/sdr/0/tx/path/1",      "/dm/sdr/0/tx/path" },
+
+    { "/dm/sdr/0/rx/dccorr/0",    "/dm/sdr/0/rx/dccorr" },
+    { "/dm/sdr/0/tx/dccorr/0",    "/dm/sdr/0/tx/dccorr" },
+    { "/dm/sdr/0/rx/phgaincorr/0","/dm/sdr/0/rx/phgaincorr" },
+    { "/dm/sdr/0/tx/phgaincorr/0","/dm/sdr/0/tx/phgaincorr" },
+    { "/dm/sdr/0/rx/dccorr/1",    "/dm/sdr/0/rx/dccorr" },
+    { "/dm/sdr/0/tx/dccorr/1",    "/dm/sdr/0/tx/dccorr" },
+    { "/dm/sdr/0/rx/phgaincorr/1","/dm/sdr/0/rx/phgaincorr" },
+    { "/dm/sdr/0/tx/phgaincorr/1","/dm/sdr/0/tx/phgaincorr" },
+
 };
 
 struct dev_m2_lm7_1_gps {
@@ -422,6 +458,99 @@ struct dev_m2_lm7_1_gps {
     stream_handle_t* rx;
     stream_handle_t* tx;
 };
+
+static int lms7002m_channel_info_string_parse(char* chanlist, unsigned max_chans, lms7002m_mac_mode_t* cinfo)
+{
+    lms7002m_mac_mode_t ch = LMS7_CH_NONE;
+    const char* delim = ":_-/";
+    char* saveptr;
+    char* str1;
+    unsigned t;
+
+    for (t = 0, str1 = chanlist; ; str1 = NULL, t++) {
+        const char* token = strtok_r(str1, delim, &saveptr);
+        if (token == NULL) {
+            break;
+        }
+
+        unsigned chn;
+        if (isdigit(*token)) {
+            chn = atoi(token);
+        } else if (isalpha(*token)) {
+            chn = tolower(*token) - 'a';
+        } else {
+            USDR_LOG("STRM", USDR_LOG_ERROR, "Channel parsing: incorrect token# %d `%s`\n", t, token);
+            return -EINVAL;
+        }
+
+        if (chn > max_chans) {
+            USDR_LOG("STRM", USDR_LOG_ERROR, "Channel parsing: incorrect channel num: %d\n", chn);
+            return -EINVAL;
+        }
+
+        ch |= 1 << chn;
+    }
+
+    *cinfo = ch;
+    return 0;
+}
+
+static int device_path_to_chmsk(const char* full_path, const char* basename, lms7002m_mac_mode_t* lms_ch)
+{
+    char chanlist[64*4];
+    const char* lst;
+
+    if (basename) {
+        size_t len;
+        len = strlen(basename);
+        if (strncmp(full_path, basename, len)) {
+            return -ENOENT;
+        }
+
+        lst = full_path + len;
+        if (*lst != '/') {
+            return -ENAVAIL;
+        }
+
+        lst++;
+    } else {
+        const char *pos = full_path;
+        lst = NULL;
+
+        while ((pos = strchr(pos, '/')) != NULL) {
+            lst = pos;
+            pos++;
+        }
+        if (lst == NULL) {
+            return -ENAVAIL;
+        }
+    }
+
+    SAFE_STRCPY(chanlist, lst);
+    return lms7002m_channel_info_string_parse(chanlist, 2, lms_ch);
+}
+
+static int lms7002_iterate_ordinal_chans(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val, const char* basename, bool rxchans)
+{
+    //struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    vfs_object_t ph;
+    lms7002m_mac_mode_t selected;
+    int res = device_path_to_chmsk(obj->full_path, basename, &selected);
+    if (res == -ENAVAIL) {
+        selected = LMS7_CH_AB;
+        res = 0;
+    } else if (res != 0) {
+        return res;
+    }
+
+    ph.type = obj->type;
+    ph.object = obj->object;
+    ph.data = obj->data;
+    ph.ops = obj->ops;
+    ph.full_path[0] = 0;
+    ph.full_path[1] = selected;
+    return obj->ops.si64(&ph, val);
+}
 
 int dev_m2_lm7_1_debug_clkinfo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -557,7 +686,7 @@ int dev_m2_lm7_1_sdr_vio_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 int dev_m2_lm7_1_lnb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    if (value < 300e6 || value > 3800e6) {
+    if ((value < 300e6) || (value > 3800e6)) {
         return -ERANGE;
     }
 
@@ -587,7 +716,7 @@ int dev_m2_lm7_1_lms8_intmode_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *o
 int dev_m2_lm7_1_lms8_switchover_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    if (value < 1500e6 || value > 3800e6) {
+    if ((value < 1500e6) || (value > 3800e6)) {
         return -ERANGE;
     }
 
@@ -627,6 +756,12 @@ int dev_m2_lm7_1_debug_lms8001_reg_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
     return res;
 }
 
+
+int dev_m2_lm7_1_sdr_rx_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    return xsdr_rxdccorr(&d->xdev, ovalue);
+}
 
 int dev_m2_lm7_1_sdr_rx_dccorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -757,11 +892,6 @@ int dev_m2_lm7_1_tfe_gen_tone_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t va
     return res;
 }
 
-int dev_m2_lm7_1_tfe_nco_enable_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
-{
-    return 0;
-}
-
 int dev_m2_lm7_1_tfe_nco_enable_frequency(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
@@ -796,19 +926,6 @@ int dev_m2_lm7_1_rfe_throttle_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t va
     return -EINVAL;
 }
 
-
-int dev_m2_lm7_1_rfe_nco_enable_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
-{
-    //struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    //return sfe_rf4_nco_enable(d->base.dev, 0, CSR_RFE4_BASE, (value & 0xff) ? true : false, value >> 32);
-    return -EINVAL;
-}
-int dev_m2_lm7_1_rfe_nco_enable_frequency(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
-{
-    //struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    //return sfe_rf4_nco_freq(d->base.dev, 0, CSR_RFE4_BASE, (int)value);
-    return -EINVAL;
-}
 int dev_m2_lm7_1_rfe_nco_pwrdc_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
@@ -850,7 +967,7 @@ int dev_m2_lm7_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value
     unsigned flags = value & 0xfffff;
     unsigned chan = value >> 32;
 
-    if (flags > 65536 || chan > 1) {
+    if (flags > 2*65536 || chan > 1) {
         const char* v = (const char* )value;
         chan = 0; // TODO B
         flags = 0;
@@ -991,11 +1108,14 @@ int dev_m2_lm7_1_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
 
 int dev_m2_lm7_1_sdr_rx_bbfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    unsigned channel = value >> 32;
-    int32_t freq = (int32_t)(value & 0xffffffff);
+    if (obj->full_path[0]) {
+        return lms7002_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/rx/frequency/bb", true);
+    }
 
-    return xsdr_rfic_bb_set_freq(&d->xdev, channel, false, freq);
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    int32_t freq = (int32_t)(value & 0xffffffff);
+    return xsdr_rfic_bb_set_freq(&d->xdev, obj->full_path[1], false, freq);
+
 }
 int dev_m2_lm7_1_sdr_tx_bbfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
@@ -1313,22 +1433,6 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
         }
     }
 
-#if 0
-    //Load DSP ucode
-    lowlevel_reg_wr32(dev, 0, 0, 0x02000001);
-    for (unsigned k = 0; k < SIZEOF_ARRAY(s_dsp_ucode_fir2); k++)
-        lowlevel_reg_wr32(dev, 0, 0, s_dsp_ucode_fir2[k]);
-    lowlevel_reg_wr32(dev, 0, 0, 0x02000000);
-#endif
-
-
-    return 0;
-}
-
-
-int dev_m2_lm7_1_usb_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
-{
-    *ovalue = 0;
     return 0;
 }
 
@@ -1435,16 +1539,16 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
             }
         }
 
+        res = xsdr_prepare(&d->xdev, true, d->tx);
+        if (res) {
+            return res;
+        }
+
         res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
                                     flags, M2PCI_REG_WR_RXDMA_CONFIRM, VIRT_CFG_SFX_BASE, 0,
                                     SRF4_FIFOBSZ, CSR_RFE4_BASE, &d->rx, &hwchs);
         if (res) {
             USDR_LL_LOG(d->base.dev, "XSDR", USDR_LOG_ERROR, "Unable to create stream '%s': error=%d\n", sid, res);
-            return res;
-        }
-
-        res = xsdr_prepare(&d->xdev, true, d->tx);
-        if (res) {
             return res;
         }
 
@@ -1490,7 +1594,8 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         }
         *out_handle = d->tx;
 
-        res = xsdr_hwchans_cnt(&d->xdev, false, hwchs);
+        res = res ? res : xsdr_hwchans_cnt(&d->xdev, false, hwchs);
+        res = res ? res : lms7002m_dc_corr_en(&d->xdev.base.lmsstate, d->xdev.base.rx_run[0], d->xdev.base.rx_run[1], d->xdev.base.tx_run[0], d->xdev.base.tx_run[1]);
     }
 
     return res;
@@ -1539,9 +1644,9 @@ int usdr_device_m2_lm7_1_create(lldev_t dev, device_id_t devid)
     }
 
     res = dev_gpi_get32(dev, IGPI_HWID, &hwid);
-    //if (res) {
-    //    goto failed_free;
-    //}
+    if (res) {
+       goto failed_free;
+    }
     did = ((hwid >> 16) & 0xff);
 
     if ((res == 0) && (did == SSDR_DEV || did == SSDRPRO_DEV)) {
@@ -1565,6 +1670,12 @@ int usdr_device_m2_lm7_1_create(lldev_t dev, device_id_t devid)
     res = usdr_vfs_obj_param_init_array(&d->base,
                                         s_fparams_m2_lm7_1_rev000,
                                         SIZEOF_ARRAY(s_fparams_m2_lm7_1_rev000));
+    if (res)
+        goto failed_tree_creation;
+
+    res = usdr_vfs_obj_link_init_array(&d->base,
+                                       s_links,
+                                       SIZEOF_ARRAY(s_links));
     if (res)
         goto failed_tree_creation;
 

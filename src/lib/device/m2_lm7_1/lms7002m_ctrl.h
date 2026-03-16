@@ -203,7 +203,8 @@ enum {
 int lms7002m_samplerate(lms7002_dev_t *d,
                         unsigned rxrate, unsigned txrate,
                         unsigned adcclk, unsigned dacclk,
-                        unsigned flags, const bool rx_port_1);
+                        unsigned flags, const bool rx_port_1,
+                        unsigned rx_dec, unsigned tx_int);
 
 
 enum {

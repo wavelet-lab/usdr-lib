@@ -392,12 +392,6 @@ static int _lms7002m_lb_status_changes(lms7002_dev_t *d)
         res = (res) ? res : lms7002m_trf_gain(&d->lmsstate,
                                               TRF_GAIN_LB,
                                               0, NULL);
-        res = (res) ? res : lms7002m_trf_gain(&d->lmsstate,
-                                              TRF_GAIN_PAD, //TRF_GAIN_LB,
-                                              -10 * d->trf_lb_atten,
-                                              NULL);
-        // res = (res) ? res : lms7002m_rfe_gain(&d->lmsstate,
-        //                                        d->rfe_lb_atten, &lb_loss);
 
         USDR_LL_LOG(d->lmsstate.dev, "UDEV", USDR_LOG_WARNING, "Turning on loopback RX + TX loss: -- + %d dB\n",
                     /*lb_loss,*/ d->trf_lb_atten);
@@ -598,7 +592,7 @@ int lms7002m_bb_set_freq(lms7002_dev_t *d,
                  rel_freq / 1000, conv_freq / 1000);
         return -EINVAL;
     }
-    int pfreq = rel_freq * 4294967296;
+    int pfreq = rel_freq * 4294967296.0;
     if (channel & LMS7_CH_A)
         opt_u32_set_val(&dsp_f[0], pfreq);
     if (channel & LMS7_CH_B)
@@ -855,9 +849,9 @@ int lms7002m_streaming_up(lms7002_dev_t *d, unsigned dir,
         d->lml_mode = nlml_mode;
     }
 
-    res = lms7002m_dc_corr_en(&d->lmsstate, d->rx_run[0], d->rx_run[1], d->tx_run[0], d->tx_run[1]);
-    if (res)
-        return res;
+    //res = lms7002m_dc_corr_en(&d->lmsstate, d->rx_run[0], d->rx_run[1], d->tx_run[0], d->tx_run[1]);
+    //if (res)
+    //    return res;
     //res = lms7_dc_init(&d->lmsstate, d->rx_run[0], d->rx_run[1], d->tx_run[0], d->tx_run[1]);
 
     USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_INFO, "configure done RUN RX:%d%d TX:%d%d\n",
@@ -890,7 +884,8 @@ enum {
 int lms7002m_samplerate(lms7002_dev_t *d,
                         unsigned rxrate, unsigned txrate,
                         unsigned adcclk, unsigned dacclk,
-                        unsigned flags, const bool rx_port_1)
+                        unsigned flags, const bool rx_port_1,
+                        unsigned rx_dec, unsigned tx_int)
 {
     //bool no_8ma = false;
     lms7002m_limelight_conf_t cfg;
@@ -928,7 +923,7 @@ int lms7002m_samplerate(lms7002_dev_t *d,
     for (unsigned citer = 0; citer < (extended_cgen_range ? 2 : 1); citer++) {
         unsigned mindecint_rx = (sisoddr_rx || extclk_rx) ? 1 : 2;
         unsigned mindecint_tx = (sisoddr_tx || extclk_tx) ? 1 : 2;
-        unsigned cgen_max = extended_cgen_range && (citer == 0) ? 380e6 : 320e6;
+        unsigned cgen_max = extended_cgen_range && (citer == 0) ? 370e6 : 320e6;
         cgen_rate = MAX(txmaster_min, rxmaster_min);
 
         if (cgen_rate < 1) {
@@ -1073,13 +1068,13 @@ int lms7002m_samplerate(lms7002_dev_t *d,
         if (rxrate > 1 && d->rx_run[i] && !d->rx_bw[i].set) {
             USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_INFO, "Set RX[%d] bandwidth to %.3f Mhz\n", i, rxrate / 1e6);
             res = res ? res : lms7002m_mac_set(&d->lmsstate, i == 0 ? LMS7_CH_A : LMS7_CH_B);
-            res = res ? res : lms7002m_rbb_bandwidth(d, rxrate, false);
+            res = res ? res : lms7002m_rbb_bandwidth(d, rxrate / rx_dec, false);
         }
 
         if (txrate > 1 && d->tx_run[i] && !d->tx_bw[i].set) {
             USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_INFO, "Set TX[%d] bandwidth to %.3f Mhz\n", i, txrate / 1e6);
             res = res ? res : lms7002m_mac_set(&d->lmsstate, i == 0 ? LMS7_CH_A : LMS7_CH_B);
-            res = res ? res : lms7002m_tbb_bandwidth(d, txrate, false);
+            res = res ? res : lms7002m_tbb_bandwidth(d, txrate / tx_int, false);
 
             res = res ? res : lms7002m_set_gain(d, i == 0 ? LMS7_CH_A : LMS7_CH_B,
                                                 RFIC_LMS7_TX_PGA_GAIN, 13, NULL);
@@ -1162,9 +1157,8 @@ int lms7002m_set_corr_param(lms7002_dev_t* d, int channel, int corr_type, int va
     case CORR_OP_SET_FREQ:
         // TODO: optimize for TDD
 
-        res = lms7002m_sxx_tune(&d->lmsstate, rx ? SXX_TX : SXX_RX, d->fref, (unsigned)value, false);
-        res = (res) ? res
-                                       : lms7002m_mac_set(&d->lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
+        res = lms7002m_sxx_tune(&d->lmsstate, rx ? SXX_RX : SXX_TX, d->fref, (unsigned)value, false);
+        res = (res) ? res : lms7002m_mac_set(&d->lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
                            return res;
     case CORR_OP_SET_BW:
         if (rx) {
