@@ -167,6 +167,19 @@ const char* SoapyUSDR::get_sdr_param(int sdridx, const char* dir, const char* pa
     return _param_name;
 }
 
+const char* SoapyUSDR::get_sdr_param_chan(int sdridx, const char* dir, const char* par, const char* subpar, unsigned chan)
+{
+    if (max_sw_rx_chans <= 1 && max_sw_tx_chans <= 1)
+        return get_sdr_param(sdridx, dir, par, subpar);
+
+    if (subpar) {
+        snprintf(_param_name, sizeof(_param_name), "/dm/sdr/%d/%s/%s/%s/%d", sdridx, dir, par, subpar, chan);
+    } else {
+        snprintf(_param_name, sizeof(_param_name), "/dm/sdr/%d/%s/%s/%d", sdridx, dir, par, chan);
+    }
+    return _param_name;
+}
+
 
 
 SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
@@ -278,6 +291,11 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
 
     uint64_t val;
     int res;
+
+    usdr_dme_get_uint(_dev->dev(), "/ll/sdr/max_hw_rx_chans", &max_hw_rx_chans);
+    usdr_dme_get_uint(_dev->dev(), "/ll/sdr/max_hw_tx_chans", &max_hw_tx_chans);
+    usdr_dme_get_uint(_dev->dev(), "/ll/sdr/max_sw_rx_chans", &max_sw_rx_chans);
+    usdr_dme_get_uint(_dev->dev(), "/ll/sdr/max_sw_tx_chans", &max_sw_tx_chans);
 
     res = usdr_dme_get_uint(_dev->dev(), "/ll/sdr/0/rfic/0", &val);
     if (res == 0) {
@@ -493,7 +511,7 @@ void SoapyUSDR::setGain(const int direction, const size_t channel, const double 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setGain(%s, %d, %g dB)", dir, int(channel), value);
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    const char* defparam = get_sdr_param(0, dir, "gain", "auto");
+    const char* defparam = get_sdr_param_chan(0, dir, "gain", "auto", channel);
     int res = usdr_dme_set_uint(_dev->dev(), defparam, value);
     if (res) {
         SoapySDR::logf(callLogLvl(), "SoapyUSDR::setGain(%s, %d, %g dB) => %s failed %d",
@@ -510,7 +528,7 @@ void SoapyUSDR::setGain(const int direction, const size_t channel, const std::st
 
     const rfic_gain_descriptor* gains = get_gains(type);
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    const char* defparam = get_sdr_param(0, dir, "gain", nullptr);
+    const char* defparam = get_sdr_param_chan(0, dir, "gain", nullptr, channel);
     unsigned i;
 
     for (i = 0; gains[i].name != nullptr; i++) {
@@ -593,16 +611,14 @@ void SoapyUSDR::setFrequency(const int direction, const size_t channel, const st
     int res;
 
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
-    const char* pname = get_sdr_param(0, dir, "frequency", (name == "BB") ? "bb" : NULL);
+    const char* pname = get_sdr_param_chan(0, dir, "frequency", (name == "BB") ? "bb" : NULL, channel);
 
-    uint64_t val = (((uint64_t)channel) << 32) | (uint32_t)frequency;
-
-    res = usdr_dme_set_uint(_dev->dev(), pname,
-                            type == RFIC_AFE79XX ? (uint64_t)frequency : val);
+    res = usdr_dme_set_uint(_dev->dev(), pname, (uint64_t)(int64_t)frequency);
     if (res)
         throw std::runtime_error(std::string("SoapyUSDR::setFrequency(") + pname + ", " + std::to_string(frequency) + ")");
 
-    _actual_frequency[direction] = val;
+    // TODO: refactor this
+    _actual_frequency[direction] = frequency;
 }
 
 double SoapyUSDR::getFrequency(const int direction, const size_t channel, const std::string &name) const
@@ -646,7 +662,9 @@ SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const 
 SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const size_t /*channel*/) const
 {
     SoapySDR::RangeList ranges;
-    if (type == RFIC_AFE79XX) {
+    if (device_type == DEVICE_SSDR) {
+        ranges.push_back(SoapySDR::Range(30e6, 11.5e9));
+    } else if (type == RFIC_AFE79XX) {
         ranges.push_back(SoapySDR::Range(5e6, 12.5e9));
     } else {
         ranges.push_back(SoapySDR::Range(0e6, 3.8e9));
@@ -752,7 +770,7 @@ void SoapyUSDR::setBandwidth(const int direction, const size_t channel, const do
     if (bw == 0.0) return; //special ignore value
 
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
-    const char* pname = get_sdr_param(0, dir, "bandwidth",  NULL);
+    const char* pname = get_sdr_param_chan(0, dir, "bandwidth",  NULL, channel);
     int res;
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setBandwidth(%s, %g MHz)",dir, bw/1e6);
 

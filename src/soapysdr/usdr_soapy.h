@@ -325,8 +325,7 @@ private:
     };
 
     const char* get_sdr_param(int sdridx, const char* dir, const char* par, const char* subpar);
-
-    enum { MAX_CHANNELS = 2 };
+    const char* get_sdr_param_chan(int sdridx, const char* dir, const char* par, const char* subpar, unsigned chan);
 
     std::shared_ptr<usdr_handle> _dev;
     char _param_name[128];
@@ -349,6 +348,11 @@ private:
     int64_t last_recv_pkt_time;
 
     double avg_gap;
+
+    uint64_t max_hw_rx_chans = 1;
+    uint64_t max_hw_tx_chans = 1;
+    uint64_t max_sw_rx_chans = 1;
+    uint64_t max_sw_tx_chans = 1;
 
     // Stats
     uint64_t rx_pkts;
