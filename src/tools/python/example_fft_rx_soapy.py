@@ -121,7 +121,8 @@ def main() -> None:
     dev.closeStream(rx_stream)
 
     # Close device
-    dev.close()  # Not strictly necessary, but good practice
+    if dev.close is not None:
+        dev.close()  # Not strictly necessary, but good practice
     dev = None
 
     psd = psd_acc / args.accumulation
