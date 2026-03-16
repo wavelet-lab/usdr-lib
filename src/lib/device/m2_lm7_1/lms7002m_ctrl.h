@@ -63,6 +63,14 @@ enum {
 struct lms7002_dev;
 typedef struct lms7002_dev lms7002_dev_t;
 
+enum sigtype {
+    XSDR_TX_LO_CHANGED,
+    XSDR_RX_LO_CHANGED,
+    XSDR_TX_LNA_CHANGED,
+    XSDR_RX_LNA_CHANGED,
+};
+
+typedef int (*on_change_signal_t)(lms7002_dev_t *d, enum sigtype t);
 typedef int (*on_change_antenna_port_sw_t)(lms7002_dev_t* dev, int direction, unsigned sw);
 typedef const lms7002m_lml_map_t (*on_get_lml_portcfg_t)(bool rx, unsigned chs, unsigned flags, bool no_siso_map);
 
@@ -73,6 +81,7 @@ struct lms7002_dev
     // Callbacks
     on_change_antenna_port_sw_t on_ant_port_sw;
     on_get_lml_portcfg_t on_get_lml_portcfg;
+    on_change_signal_t on_custom_signal;
 
     // RFIC state
     uint8_t rx_cfg_path;  // Configuration index in cfg_auto_rx

@@ -1365,7 +1365,15 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
                        double *actualfreq)
 {
     int res = 0;
-
+    double original = freq;
+    double actual_lms7;
+    double actual_lms8 = 0;
+    int64_t lms8_freq = 0;
+    uint64_t other_freq = (type == RFIC_LMS7_TUNE_RX_FDD) ? d->freq_txlo : d->freq_rxlo;
+    bool current_changed = false;
+    bool other_active = (other_freq > d->lms8_switchover_freq) && ((type == RFIC_LMS7_TUNE_RX_FDD) ?
+                                                                       (d->base.tx_run[0] || d->base.tx_run[1]) :
+                                                                       (d->base.rx_run[0] || d->base.rx_run[1]));
     if (d->ssdr && freq > d->lms8_switchover_freq) {
         float bwef = d->lms8st_bwef_1000 / 1000.0;
         unsigned lob = (d->lms7_lob == 0) ? 2.01e9 : d->lms7_lob;
@@ -1375,12 +1383,28 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
             (d->base.rx_run[0] ? 1 << LMS8_RXA_CHIDX : 0) |
             (d->base.rx_run[1] ? 1 << LMS8_RXB_CHIDX : 0);
 
-        int64_t lms8_freq;
+        if (other_active) {
+            double delta = fabs(original - other_freq);
+            if (delta > 1.5e9) {
+                USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "Both TX & RX path use high band, however RX and TX freqs are %.3f Mhz apart! sSDR use shared LO for both RX & TX: either reduce delta or use different bands\n",
+                            delta / 1e6);
+                return -EINVAL;
+            }
+        }
+
         if (d->lms8_int_mode) {
-            lms8_freq = (freq - lob + d->base.fref / 2) / d->base.fref;
+            if (other_active) {
+                lms8_freq = (((freq + other_freq) / 2) - lob + d->base.fref / 2) / d->base.fref;
+            } else {
+                lms8_freq = (freq - lob + d->base.fref / 2) / d->base.fref;
+            }
             lms8_freq *= d->base.fref;
         } else {
-            lms8_freq = freq - lob;
+            if (other_active) {
+                lms8_freq = ((freq + other_freq) / 2) - lob;
+            } else {
+                lms8_freq = freq - lob;
+            }
         }
 
         lob = freq - lms8_freq;
@@ -1418,18 +1442,37 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
 
         USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "Setting FREQ  %.3f Mhz, LNB %.3f Mhz\n", freq / 1.0e6, lob / 1.0e6);
         freq = lob;
+        actual_lms8 = d->lms8_lo_freq;
+        current_changed = true;
     }
 
     if (type == RFIC_LMS7_TUNE_RX_FDD && d->lms7_rxlo_last == freq)
         return 0;
     if (type == RFIC_LMS7_TUNE_TX_FDD && d->lms7_txlo_last == freq)
         return 0;
+    if (type == RFIC_LMS7_TUNE_RX_FDD)
+        d->freq_rxlo = original;
+    if (type == RFIC_LMS7_TUNE_TX_FDD)
+        d->freq_txlo = original;
 
-    res = lms7002m_fe_set_freq(&d->base, channel, type, freq, actualfreq);
+    res = lms7002m_fe_set_freq(&d->base, channel, type, freq, &actual_lms7);
     if (type == RFIC_LMS7_TUNE_RX_FDD) {
         d->lms7_rxlo_last = (res == 0) ? freq : 0;
     } else if (type == RFIC_LMS7_TUNE_TX_FDD) {
         d->lms7_txlo_last = (res == 0) ? freq : 0;
+    }
+
+    if (res == 0 && other_active && current_changed) {
+        unsigned ntype = (type == RFIC_LMS7_TUNE_RX_FDD) ? RFIC_LMS7_TUNE_TX_FDD : RFIC_LMS7_TUNE_RX_FDD;
+        double nfreq = other_freq - lms8_freq;
+        res = lms7002m_fe_set_freq(&d->base, channel, ntype, nfreq, NULL);
+
+        USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "Freq configuration updated: RX_LO=%.3f TX_LO=%.3f LMS8_LO=%.3f\n",
+                    d->base.rx_lo / 1e6, d->base.tx_lo / 1e6, lms8_freq / 1e6);
+    }
+
+    if (res == 0 && actualfreq) {
+        *actualfreq = actual_lms8 + actual_lms7;
     }
 
     // LO correction
@@ -1437,6 +1480,19 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
     return res;
 }
 
+int xsdr_on_change_signal(lms7002_dev_t *dev, enum sigtype t)
+{
+    xsdr_dev_t *d = (xsdr_dev_t *)(dev);
+    switch (t) {
+    case XSDR_RX_LO_CHANGED:
+    case XSDR_RX_LNA_CHANGED:
+        return (d->freq_rxlo > d->lms8_switchover_freq) ? 1 : 0;
+    case XSDR_TX_LO_CHANGED:
+    case XSDR_TX_LNA_CHANGED:
+        return (d->freq_txlo > d->lms8_switchover_freq) ? 1 : 0;
+    };
+    return 0;
+}
 
 int xsdr_rfic_rfe_set_path(xsdr_dev_t *d,
                            unsigned path)
@@ -2064,6 +2120,10 @@ int xsdr_init(xsdr_dev_t *d)
         } else {
             return -EINVAL;
         }
+    }
+
+    if (d->ssdr) {
+        d->base.on_custom_signal = &xsdr_on_change_signal;
     }
 
     res = (d->new_rev) ? _xsdr_init_revx(d, hwcfg_devid) : _xsdr_init_revo(d);

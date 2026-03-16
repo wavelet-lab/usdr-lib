@@ -18,13 +18,6 @@
 #define MAX(x,y) (((x) > (y)) ? (x) : (y))
 #endif
 
-enum sigtype {
-    XSDR_TX_LO_CHANGED,
-    XSDR_RX_LO_CHANGED,
-    XSDR_TX_LNA_CHANGED,
-    XSDR_RX_LNA_CHANGED,
-};
-
 static unsigned _ulog(unsigned d)
 {
     switch (d) {
@@ -49,7 +42,7 @@ static int get_antenna_cfg_by_name(const char* name, const freq_auto_band_map_t*
     return -1;
 }
 
-static int get_antenna_cfg_by_freq(unsigned freq, const freq_auto_band_map_t* maps, unsigned max)
+static int get_antenna_cfg_by_freq(uint64_t freq, const freq_auto_band_map_t* maps, unsigned max)
 {
     unsigned i;
     for (i = 0; i < max - 1; i++) {
@@ -84,6 +77,7 @@ int lms7002m_init(lms7002_dev_t* d, lldev_t dev, unsigned subdev, unsigned refcl
     d->lmsstate.dev = dev;
     d->lmsstate.subdev = subdev;
     d->fref = refclk;
+    d->on_custom_signal = NULL;
 
     d->rx_rfic_path = XSDR_RX_AUTO;
     d->tx_rfic_path = XSDR_TX_AUTO;
@@ -183,7 +177,9 @@ static int _lms7002m_signal_event(lms7002_dev_t *d, enum sigtype t)
         res = lms7002m_mac_set(&d->lmsstate, LMS7_CH_AB);
     case XSDR_RX_LNA_CHANGED:
         if (d->rx_rfic_path == XSDR_RX_AUTO) {
-            cfgidx = get_antenna_cfg_by_freq(d->rx_lo, d->cfg_auto_rx, MAX_RX_BANDS);
+            cfgidx = (d->on_custom_signal) ?
+                         d->on_custom_signal(d, t) :
+                         get_antenna_cfg_by_freq(d->rx_lo, d->cfg_auto_rx, MAX_RX_BANDS);
             USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_INFO, "Auto RX band selection: %s\n",
                         d->cfg_auto_rx[cfgidx].name0);
 
@@ -194,7 +190,9 @@ static int _lms7002m_signal_event(lms7002_dev_t *d, enum sigtype t)
         res = lms7002m_mac_set(&d->lmsstate, LMS7_CH_AB);
     case XSDR_TX_LNA_CHANGED:
         if (d->tx_rfic_path == XSDR_TX_AUTO) {
-            cfgidx = get_antenna_cfg_by_freq(d->tx_lo, d->cfg_auto_tx, MAX_TX_BANDS);
+            cfgidx = (d->on_custom_signal) ?
+                         d->on_custom_signal(d, t) :
+                         get_antenna_cfg_by_freq(d->tx_lo, d->cfg_auto_tx, MAX_TX_BANDS);
             USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_INFO, "Auto TX band selection: %s\n",
                         d->cfg_auto_tx[cfgidx].name0);
 
@@ -438,7 +436,8 @@ int lms7002m_rfe_set_path(lms7002_dev_t *d,
 
     d->rx_rfic_path = path;
     if (path == XSDR_RX_AUTO) {
-        cfgidx = get_antenna_cfg_by_freq(d->rx_lo, d->cfg_auto_rx, MAX_RX_BANDS);
+        res = _lms7002m_signal_event(d, XSDR_RX_LNA_CHANGED);
+        goto finish;
     } else {
         cfgidx = get_antenna_cfg_by_band(band, d->cfg_auto_rx, MAX_RX_BANDS);
     }
@@ -447,6 +446,8 @@ int lms7002m_rfe_set_path(lms7002_dev_t *d,
 
 
     res = (res) ? res : _lms7002m_set_lna_rx(d, cfgidx);
+
+finish:
     if (lb_change) {
         res = (res) ? res : _lms7002m_lb_status_changes(d);
     }

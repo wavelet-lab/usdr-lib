@@ -58,11 +58,14 @@ struct xsdr_dev
     unsigned s_dacclk;
     unsigned s_flags;
 
-    unsigned lms7_lob;
+    unsigned lms7_lob; // Preferred LMS7 lo if set
     unsigned lms7_rxlo_last;
     unsigned lms7_txlo_last;
-    int64_t lms8_lo_freq;
     unsigned lms8_switchover_freq;
+
+    uint64_t freq_rxlo; // LMS7 + LMS8
+    uint64_t freq_txlo; // LMS7 + LMS8
+    int64_t lms8_lo_freq;
 
     int tx_override_phase;
     int tx_override_phase_iq;
