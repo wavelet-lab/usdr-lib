@@ -398,6 +398,10 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     unsigned vco_div_io = (VCO_MAX  + io_clk - 1) / io_clk;
     bool sep_clkdiv = d->sep_clkdiv;
 
+    // No MMCM in RX chain
+    if (!d->mmcm_single && !d->mmcm_rx && rx_master)
+        return 0;
+
     vco_div_io += g_clk_reduce;
 
     vco_div_io += (txphase_off > 2) ? 2 : txphase_off;
@@ -583,6 +587,7 @@ enum HWID_MSKS {
     PHY_CFG_RX_MMCM = 0x10,
 
     PHY_CFG_HAS_DUC_DDC = 0x04,
+    PHY_CFG_SINGLE_MMCM = 0x01,
 };
 
 static bool noerrors_v4(unsigned errs[4], uint64_t* badness)
@@ -675,6 +680,8 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
             } else if (!d->siso_sdr_active_rx && d->new_rev && !d->ssdr && (d->s_rxrate > 70e6 || d->s_txrate > 70e6)) {
                 res = res ? res : xsdr_set_vio(d, 1940);
                 res = res ? res : xsdr_set_lms125vdd(d, 1320);
+            } else if (!d->siso_sdr_active_rx && !d->new_rev && (d->s_rxrate > 50e6 || d->s_txrate > 50e6)) {
+                res = res ? res : xsdr_set_vio(d, ((d->s_rxrate > 60e6 || d->s_txrate > 60e6)) ? 2150 : 1960);
             }
 
             // Fixup for 53-58 MSPS range, but still 58 to 60 might be unoperable on some chips, and 60+ works fine again
@@ -2082,6 +2089,7 @@ int xsdr_init(xsdr_dev_t *d)
     const bool rx_port_is_1 = ((phycfg_id & PHY_CFG_LML2_IS_RX) != PHY_CFG_LML2_IS_RX);
     const bool tx_mmcm = ((phycfg_id & PHY_CFG_TX_MMCM) == PHY_CFG_TX_MMCM);
     const bool rx_mmcm = ((phycfg_id & PHY_CFG_RX_MMCM) == PHY_CFG_RX_MMCM);
+    const bool mmcm_single = ((phycfg_id & PHY_CFG_SINGLE_MMCM) == PHY_CFG_SINGLE_MMCM);
     const bool sep_clkdiv = ((phycfg_id & PHY_CFG_SEP_CLKDIV_MSK) == PHY_CFG_SEP_CLKDIV_MSK);
     const bool has_duc_ddc = ((phycfg_id & PHY_CFG_HAS_DUC_DDC) == PHY_CFG_HAS_DUC_DDC);
 
@@ -2093,6 +2101,7 @@ int xsdr_init(xsdr_dev_t *d)
     d->rx_port_is_1 = rx_port_is_1;
     d->mmcm_rx = rx_mmcm;
     d->mmcm_tx = tx_mmcm;
+    d->mmcm_single = mmcm_single;
     d->sep_clkdiv = sep_clkdiv;
     d->cfg_srate_siso_rx = 0;
     d->cfg_srate_siso_tx = 0;
