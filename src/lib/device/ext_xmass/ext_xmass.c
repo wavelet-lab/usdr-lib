@@ -10,6 +10,8 @@
 
 #include "../hw/tca9555/tca9555.h"
 #include "../hw/lmk05318/lmk05318.h"
+#include "../hw/tmp114/tmp114.h"
+#include "../hw/at24/at24.h"
 
 #include "def_ext_xmass_ctrl.h"
 
@@ -50,6 +52,8 @@ enum {
 //    OUT5     aux_p + aux_n
 //    OUT6     REF  / LVCMOS
 //    OUT7     1PPS / LVCMOS
+// TMP114NAIYMTR  1001111
+// TMP114NBIYMTR  1001110
 //
 // M2_Connector (master)
 // LED1/SDA   CLK_SDA
@@ -80,6 +84,12 @@ enum {
     I2C_ADDR_XRA1201 = 0x14,
     I2C_GPS_RX = 0x20,
     I2C_GPS_TX = 0x21,
+
+    I2C_TMP114NB = 0x4E,
+    I2C_TMP114NA = 0x4F,
+
+    I2C_DEV_AT24_MEM  = 0x50,
+    I2C_DEV_AT24_SEC  = 0x58,
 };
 
 static int _board_xmass_fill_lmk05318(board_xmass_t* ob, lmk05318_out_config_t lmk05318_outs_cfg[8])
@@ -127,6 +137,9 @@ int board_xmass_init(lldev_t dev,
 
     unsigned i2c_lmka = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_LMK);
     unsigned i2c_xraa = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_ADDR_XRA1201);
+    unsigned i2c_tmpa = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_TMP114NA);
+    unsigned i2c_tmpb = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_TMP114NB);
+    unsigned i2c_at24 = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(i2c_loc), LSOP_I2C_BUSNO(i2c_loc), I2C_DEV_AT24_SEC);
     uint16_t val;
     uint16_t out_msk = 0xe000;
 
@@ -199,6 +212,26 @@ int board_xmass_init(lldev_t dev,
     USDR_LOG("XMSS", USDR_LOG_INFO, "LMK03518 outputs synced");
 
     ob->i2c_xraa = i2c_xraa;
+
+    int ida, idb, temp;
+    res = res ? res : tmp114_devid_get(dev, subdev, i2c_tmpa, &ida);
+    if (res == 0 && ida == 0x1114) {
+        res = res ? res : tmp114_temp_get(dev, subdev, i2c_tmpa, &temp);
+        USDR_LOG("XMSS", USDR_LOG_INFO, "Rev.1a: TempA = %.2fC\n", temp / 256.0);
+    }
+    res = res ? res : tmp114_devid_get(dev, subdev, i2c_tmpb, &idb);
+    if (res == 0 && idb == 0x1114) {
+        res = res ? res : tmp114_temp_get(dev, subdev, i2c_tmpb, &temp);
+
+        USDR_LOG("XMSS", USDR_LOG_INFO, "Rev.1a: TempB = %.2fC\n", temp / 256.0);
+    }
+
+    if (res == 0 && (ida == 0x1114 || idb == 0x1114)) {
+        uint8_t s[16] = { 0, };
+        res = res ? res : at24_saddr_mem_get(dev, subdev, i2c_at24, AT24_SECURE_SERIAL_OFF, 16, s);
+        USDR_LL_LOG(dev, "XMSS", USDR_LOG_WARNING, "AT24_SERIAL: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
+                    s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8], s[9], s[10], s[11], s[12], s[13], s[14], s[15]);
+    }
 
     //res = (res) ? res : tca9555_reg16_set(dev, subdev, i2c_xraa, TCA9555_OUT0, (3) | (1 << 4) | (1 << 8) | (1 << 7) | (1 << 5) | (1 << 10));
     return res;
