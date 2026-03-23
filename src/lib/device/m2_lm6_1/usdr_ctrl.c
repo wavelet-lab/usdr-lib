@@ -414,6 +414,20 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
     }
     */
 
+    // Update FE
+    res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, 7);
+    res = res ? res : usleep(10);
+    res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, 0);
+    res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, (1 << 24) | 1);
+
+     res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, (8 << 24) | 0);
+     res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, (9 << 24) | 16384);
+
+     uint32_t v = 0;
+     res = res ? res : lowlevel_reg_rd32(dev, 0, REG_CFG_PHY_0, &v);
+
+     USDR_LOG("UDEV", USDR_LOG_WARNING, "V=%08x\n", v);
+
     d->rxbb_decim = int_decim[i];
     d->txbb_intr = int_decim[i];
 
