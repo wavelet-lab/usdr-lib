@@ -178,4 +178,20 @@ struct pcie_driver_woa_oob {
 #define PCIE_DRIVER_DMA_POST          _IOW(PCIE_DRIVER_MAGIC, 25, uint32_t)
 
 
+// XMASS specific functions
+struct xmass_iop {
+    unsigned io_len;   //
+    unsigned delay_ns; //
+    uint8_t* out_buf;  // Write buffer
+    uint8_t* in_buf;   // Readback buffer
+};
+
+//
+#define PCIE_XMASS_DRIVER_MAGIC          0xDC
+#define PCIE_GPIOS_8     _IOWR(PCIE_XMASS_DRIVER_MAGIC, 0, struct xmass_iop)
+#define PCIE_FLASH_READ  _IOWR(PCIE_XMASS_DRIVER_MAGIC, 1, uint8_t*)
+#define PCIE_FLASH_ERASE _IOWR(PCIE_XMASS_DRIVER_MAGIC, 2, uint32_t)
+#define PCIE_FLASH_WRITE _IOWR(PCIE_XMASS_DRIVER_MAGIC, 3, uint8_t*)
+#define PCIE_GETIDS      _IOWR(PCIE_XMASS_DRIVER_MAGIC, 4, uint8_t*)
+
 #endif
