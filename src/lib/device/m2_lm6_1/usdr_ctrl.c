@@ -64,6 +64,20 @@ enum lms6_vios {
     LMS6_VIO_BOOST = 1950,
 };
 
+enum fpga_phy_regs {
+    CFG_REG_RESET = 0,
+    CFG_REG_DCCTRL = 1,
+    CFG_REG_IQIMB_0 = 2,
+    CFG_REG_IQIMB_1 = 3,
+    CFG_REG_IQIMB_2 = 4,
+    CFG_REG_IQIMB_3 = 5,
+    CFG_REG_NCO0_L = 8,
+    CFG_REG_NCO0_H = 9,
+    CFG_REG_NCO1_L = 10,
+    CFG_REG_NCO1_H = 11,
+    CFG_REG_DSP_LD = 64,
+};
+
 // RX chain
 // LNA_GAIN -> mixer -> VGA1_GAIN -> lpf -> VGA2_GAIN[a,b] -> adc
 
@@ -264,6 +278,29 @@ static int _usdr_set_lna_rx(usdr_dev_t *d, unsigned cfg_idx)
     return usdr_set_rx_port_switch(d, /*d->rx_lna_lb_active ? cfg->swlb :*/ cfg->sw);
 }
 
+static int _usdr_set_nco(usdr_dev_t *d, bool rx, unsigned nco_num, double freq)
+{
+    unsigned raw_rate = (rx) ? d->adc_clk : d->dac_clk;
+    double rel_f = freq / raw_rate; // [-1 .. 1]
+    if ((rel_f > 1) || (rel_f < -1)) {
+        USDR_LOG("UDEV", USDR_LOG_WARNING, "NCO_%s_%d: Frequency %.0f is out of ADC/DAC range %u!\n",
+                 rx ? "RX" : "TX", nco_num, freq, raw_rate);
+
+        rel_f = -1;
+    }
+    int32_t nco_freq = rel_f * INT_MAX;
+    nco_freq <<= 1;
+    unsigned reg = rx ? REG_CFG_PHY_0 : REG_CFG_PHY_1;
+    unsigned off = 8 + 2 * nco_num;
+    int res = 0;
+
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, reg, ((off + 0) << 24) | (nco_freq & 0xffff));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, reg, ((off + 1) << 24) | ((nco_freq >> 16) & 0xffff));
+
+    USDR_LOG("UDEV", USDR_LOG_WARNING, "NCO_%s_%d: Set to %.3f KHz -- %0.3f %08x -- rate: %.3f MSPS\n",
+             rx ? "RX" : "TX", nco_num, rel_f * raw_rate / 1.0e3, rel_f, nco_freq, raw_rate / 1e6);
+    return res;
+}
 
 static int _usdr_set_lna_tx(usdr_dev_t *d, unsigned cfg_idx)
 {
@@ -366,6 +403,8 @@ int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob)
     return usdr_set_samplerate_ex(d, d->rawsamplerate, d->rawsamplerate, 0, 0, 0);
 }
 
+#define TARGET_RATE 30720000
+
 int usdr_set_samplerate_ex(struct usdr_dev *d,
                            unsigned rxrate, unsigned txrate,
                            unsigned adcclk, unsigned dacclk,
@@ -373,22 +412,20 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
 {
     lldev_t dev = d->base.dev;
     unsigned rate = (rxrate == 0) ? txrate : rxrate;
-    unsigned freq = rate << 1; //Link speed x2 sample rate
-    struct si5332_layout_info nfo = { d->fref, freq };
+    struct si5332_layout_info nfo = { d->fref, rate << 1 }; //Link speed x2 sample rate
     int res = 0;
-    unsigned i = 0;
-    unsigned int_decim[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+    unsigned ind = 0;
+    unsigned int_dec_x[] = { 1, 2, 4, 8, 16, 32 /*, 64, 128, 256 */ };
 
-    /*
-    for (unsigned ii = 0; ii < SIZEOF_ARRAY(int_decim); ii++) {
-        if (rxrate * int_decim[ii] < 60e6)
-            i = ii;
-        else
-            break;
+    if (d->has_rxchain && d->has_txchain) {
+        for (; ind < SIZEOF_ARRAY(int_dec_x); ind++) {
+            if (rate * int_dec_x[ind] >= TARGET_RATE)
+                break;
+        }
+
+        rate *= int_dec_x[ind];
+        nfo.out = rate << 1;
     }
-    */
-
-    nfo.out *= int_decim[i];
 
     if (rate >= 60e6 && !d->vio_boost) {
         USDR_LOG("UDEV", USDR_LOG_WARNING, "Boosting Vio to get stable samplerates over 60Msps\n");
@@ -406,30 +443,59 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
     // TODO: Add ability to alter it
     d->mixer_lo = d->si_vco_freq / d->si_vco_div;
     d->rawsamplerate = nfo.out;
-    /*
-    if (d->rxbb_decim != int_decim[i]) {
-        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSP_RX_CTRL, 0x0);
-        res = (res) ? res : fgearbox_load_fir(d->base.dev, IGPO_DSP_RX_CFG, (fgearbox_firs_t)d->rxbb_decim, DSP_7SERIES);
-        res = (res) ? res : dev_gpo_set(d->base.dev, IGPO_DSP_RX_CTRL, 0x0);
+
+    if (d->has_rxchain && rxrate && d->rxbb_decim != int_dec_x[ind]) {
+        d->rxbb_decim = int_dec_x[ind];
+        res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, 15);
+        res = res ? res : usleep(1);
+        res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, 1 | (1<<3));
+
+        res = (res) ? res : fgearbox_load_fir_ex(d->base.dev, REG_CFG_PHY_0, CFG_REG_DSP_LD << 24, (fgearbox_firs_t)d->rxbb_decim, DSP_7SERIES, 1);
     }
-    */
+    if (d->has_txchain && txrate && d->txbb_intr != int_dec_x[ind]) {
+        d->txbb_intr = int_dec_x[ind];
+        res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_1, 7);
+        res = res ? res : usleep(1);
+        res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_1, 0);
+
+        res = (res) ? res : fgearbox_load_fir_i_ex(d->base.dev, REG_CFG_PHY_1, CFG_REG_DSP_LD << 24, (fgearbox_firs_t)d->txbb_intr, DSP_7SERIES, 10);
+    }
+
+    d->dac_clk = rate;
+    d->adc_clk = rate;
 
     // Update FE
-    res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, 7);
+    res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, 1);
+    res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_1, 7);
     res = res ? res : usleep(10);
     res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, 0);
+    res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_1, 0);
+
+    // DC control
     res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, (1 << 24) | 1);
+    // res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_1, (1 << 24) | 0);
 
-     res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, (8 << 24) | 0);
-     res = res ? res : lowlevel_reg_wr32(dev, 0, REG_CFG_PHY_0, (9 << 24) | 16384);
+    // Update NCOs
+    for (unsigned rxgrp = 0; rxgrp < 2; rxgrp++) {
+        bool istx = (rxgrp == 1);
+        freq_data_t* freqd = (istx) ? &d->tx_raw : &d->rx_raw;
 
-     uint32_t v = 0;
-     res = res ? res : lowlevel_reg_rd32(dev, 0, REG_CFG_PHY_0, &v);
+        for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
+            if (freqd->bb[i].set) {
+                res = res ? res : _usdr_set_nco(d, !istx, i, (int32_t)freqd->bb[i].value);
+            } else {
+                res = res ? res : _usdr_set_nco(d, !istx, i, 0);
+            }
+        }
+    }
 
-     USDR_LOG("UDEV", USDR_LOG_WARNING, "V=%08x\n", v);
+    uint32_t v = 0;
+    res = res ? res : lowlevel_reg_rd32(dev, 0, REG_CFG_PHY_0, &v);
 
-    d->rxbb_decim = int_decim[i];
-    d->txbb_intr = int_decim[i];
+    USDR_LOG("UDEV", USDR_LOG_WARNING, "V=%08x\n", v);
+
+    d->rxbb_decim = int_dec_x[ind];
+    d->txbb_intr = int_dec_x[ind];
 
     // Apply automatic RF Freq correction if external mixer is active
     if (d->mexir_en) {
@@ -438,13 +504,13 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
 
     // If user didn't set BW filter set it to samplerate
     if (!d->rx_bw.set && rxrate > 1) {
-        res = res ? res : lms6002d_set_bandwidth(&d->lms, false, rxrate);
+        res = res ? res : lms6002d_set_bandwidth(&d->lms, false, 2 * d->rx_nco_distance + rxrate);
     }
     if (!d->tx_bw.set && txrate > 1) {
-        res = res ? res : lms6002d_set_bandwidth(&d->lms, true, txrate);
+        res = res ? res : lms6002d_set_bandwidth(&d->lms, true, 2 * d->tx_nco_distance + txrate);
     }
 
-    USDR_LOG("UDEV", USDR_LOG_INFO, "INTR %d RX_RATE %.3f TX_RATE %.3f MXLO %.3f\n", int_decim[i], rxrate / 1.0e6, txrate / 1.0e6, d->mixer_lo / 1.0e6);
+    USDR_LOG("UDEV", USDR_LOG_INFO, "INTR %d RX_RATE %.3f TX_RATE %.3f MXLO %.3f\n", int_dec_x[ind], rxrate / 1.0e6, txrate / 1.0e6, d->mixer_lo / 1.0e6);
     return res;
 }
 
@@ -519,6 +585,12 @@ int usdr_set_extref(usdr_dev_t *d, bool ext, uint32_t freq)
     return si5532_set_ext_clock_sw(d->base.dev, 0, I2C_BUS_SI5332A, ext);
 }
 
+int usdr_tx_dccorr(usdr_dev_t *d, int16_t i, int16_t q)
+{
+    uint32_t val = ((((uint16_t)q) & 0xfff) << 12) | (((uint16_t)i) & 0xfff);
+    return lowlevel_reg_wr32(d->lms.dev, 0, REG_CFG_PHY_1, (1 << 24) | val);
+}
+
 int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
 {
     lldev_t dev = d->base.dev;
@@ -585,6 +657,10 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
     d->si_vco_div = 8;
     d->hw_board_hasmixer = false;
     d->hw_board_rev = (d->hwid >> 8) & 0xff;
+
+    d->has_rxchain = ((d->hwid >> 16) & 2) ? true : false;
+    d->has_txchain = ((d->hwid >> 16) & 1) ? true : false;
+
     USDR_LOG("XDEV", USDR_LOG_WARNING, "HWID %08x USDR Board rev.%d Device `%s` FirmwareID %08x (%lld)\n",
              d->hwid, d->hw_board_rev, lowlevel_get_devname(dev), uaccess, (long long)get_xilinx_rev_h(uaccess));
 
@@ -769,49 +845,126 @@ int _usdr_lms6002_dc_calib(struct usdr_dev *d)
 }
 
 int usdr_rfic_fe_set_freq(struct usdr_dev *d,
-                          bool dir_tx,
+                          enum fe_freq_type type,
+                          unsigned chmask,
                           double freq,
                           double *actualfreq)
 {
     int res;
     if (actualfreq) *actualfreq = freq;
     bool first_tx = (d->tx_lo == 0);
-    if (dir_tx) {
-        d->tx_lo = freq;
+    bool istx = (type == FE_FREQ_LO_TX) || (type == FE_FREQ_BB_TX);
+    bool islo = (type == FE_FREQ_LO_TX) || (type == FE_FREQ_LO_RX);
+    freq_data_t* freqd = (istx) ? &d->tx_raw : &d->rx_raw;
+
+    for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
+        if (chmask & (1 << i)) {
+            switch (type) {
+            case FE_FREQ_LO_RX: opt_u32_set_val(&d->rx_raw.lo[i], freq); break;
+            case FE_FREQ_LO_TX: opt_u32_set_val(&d->tx_raw.lo[i], freq); break;
+            case FE_FREQ_BB_RX: opt_u32_set_val(&d->rx_raw.bb[i], freq); break;
+            case FE_FREQ_BB_TX: opt_u32_set_val(&d->tx_raw.bb[i], freq); break;
+            default:
+                return -EINVAL;
+            }
+        }
+    }
+
+    if (islo) {
+        double avg = 0;
+        unsigned cnt = 0;
+        for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
+            if (freqd->lo[i].set) {
+                avg += freqd->lo[i].value;
+                cnt++;
+            }
+        }
+        avg /= cnt;
+
+        if (!istx) {
+            d->rx_lo = avg;
+        } else {
+            d->tx_lo = avg;
+        }
+
+        for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
+            if (freqd->lo[i].set /* && freqd->bb[i].set */) {
+                double diff = (double)freqd->lo[i].value - avg;
+                opt_u32_set_val(&freqd->bb[i], (uint32_t)(int32_t)diff);
+            }
+        }
     } else {
-        d->rx_lo = freq;
+        // Update based on
+    }
+
+    unsigned nco_distance = 0;
+
+    for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
+        if (freqd->bb[i].set) {
+            nco_distance = MAX(nco_distance, ABS((int)freqd->bb[i].value));
+        }
+    }
+    if (nco_distance > 20e6) {
+        USDR_LOG("UDEV", USDR_LOG_WARNING, "%s: NCO_DISTANCE=%u Hz is more than BB IF LPF filter limit\n",
+                 lowlevel_get_devname(d->base.dev), 2 * nco_distance);
     }
 
     // Apply automatic switch, turn on pwr for RX or TX
-    _usdr_signal_event(d, dir_tx ? USDR_TX_LO_CHANGED : USDR_RX_LO_CHANGED);
+    _usdr_signal_event(d, istx ? USDR_TX_LO_CHANGED : USDR_RX_LO_CHANGED);
 
-    if (d->mexir_en && !dir_tx) {
-        // upconverter mixer
-        freq += d->mixer_lo;
+    if (!istx) {
+        freq = d->rx_lo;
+        d->rx_nco_distance = nco_distance;
+
+        if (d->mexir_en) {
+            // upconverter mixer
+            freq += d->mixer_lo;
+        }
+        d->rfic_rx_lo = freq;
+
+        USDR_LOG("UDEV", USDR_LOG_INFO, "%s: RX_LO=%u RFIC=%u\n",
+                 lowlevel_get_devname(d->base.dev), d->rx_lo, d->rfic_rx_lo);
+    } else {
+        freq = d->tx_lo;
+        d->tx_nco_distance = nco_distance;
     }
-    d->rfic_rx_lo = freq;
 
-    USDR_LOG("UDEV", USDR_LOG_INFO, "%s: FE_FREQ orig=%u RFIC=%u\n",
-             lowlevel_get_devname(d->base.dev), d->rx_lo, d->rfic_rx_lo);
-
-    res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
+    res = lms6002d_tune_pll(&d->lms, istx, freq);
     if (res == -ENOLCK) {
         // For unrecognized reason some LMS6002 chips fail to lock TX pll before RX initialization
         // so we try to lock TX in standalone mode first and if fails try to initialize RX pll
         // and tune TX again
-        if (dir_tx && first_tx && d->rx_lo == 0) {
-            lms6002d_tune_pll(&d->lms, 0, freq);
+        if (istx && first_tx && d->rx_lo == 0) {
+            lms6002d_tune_pll(&d->lms, false, freq);
         }
         // LDO may not be ready, check again
         usleep(5000);
-        res = lms6002d_tune_pll(&d->lms, dir_tx, freq);
+        res = lms6002d_tune_pll(&d->lms, istx, freq);
     }
     if (res == -ENOLCK) {
         USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: %s_LO=%u unable to lock (pwr: %d)!\n",
-                 lowlevel_get_devname(d->base.dev), dir_tx ? "TX" : "RX",
-                 dir_tx ? d->tx_lo : d->rx_lo,
-                 dir_tx ? d->tx_pwren : d->rx_pwren);
+                 lowlevel_get_devname(d->base.dev), istx ? "TX" : "RX",
+                 istx ? d->tx_lo : d->rx_lo,
+                 istx ? d->tx_pwren : d->rx_pwren);
     }
+
+    // Update NCOs
+    for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
+        if (freqd->bb[i].set) {
+            res = res ? res : _usdr_set_nco(d, !istx, i, (int32_t)freqd->bb[i].value);
+        }
+    }
+
+    // Update BW
+    if ((istx && !d->tx_bw.set) || (!istx && !d->rx_bw.set)) {
+        unsigned rate = istx ? (d->dac_clk / d->txbb_intr) : (d->adc_clk / d->rxbb_decim);
+        unsigned bw = 2 * d->tx_nco_distance + rate;
+
+        USDR_LOG("UDEV", USDR_LOG_WARNING, "%s: Updating %s bandwidth to %.3f Mhz\n",
+                 lowlevel_get_devname(d->base.dev), istx ? "TX" : "RX", bw / 1e6);
+        res = res ? res : lms6002d_set_bandwidth(&d->lms, istx, bw);
+    }
+
     return res;
 }
 

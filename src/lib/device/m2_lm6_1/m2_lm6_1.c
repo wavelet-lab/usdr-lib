@@ -6,6 +6,8 @@
 #include <usdr_logging.h>
 #include <string.h>
 #include <strings.h>
+#include <limits.h>
+#include <ctype.h>
 
 #include "../device.h"
 #include "../device_ids.h"
@@ -116,8 +118,8 @@ const usdr_dev_param_constant_t s_params_m2_lm6_1_rev000[] = {
     { "/ll/sdr/max_hw_rx_chans",  1 },
     { "/ll/sdr/max_hw_tx_chans",  1 },
 
-    { "/ll/sdr/max_sw_rx_chans",  1 },
-    { "/ll/sdr/max_sw_tx_chans",  1 },
+//    { "/ll/sdr/max_sw_rx_chans",  2 },
+//    { "/ll/sdr/max_sw_tx_chans",  2 },
 
     { "/ll/poll_event/in",  M2PCI_INT_RX },
     { "/ll/poll_event/out", M2PCI_INT_TX },
@@ -136,6 +138,8 @@ static const vfs_constant_str_t s_params_m2_lm6_1_rev000_s[] = {
     { "/ll/device/name",  "usdr"},
 };
 
+static int dev_m2_lm6_1_max_sw_rx_chans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
+static int dev_m2_lm6_1_max_sw_tx_chans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue);
 
 static int dev_m2_lm6_1_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -146,6 +150,9 @@ static int dev_m2_lm6_1_pwren_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t va
 static int dev_m2_lm6_1_sdr_rx_freq_lob_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_sdr_rx_freqbb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_sdr_tx_freqbb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int dev_m2_lm6_1_sdr_rx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_gain_vga1_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -210,6 +217,9 @@ static int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
 
 static
 const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
+    { "/ll/sdr/max_sw_rx_chans",  { NULL, dev_m2_lm6_1_max_sw_rx_chans_get } },
+    { "/ll/sdr/max_sw_tx_chans",  { NULL, dev_m2_lm6_1_max_sw_tx_chans_get } },
+
     { "/dm/rate/master",        { dev_m2_lm6_1_rate_set, NULL }},
     { "/dm/rate/rxtxadcdac",    { dev_m2_lm6_1_rate_m_set, NULL }},
 
@@ -235,6 +245,8 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/rx/frequency/lob",{ dev_m2_lm6_1_sdr_rx_freq_lob_set, NULL }},
     { "/dm/sdr/0/rx/frequency",  { dev_m2_lm6_1_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/tx/frequency",  { dev_m2_lm6_1_sdr_tx_freq_set, NULL }},
+    { "/dm/sdr/0/rx/frequency/bb", { dev_m2_lm6_1_sdr_rx_freqbb_set, NULL }},
+    { "/dm/sdr/0/tx/frequency/bb", { dev_m2_lm6_1_sdr_tx_freqbb_set, NULL }},
 
     /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/rx/freqency/lob",{ dev_m2_lm6_1_sdr_rx_freq_lob_set, NULL }},
@@ -274,6 +286,61 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/revision", { NULL, dev_m2_lm6_1_sdr_revision_get }},
     { "/dm/sdr/0/rfe/throttle", { dev_m2_lm6_1_sdr_rfe_throttle_set, NULL }},
 };
+
+static const usdr_dev_link_t s_links[] = {
+    { "/dm/sdr/0/rx/frequency/0",    "/dm/sdr/0/rx/frequency" },
+    { "/dm/sdr/0/rx/frequency/1",    "/dm/sdr/0/rx/frequency" },
+    { "/dm/sdr/0/tx/frequency/0",    "/dm/sdr/0/tx/frequency" },
+    { "/dm/sdr/0/tx/frequency/1",    "/dm/sdr/0/tx/frequency" },
+    { "/dm/sdr/0/rx/frequency/bb/0", "/dm/sdr/0/rx/frequency/bb" },
+    { "/dm/sdr/0/rx/frequency/bb/1", "/dm/sdr/0/rx/frequency/bb" },
+    { "/dm/sdr/0/tx/frequency/bb/0", "/dm/sdr/0/tx/frequency/bb" },
+    { "/dm/sdr/0/tx/frequency/bb/1", "/dm/sdr/0/tx/frequency/bb" },
+
+    { "/dm/sdr/0/rx/gain/0",      "/dm/sdr/0/rx/gain" },
+    { "/dm/sdr/0/tx/gain/0",      "/dm/sdr/0/tx/gain" },
+ //   { "/dm/sdr/0/tx/gain/lb/0",   "/dm/sdr/0/tx/gain/lb" },
+    { "/dm/sdr/0/tx/gain/vga1/0", "/dm/sdr/0/tx/gain/vga1" },
+    { "/dm/sdr/0/tx/gain/vga2/0", "/dm/sdr/0/tx/gain/vga2" },
+    { "/dm/sdr/0/rx/gain/pga/0",  "/dm/sdr/0/rx/gain/pga" },
+    { "/dm/sdr/0/rx/gain/vga/0",  "/dm/sdr/0/rx/gain/vga" },
+    { "/dm/sdr/0/rx/gain/vga2a/0",  "/dm/sdr/0/rx/gain/vga2a" },
+    { "/dm/sdr/0/rx/gain/vga2b/0",  "/dm/sdr/0/rx/gain/vga2b" },
+    { "/dm/sdr/0/rx/gain/lna/0",  "/dm/sdr/0/rx/gain/lna" },
+ //   { "/dm/sdr/0/rx/gain/lb/0",   "/dm/sdr/0/rx/gain/lb" },
+    { "/dm/sdr/0/rx/gain/1",      "/dm/sdr/0/rx/gain" },
+    { "/dm/sdr/0/tx/gain/1",      "/dm/sdr/0/tx/gain" },
+ //   { "/dm/sdr/0/tx/gain/lb/1",   "/dm/sdr/0/tx/gain/lb" },
+    { "/dm/sdr/0/tx/gain/vga1/1", "/dm/sdr/0/tx/gain/vga1" },
+    { "/dm/sdr/0/tx/gain/vga2/1", "/dm/sdr/0/tx/gain/vga2" },
+    { "/dm/sdr/0/rx/gain/pga/1",  "/dm/sdr/0/rx/gain/pga" },
+    { "/dm/sdr/0/rx/gain/vga/1",  "/dm/sdr/0/rx/gain/vga" },
+    { "/dm/sdr/0/rx/gain/vga2a/1",  "/dm/sdr/0/rx/gain/vga2a" },
+    { "/dm/sdr/0/rx/gain/vga2b/1",  "/dm/sdr/0/rx/gain/vga2b" },
+    { "/dm/sdr/0/rx/gain/lna/1",  "/dm/sdr/0/rx/gain/lna" },
+ //   { "/dm/sdr/0/rx/gain/lb/1",   "/dm/sdr/0/rx/gain/lb" },
+
+    { "/dm/sdr/0/rx/bandwidth/0", "/dm/sdr/0/rx/bandwidth" },
+    { "/dm/sdr/0/tx/bandwidth/0", "/dm/sdr/0/tx/bandwidth" },
+    { "/dm/sdr/0/rx/bandwidth/1", "/dm/sdr/0/rx/bandwidth" },
+    { "/dm/sdr/0/tx/bandwidth/1", "/dm/sdr/0/tx/bandwidth" },
+
+    { "/dm/sdr/0/rx/path/0",      "/dm/sdr/0/rx/path" },
+    { "/dm/sdr/0/rx/path/1",      "/dm/sdr/0/rx/path" },
+    { "/dm/sdr/0/tx/path/0",      "/dm/sdr/0/tx/path" },
+    { "/dm/sdr/0/tx/path/1",      "/dm/sdr/0/tx/path" },
+
+    { "/dm/sdr/0/rx/dccorr/0",    "/dm/sdr/0/rx/dccorr" },
+    { "/dm/sdr/0/tx/dccorr/0",    "/dm/sdr/0/tx/dccorr" },
+  //  { "/dm/sdr/0/rx/phgaincorr/0","/dm/sdr/0/rx/phgaincorr" },
+  //  { "/dm/sdr/0/tx/phgaincorr/0","/dm/sdr/0/tx/phgaincorr" },
+    { "/dm/sdr/0/rx/dccorr/1",    "/dm/sdr/0/rx/dccorr" },
+    { "/dm/sdr/0/tx/dccorr/1",    "/dm/sdr/0/tx/dccorr" },
+  //  { "/dm/sdr/0/rx/phgaincorr/1","/dm/sdr/0/rx/phgaincorr" },
+  //  { "/dm/sdr/0/tx/phgaincorr/1","/dm/sdr/0/tx/phgaincorr" },
+
+};
+
 
 struct dev_m2_lm6_1 {
     device_t base;
@@ -316,6 +383,70 @@ static int find_param_list(const char* param, const param_list_idx_t* lst, unsig
 }
 #endif
 
+static int _channel_info_string_parse(char* chanlist, unsigned max_chans, unsigned* cinfo)
+{
+    unsigned ch = 0;
+    for (; *chanlist; chanlist++) {
+        unsigned chn;
+        if (isdigit(*chanlist)) {
+            chn = atoi(chanlist);
+        } else {
+            return -ENAVAIL;
+        }
+
+        if (chn > max_chans) {
+            USDR_LOG("STRM", USDR_LOG_ERROR, "Channel parsing: incorrect channel num: %d\n", chn);
+            return -EINVAL;
+        }
+
+        ch |= 1 << chn;
+    }
+
+    *cinfo = ch;
+    return 0;
+}
+
+static int _device_path_to_chmsk(const char* full_path, unsigned max_chs, unsigned* lms_ch)
+{
+    char chanlist[64*4];
+    const char* lst;
+    const char* pos = full_path;
+    lst = NULL;
+
+    while ((pos = strchr(pos, '/')) != NULL) {
+        lst = ++pos;
+    }
+    if (lst == NULL) {
+        return -ENAVAIL;
+    }
+
+    SAFE_STRCPY(chanlist, lst);
+    return _channel_info_string_parse(chanlist, max_chs, lms_ch);
+}
+
+static int _iterate_ordinal_chans(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val, bool rxchans)
+{
+    vfs_object_t ph;
+    unsigned selected;
+    const unsigned max_chs = 2;
+
+    int res = _device_path_to_chmsk(obj->full_path, max_chs, &selected);
+    if (res == -ENAVAIL) {
+        selected = (1 << max_chs) - 1;
+        res = 0;
+    } else if (res != 0) {
+        return res;
+    }
+
+    ph.type = obj->type;
+    ph.object = obj->object;
+    ph.data = obj->data;
+    ph.ops = obj->ops;
+    ph.full_path[0] = 0;
+    ph.full_path[1] = selected;
+    return obj->ops.si64(&ph, val);
+}
+
 static int dev_gpo_set(lldev_t dev, unsigned bank, unsigned data)
 {
     return lowlevel_reg_wr32(dev, 0, 0, ((bank & 0x7f) << 24) | (data & 0xff));
@@ -324,6 +455,20 @@ static int dev_gpo_set(lldev_t dev, unsigned bank, unsigned data)
 static int dev_gpi_get32(lldev_t dev, unsigned bank, unsigned* data)
 {
     return lowlevel_reg_rd32(dev, 0, 16 + (bank / 4), data);
+}
+
+int dev_m2_lm6_1_max_sw_rx_chans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    *ovalue = d->d.has_rxchain ? 2 : 1;
+    return 0;
+}
+
+int dev_m2_lm6_1_max_sw_tx_chans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    *ovalue = d->d.has_txchain ? 2 : 1;
+    return 0;
 }
 
 int dev_m2_lm6_1_sdr_clkmeas_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -590,16 +735,45 @@ int dev_m2_lm6_1_sdr_rx_freq_lob_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
     return usdr_set_lob_freq(&d->d, value);
 }
 
-int dev_m2_lm6_1_sdr_rx_freq_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
+int dev_m2_lm6_1_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
+    if (obj->full_path[0]) {
+        return _iterate_ordinal_chans(ud, obj, value, true);
+    }
+
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
-    return usdr_rfic_fe_set_freq(&d->d, false, value, NULL);
+    return usdr_rfic_fe_set_freq(&d->d, FE_FREQ_LO_RX, obj->full_path[1], value, NULL);
 }
-int dev_m2_lm6_1_sdr_tx_freq_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
+int dev_m2_lm6_1_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
+    if (obj->full_path[0]) {
+        return _iterate_ordinal_chans(ud, obj, value, false);
+    }
+
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
-    return usdr_rfic_fe_set_freq(&d->d, true, value, NULL);
+    return usdr_rfic_fe_set_freq(&d->d, FE_FREQ_LO_TX, obj->full_path[1], value, NULL);
 }
+
+int dev_m2_lm6_1_sdr_rx_freqbb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    if (obj->full_path[0]) {
+        return _iterate_ordinal_chans(ud, obj, value, true);
+    }
+
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    return usdr_rfic_fe_set_freq(&d->d, FE_FREQ_BB_RX, obj->full_path[1], (int64_t)value, NULL);
+}
+
+int dev_m2_lm6_1_sdr_tx_freqbb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    if (obj->full_path[0]) {
+        return _iterate_ordinal_chans(ud, obj, value, false);
+    }
+
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    return usdr_rfic_fe_set_freq(&d->d, FE_FREQ_BB_TX, obj->full_path[1], (int64_t)value, NULL);
+}
+
 int dev_m2_lm6_1_sdr_rx_gain_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
@@ -738,7 +912,12 @@ int dev_m2_lm6_1_sdr_rx_ip2corr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t 
 
 int dev_m2_lm6_1_sdr_tx_dccorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    return -EINVAL;
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+
+    unsigned vi = (value >> 16) & 0xffff;
+    unsigned vq = (value >> 0) & 0xffff;
+
+    return usdr_tx_dccorr(&d->d, vi, vq);
 }
 
 int dev_m2_lm6_1_sdr_rx_tia_cfb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -935,7 +1114,7 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         }
 
         if (d->d.rx_lo == 0) {
-            res = usdr_rfic_fe_set_freq(&d->d, false, 320e6, NULL);
+            res = usdr_rfic_fe_set_freq(&d->d, false, ~0U, 320e6, NULL);
             if (res) {
                 return res;
             }
@@ -948,8 +1127,14 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
             return res;
         }
 
-        if (d->d.rx_lo != 0) {
-            usdr_rfic_fe_set_freq(&d->d, false, d->d.rx_lo, NULL);
+        //if (d->d.rx_lo != 0) {
+        //    usdr_rfic_fe_set_freq(&d->d, false, d->d.rx_lo, NULL);
+        //}
+
+        for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
+            if (d->d.rx_raw.lo[i].set) {
+                usdr_rfic_fe_set_freq(&d->d, false, 1 << i, d->d.rx_raw.lo[i].value, NULL);
+            }
         }
 
         res = create_sfetrx4_stream(dev, CORE_SFERX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
@@ -958,6 +1143,7 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         if (res) {
             return res;
         }
+        d->d.rx_lchans = chans;
         *out_handle = d->rx;
     } else if (strstr(sid, "tx") != NULL) {
         if (d->tx) {
@@ -974,7 +1160,10 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         if (res) {
             return res;
         }
+        d->d.tx_lchans = chans;
         *out_handle = d->tx;
+
+        // TODO: handle NCO changes
     }
 
     return res;
@@ -988,10 +1177,12 @@ int usdr_device_m2_lm6_1_unregister_stream(device_t* dev, stream_handle_t* strea
         usdr_rfic_streaming_down(&d->d, RFIC_LMS6_TX);
         d->tx->ops->destroy(d->tx);
         d->tx = NULL;
+        d->d.tx_lchans = 0;
     } else if (stream == d->rx) {
         usdr_rfic_streaming_down(&d->d, RFIC_LMS6_RX);
         d->rx->ops->destroy(d->rx);
         d->rx = NULL;
+        d->d.rx_lchans = 0;
     } else {
         return -EINVAL;
     }
@@ -1025,6 +1216,12 @@ int usdr_device_m2_lm6_1_create(lldev_t dev, /*UNUSED*/ device_id_t devid)
     res = usdr_vfs_obj_param_init_array(&d->base,
                                         s_fparams_m2_lm6_1_rev000,
                                         SIZEOF_ARRAY(s_fparams_m2_lm6_1_rev000));
+    if (res)
+        goto failed_tree_creation;
+
+    res = usdr_vfs_obj_link_init_array(&d->base,
+                                       s_links,
+                                       SIZEOF_ARRAY(s_links));
     if (res)
         goto failed_tree_creation;
 
