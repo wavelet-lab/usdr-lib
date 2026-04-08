@@ -260,7 +260,7 @@ static void* chirp_gen_thread_ci16(void* obj)
     USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 CHIRP sinus generator with USE_WVLT_SINCOS opt @ ch#%d F1:%.6f MHz F2:%.6f MHz GAIN:(%.2fdBFS = %d)",
              p, inp->chirp_freq0 / 1000000.f, inp->chirp_freq1 / 1000000.f, inp->gain, gain);
     USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CHIRP steps count: %d [%s]", inp->chirp_steps, (upchirp ? "UP_CHIRP":"DOWN_CHIRP"));
-    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CHIRP period: %.6f s (having sr:%u Ms)", (double)inp->chirp_steps / (double)inp->samplerate, inp->samplerate / 1000000);
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CHIRP period: %.6f s (having sr:%.3f Msps)", (double)inp->chirp_steps / (double)inp->samplerate, inp->samplerate / 1e6);
 
     int32_t phase = WVLT_CONVPHASE_F32_I32(inp->start_phase);
 
@@ -454,6 +454,8 @@ static void usage(int severity, const char* me)
                                 "\t[-T <flag: TX+RX mode>] \n"
                                 "\t[-N <flag: No TX timestamps>] \n"
                                 "\t[-J <flag: use samp/3 LUT table for sin generator (ultra fast)>]\n"
+                                "\t[-v RX_BB_FREQ] \n"
+                                "\t[-V TX_BB_FREQ] \n"
                                 "\t[-q TDD_FREQ [910e6]] \n"
                                 "\t[-e RX_FREQ [900e6]] \n"
                                 "\t[-E TX_FREQ [920e6]] \n"
@@ -702,6 +704,8 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned extra_param_len = 0;
     int tx_pkt_precharge = 16;
     bool use_chirp_gen = false;
+    double freq_bb_rx = 0.0;
+    double freq_bb_tx = 0.0;
 
     memset(rx_thread_inputs, 0, sizeof(rx_thread_inputs));
     memset(tx_thread_inputs, 0, sizeof(tx_thread_inputs));
@@ -746,9 +750,13 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    // Still available: kvVL
-    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:K:mM:")) != -1) {
+    // Still available: kL
+    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:K:mM:v:V:")) != -1) {
         switch (opt) {
+        //BB frequency RX
+        case 'v': freq_bb_rx = atof(optarg); break;
+        //BB frequency TX
+        case 'V': freq_bb_tx = atof(optarg); break;
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
         //RX frequency
@@ -1049,10 +1057,11 @@ int main(UNUSED int argc, UNUSED char** argv)
             }
         }
 
-        if (dev_data[DD_TX_BANDWIDTH].ignore) {
-            dev_data[DD_TX_BANDWIDTH].ignore = false;
-            dev_data[DD_TX_BANDWIDTH].value = rate;
-        }
+        // Device should decide which BW to use
+        // if (dev_data[DD_TX_BANDWIDTH].ignore) {
+        //     dev_data[DD_TX_BANDWIDTH].ignore = false;
+        //     dev_data[DD_TX_BANDWIDTH].value = rate;
+        // }
     }
 
     //Prepare parameters to RX
@@ -1063,10 +1072,11 @@ int main(UNUSED int argc, UNUSED char** argv)
             return 3;
         }
 
-        if (dev_data[DD_RX_BANDWIDTH].ignore) {
-            dev_data[DD_RX_BANDWIDTH].ignore = false;
-            dev_data[DD_RX_BANDWIDTH].value = rate;
-        }
+        // Device should decide which BW to use
+        // if (dev_data[DD_RX_BANDWIDTH].ignore) {
+        //     dev_data[DD_RX_BANDWIDTH].ignore = false;
+        //     dev_data[DD_RX_BANDWIDTH].value = rate;
+        // }
     }
 
     //Open device & create dev handle
@@ -1377,12 +1387,12 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
-    //Sync TX&RX data streams
-    res = usdr_dms_sync(dev, synctype, 2, strms);
-    if (res) {
-        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
-        if (stop_on_error) goto dev_close;
-    }
+    // //Sync TX&RX data streams
+    // res = usdr_dms_sync(dev, synctype, 2, strms);
+    // if (res) {
+    //     USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
+    //     if (stop_on_error) goto dev_close;
+    // }
 
 
     //Set antenna configuration
@@ -1405,11 +1415,26 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
+    //Sync TX&RX data streams
+    res = usdr_dms_sync(dev, synctype, 2, strms);
+    if (res) {
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
+        if (stop_on_error) goto dev_close;
+    }
+
     if (calibrate) {
         res = usdr_dme_set_uint(dev, "/dm/sdr/0/calibrate", calibrate);
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "SDR Calibration done: %d\n", res);
 
         res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
+    }
+
+    // Update BB freqs if set
+    if (freq_bb_rx != 0.0) {
+        usdr_dme_set_uint(dev, "/dm/sdr/0/rx/frequency/bb", (int64_t)freq_bb_rx);
+    }
+    if (freq_bb_tx != 0.0) {
+        usdr_dme_set_uint(dev, "/dm/sdr/0/tx/frequency/bb", (int64_t)freq_bb_tx);
     }
 
     uint64_t stm = start_tx_delay;
