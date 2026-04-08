@@ -1315,16 +1315,19 @@ static const uint8_t fir_data_dec256_clkr2[1280] = {
 
 
 // BITS_PER_DSP
-static int dev_gpo_set(lldev_t dev, unsigned bank, unsigned data)
-{
-    return lowlevel_reg_wr32(dev, 0, 0, ((bank & 0x7f) << 24) | (data & 0xff));
-}
+//static int dev_gpo_set(lldev_t dev, unsigned bank, unsigned data)/
+//{
+//    return lowlevel_reg_wr32(dev, 0, 0, ((bank & 0x7f) << 24) | (data & 0xff));
+//}
 
-int fgearbox_load_ucode(lldev_t dev, unsigned gport, const uint8_t* ucode, unsigned sleep_us)
+#define MAKE_GPO_MSK(bank) ((bank & 0x7f) << 24)
+#define GPO_REG 0
+
+static int fgearbox_load_ucode(lldev_t dev, unsigned reg, unsigned mask, const uint8_t* ucode, unsigned sleep_us)
 {
     int res;
     for (unsigned i = 0; i < UCODE_SIZE; i++) {
-        res = dev_gpo_set(dev, gport, ucode[i]);
+        res = lowlevel_reg_wr32(dev, 0, reg, mask | ucode[i]);
         if (res)
             return res;
 
@@ -1337,10 +1340,10 @@ int fgearbox_load_ucode(lldev_t dev, unsigned gport, const uint8_t* ucode, unsig
 
 int fgearbox_load_fir(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam)
 {
-    return fgearbox_load_fir_ex(dev, gport, fir, fam, 0);
+    return fgearbox_load_fir_ex(dev, GPO_REG, MAKE_GPO_MSK(gport), fir, fam, 0);
 }
 
-int fgearbox_load_fir_ex(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam, unsigned sleep_us)
+int fgearbox_load_fir_ex(lldev_t dev, unsigned reg, unsigned mask, fgearbox_firs_t fir, dspfamily_t fam, unsigned sleep_us)
 {
     const uint8_t* s_st8_dsp;
 
@@ -1399,16 +1402,16 @@ int fgearbox_load_fir_ex(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfa
         return -EINVAL;
     }
 
-    return fgearbox_load_ucode(dev, gport, s_st8_dsp, sleep_us);
+    return fgearbox_load_ucode(dev, reg, mask, s_st8_dsp, sleep_us);
 }
 
 
 int fgearbox_load_fir_i(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam)
 {
-    return fgearbox_load_fir_i_ex(dev, gport, fir, fam, 0);
+    return fgearbox_load_fir_i_ex(dev, GPO_REG, MAKE_GPO_MSK(gport), fir, fam, 0);
 }
 
-int fgearbox_load_fir_i_ex(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam, unsigned sleep_us)
+int fgearbox_load_fir_i_ex(lldev_t dev, unsigned reg, unsigned int mask, fgearbox_firs_t fir, dspfamily_t fam, unsigned sleep_us)
 {
     const uint8_t* s_st8_dsp;
 
@@ -1444,7 +1447,7 @@ int fgearbox_load_fir_i_ex(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dsp
         return -EINVAL;
     }
 
-    return fgearbox_load_ucode(dev, gport, s_st8_dsp, sleep_us);
+    return fgearbox_load_ucode(dev, reg, mask, s_st8_dsp, sleep_us);
 }
 
 

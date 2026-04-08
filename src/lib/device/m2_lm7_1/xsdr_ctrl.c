@@ -1105,7 +1105,7 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0x2);
         usleep(10);
-        res = (res) ? res : fgearbox_load_fir_ex(dev, IGPO_DSPCHAIN_RX_PRG, rx_dec, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
+        res = (res) ? res : fgearbox_load_fir_ex(dev, 0, IGPO_DSPCHAIN_RX_PRG << 24, rx_dec, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0x0);
 
@@ -1119,7 +1119,7 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x2);
         usleep(10);
-        res = (res) ? res : fgearbox_load_fir_i_ex(dev, IGPO_DSPCHAIN_TX_PRG, tx_inr, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
+        res = (res) ? res : fgearbox_load_fir_i_ex(dev, 0, IGPO_DSPCHAIN_TX_PRG << 24, tx_inr, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x0);
 

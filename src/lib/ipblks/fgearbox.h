@@ -40,7 +40,7 @@ typedef enum dspfamily {
 int fgearbox_load_fir(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam);
 int fgearbox_load_fir_i(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam);
 
-int fgearbox_load_fir_ex(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam, unsigned sleep_us);
-int fgearbox_load_fir_i_ex(lldev_t dev, unsigned gport, fgearbox_firs_t fir, dspfamily_t fam, unsigned sleep_us);
+int fgearbox_load_fir_ex(lldev_t dev, unsigned reg, unsigned mask, fgearbox_firs_t fir, dspfamily_t fam, unsigned sleep_us);
+int fgearbox_load_fir_i_ex(lldev_t dev, unsigned reg, unsigned mask, fgearbox_firs_t fir, dspfamily_t fam, unsigned sleep_us);
 
 #endif
