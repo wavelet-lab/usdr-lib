@@ -22,6 +22,10 @@
      __typeof__ (b) _b = (b); \
      _a < _b ? _a : _b; })
 
+#define ABS(a) \
+  ({ __typeof__ (a) _a = (a); \
+     _a < 0 ? -_a : a; })
+
 typedef int (*evaluate_fn_t)(void* param, int value, int* func);
 
 /* find local minimum of fn() within [start; stop] range
