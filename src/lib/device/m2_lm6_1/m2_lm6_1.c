@@ -162,6 +162,9 @@ static int dev_m2_lm6_1_sdr_tx_gainauto_set(pdevice_t ud, pusdr_vfs_obj_t obj, u
 static int dev_m2_lm6_1_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_tx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
+static int dev_m2_lm6_1_sdr_tx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm6_1_sdr_rx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
 static int dev_m2_lm6_1_sdr_rx_gainpga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_rx_gainvga_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm6_1_sdr_rx_gainvga2a_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -272,6 +275,9 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/rx/bandwidth", { dev_m2_lm6_1_sdr_rx_bandwidth_set, NULL }},
     { "/dm/sdr/0/tx/bandwidth", { dev_m2_lm6_1_sdr_tx_bandwidth_set, NULL }},
 
+    { "/dm/sdr/0/tx/phgaincorr", {  dev_m2_lm6_1_sdr_tx_phgaincorr_set, NULL }},
+    { "/dm/sdr/0/rx/phgaincorr", {  dev_m2_lm6_1_sdr_rx_phgaincorr_set, NULL }},
+
     { "/debug/hw/lms6002d/0/reg",  { dev_m2_lm6_1_debug_lms6002d_reg_set, dev_m2_lm6_1_debug_lms6002d_reg_get }},
     { "/debug/hw/si5332/0/reg",    { dev_m2_lm6_1_debug_si5332_reg_set, dev_m2_lm6_1_debug_si5332_reg_get }},
     { "/debug/hw/tps6381x/0/reg",  { dev_m2_lm6_1_debug_tps6381x_reg_set, dev_m2_lm6_1_debug_tps6381x_reg_get }},
@@ -332,12 +338,12 @@ static const usdr_dev_link_t s_links[] = {
 
     { "/dm/sdr/0/rx/dccorr/0",    "/dm/sdr/0/rx/dccorr" },
     { "/dm/sdr/0/tx/dccorr/0",    "/dm/sdr/0/tx/dccorr" },
-  //  { "/dm/sdr/0/rx/phgaincorr/0","/dm/sdr/0/rx/phgaincorr" },
-  //  { "/dm/sdr/0/tx/phgaincorr/0","/dm/sdr/0/tx/phgaincorr" },
+    { "/dm/sdr/0/rx/phgaincorr/0","/dm/sdr/0/rx/phgaincorr" },
+    { "/dm/sdr/0/tx/phgaincorr/0","/dm/sdr/0/tx/phgaincorr" },
     { "/dm/sdr/0/rx/dccorr/1",    "/dm/sdr/0/rx/dccorr" },
     { "/dm/sdr/0/tx/dccorr/1",    "/dm/sdr/0/tx/dccorr" },
-  //  { "/dm/sdr/0/rx/phgaincorr/1","/dm/sdr/0/rx/phgaincorr" },
-  //  { "/dm/sdr/0/tx/phgaincorr/1","/dm/sdr/0/tx/phgaincorr" },
+    { "/dm/sdr/0/rx/phgaincorr/1","/dm/sdr/0/rx/phgaincorr" },
+    { "/dm/sdr/0/tx/phgaincorr/1","/dm/sdr/0/tx/phgaincorr" },
 
 };
 
@@ -502,6 +508,8 @@ int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ova
     USDR_LOG("UDEV", USDR_LOG_WARNING, "%s: DC_AAVG I=%d Q=%d\n", lowlevel_get_devname(d->base.dev), i, q);
 
     *ovalue = v;
+
+    usdr_rxdccorr(&d->d, ovalue);
     return 0;
 }
 
@@ -660,7 +668,9 @@ int dev_m2_lm6_1_sdr_refclk_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
     return res;
 }
 
-
+enum {
+    DECIM_INTER_MAX = 32,
+};
 enum {
     RATE_MIN =  1000000,
     RATE_MAX = 80000000,
@@ -668,15 +678,19 @@ enum {
 
 int dev_m2_lm6_1_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    if (value < RATE_MIN || value > RATE_MAX)
-        return -ERANGE;
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    unsigned rate_min = (d->d.has_rxchain && d->d.has_txchain) ? RATE_MIN / DECIM_INTER_MAX : RATE_MIN;
+    if (value < rate_min || value > RATE_MAX)
+        return -ERANGE;
+
     return usdr_set_samplerate_ex(&d->d, value, value, 0, 0, 0);
 }
 
 int dev_m2_lm6_1_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    unsigned rate_min = (d->d.has_rxchain && d->d.has_txchain) ? RATE_MIN / DECIM_INTER_MAX : RATE_MIN;
+
     uint32_t *rates = (uint32_t *)(uintptr_t)value;
 
     uint32_t rx_rate = rates[0];
@@ -688,10 +702,10 @@ int dev_m2_lm6_1_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     if (rx_rate == 0 && tx_rate == 0)
         return -EINVAL;
 
-    if ((rx_rate != 0) && (rx_rate < RATE_MIN || rx_rate > RATE_MAX))
+    if ((rx_rate != 0) && (rx_rate < rate_min || rx_rate > RATE_MAX))
         return -ERANGE;
 
-    if ((tx_rate != 0) && (tx_rate < RATE_MIN || tx_rate > RATE_MAX))
+    if ((tx_rate != 0) && (tx_rate < rate_min || tx_rate > RATE_MAX))
         return -ERANGE;
 
     return usdr_set_samplerate_ex(&d->d, rx_rate, tx_rate, adc_rate, dac_rate, 0);
@@ -722,10 +736,6 @@ int dev_m2_lm6_1_debug_all_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* oval
 
 int dev_m2_lm6_1_pwren_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    // struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
-    USDR_LOG("UDEV", USDR_LOG_INFO, "M2_LM6_1: power en:%d\n", (int)value);
-    // return usdr_pwren(&d->d, value);
-
     return 0;
 }
 
@@ -851,7 +861,7 @@ int dev_m2_lm6_1_sdr_rx_gainauto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t
 int dev_m2_lm6_1_sdr_rx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
-
+    bool rflb = false;
     // 00 – All output buffers powered down;
     // 01 – First buffer enabled for LNA1 path (default);   WB:  250 - 2700
     // 10 – Second buffer enabledfor LNA2 path;             HB: 2700 - 3800
@@ -864,10 +874,18 @@ int dev_m2_lm6_1_sdr_rx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
             value = (uintptr_t)"W";
         } else if (strcasecmp("rxh", param) == 0) {
             value = (uintptr_t)"H";
-        };
+        } else if (strcasecmp("rxl_lb", param) == 0) {
+            value = (uintptr_t)"EXT"; rflb = true;
+        } else if (strcasecmp("rxw_lb", param) == 0) {
+            value = (uintptr_t)"W"; rflb = true;
+        } else if (strcasecmp("rxh_lb", param) == 0) {
+            value = (uintptr_t)"H"; rflb = true;
+        }
+    } else {
+        return -EINVAL;
     }
 
-    return usdr_rfic_fe_set_rxlna(&d->d, (const char *)(uintptr_t)value);
+    return usdr_rfic_fe_set_rxlna(&d->d, (const char *)(uintptr_t)value, rflb);
 }
 
 int dev_m2_lm6_1_sdr_tx_path_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
@@ -959,6 +977,31 @@ int dev_m2_lm6_1_sdr_rx_dc_meas_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t*
     *ovalue = 0;
     return 0;
 }
+
+int dev_m2_lm6_1_sdr_tx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+
+    unsigned ig = (value & 0xffff);
+    unsigned qg = ((value >> 16) & 0xffff);
+    int16_t pcorr = (int16_t)((value >> 48) & 0xffff);
+    int amp_imb;
+    if (ig < 2047) {
+        amp_imb = (2047 - ig) * 8;
+    } else {
+        amp_imb = - (2047 - qg) * 8;
+    }
+    pcorr *= 16;
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "TXGAC I=%d Q=%d A=%d => AMP_IMB=%d\n", ig, qg, pcorr, amp_imb);
+
+    return usdr_tx_iqimb_set(&d->d, amp_imb, pcorr);
+}
+
+int dev_m2_lm6_1_sdr_rx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return -EINVAL;
+}
+
 
 int dev_m2_lm6_1_sdr_revision_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
@@ -1146,6 +1189,8 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         d->d.rx_lchans = chans;
         *out_handle = d->rx;
     } else if (strstr(sid, "tx") != NULL) {
+        bool extended_core = (d->d.hwid & (1 << (24 + 2))) ? true : false;
+
         if (d->tx) {
             return -EBUSY;
         }
@@ -1154,9 +1199,16 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
             return res;
         }
 
-        res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags, M2PCI_REG_WR_TXDMA_CNF_L, M2PCI_REG_WR_SYNC_CTRL, M2PCI_REG_RD_TXDMA_STAT,
-                                    0, 0, &d->tx, &chans);
+        if (extended_core) {
+            res = res ? res : usdr_reset_txfex(&d->d);
+        }
+
+        res = create_sfetrx4_stream(dev, extended_core ? CORE_EXFETX_DMA32_R0_2 : CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
+                                    flags,
+                                    extended_core ? M2PCI_REG_WR_TXDMA_CFG0 : M2PCI_REG_WR_TXDMA_CNF_L,
+                                    M2PCI_REG_WR_SYNC_CTRL,
+                                    M2PCI_REG_RD_TXDMA_STAT,
+                                    0, CSR_TFE4_BASE, &d->tx, &chans);
         if (res) {
             return res;
         }
@@ -1164,6 +1216,7 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         *out_handle = d->tx;
 
         // TODO: handle NCO changes
+        res = res ? res : usdr_txupdate_cal(&d->d);
     }
 
     return res;

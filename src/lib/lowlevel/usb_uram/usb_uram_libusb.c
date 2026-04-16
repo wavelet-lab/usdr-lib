@@ -764,14 +764,18 @@ int usb_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, voi
         USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX incorrect pointer supplied\n");
         return -EINVAL;
     }
+    if (sz > 0x1ffff) {
+        USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX FPGA maximum buffer size oveflow!\n");
+        return -EINVAL;
+    }
 
     uint64_t rsamples = sz * 8 / d->tx_strms_params[0].bits_per_all_chs;
-    unsigned samples = rsamples - 1;
+    unsigned samples = rsamples - 1; // Ignored in new TXFE
 
     uint32_t* header = (uint32_t*)bx;
     header[0] = timestamp;
     header[1] = ((timestamp >> 32) & 0xffff) | ((samples & 0x7fff) << 16) | (timestamp < 0 ? 0x80000000 : 0);
-    header[2] = 0; // (samples >> 15) & 0x3;
+    header[2] = (((sz - 1) & 0x1ffff) << 15) | ((timestamp >> 48) & 0x7fff); // Ignored in old TXFE
     header[3] = 0;
 
     USDR_LOG("USBX", USDR_LOG_DEBUG, "TX post buffer %d: %08x.%08x.%08x.%08x -> %d bytes\n",

@@ -22,6 +22,7 @@
 #include "../generic_usdr/generic_regs.h"
 
 #include "../ipblks/fgearbox.h"
+#include "../ipblks/dc_estim.h"
 
 // Clock configuration
 //          rev4/rev3      rev2         rev1
@@ -297,6 +298,10 @@ static int _usdr_set_nco(usdr_dev_t *d, bool rx, unsigned nco_num, double freq)
     res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, reg, ((off + 0) << 24) | (nco_freq & 0xffff));
     res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, reg, ((off + 1) << 24) | ((nco_freq >> 16) & 0xffff));
 
+    // Reset NCOs
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, reg, (0 << 24) | (1 << 8));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, reg, (0 << 24) | (0 << 8));
+
     USDR_LOG("UDEV", USDR_LOG_WARNING, "NCO_%s_%d: Set to %.3f KHz -- %0.3f %08x -- rate: %.3f MSPS\n",
              rx ? "RX" : "TX", nco_num, rel_f * raw_rate / 1.0e3, rel_f, nco_freq, raw_rate / 1e6);
     return res;
@@ -404,6 +409,84 @@ int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob)
 }
 
 #define TARGET_RATE 30720000
+
+#define MAKE_PHY_WR_REG(a, w) ((((a) & 0x7f) << 24) | ((w) & 0xffffff))
+#define MAKE_PHY_RD_REG(a, i) ((((a) & 0x7f) << 24) | ((i) & 0xffffff) | 0x80000000)
+
+int usdr_reset_txfex(struct usdr_dev *d)
+{
+    int res = 0;
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, 8);
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, 0);
+    return res;
+}
+
+int usdr_reset_txnco(struct usdr_dev *d)
+{
+    int res = 0;
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, 256);
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, 0);
+    return res;
+}
+
+int usdr_txupdate_cal(struct usdr_dev *d)
+{
+    // CFG_AMP_I
+    // CFG_AMP_Q
+    // CFG_TAN_I
+    // CFG_TAN_Q
+
+    // I = CFG_AMP_I * i + CFG_TAN_Q * q
+    // Q = CFG_AMP_Q * q + CFG_TAN_I * i
+
+    // c = math.cos(phi / 2.0)
+    // s = math.sin(phi / 2.0)
+    // I = (c / alpha) * Id + (s / beta) * Qd
+    // Q = (c / beta)  * Qd -(s / alpha) * Id
+
+    float c = cos(M_PI_4 * d->tx_corr.pahse / IMB_PHASE_MAX);
+    float s = sin(M_PI_4 * d->tx_corr.pahse / IMB_PHASE_MAX);
+
+    float alpha = (d->tx_corr.ampl > 0) ? 1.0 - (((double)d->tx_corr.ampl) / IMB_AMPL_MAX) : 1.0;
+    float beta = (d->tx_corr.ampl < 0) ? 1.0 + (((double)d->tx_corr.ampl) / IMB_AMPL_MAX) : 1.0;
+
+    // 18 bits -> 16 bits
+    // probably we need extra headroom for DC and IQimb correction, but leave as an extra option
+    //
+    // AMP_COMP_2CH_3DB: 17bit * SQRT(2)  | MAX * 0.35355
+    // AMP_COMP_2CH_0DB: 17bit            | MAX * 0.5
+    // AMP_COMP_1CH_3DB: 16bit * SQRT(2)  | MAX * 0.7071
+    // AMP_COMP_1CH_0DB: 16bit            | MAX
+    float scale =
+        (d->tx_corr.amp_corr == AMP_COMP_1CH_0DB) ? 1.0 :
+        (d->tx_corr.amp_corr == AMP_COMP_1CH_3DB) ? 0.7071 :
+        (d->tx_corr.amp_corr == AMP_COMP_2CH_0DB) ? 0.5 : 0.35355;
+
+    float fcfg_amp_i = scale * c * alpha;
+    float fcfg_amp_q = scale * c * beta;
+    float fcfg_tan_q = scale * s * beta;
+    float fcfg_tan_i = - scale * s * alpha;
+
+    int32_t dsp_amp_max = 8388607;
+    int32_t cfg_amp_i = dsp_amp_max * fcfg_amp_i;
+    int32_t cfg_amp_q = dsp_amp_max * fcfg_amp_q;
+    int32_t cfg_tan_i = dsp_amp_max * fcfg_tan_i;
+    int32_t cfg_tan_q = dsp_amp_max * fcfg_tan_q;
+
+    USDR_LOG("UDEV", USDR_LOG_WARNING, "TX CORRECTION: CFG_AMP_I=%d CFG_AMP_Q=%d CFG_TAN_I=%d CFG_TAN_Q=%d\n",
+             cfg_amp_i, cfg_amp_q, cfg_tan_i, cfg_tan_q);
+
+    int res = 0;
+    //res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, (CFG_REG_IQIMB_0 << 24) | (cfg_amp_i & 0xffffff));
+    //res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, (CFG_REG_IQIMB_1 << 24) | (cfg_amp_q & 0xffffff));
+    //res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, (CFG_REG_IQIMB_2 << 24) | (cfg_tan_i & 0xffffff));
+    //res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, (CFG_REG_IQIMB_3 << 24) | (cfg_tan_q & 0xffffff));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_0, cfg_amp_i));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_1, cfg_amp_q));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_2, cfg_tan_i));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_3, cfg_tan_q));
+    return res;
+}
 
 int usdr_set_samplerate_ex(struct usdr_dev *d,
                            unsigned rxrate, unsigned txrate,
@@ -1102,19 +1185,42 @@ int usdr_rfic_set_gain(struct usdr_dev *d,
 }
 
 
+int usdr_rfic_switch_loopback(struct usdr_dev *d, bool lb)
+{
+    int res = 0;
+    if (!lb) {
+        if (d->rf_loopback_active) {
+            USDR_LOG("UDEV", USDR_LOG_WARNING, "Disable RF LOOPBACK\n");
+            res = res ? res : lms6002d_rf_loopback_dis(&d->lms);
+            d->rf_loopback_active = false;
+        }
+    } else {
+        if (!d->rf_loopback_active) {
+            USDR_LOG("UDEV", USDR_LOG_WARNING, "Enabling RF LOOPBACK\n");
+            res = res ? res : lms6002d_rf_loopback_en(&d->lms);
+            d->rf_loopback_active = true;
+        }
+    }
+    return res;
+}
+
 int usdr_rfic_fe_set_rxlna(struct usdr_dev *d,
-                           const char *lna)
+                           const char *lna, bool lb)
 {
     int res = get_antenna_cfg_by_name(lna, d->cfg_auto_rx, SIZEOF_ARRAY(d->cfg_auto_rx));
     USDR_LOG("UDEV", USDR_LOG_INFO, "RX_PATH set to %s from `%s`\n", (res < 0) ? "AUTO" : d->cfg_auto_rx[res].name0, lna);
 
     if (res == -1) {
         d->rx_rfic_path = USDR_RX_AUTO;
-        return _usdr_signal_event(d, USDR_RX_LNA_CHANGED);
+        res = _usdr_signal_event(d, USDR_RX_LNA_CHANGED);
+        res = res ? res : usdr_rfic_switch_loopback(d, lb);
+        return res;
     }
 
     d->rx_rfic_path = res;
-    return _usdr_set_lna_rx(d, d->rx_rfic_path);
+    res = _usdr_set_lna_rx(d, d->rx_rfic_path);
+    res = res ? res : usdr_rfic_switch_loopback(d, lb);
+    return res;
 }
 
 int usdr_rfic_fe_set_txlna(struct usdr_dev *d,
@@ -1167,4 +1273,23 @@ int usdr_calib_dc(struct usdr_dev *d, bool rx)
 int usdr_gettemp(struct usdr_dev *d, int* temp256)
 {
     return tmp114_temp_get(d->base.dev, 0, I2C_BUS_TEMP, temp256);
+}
+
+
+// Calibration
+int usdr_tx_iqimb_set(usdr_dev_t* d, int iq_amp_imb, int phase_imb)
+{
+    d->tx_corr.ampl = (int64_t)iq_amp_imb * IMB_AMPL_MAX / INT16_MAX;
+    d->tx_corr.pahse = phase_imb;
+
+    return usdr_txupdate_cal(d);
+}
+
+int usdr_rxdccorr(struct usdr_dev *d, uint64_t *ov)
+{
+    int out;
+    int res = phy_do_meas_nco_avg(d->lms.dev, REG_CFG_PHY_0, 32767, 0, 1, &out);
+
+    *ov = out;
+    return res;
 }

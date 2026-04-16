@@ -17,6 +17,9 @@ enum {
 
     CORE_EXFERX_DMA32_R0_8 = 258,
     CORE_EXFETX_DMA32_R0_8 = 259,
+
+    CORE_EXFERX_DMA32_R0_2 = 260,
+    CORE_EXFETX_DMA32_R0_2 = 261,
 };
 
 enum {

@@ -634,7 +634,7 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     const channel_info_t* newmap = (pack_3x16) ? &pack_3x16_mmap : newmap_orig;
 
     // For TX we need invert in and out
-    if (fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0 || fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_8) {
+    if (fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0 || fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_2 || fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_8) {
         memset(reverse_map.ch_map, ~CH_SWAP_IQ_FLAG, sizeof(reverse_map.ch_map));
 
         for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {

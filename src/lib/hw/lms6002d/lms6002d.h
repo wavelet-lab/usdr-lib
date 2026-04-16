@@ -30,6 +30,7 @@ struct lms6002d_state {
     uint8_t rxpll_vco_div_bufsel;
     uint8_t rfe_in1sel_dci;
     uint8_t rfe_gain_lna_sel;
+    uint8_t trf_pa_ctrl;
 };
 typedef struct lms6002d_state lms6002d_state_t;
 
@@ -101,5 +102,7 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode, bool do_tu
 int lms6002d_set_tia_cfb(lms6002d_state_t* obj, uint8_t value);
 int lms6002d_set_tia_rfb(lms6002d_state_t* obj, uint8_t value);
 
+int lms6002d_rf_loopback_en(lms6002d_state_t* obj);
+int lms6002d_rf_loopback_dis(lms6002d_state_t* obj);
 
 #endif

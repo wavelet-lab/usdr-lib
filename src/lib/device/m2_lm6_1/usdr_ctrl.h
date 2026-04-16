@@ -57,6 +57,28 @@ struct freq_data
 };
 typedef struct freq_data freq_data_t;
 
+
+enum {
+    AMP_COMP_2CH_3DB = 0,
+    AMP_COMP_2CH_0DB = 1,
+    AMP_COMP_1CH_3DB = 2,
+    AMP_COMP_1CH_0DB = 3,
+};
+
+
+#define IMB_AMPL_MAX 262144
+#define IMB_AMPL_MIN -262144
+
+#define IMB_PHASE_MAX 45000
+#define IMB_PHASE_MIN -45000
+
+struct imb_data
+{
+    int32_t ampl;     // AMPL_IMB_MIN  .. AMPL_IMB_MAX
+    int32_t pahse;    // IMB_PHASE_MIN .. IMB_PHASE_MAX
+    int32_t amp_corr; // Amplitude correction
+};
+
 struct usdr_dev
 {
     union {
@@ -103,6 +125,8 @@ struct usdr_dev
     bool has_rxchain;
     bool has_txchain;
 
+    bool rf_loopback_active;
+
     unsigned rawsamplerate;
     unsigned rxbb_decim;
     unsigned txbb_intr;
@@ -124,6 +148,8 @@ struct usdr_dev
 
     opt_u32_t tx_bw;
     opt_u32_t rx_bw;
+
+    struct imb_data tx_corr;
 
     freq_auto_band_map_t cfg_auto_rx[USDR_MAX_RX_BANDS];
     freq_auto_band_map_t cfg_auto_tx[USDR_MAX_TX_BANDS];
@@ -149,7 +175,7 @@ int usdr_set_tx_port_switch(struct usdr_dev *d, unsigned path);
 int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob);
 
 int usdr_rfic_fe_set_rxlna(struct usdr_dev *d,
-                           const char* lna);
+                           const char* lna, bool lb);
 int usdr_rfic_fe_set_txlna(struct usdr_dev *d,
                            const char *lna);
 
@@ -184,6 +210,10 @@ int usdr_dtor(struct usdr_dev *d);
 int usdr_calib_dc(struct usdr_dev *d, bool rx);
 
 int usdr_gettemp(struct usdr_dev *d, int* temp256);
+
+int usdr_reset_txfex(struct usdr_dev *d);
+
+int usdr_rxdccorr(struct usdr_dev *d, uint64_t *ov);
 
 #ifndef NO_IGPO
 
@@ -227,6 +257,14 @@ enum {
 int usdr_set_extref(usdr_dev_t *d, bool ext, uint32_t freq);
 
 int usdr_tx_dccorr(usdr_dev_t *d, int16_t i, int16_t q);
+
+// Realign NCO-A / NCO-B to be phase cocherent
+int usdr_reset_txnco(struct usdr_dev *d);
+
+int usdr_txupdate_cal(struct usdr_dev *d);
+
+int usdr_tx_iqimb_set(usdr_dev_t* d, int iq_amp_imb, int phase_imb);
+
 
 #endif
 

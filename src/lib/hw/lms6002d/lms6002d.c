@@ -74,6 +74,7 @@ int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, struct lms600
     out->top_enreg = (uint8_t)MAKE_LMS6002D_TOP_ENREG(0, 0, 0, 0, 0, 0, 0, 0);
     out->rxpll_vco_div_bufsel = (uint8_t)MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(0, 0, 1);
     out->rfe_gain_lna_sel = 0xc0;
+    out->trf_pa_ctrl = (uint8_t)MAKE_LMS6002D_TRF_PA_CTRL(0, 0);
 
     memset(out->rclpfcal, 3, sizeof(out->rclpfcal));
 
@@ -555,8 +556,11 @@ int lms6002d_set_rx_path(lms6002d_state_t* obj, unsigned path)
 
 int lms6002d_set_tx_path(lms6002d_state_t* obj, unsigned path)
 {
+    SET_LMS6002D_TRF_PA_CTRL_EN12(obj->trf_pa_ctrl, path);
+    SET_LMS6002D_TRF_PA_CTRL_ENAUX(obj->trf_pa_ctrl, path == 3 ? 1 : 0);
+
     uint16_t regs[] = {
-        MAKE_LMS6002D_TRF_PA_CTRL(path, path == 3 ? 1 : 0),
+        MAKE_LMS6002D_REG_WR(TRF_PA_CTRL, obj->trf_pa_ctrl),
     };
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
@@ -870,3 +874,28 @@ int lms6002d_set_rxfe_ip2corr(lms6002d_state_t* obj, int8_t i, int8_t q)
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
 
+int lms6002d_rf_loopback_en(lms6002d_state_t* obj)
+{
+    int lna = GET_LMS6002D_RFE_GAIN_LNA_SEL_LNASEL(obj->rfe_gain_lna_sel);
+    uint16_t regs[] = {
+        MAKE_LMS6002D_RFE_PD(0, 0, 0, 1),
+        MAKE_LMS6002D_RFE_CTRL(1, 1),
+        MAKE_LMS6002D_TRF_PA_CTRL(0, 0),
+        MAKE_LMS6002D_TOP_POWER(0, 1, 0, 1, 1),
+        MAKE_LMS6002D_TOP_LOOPBACK(0, 0, 0, lna),
+    };
+
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms6002d_rf_loopback_dis(lms6002d_state_t* obj)
+{
+    uint16_t regs[] = {
+        MAKE_LMS6002D_TOP_POWER(0, 1, 0, 1, 0),
+        MAKE_LMS6002D_TOP_LOOPBACK(0, 0, 0, 0),
+        MAKE_LMS6002D_REG_WR(TRF_PA_CTRL, obj->trf_pa_ctrl),
+        MAKE_LMS6002D_TOP_POWER(0, 1, 0, 1, 0),
+        MAKE_LMS6002D_RFE_PD(0, 0, 0, 0),
+    };
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
