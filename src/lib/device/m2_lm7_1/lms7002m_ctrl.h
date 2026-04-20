@@ -96,11 +96,12 @@ struct lms7002_dev
     uint8_t txcgen_div;
     uint8_t rxtsp_div;
     uint8_t txtsp_div;
-    uint8_t tx_dsp_inter;
-    uint8_t rx_dsp_decim;
 
     uint8_t rx_no_siso_map;
     uint8_t tx_no_siso_map;
+
+    uint16_t tx_dsp_inter;
+    uint16_t rx_dsp_decim;
 
     rfic_lms7_rf_path_t rx_rfic_path;
     rfic_lms7_rf_path_t tx_rfic_path;
@@ -118,6 +119,8 @@ struct lms7002_dev
     unsigned cgen_clk; // LMS7002 CGEN frequency
     unsigned rx_lo;
     unsigned tx_lo;
+    unsigned rx_nco_distance; // Maximum distance from LO to the farest NCO
+    unsigned tx_nco_distance;
 
     lms7002m_limelight_conf_t lml_mode;
 
@@ -171,6 +174,7 @@ int lms7002m_bb_set_badwidth(lms7002_dev_t *d,
                              unsigned bw,
                              unsigned* actualbw);
 
+int lms7002m_bb_translate(lms7002_dev_t *d, bool dir_tx, int freq, int32_t* lms_dsp_val);
 int lms7002m_bb_set_freq(lms7002_dev_t *d,
                         unsigned channel,
                         bool dir_tx,
@@ -226,6 +230,7 @@ int lms7002m_set_lmlrx_mode(lms7002_dev_t *d, unsigned mode);
 
 
 // Calibration
+int lms7002m_update_bandwidth(lms7002_dev_t *d, bool istx, unsigned bb_rate, bool force_upd);
 
 int lms7002m_set_corr_param(lms7002_dev_t* d, int channel, int corr_type, int value);
 int lms7002m_set_tx_testsig(lms7002_dev_t* d, int channel, int32_t freqoffset, unsigned pwr);

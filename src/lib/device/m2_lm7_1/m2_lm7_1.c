@@ -1120,11 +1120,14 @@ int dev_m2_lm7_1_sdr_rx_bbfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
 }
 int dev_m2_lm7_1_sdr_tx_bbfreq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
+    if (obj->full_path[0]) {
+        return lms7002_iterate_ordinal_chans(ud, obj, value, "/dm/sdr/0/tx/frequency/bb", true);
+    }
+
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
-    unsigned channel = value >> 32;
     int32_t freq = (int32_t)(value & 0xffffffff);
 
-    return xsdr_rfic_bb_set_freq(&d->xdev, channel, true, freq);
+    return xsdr_rfic_bb_set_freq(&d->xdev, obj->full_path[1], true, freq);
 }
 
 int dev_m2_lm7_1_sdr_rx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)

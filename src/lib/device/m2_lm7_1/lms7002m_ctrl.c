@@ -571,6 +571,20 @@ int lms7002m_bb_set_badwidth(lms7002_dev_t *d,
     return res;
 }
 
+int lms7002m_bb_translate(lms7002_dev_t *d, bool dir_tx, int freq, int32_t* lms_dsp_val)
+{
+    double conv_freq = d->cgen_clk / (dir_tx ? d->txcgen_div : d->rxcgen_div);
+    double rel_freq = freq / conv_freq;
+    if (rel_freq > 0.5 || rel_freq < -0.5) {
+        USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_WARNING,
+                    "NCO %s ouf of range, requested %.3f while DAC %.3f\n",
+                    dir_tx ? "TX" : "RX",
+                    rel_freq / 1000, conv_freq / 1000);
+        return -EINVAL;
+    }
+    *lms_dsp_val = rel_freq * 4294967296.0;
+    return 0;
+}
 
 
 int lms7002m_bb_set_freq(lms7002_dev_t *d,
@@ -584,16 +598,11 @@ int lms7002m_bb_set_freq(lms7002_dev_t *d,
         return res;
 
     opt_u32_t* dsp_f = dir_tx ? &d->tx_dsp[0] : &d->rx_dsp[0];
-    double conv_freq = d->cgen_clk / (dir_tx ? d->txcgen_div : d->rxcgen_div);
-    double rel_freq = freq / conv_freq;
-    if (rel_freq > 0.5 || rel_freq < -0.5) {
-        USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_WARNING,
-                 "NCO %s ouf of range, requested %.3f while DAC %.3f\n",
-                 dir_tx ? "TX" : "RX",
-                 rel_freq / 1000, conv_freq / 1000);
-        return -EINVAL;
-    }
-    int pfreq = rel_freq * 4294967296.0;
+    int pfreq;
+    res = lms7002m_bb_translate(d, dir_tx, freq, &pfreq);
+    if (res)
+        return res;
+
     if (channel & LMS7_CH_A)
         opt_u32_set_val(&dsp_f[0], pfreq);
     if (channel & LMS7_CH_B)
@@ -912,8 +921,6 @@ int lms7002m_samplerate(lms7002_dev_t *d,
     unsigned mpy_dac = 4; // Might be 4,2,1
     unsigned rxdiv = 1;
     unsigned txdiv = 1;
-    unsigned tx_dsp_inter = 1; // Off chip extra interpolator
-    unsigned rx_dsp_decim = 1; // Off chip extra decimator
     unsigned tx_host_mul = 1;
     unsigned rx_host_div = 1;
     unsigned txmaster_min = mpy_dac * dacclk;
@@ -976,8 +983,8 @@ int lms7002m_samplerate(lms7002_dev_t *d,
         d->txcgen_div = mpy_dac;
         d->rxtsp_div = rxdiv;
         d->txtsp_div = txdiv;
-        d->tx_dsp_inter = tx_dsp_inter;
-        d->rx_dsp_decim = rx_dsp_decim;
+        d->tx_dsp_inter = tx_int;
+        d->rx_dsp_decim = rx_dec;
 
         for (unsigned j = 0; j < 4; j++) {
             unsigned clkdiv = (mpy_dac == 1) ? 0 :
@@ -1060,7 +1067,7 @@ int lms7002m_samplerate(lms7002_dev_t *d,
                rxrate / 1e6, txrate / 1e6,
                rxdiv, rx_host_div, txdiv, tx_host_mul,
                cgen_rate / mpy_adc / 1e6, cgen_rate / mpy_dac / 1e6,
-               tx_dsp_inter, rx_dsp_decim, cgen_rate / 1e6,
+               tx_int, rx_dec, cgen_rate / 1e6,
                rxtsp_div, txtsp_div, sisoddr_rx, sisoddr_tx,
                d->fref / 1e6);
 
@@ -1087,6 +1094,40 @@ int lms7002m_samplerate(lms7002_dev_t *d,
 
     return res;
 }
+
+int lms7002m_update_bandwidth(lms7002_dev_t *d, bool istx, unsigned bb_rate, bool force_upd)
+{
+    int res = 0;
+    unsigned bw = 2 * (istx ? d->tx_nco_distance : d->rx_nco_distance) + bb_rate;
+    if (bb_rate == 0)
+        return 0;
+
+    for (unsigned i = 0; i < 2; i++) {
+        bool is_set = istx ? d->tx_bw[i].set : d->rx_bw[i].set;
+        bool is_run = istx ? d->tx_run[i] : d->rx_run[i];
+
+        if (!is_run)
+            continue;
+
+        if (is_set && !force_upd)
+            continue;
+
+        if (is_set)
+            bw = istx ? d->tx_bw[i].value : d->rx_bw[i].value;
+
+        USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_INFO, "Set RX[%d] bandwidth to %.3f Mhz\n", i, bw / 1e6);
+
+        res = res ? res : lms7002m_mac_set(&d->lmsstate, i == 0 ? LMS7_CH_A : LMS7_CH_B);
+        if (!istx) {
+            res = res ? res : lms7002m_rbb_bandwidth(d, bw, false);
+        } else {
+            res = res ? res : lms7002m_tbb_bandwidth(d, bw, false);
+        }
+
+    }
+    return res;
+}
+
 
 
 int lms7002m_set_lmlrx_mode(lms7002_dev_t *d, unsigned mode)
@@ -1178,23 +1219,16 @@ int lms7002m_set_corr_param(lms7002_dev_t* d, int channel, int corr_type, int va
 
 int lms7002m_set_tx_testsig(lms7002_dev_t* d, int channel, int32_t freqoffset, unsigned pwr)
 {
-    unsigned scaling = d->txtsp_div / 2;
-    int res;
+    int res = 0;
+    int32_t dsp_reg;
 
-    res = lms7002m_mac_set(&d->lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
-    if (res)
-        return res;
+    res = res ? res : lms7002m_mac_set(&d->lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
+    res = res ? res : lms7002m_xxtsp_gen(&d->lmsstate, LMS_TXTSP,
+                                         (pwr == UINT_MAX) ?  XXTSP_NORMAL: XXTSP_DC,
+                                         pwr & 0x7fff, pwr & 0x7fff);
+    res = res ? res : lms7002m_bb_translate(d, true, freqoffset, &dsp_reg);
+    res = res ? res : lms7002m_xxtsp_cmix(&d->lmsstate, LMS_TXTSP, dsp_reg);
 
-    res = lms7002m_xxtsp_gen(&d->lmsstate, LMS_TXTSP,
-                             (pwr == UINT_MAX) ?  XXTSP_NORMAL: XXTSP_DC,
-                             pwr & 0x7fff, pwr & 0x7fff);
-    if (res)
-        return res;
-
-    res = lms7002m_xxtsp_cmix(&d->lmsstate, LMS_TXTSP, freqoffset / scaling);
-    if (res)
-        return res;
-
-    return 0;
+    return res;
 }
 

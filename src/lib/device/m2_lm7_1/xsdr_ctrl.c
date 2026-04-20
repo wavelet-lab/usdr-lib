@@ -187,7 +187,7 @@ enum {
 
 int xsdr_phy_rx_reg(xsdr_dev_t *d, bool wr, uint8_t bank, uint8_t addr, uint16_t val)
 {
-    uint32_t reg = (wr ? 0x80000000 : 0) | (((uint32_t)bank & 0x7f) << 24) | ((uint32_t)addr << 16) | val;
+    uint32_t reg = (wr ? 0x80000000 : 0) | (((uint32_t)bank & 0x7f) << 24) | ((uint32_t)(addr & 0xff) << 16) | val;
     return lowlevel_reg_wr32(d->base.lmsstate.dev, d->base.lmsstate.subdev, REG_CFG_PHY_0, reg);
 }
 
@@ -1358,6 +1358,7 @@ int xsdr_rfic_set_gain(xsdr_dev_t *d,
     return lms7002m_set_gain(&d->base, channel, gain_type, gain, actualgain);
 }
 
+
 enum {
     LMS8_TXA_CHIDX = 0,
     LMS8_TXB_CHIDX = 1,
@@ -2232,7 +2233,7 @@ int xsdr_prepare(xsdr_dev_t *d, bool rxen, bool txen)
 
 
 // Calculate power in dbfs
-int xsdr_rfe_pwrdc_get(xsdr_dev_t *d, unsigned acc_norm, int prev_gen, unsigned chan_no, int *meas1000db)
+int xsdr_rfe_pwrdc_get(xsdr_dev_t *d, unsigned acc_norm, int prev_gen, unsigned chan_no, float corr, int *meas1000db)
 {
     int32_t val[2];
     int gen, gen_n;
@@ -2258,8 +2259,8 @@ int xsdr_rfe_pwrdc_get(xsdr_dev_t *d, unsigned acc_norm, int prev_gen, unsigned 
 
     double fs_i = val[0];
     double fs_q = val[1];
-    double i = (0.5 + (fs_i / acc_norm / 65536)) / 2048; // Static correction by +0.5 bits in FPGA
-    double q = (0.5 + (fs_q / acc_norm / 65536)) / 2048; // Static correction by +0.5 bits in FPGA
+    double i = (corr + (fs_i / acc_norm / 65536)) / 2048; // Static correction by +0.5 bits in FPGA
+    double q = (corr + (fs_q / acc_norm / 65536)) / 2048; // Static correction by +0.5 bits in FPGA
     double pwr_d = i * i + q * q;
 
     USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "%d->%d %d %d => %.3f %.3f\n",
@@ -2278,10 +2279,12 @@ int xsdr_rfe_pwrdc_get(xsdr_dev_t *d, unsigned acc_norm, int prev_gen, unsigned 
 int xsdrcal_set_nco_offset(void* param, int channel, int32_t freqoffset)
 {
     xsdr_dev_t *d = (xsdr_dev_t *)param;
-    //d->rxdsp_freq_offset = freqoffset;
-    //return sfe_rf4_nco_freq(d->base.lmsstate.dev, 0, CSR_RFE4_BASE, freqoffset);
-    //return -EINVAL;
-    return lms7002m_bb_set_freq(&d->base, channel ? LMS7_CH_B : LMS7_CH_A, false, freqoffset);
+    int32_t dsp_reg;
+    int res = 0;
+    res = res ? res : lms7002m_mac_set(&d->base.lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
+    res = res ? res : lms7002m_bb_translate(&d->base, false, freqoffset, &dsp_reg);
+    res = res ? res : lms7002m_xxtsp_cmix(&d->base.lmsstate, LMS_RXTSP, dsp_reg);
+    return res;
 }
 
 int xsdr_rxdccorr(xsdr_dev_t *d, uint64_t *ov)
@@ -2300,10 +2303,15 @@ int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int*
     int res = 0;
     int meas1000db = 0;
     int accum = 0, gen = 0;
-    unsigned acc_idx = 16;
+    unsigned acc_idx = 1;
+    float corr = 0.5;
 
     if (!func)
         return 0;
+
+    // Fixups
+    if (d->s_rx_dec == 8)
+        corr = 0.5;
 
     res = res ? res : xsdr_phy_dc_estim_accum(d, acc_idx);
     res = res ? res : xsdr_phy_dc_estim_start(d, false);
@@ -2314,7 +2322,7 @@ int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int*
         return res;
 
     for (unsigned k = 0; k < 8000; k++) {
-        res = xsdr_rfe_pwrdc_get(d, acc_idx, gen, channel, &meas1000db);
+        res = xsdr_rfe_pwrdc_get(d, acc_idx, gen, channel, corr, &meas1000db);
         if (res != -EAGAIN) {
             accum += meas1000db;
             break;
@@ -2323,7 +2331,7 @@ int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int*
         usleep(1000);
     }
 
-    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "MEAS[%d] = %.3f\n", channel, meas1000db/1e3);
+    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "MEAS[%d] = %.3f DEC=%d CORR=%.f\n", channel, meas1000db/1e3, d->s_rx_dec, corr);
 
     *func = accum;
     return res;
@@ -2346,8 +2354,8 @@ int xsdrcal_init_calibrate(xsdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
 {
     ops->adcrate = d->base.cgen_clk / d->base.rxcgen_div;
     ops->dacrate = d->base.cgen_clk / d->base.txcgen_div;
-    ops->rxsamplerate = ops->adcrate / d->base.rxtsp_div;// / d->base.rx_dsp_decim;
-    ops->txsamplerate = ops->dacrate / d->base.txtsp_div;// / d->base.tx_dsp_inter;
+    ops->rxsamplerate = ops->adcrate / d->base.rxtsp_div / d->base.rx_dsp_decim;
+    ops->txsamplerate = ops->dacrate / d->base.txtsp_div / d->base.tx_dsp_inter;
 
     ops->rxfrequency = d->base.rx_lo;
     ops->txfrequency = d->base.tx_lo;
@@ -2564,8 +2572,14 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
             USDR_LL_LOG(dev, "LMS7", USDR_LOG_INFO, "------------------ Calibration TXIQIMB(%c) ------------------\n", 'A' + channel);
             res = (res) ? res : calibrate_txiqimb(&cops);
             if (res) {
-                USDR_LL_LOG(dev, "LMS7", USDR_LOG_WARNING, " TXIQIMB failed: res=%d\n", res);
-                return res;
+                if (res == -ENAVAIL) {
+                    cops.i = 0;
+                    cops.q = 0;
+                    res = 0;
+                } else {
+                    USDR_LL_LOG(dev, "LMS7", USDR_LOG_WARNING, " TXIQIMB failed: res=%d\n", res);
+                    return res;
+                }
             }
             if (sarray) {
                 sarray[ 2 * 3 + 0] = cops.i;
@@ -2593,12 +2607,16 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
 
     // Restore individual PAD attenuation
     if ((old_dsp_txcfg & 0x1) == 0) {
-        res = (res) ? res : lms7002m_mac_set(&d->base.lmsstate, LMS7_CH_A);
-        res = (res) ? res : lms7002m_trf_gain(&d->base.lmsstate, TRF_GAIN_PAD, -10 * tx_loss[0], NULL);
+        res = res ? res : lms7002m_mac_set(&d->base.lmsstate, LMS7_CH_A);
+        res = res ? res : lms7002m_trf_gain(&d->base.lmsstate, TRF_GAIN_PAD, -10 * tx_loss[0], NULL);
+        res = res ? res : lms7002m_xxtsp_cmix(&d->base.lmsstate, LMS_TXTSP, d->base.tx_dsp[0].set ? d->base.tx_dsp[0].value : 0);
+        res = res ? res : lms7002m_xxtsp_cmix(&d->base.lmsstate, LMS_RXTSP, d->base.rx_dsp[0].set ? d->base.rx_dsp[0].value : 0);
     }
     if ((old_dsp_txcfg & 0x2) == 0) {
-        res = (res) ? res : lms7002m_mac_set(&d->base.lmsstate, LMS7_CH_B);
-        res = (res) ? res : lms7002m_trf_gain(&d->base.lmsstate, TRF_GAIN_PAD, -10 * tx_loss[1], NULL);
+        res = res ? res : lms7002m_mac_set(&d->base.lmsstate, LMS7_CH_B);
+        res = res ? res : lms7002m_trf_gain(&d->base.lmsstate, TRF_GAIN_PAD, -10 * tx_loss[1], NULL);
+        res = res ? res : lms7002m_xxtsp_cmix(&d->base.lmsstate, LMS_TXTSP, d->base.tx_dsp[1].set ? d->base.tx_dsp[1].value : 0);
+        res = res ? res : lms7002m_xxtsp_cmix(&d->base.lmsstate, LMS_RXTSP, d->base.rx_dsp[1].set ? d->base.rx_dsp[1].value : 0);
     }
     res = (res) ? res : lms7002m_mac_set(&d->base.lmsstate, LMS7_CH_AB);
     res = (res) ? res : xsdr_rfic_rfe_set_path(d, old_rx_lna);
@@ -2606,8 +2624,10 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     res = (res) ? res : xsdr_tx_antennat_port_cfg(d, old_dsp_txcfg);
     res = (res) ? res : lms7002m_mac_set(&d->base.lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
 
+    res = (res) ? res : lms7002m_update_bandwidth(&d->base, true, d->s_txrate / d->s_tx_int, true);
+    res = (res) ? res : lms7002m_update_bandwidth(&d->base, false, d->s_rxrate / d->s_rx_dec, true);
+
 restore_rxcfg:
-    // res = (res) ? res : xsdrcal_do_meas_nco_avg(d, channel, 0, NULL);
     // res = (res) ? res : xsdr_rfic_streaming_xflags(d, old_dsp_rxcfg, 0);
     res = (res) ? res : xsdrcal_set_tx_testsig(d, channel, 0, UINT_MAX);
 

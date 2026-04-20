@@ -131,8 +131,8 @@ int calibrate_txlo(struct calibrate_ops* ops)
                                           ops->txfrequency - freqoff);
     res = res ? res : ops->set_corr_param(ops->param, ops->channel, CORR_DIR_RX | CORR_OP_SET_BW,
                                           ABS(freqoff) * ops->rxbw_factor);
-    res = res ? res : ops->set_corr_param(ops->param, ops->channel, CORR_DIR_TX | CORR_OP_SET_BW,
-                                          1e6);
+    //res = res ? res : ops->set_corr_param(ops->param, ops->channel, CORR_DIR_TX | CORR_OP_SET_BW,
+    //                                      1e6);
     res = res ? res : ops->set_nco_rx_offset(ops->param, ops->channel, -freqoff);
     res = res ? res : find_best_2d(&o[0], SIZEOF_ARRAY(o) - coarse, ops, ops->defstop, &ops->i, &ops->q, &ops->bestmeas);
 
@@ -142,7 +142,7 @@ int calibrate_txlo(struct calibrate_ops* ops)
 static int _calibrate_txpwr(struct calibrate_ops* ops, int32_t freqoffset, int* opwr)
 {
     int ampl = 128;
-    int pwr_r;
+    int pwr_r = -120000;
     int res;
 
     for (; ampl <= 32768; ampl <<= 1) {
@@ -160,6 +160,11 @@ static int _calibrate_txpwr(struct calibrate_ops* ops, int32_t freqoffset, int* 
     }
 
     *opwr = pwr_r;
+    if (pwr_r < -70000) {
+        USDR_LOG("UDEV", USDR_LOG_WARNING, "CAL_IQIMB: Signal is too low to perform calibration, giving up!\n");
+        return -ENAVAIL; // Signal is too low to perform calibation
+    }
+
     return 0;
 }
 
@@ -187,6 +192,9 @@ int _calibrate_iqimb_generic(struct calibrate_ops* ops,
                                           freqoffset * ops->txbw_factor);
     res = res ? res : ops->set_nco_rx_offset(ops->param, ops->channel, rxreoff);
     res = res ? res : _calibrate_txpwr(ops, freqoffset, &pwr_r);
+    if (res)
+        return res;
+
     res = res ? res : ops->set_nco_rx_offset(ops->param, ops->channel, rximoff);
     res = res ? res : ops->do_meas_nco_avg(ops->param, ops->channel, 0, &pwr_i);
     if (res)
