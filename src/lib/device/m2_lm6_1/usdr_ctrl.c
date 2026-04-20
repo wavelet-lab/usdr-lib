@@ -959,8 +959,7 @@ int usdr_dtor(struct usdr_dev *d)
     return 0;
 }
 
-static
-int _usdr_lms6002_dc_calib(struct usdr_dev *d)
+static int _usdr_lms6002_dc_calib_rx(struct usdr_dev *d)
 {
     int res = 0;
 
@@ -981,6 +980,15 @@ int _usdr_lms6002_dc_calib(struct usdr_dev *d)
 
     // Restore initial VGA2 gain values
     res = res ? res : lms6002d_set_rxvga2ab_gain(&d->lms, d->rx_vga2a, d->rx_vga2b);
+
+    return res;
+}
+
+static int _usdr_lms6002_dc_calib_tx(struct usdr_dev *d)
+{
+    int res = 0;
+
+    res = res ? res : lms6002d_cal_txrxlpfdc(&d->lms, true);
 
     return res;
 }
@@ -1324,9 +1332,9 @@ int usdr_set_tx_port_switch(struct usdr_dev *d, unsigned path)
 int usdr_calib_dc(struct usdr_dev *d, bool rx)
 {
     int res;
-    res = _usdr_lms6002_dc_calib(d);
+    res = rx ? _usdr_lms6002_dc_calib_rx(d) : _usdr_lms6002_dc_calib_tx(d);
 
-    USDR_LOG("UDEV", USDR_LOG_INFO, "DC - Calibration done\n");
+    USDR_LOG("UDEV", USDR_LOG_INFO, "DC %s - Calibration done\n", rx ? "RX" : "TX");
     return res;
 }
 
