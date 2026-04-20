@@ -31,12 +31,15 @@ struct lms6002d_state {
     uint8_t rfe_in1sel_dci;
     uint8_t rfe_gain_lna_sel;
     uint8_t trf_pa_ctrl;
+
+    uint8_t trf_vga1_gain;
 };
 typedef struct lms6002d_state lms6002d_state_t;
 
 
 int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms6002d_state_t* out);
 int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq);
+int lms6002d_disable_pll(lms6002d_state_t* obj, bool tx);
 
 //int lms6002d_rf_enable(lms6002d_state_t* obj, bool tx, bool en);
 

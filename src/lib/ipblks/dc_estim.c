@@ -9,6 +9,7 @@ enum {
     ADDR_DC_EST_ACCM = 1,
 };
 
+// TODO: fix wr bit to 1 for usdr!
 static int _phy_rx_reg(lldev_t d, uint32_t llreg, bool wr, uint8_t bank, uint8_t addr, uint16_t val)
 {
     uint32_t reg = (!wr ? 0x80000000 : 0) | (((uint32_t)bank & 0x7f) << 24) | ((uint32_t)addr << 16) | val;

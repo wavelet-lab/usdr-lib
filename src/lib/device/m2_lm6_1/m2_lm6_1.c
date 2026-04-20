@@ -217,6 +217,11 @@ static int dev_m2_lm6_1_sdr_revision_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint
 static int dev_m2_lm6_1_sdr_rfe_throttle_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm6_1_sdr_dccorr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
+static int dev_m2_lm6_1_sdr_tfe_gen_const_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
+static int usdr_device_m2_lm6_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int usdr_device_m2_lm6_1_calibrate_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
+
 
 static
 const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
@@ -234,6 +239,8 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
 
     { "/dm/sdr/refclk/frequency", {dev_m2_lm6_1_sdr_refclk_frequency_set, dev_m2_lm6_1_sdr_refclk_frequency_get}},
     { "/dm/sdr/refclk/path",      {dev_m2_lm6_1_sdr_refclk_path_set, NULL}},
+
+    { "/dm/sdr/0/calibrate",      { usdr_device_m2_lm6_1_calibrate_set, usdr_device_m2_lm6_1_calibrate_get }},
 
     { "/dm/sdr/0/rx/tia/cfb",   { dev_m2_lm6_1_sdr_rx_tia_cfb_set, NULL }},
     { "/dm/sdr/0/rx/tia/rfb",   { dev_m2_lm6_1_sdr_rx_tia_rfb_set, NULL }},
@@ -277,6 +284,8 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
 
     { "/dm/sdr/0/tx/phgaincorr", {  dev_m2_lm6_1_sdr_tx_phgaincorr_set, NULL }},
     { "/dm/sdr/0/rx/phgaincorr", {  dev_m2_lm6_1_sdr_rx_phgaincorr_set, NULL }},
+
+    { "/dm/sdr/0/tfe/generator/const",   { dev_m2_lm6_1_sdr_tfe_gen_const_set, NULL }},
 
     { "/debug/hw/lms6002d/0/reg",  { dev_m2_lm6_1_debug_lms6002d_reg_set, dev_m2_lm6_1_debug_lms6002d_reg_get }},
     { "/debug/hw/si5332/0/reg",    { dev_m2_lm6_1_debug_si5332_reg_set, dev_m2_lm6_1_debug_si5332_reg_get }},
@@ -345,6 +354,9 @@ static const usdr_dev_link_t s_links[] = {
     { "/dm/sdr/0/rx/phgaincorr/1","/dm/sdr/0/rx/phgaincorr" },
     { "/dm/sdr/0/tx/phgaincorr/1","/dm/sdr/0/tx/phgaincorr" },
 
+    { "/dm/sdr/0/tfe/generator/const/0", "/dm/sdr/0/tfe/generator/const" },
+    { "/dm/sdr/0/tfe/generator/const/1", "/dm/sdr/0/tfe/generator/const" },
+
 };
 
 
@@ -358,6 +370,8 @@ struct dev_m2_lm6_1 {
     uint32_t debug_si5332_last;
     uint32_t debug_tps6381x_last;
     uint32_t debug_lp8758_last;
+
+    int cal_data[8];
 
     stream_handle_t* rx;
     stream_handle_t* tx;
@@ -1117,6 +1131,72 @@ int usdr_device_m2_lm6_1_initialize(pdevice_t udev, unsigned pcount, const char*
     return res;
 }
 
+int dev_m2_lm6_1_sdr_tfe_gen_const_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    bool normal = (value == UINT64_MAX);
+    int16_t vi = (int16_t)((value >> 16) & 0xffff);
+    int16_t vq = (int16_t)((value >> 0) & 0xffff);
+
+    return usdr_tx_gen_set(&d->d, !normal, 0x3, vi, vq);
+}
+
+int usdr_device_m2_lm6_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    int res;
+    unsigned flags = value & 0xfffff;
+    unsigned chan = value >> 32;
+
+    if (flags > 2*65536 || chan > 1) {
+        const char* v = (const char* )value;
+        chan = 0; // TODO B
+        flags = 0;
+
+        if (strncmp(v, "e", 1) == 0) {
+            v += 1;
+            flags |= USDR_CAL_EXT_FB;
+        }
+
+        if (strncmp(v, "a:", 2) == 0) {
+            v += 2;
+        } if (strncmp(v, "b:", 2) == 0) {
+            v += 2;
+            chan = 1;
+        }
+
+        if (strcmp(v, "txlo") == 0) {
+            flags |= USDR_CAL_TXLO;
+        } else if (strcmp(v, "rxlo") == 0) {
+            flags |= USDR_CAL_RXLO;
+        } else if (strcmp(v, "txiqimb") == 0) {
+            flags |= USDR_CAL_TXIQIMB;
+        } else if (strcmp(v, "rxiqimb") == 0) {
+            flags |= USDR_CAL_RXIQIMB;
+        } else if (strcmp(v, "tx") == 0) {
+            flags |= USDR_CAL_TXLO | USDR_CAL_TXIQIMB;
+        } else if (strcmp(v, "rx") == 0) {
+            flags |= USDR_CAL_RXLO | USDR_CAL_RXIQIMB;
+        } else if (strcmp(v, "all") == 0) {
+            flags |= USDR_CAL_TXLO | USDR_CAL_TXIQIMB | USDR_CAL_RXLO | USDR_CAL_RXIQIMB;
+        } else if (strcmp(v, "lo") == 0) {
+            flags |= USDR_CAL_TXLO | USDR_CAL_RXLO;
+        } else {
+            return -EINVAL;
+        }
+    }
+
+    res = usdr_calibrate(&d->d, chan, flags, &d->cal_data[0]);
+    return res;
+}
+
+int usdr_device_m2_lm6_1_calibrate_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    *value = (intptr_t)&d->cal_data[0];
+    return 0;
+}
+
 static const channel_map_info_t s_usdr_chmap[] = {
     { "ai", 0 },
     { "aq", 1 },
@@ -1169,10 +1249,9 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         if (res) {
             return res;
         }
-
-        //if (d->d.rx_lo != 0) {
-        //    usdr_rfic_fe_set_freq(&d->d, false, d->d.rx_lo, NULL);
-        //}
+        if (d->d.tx_lo) {
+            lms6002d_tune_pll(&d->d.lms, true, d->d.tx_lo);
+        }
 
         for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
             if (d->d.rx_raw.lo[i].set) {
@@ -1203,12 +1282,12 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
             res = res ? res : usdr_reset_txfex(&d->d);
         }
 
-        res = create_sfetrx4_stream(dev, extended_core ? CORE_EXFETX_DMA32_R0_2 : CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags,
-                                    extended_core ? M2PCI_REG_WR_TXDMA_CFG0 : M2PCI_REG_WR_TXDMA_CNF_L,
-                                    M2PCI_REG_WR_SYNC_CTRL,
-                                    M2PCI_REG_RD_TXDMA_STAT,
-                                    0, CSR_TFE4_BASE, &d->tx, &chans);
+        res = res ? res : create_sfetrx4_stream(dev, extended_core ? CORE_EXFETX_DMA32_R0_2 : CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
+                            flags,
+                            extended_core ? M2PCI_REG_WR_TXDMA_CFG0 : M2PCI_REG_WR_TXDMA_CNF_L,
+                            M2PCI_REG_WR_SYNC_CTRL,
+                            M2PCI_REG_RD_TXDMA_STAT,
+                            0, CSR_TFE4_BASE, &d->tx, &chans);
         if (res) {
             return res;
         }
@@ -1240,6 +1319,22 @@ int usdr_device_m2_lm6_1_unregister_stream(device_t* dev, stream_handle_t* strea
         return -EINVAL;
     }
     return 0;
+}
+
+static int usdr_device_m2_lm6_1_sync(device_t* dev,
+                                     stream_handle_t** pstreams,
+                                     unsigned stream_count,
+                                     const char* sync_op)
+{
+    if (sync_op != NULL && strcmp(sync_op, "off")) {
+        struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)dev;
+
+        //if (d->tx) {
+        //    usdr_calibrate(&d->d, 3, USDR_CAL_TXLO | USDR_CAL_TXIQIMB, NULL);
+        //}
+    }
+
+    return sfetrx4_stream_sync(dev, pstreams, stream_count, sync_op);
 }
 
 
@@ -1282,7 +1377,7 @@ int usdr_device_m2_lm6_1_create(lldev_t dev, /*UNUSED*/ device_id_t devid)
     d->base.destroy = &usdr_device_m2_lm6_1_destroy;
     d->base.create_stream = &usdr_device_m2_lm6_1_create_stream;
     d->base.unregister_stream = &usdr_device_m2_lm6_1_unregister_stream;
-    d->base.timer_op = &sfetrx4_stream_sync;
+    d->base.timer_op = usdr_device_m2_lm6_1_sync;
     d->rx = NULL;
     d->tx = NULL;
 

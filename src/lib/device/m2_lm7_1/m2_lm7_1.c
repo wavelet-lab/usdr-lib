@@ -876,9 +876,10 @@ int dev_m2_lm7_1_tfe_gen_const_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t v
     unsigned chan = (unsigned)(value >> 32);
     unsigned vi = (value >> 16) & 0xffff;
     unsigned vq = (value >> 0) & 0xffff;
+    bool normal = (value == UINT64_MAX);
 
     res = (res) ? res : lms7002m_mac_set(&d->xdev.base.lmsstate, chan);
-    res = (res) ? res : lms7002m_xxtsp_gen(&d->xdev.base.lmsstate, LMS_TXTSP, XXTSP_DC, vi, vq);
+    res = (res) ? res : lms7002m_xxtsp_gen(&d->xdev.base.lmsstate, LMS_TXTSP, normal ? XXTSP_NORMAL : XXTSP_DC, vi, vq);
     return res;
 }
 

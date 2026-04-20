@@ -2363,6 +2363,10 @@ int xsdrcal_init_calibrate(xsdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
     ops->rxtxlo_frac = ((uint64_t)INT_MAX + 1) / 9.0187;
     ops->rxiqimb_frac = ((uint64_t)INT_MAX + 1) / 5.1031;
     ops->txiqimb_frac = ((uint64_t)INT_MAX + 1) / 11.1076;
+    ops->coarse_mode = 0;
+
+    ops->rxbw_factor = 2.33;
+    ops->txbw_factor = 2.33;
 
     ops->txlo_iq_corr.max = 1023;
     ops->txlo_iq_corr.min = -1023;
@@ -2382,7 +2386,7 @@ int xsdrcal_init_calibrate(xsdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
     ops->rximb_ang_corr.max = 2047;
     ops->rximb_ang_corr.min = -2047;
 
-    ops->set_nco_offset = &xsdrcal_set_nco_offset;
+    ops->set_nco_rx_offset = &xsdrcal_set_nco_offset;
     ops->set_corr_param = &xsdrcal_set_corr_param;
     ops->do_meas_nco_avg = &xsdrcal_do_meas_nco_avg;
     ops->set_tx_testsig = &xsdrcal_set_tx_testsig;

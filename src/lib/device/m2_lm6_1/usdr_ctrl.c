@@ -72,12 +72,18 @@ enum fpga_phy_regs {
     CFG_REG_IQIMB_1 = 3,
     CFG_REG_IQIMB_2 = 4,
     CFG_REG_IQIMB_3 = 5,
+    CFG_REG_DC_EST = 6,
+    CFG_REG_DC_GEN = 7,
     CFG_REG_NCO0_L = 8,
     CFG_REG_NCO0_H = 9,
     CFG_REG_NCO1_L = 10,
     CFG_REG_NCO1_H = 11,
     CFG_REG_DSP_LD = 64,
 };
+
+#define MAKE_PHY_WR_REG(a, w) ((((a) & 0x7f) << 24) | ((w) & 0xffffff))
+#define MAKE_PHY_WR_SUB_REG(a, b, w) MAKE_PHY_WR_REG(a, (((b) & 0xff) << 16) | ((w) & 0xffff))
+#define MAKE_PHY_RD_REG(a, i) ((((a) & 0x7f) << 24) | ((i) & 0xffffff) | 0x80000000)
 
 // RX chain
 // LNA_GAIN -> mixer -> VGA1_GAIN -> lpf -> VGA2_GAIN[a,b] -> adc
@@ -307,6 +313,32 @@ static int _usdr_set_nco(usdr_dev_t *d, bool rx, unsigned nco_num, double freq)
     return res;
 }
 
+enum {
+    CFG_REG_DC_GEN_CTRL = 0,
+    CFG_REG_DC_GEN_AI = 4,
+    CFG_REG_DC_GEN_AQ = 5,
+    CFG_REG_DC_GEN_BI = 6,
+    CFG_REG_DC_GEN_BQ = 7,
+};
+
+int usdr_tx_gen_set(usdr_dev_t *d, bool enable, unsigned chanmsk, int16_t i, int16_t q)
+{
+    int res = 0;
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_SUB_REG(CFG_REG_DC_GEN, CFG_REG_DC_GEN_CTRL, enable ? 1 : 0));
+    if (!enable)
+        return res;
+
+    if (chanmsk & 1) {
+        res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_SUB_REG(CFG_REG_DC_GEN, CFG_REG_DC_GEN_AI, i));
+        res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_SUB_REG(CFG_REG_DC_GEN, CFG_REG_DC_GEN_AQ, q));
+    }
+    if (chanmsk & 2) {
+        res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_SUB_REG(CFG_REG_DC_GEN, CFG_REG_DC_GEN_BI, i));
+        res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_SUB_REG(CFG_REG_DC_GEN, CFG_REG_DC_GEN_BQ, q));
+    }
+    return res;
+}
+
 static int _usdr_set_lna_tx(usdr_dev_t *d, unsigned cfg_idx)
 {
     const freq_auto_band_map_t* cfg = &d->cfg_auto_tx[cfg_idx];
@@ -410,8 +442,6 @@ int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob)
 
 #define TARGET_RATE 30720000
 
-#define MAKE_PHY_WR_REG(a, w) ((((a) & 0x7f) << 24) | ((w) & 0xffffff))
-#define MAKE_PHY_RD_REG(a, i) ((((a) & 0x7f) << 24) | ((i) & 0xffffff) | 0x80000000)
 
 int usdr_reset_txfex(struct usdr_dev *d)
 {
@@ -429,6 +459,16 @@ int usdr_reset_txnco(struct usdr_dev *d)
     return res;
 }
 
+int usdr_update_cal(struct usdr_dev *d, bool rx)
+{
+    return rx ? usdr_rxupdate_cal(d) : usdr_txupdate_cal(d);
+}
+
+int usdr_rxupdate_cal(struct usdr_dev *d)
+{
+    return 0;
+}
+
 int usdr_txupdate_cal(struct usdr_dev *d)
 {
     // CFG_AMP_I
@@ -438,7 +478,7 @@ int usdr_txupdate_cal(struct usdr_dev *d)
 
     // I = CFG_AMP_I * i + CFG_TAN_Q * q
     // Q = CFG_AMP_Q * q + CFG_TAN_I * i
-
+    // Symmetric correction to I/Q:
     // c = math.cos(phi / 2.0)
     // s = math.sin(phi / 2.0)
     // I = (c / alpha) * Id + (s / beta) * Qd
@@ -486,6 +526,31 @@ int usdr_txupdate_cal(struct usdr_dev *d)
     res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_2, cfg_tan_i));
     res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_3, cfg_tan_q));
     return res;
+}
+
+static int usdr_restore_nco(struct usdr_dev *d, bool istx)
+{
+    int res = 0;
+    freq_data_t* freqd = (istx) ? &d->tx_raw : &d->rx_raw;
+
+    for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
+        if (freqd->bb[i].set) {
+            res = res ? res : _usdr_set_nco(d, !istx, i, (int32_t)freqd->bb[i].value);
+        } else {
+            res = res ? res : _usdr_set_nco(d, !istx, i, 0);
+        }
+    }
+    return res;
+}
+
+static int _usdr_update_bandwidth(struct usdr_dev *d, bool istx)
+{
+    unsigned rate = istx ? (d->dac_clk / d->txbb_intr) : (d->adc_clk / d->rxbb_decim);
+    unsigned bw = 2 * (istx ? d->tx_nco_distance : d->rx_nco_distance) + rate;
+
+    USDR_LOG("UDEV", USDR_LOG_WARNING, "%s: Updating %s bandwidth to %.3f Mhz\n",
+             lowlevel_get_devname(d->base.dev), istx ? "TX" : "RX", bw / 1e6);
+    return lms6002d_set_bandwidth(&d->lms, istx, bw);
 }
 
 int usdr_set_samplerate_ex(struct usdr_dev *d,
@@ -560,16 +625,7 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
 
     // Update NCOs
     for (unsigned rxgrp = 0; rxgrp < 2; rxgrp++) {
-        bool istx = (rxgrp == 1);
-        freq_data_t* freqd = (istx) ? &d->tx_raw : &d->rx_raw;
-
-        for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
-            if (freqd->bb[i].set) {
-                res = res ? res : _usdr_set_nco(d, !istx, i, (int32_t)freqd->bb[i].value);
-            } else {
-                res = res ? res : _usdr_set_nco(d, !istx, i, 0);
-            }
-        }
+        res = res ? res : usdr_restore_nco(d, (rxgrp == 1));
     }
 
     uint32_t v = 0;
@@ -587,10 +643,12 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
 
     // If user didn't set BW filter set it to samplerate
     if (!d->rx_bw.set && rxrate > 1) {
-        res = res ? res : lms6002d_set_bandwidth(&d->lms, false, 2 * d->rx_nco_distance + rxrate);
+        //res = res ? res : lms6002d_set_bandwidth(&d->lms, false, 2 * d->rx_nco_distance + rxrate);
+        res = res ? res : _usdr_update_bandwidth(d, false);
     }
     if (!d->tx_bw.set && txrate > 1) {
-        res = res ? res : lms6002d_set_bandwidth(&d->lms, true, 2 * d->tx_nco_distance + txrate);
+        //res = res ? res : lms6002d_set_bandwidth(&d->lms, true, 2 * d->tx_nco_distance + txrate);
+        res = res ? res : _usdr_update_bandwidth(d, true);
     }
 
     USDR_LOG("UDEV", USDR_LOG_INFO, "INTR %d RX_RATE %.3f TX_RATE %.3f MXLO %.3f\n", int_dec_x[ind], rxrate / 1.0e6, txrate / 1.0e6, d->mixer_lo / 1.0e6);
@@ -1040,12 +1098,15 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
 
     // Update BW
     if ((istx && !d->tx_bw.set) || (!istx && !d->rx_bw.set)) {
+        /*
         unsigned rate = istx ? (d->dac_clk / d->txbb_intr) : (d->adc_clk / d->rxbb_decim);
-        unsigned bw = 2 * d->tx_nco_distance + rate;
+        unsigned bw = 2 * (istx ? d->tx_nco_distance : d->rx_nco_distance) + rate;
 
         USDR_LOG("UDEV", USDR_LOG_WARNING, "%s: Updating %s bandwidth to %.3f Mhz\n",
                  lowlevel_get_devname(d->base.dev), istx ? "TX" : "RX", bw / 1e6);
         res = res ? res : lms6002d_set_bandwidth(&d->lms, istx, bw);
+        */
+        res = res ? res : _usdr_update_bandwidth(d, istx);
     }
 
     return res;
@@ -1291,5 +1352,260 @@ int usdr_rxdccorr(struct usdr_dev *d, uint64_t *ov)
     int res = phy_do_meas_nco_avg(d->lms.dev, REG_CFG_PHY_0, 32767, 0, 1, &out);
 
     *ov = out;
+    return res;
+}
+
+static
+int usdr_set_corr_param(usdr_dev_t* d, int channel, int corr_type, int value)
+{
+    unsigned type = (corr_type & 0xff);
+    bool rx = (corr_type >> CORR_DIR_OFF) == CORR_DIR_RX;
+    struct imb_data* imb_corr = rx ? &d->rx_corr : &d->tx_corr;
+
+    switch (type) {
+    case CORR_PARAM_I:
+    case CORR_PARAM_Q:
+        USDR_LL_LOG(d->base.dev, "LMS6", USDR_LOG_INFO, "Set %s%s%s to %d\n",
+                    rx ? "RX" : "TX",
+                    (channel == 0) ? "A" : "B",
+                    type == CORR_PARAM_I ? "I" : "Q",
+                    value);
+        if (type == CORR_PARAM_Q) {
+            imb_corr->dc_i = value;
+        } else {
+            imb_corr->dc_q = value;
+        }
+
+        if (rx) {
+            return -EINVAL;
+        } else {
+            return usdr_tx_dccorr(d, imb_corr->dc_i, imb_corr->dc_q);
+        }
+
+    case CORR_PARAM_A:
+        USDR_LL_LOG(d->base.dev, "LMS6", USDR_LOG_INFO, "Set %sA to %d\n", rx ? "RX" : "TX", value);
+        imb_corr->pahse = value;
+        return usdr_update_cal(d, rx);
+
+    case CORR_PARAM_GIQ:
+        USDR_LL_LOG(d->base.dev, "LMS6", USDR_LOG_INFO, "Adjust %sGIQ to %d\n",
+                    rx ? "RX" : "TX", value);
+        imb_corr->ampl = value;
+        return usdr_update_cal(d, rx);
+
+    case CORR_OP_SET_FREQ:
+        return lms6002d_tune_pll(&d->lms, !rx, value);
+
+    case CORR_OP_SET_BW:
+        return lms6002d_set_bandwidth(&d->lms, !rx, value);
+
+    default:
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+static
+int usdrcal_set_corr_param(void* param, int channel, int corr_type, int value)
+{
+    usdr_dev_t *d = (usdr_dev_t *)param;
+    return usdr_set_corr_param(d, channel, corr_type, value);
+}
+
+static
+int usdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int* func)
+{
+    usdr_dev_t *d = (usdr_dev_t *)param;
+    unsigned acc_idx = 1; //TODO: FIXME: !!!!!!!!!!!!!!!!!!!
+
+    return phy_do_meas_nco_avg(d->lms.dev, REG_CFG_PHY_0, 32767, channel, acc_idx, func);
+}
+
+static
+int usdrcal_set_tx_testsig(void* param, int channel, int32_t freqoffset, unsigned pwr)
+{
+    usdr_dev_t *d = (usdr_dev_t *)param;
+    int res = 0;
+    int clamp_pwr = (pwr > 30000) ? 30000 : pwr;
+    res = res ? res : usdr_tx_gen_set(d, pwr == 0 ? false : true, 0x3, clamp_pwr, 0);
+    res = res ? res : _usdr_set_nco(d, false, 0, freqoffset);
+    res = res ? res : _usdr_set_nco(d, false, 1, freqoffset);
+    return res;
+}
+
+static
+int usdrcal_set_nco_offset(void* param, int channel, int32_t freqoffset)
+{
+    usdr_dev_t *d = (usdr_dev_t *)param;
+    return _usdr_set_nco(d, true, channel, freqoffset);
+}
+
+static
+int usdrcal_init_calibrate(usdr_dev_t *d, struct calibrate_ops* ops, unsigned channel)
+{
+    ops->adcrate = d->adc_clk;
+    ops->dacrate = d->dac_clk;
+    ops->rxsamplerate = ops->adcrate / d->rxbb_decim;
+    ops->txsamplerate = ops->dacrate / d->txbb_intr;
+
+    ops->rxfrequency = d->rx_lo;
+    ops->txfrequency = d->tx_lo;
+    ops->channel = channel;
+    ops->deflogdur = ops->rxsamplerate / 16;
+    if (ops->deflogdur > 131072) {
+        ops->deflogdur = 131072;
+    }
+    ops->defstop = -120000;
+    ops->param = d;
+
+    // Make very odd fraction not to fall harmonics into the same bins after nyquist
+    ops->rxtxlo_frac = ((uint64_t)INT_MAX + 1) / 9.0187;
+    ops->rxiqimb_frac = ((uint64_t)INT_MAX + 1) / 5.1031;
+    ops->txiqimb_frac = ((uint64_t)INT_MAX + 1) / 11.1076;
+    ops->coarse_mode = 0;
+
+    ops->rxbw_factor = 2.45;
+    ops->txbw_factor = 2.45;
+
+    ops->txlo_iq_corr.max = 2048;
+    ops->txlo_iq_corr.min = -2047;
+
+    ops->tximb_iq_corr.max = IMB_AMPL_MAX;
+    ops->tximb_iq_corr.min = -IMB_AMPL_MAX;
+
+    ops->tximb_ang_corr.max = IMB_PHASE_MAX;
+    ops->tximb_ang_corr.min = -IMB_PHASE_MAX;
+
+    ops->rxlo_iq_corr.max = 63;
+    ops->rxlo_iq_corr.min = -63;
+
+    ops->rximb_iq_corr.max = IMB_AMPL_MAX;
+    ops->rximb_iq_corr.min = -IMB_AMPL_MAX;
+
+    ops->rximb_ang_corr.max = IMB_PHASE_MAX;
+    ops->rximb_ang_corr.min = -IMB_PHASE_MAX;
+
+    ops->set_nco_rx_offset = &usdrcal_set_nco_offset; // RX NCO offset
+    ops->set_corr_param = &usdrcal_set_corr_param;
+    ops->do_meas_nco_avg = &usdrcal_do_meas_nco_avg;
+    ops->set_tx_testsig = &usdrcal_set_tx_testsig;
+
+    return 0;
+}
+
+int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
+{
+    int res = 0;
+    struct calibrate_ops cops;
+    lldev_t dev = d->lms.dev;
+    bool externallb = (param & USDR_CAL_EXT_FB) == USDR_CAL_EXT_FB;
+    bool norestore = false;
+
+    unsigned coarse = (((param & USDR_CAL_COARSE_1) == USDR_CAL_COARSE_1) ? 1 : 0) |
+                      (((param & USDR_CAL_COARSE_2) == USDR_CAL_COARSE_2) ? 2 : 0);
+    unsigned tx_lo = d->tx_lo;
+    unsigned rx_lo = d->rx_lo;
+    unsigned rfic_rx_lo = d->rfic_rx_lo;
+    unsigned rfe_gain_lna_sel = (d->lms.rfe_gain_lna_sel & 0x30) >> 4; // Fixme!
+
+    res = res ? res : usdrcal_init_calibrate(d, &cops, channel);
+    cops.coarse_mode = coarse;
+
+    if ((param & USDR_CAL_RXLO) && (rx_lo > 0)) {
+        USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration RXLO(%c) ------------------\n", 'A' + channel);
+    }
+
+    if ((param & USDR_CAL_RXIQIMB) && (rx_lo > 0)) {
+        // TODO if TX was disabled enable TX
+        USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration RXIQIMB(%c) ------------------\n", 'A' + channel);
+    }
+
+    if ((param & (USDR_CAL_TXLO | USDR_CAL_TXIQIMB)) && (tx_lo > 0)) {
+        if (rx_lo == 0) {
+            res = res ? res : _usdr_pwr_state(d, false, true);
+            res = res ? res : usleep(500000);
+            res = res ? res : lms6002d_tune_pll(&d->lms, false, 320e6);
+            res = res ? res : usdr_calib_dc(d, true);
+            res = res ? res : lms6002d_tune_pll(&d->lms, true, tx_lo);
+        }
+        if (!externallb) {
+            unsigned lb_path = 1; // TODO select RX path for LB
+            res = res ? res : lms6002d_set_rx_path(&d->lms, lb_path);
+            res = res ? res : lms6002d_rf_loopback_en(&d->lms);
+        }
+        if (res)
+            return res;
+
+        if (param & USDR_CAL_TXLO) {
+            USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration TXLO(%c) ------------------\n", 'A' + channel);
+            res = (res) ? res : calibrate_txlo(&cops);
+            if (res) {
+                USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " TXLO failed: res=%d\n", res);
+                return res;
+            }
+            if (sarray) {
+                sarray[ 2 * 1 + 0] = cops.i;
+                sarray[ 2 * 1 + 1] = cops.q;
+            }
+        }
+
+        if (param & USDR_CAL_TXIQIMB) {
+            uint8_t old_txvga1 = d->lms.trf_vga1_gain;
+            USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration TXIQIMB(%c) ------------------\n", 'A' + channel);
+            res = res ? res : lms6002d_set_txvga1_gain(&d->lms, 28);
+            res = res ? res : calibrate_txiqimb(&cops);
+            res = res ? res : lms6002d_set_txvga1_gain(&d->lms, old_txvga1);
+            if (res) {
+                USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " TXIQIMB failed: res=%d\n", res);
+                return res;
+            }
+            if (sarray) {
+                sarray[ 2 * 3 + 0] = cops.i;
+                sarray[ 2 * 3 + 1] = cops.q;
+            }
+        }
+
+        if (!norestore) {
+            if (rfic_rx_lo > 0) {
+                res = res ? res : lms6002d_tune_pll(&d->lms, false, rfic_rx_lo);
+            } else {
+                res = res ? res : lms6002d_disable_pll(&d->lms, false);
+            }
+            if (!externallb) {
+                res = res ? res : lms6002d_set_rx_path(&d->lms, rfe_gain_lna_sel);
+                res = res ? res : lms6002d_rf_loopback_dis(&d->lms);
+            }
+            if (res) {
+                USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, "restore configuration failed: res=%d\n", res);
+                return res;
+            }
+        }
+
+    }
+
+    if (norestore)
+        return res;
+
+    res = res ? res : usdr_tx_gen_set(d, false, 0, 0, 0); // Restore TX BB
+    res = res ? res : usdr_restore_nco(d, true);          // RXNCO
+    res = res ? res : usdr_restore_nco(d, false);         // TXNCO
+
+    if (!d->rx_bw.set) {
+        res = res ? res : _usdr_update_bandwidth(d, false);
+    } else {
+        res = res ? res : lms6002d_set_bandwidth(&d->lms, false, d->rx_bw.value);
+    }
+
+    if (!d->tx_bw.set) {
+        res = res ? res : _usdr_update_bandwidth(d, true);
+    } else {
+        res = res ? res : lms6002d_set_bandwidth(&d->lms, true, d->tx_bw.value);
+    }
+
+    if (rx_lo == 0) {
+        _usdr_pwr_state(d, false, false);
+    }
+
     return res;
 }

@@ -77,6 +77,8 @@ struct imb_data
     int32_t ampl;     // AMPL_IMB_MIN  .. AMPL_IMB_MAX
     int32_t pahse;    // IMB_PHASE_MIN .. IMB_PHASE_MAX
     int32_t amp_corr; // Amplitude correction
+    int16_t dc_i;
+    int16_t dc_q;
 };
 
 struct usdr_dev
@@ -150,6 +152,7 @@ struct usdr_dev
     opt_u32_t rx_bw;
 
     struct imb_data tx_corr;
+    struct imb_data rx_corr;
 
     freq_auto_band_map_t cfg_auto_rx[USDR_MAX_RX_BANDS];
     freq_auto_band_map_t cfg_auto_tx[USDR_MAX_TX_BANDS];
@@ -215,6 +218,20 @@ int usdr_reset_txfex(struct usdr_dev *d);
 
 int usdr_rxdccorr(struct usdr_dev *d, uint64_t *ov);
 
+int usdr_tx_gen_set(usdr_dev_t *d, bool enable, unsigned chanmsk, int16_t i, int16_t q);
+
+enum {
+    USDR_CAL_RXLO = 1,
+    USDR_CAL_TXLO = 2,
+    USDR_CAL_RXIQIMB = 4,
+    USDR_CAL_TXIQIMB = 8,
+
+    USDR_CAL_EXT_FB = 256,
+    USDR_CAL_COARSE_1 = 512,
+    USDR_CAL_COARSE_2 = 1024,
+};
+int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray);
+
 #ifndef NO_IGPO
 
 enum {
@@ -249,8 +266,6 @@ enum {
     IGPI_CLK1PPS     = 28,
     IGPI_TXCLK       = 32,
     IGPI_RXCLK       = 36,
-    IGPI_RX_I        = 40,
-    IGPI_RX_Q        = 44,
 
 };
 
@@ -262,6 +277,8 @@ int usdr_tx_dccorr(usdr_dev_t *d, int16_t i, int16_t q);
 int usdr_reset_txnco(struct usdr_dev *d);
 
 int usdr_txupdate_cal(struct usdr_dev *d);
+int usdr_rxupdate_cal(struct usdr_dev *d);
+int usdr_update_cal(struct usdr_dev *d, bool rx);
 
 int usdr_tx_iqimb_set(usdr_dev_t* d, int iq_amp_imb, int phase_imb);
 

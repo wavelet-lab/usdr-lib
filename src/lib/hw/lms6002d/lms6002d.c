@@ -75,6 +75,7 @@ int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, struct lms600
     out->rxpll_vco_div_bufsel = (uint8_t)MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(0, 0, 1);
     out->rfe_gain_lna_sel = 0xc0;
     out->trf_pa_ctrl = (uint8_t)MAKE_LMS6002D_TRF_PA_CTRL(0, 0);
+    out->trf_vga1_gain = (uint8_t)GET_LMS6002D_TRF_VGA1GAIN_VGA1GAIN(21);
 
     memset(out->rclpfcal, 3, sizeof(out->rclpfcal));
 
@@ -244,6 +245,24 @@ found:
     return 0;
 }
 
+int lms6002d_disable_pll(lms6002d_state_t* obj, bool tx)
+{
+    int res;
+    if (tx) {
+        SET_LMS6002D_TOP_ENREG_CLK_TX_DSM_SPI(obj->top_enreg, 0);
+    } else {
+        SET_LMS6002D_TOP_ENREG_CLK_RX_DSM_SPI(obj->top_enreg, 0);
+    }
+
+    uint16_t regs[] = {
+        MAKE_LMS6002D_REG_WR(TOP_ENREG, obj->top_enreg),
+        tx ? MAKE_LMS6002D_TXPLL_PLL_CFG(0, 0, 0, 0, 0) :
+             MAKE_LMS6002D_RXPLL_PLL_CFG(0, 0, 0, 0, 0),
+    };
+
+    res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+    return res;
+}
 
 int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
 {
@@ -432,8 +451,8 @@ int lms6002d_set_bandwidth(lms6002d_state_t* obj, bool tx, unsigned freq)
         (tx ? 0x3600 : 0x5600) | 0x8000 | (lpfcal << 4),
     };
 
-    USDR_LOG("6002", USDR_LOG_INFO, "LPF %d => BAND=%d RC=%d BYPASS=%d CAL=%d\n",
-             freq / 1000, band, lpfcal, b, obj->rclpfcal[band]);
+    USDR_LOG("6002", USDR_LOG_INFO, "LPF_%s %d => BAND=%d RC=%d BYPASS=%d CAL=%d\n",
+             tx ? "TX" : "RX", freq / 1000, band, lpfcal, b, obj->rclpfcal[band]);
 
     res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
     if (res)
@@ -477,7 +496,7 @@ int lms6002d_set_txvga1_gain(lms6002d_state_t* obj, unsigned vga)
     uint16_t regs[] = {
         MAKE_LMS6002D_TRF_VGA1GAIN(vga),
     };
-
+    obj->trf_vga1_gain = vga;
     res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
     if (res)
         return res;
