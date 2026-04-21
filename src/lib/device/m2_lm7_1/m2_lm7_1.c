@@ -966,9 +966,9 @@ int dev_m2_lm7_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
     int res;
     unsigned flags = value & 0xfffff;
-    unsigned chan = value >> 32;
+    unsigned chan = 0;
 
-    if (flags > 2*65536 || chan > 1) {
+    if (value > 256*65536) {
         const char* v = (const char* )value;
         chan = 0; // TODO B
         flags = 0;
@@ -1004,6 +1004,8 @@ int dev_m2_lm7_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value
         } else {
             return -EINVAL;
         }
+    } else if (value & 262144) {
+        chan = 1;
     }
 
     res = xsdr_calibrate(&d->xdev, chan, flags, &d->cal_data[0]);

@@ -2364,7 +2364,7 @@ int xsdrcal_init_calibrate(xsdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
     if (ops->deflogdur > 131072) {
         ops->deflogdur = 131072;
     }
-    ops->defstop = -120000;
+    ops->defstop = -140000;
     ops->param = d;
 
     // Make very odd fraction not to fall harmonics into the same bins after nyquist
@@ -2382,8 +2382,8 @@ int xsdrcal_init_calibrate(xsdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
     ops->tximb_iq_corr.max = 2047;
     ops->tximb_iq_corr.min = -2047;
 
-    ops->tximb_ang_corr.max = 2047;
-    ops->tximb_ang_corr.min = -2047;
+    ops->tximb_ang_corr.max = 768; // 2047;
+    ops->tximb_ang_corr.min = -768; // -2047;
 
     ops->rxlo_iq_corr.max = 63;
     ops->rxlo_iq_corr.min = -63;
