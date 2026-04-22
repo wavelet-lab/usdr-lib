@@ -93,6 +93,7 @@ struct xsdr_dev
     bool lms8_mode_b;
     bool xilinx_usp;
     bool has_duc_ddc;
+    bool exttx;
 
     bool dpump; //Dual pump data
     union {
@@ -114,6 +115,7 @@ struct xsdr_dev
     uint32_t lms8st_int_mod;
     uint32_t lms8st_enabled;
 
+    uint8_t meas_cnt;
     // Statistics
     double actual_rx_freq;
     double actual_tx_freq;
@@ -254,6 +256,8 @@ int xsdr_usbclk(xsdr_dev_t *d, bool uclk);
 int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray);
 
 int xsdr_trspi_lms8(xsdr_dev_t *d, uint32_t out, uint32_t* in);
+
+int xsdr_reset_extfe(xsdr_dev_t *d);
 
 #ifndef NO_IGPO
 

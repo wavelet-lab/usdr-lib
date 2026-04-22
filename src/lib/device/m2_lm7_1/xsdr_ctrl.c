@@ -586,7 +586,9 @@ enum HWID_MSKS {
     PHY_CFG_TX_MMCM = 0x20,
     PHY_CFG_RX_MMCM = 0x10,
 
+    PHY_EXTENDED_TXFE = 0x08,
     PHY_CFG_HAS_DUC_DDC = 0x04,
+    // PHY_CFG_SEP_CLKDIV_MSK duplicates to 0x02
     PHY_CFG_SINGLE_MMCM = 0x01,
 };
 
@@ -1019,6 +1021,15 @@ no_tx:
     return res;
 }
 
+int xsdr_reset_extfe(xsdr_dev_t *d)
+{
+    lldev_t dev = d->base.lmsstate.dev;
+    int res = 0;
+    res = res ? res : dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x4);
+    res = res ? res : dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x0);
+    return res;
+}
+
 int xsdr_set_samplerate_ex(xsdr_dev_t *d,
                            unsigned rxrate, unsigned txrate,
                            unsigned adcclk, unsigned dacclk,
@@ -1115,7 +1126,7 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
     if (d->has_duc_ddc && txrate && d->s_tx_int != tx_inr) {
         // Optional TX DSP reset
         usleep(10);
-        dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0xf);
+        dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x3);
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x2);
         usleep(10);
@@ -2093,6 +2104,7 @@ int xsdr_init(xsdr_dev_t *d)
     const bool mmcm_single = ((phycfg_id & PHY_CFG_SINGLE_MMCM) == PHY_CFG_SINGLE_MMCM);
     const bool sep_clkdiv = ((phycfg_id & PHY_CFG_SEP_CLKDIV_MSK) == PHY_CFG_SEP_CLKDIV_MSK);
     const bool has_duc_ddc = ((phycfg_id & PHY_CFG_HAS_DUC_DDC) == PHY_CFG_HAS_DUC_DDC);
+    const bool exttx = ((phycfg_id & PHY_EXTENDED_TXFE) == PHY_EXTENDED_TXFE);
 
     d->hwid = hwid;
     d->hwchans_rx = 2; // Defaults to MIMO;
@@ -2111,6 +2123,7 @@ int xsdr_init(xsdr_dev_t *d)
     d->xilinx_usp = false;
     d->lms8_mode_b = false;
     d->has_duc_ddc = has_duc_ddc;
+    d->exttx = exttx;
 
     res = lms7002m_init(&d->base, dev, 0, XSDR_INT_REFCLK);
     if (res) {
@@ -2302,7 +2315,7 @@ int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int*
     xsdr_dev_t *d = (xsdr_dev_t *)param;
     int res = 0;
     int meas1000db = 0;
-    int accum = 0, gen = 0;
+    int accum = -180000, gen = 0;
     unsigned acc_idx = 1;
     float corr = 0.5;
 
@@ -2314,24 +2327,25 @@ int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int*
         corr = 0.5;
 
     res = res ? res : xsdr_phy_dc_estim_accum(d, acc_idx);
-    res = res ? res : xsdr_phy_dc_estim_start(d, false);
-    res = res ? res : usleep(1);
-    res = res ? res : xsdr_phy_dc_estim_start(d, true);
-    res = res ? res : xsdr_phy_dc_estim_get(d, DC_ESTIM_GEN, &gen);
-    if (res)
-        return res;
 
-    for (unsigned k = 0; k < 8000; k++) {
-        res = xsdr_rfe_pwrdc_get(d, acc_idx, gen, channel, corr, &meas1000db);
-        if (res != -EAGAIN) {
-            accum += meas1000db;
-            break;
+    for (unsigned c = 0; c <= d->meas_cnt; c++) {
+        res = res ? res : xsdr_phy_dc_estim_start(d, false);
+        res = res ? res : usleep(1);
+        res = res ? res : xsdr_phy_dc_estim_start(d, true);
+        res = res ? res : xsdr_phy_dc_estim_get(d, DC_ESTIM_GEN, &gen);
+        if (res)
+            return res;
+
+        for (unsigned k = 0; k < 8000; k++) {
+            res = xsdr_rfe_pwrdc_get(d, acc_idx, gen, channel, corr, &meas1000db);
+            if (res != -EAGAIN) {
+                accum = MAX(accum, meas1000db);
+                break;
+            }
+            usleep(500);
         }
-
-        usleep(1000);
+        USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "MEAS[%d] = %.3f DEC=%d CORR=%.f\n", channel, meas1000db/1e3, d->s_rx_dec, corr);
     }
-
-    USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_INFO, "MEAS[%d] = %.3f DEC=%d CORR=%.f\n", channel, meas1000db/1e3, d->s_rx_dec, corr);
 
     *func = accum;
     return res;
@@ -2462,25 +2476,24 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     uint8_t old_rx_lna = d->base.rx_rfic_path;
     uint8_t old_tx_lna = d->base.tx_rfic_path;
     uint8_t tx_loss[2] = { d->base.tx_loss[0] , d->base.tx_loss[1] };
+    uint8_t gc_corr[2] = { d->base.lmsstate.reg_tbb_gc_corr[0], d->base.lmsstate.reg_tbb_gc_corr[1] };
     lldev_t dev = d->base.lmsstate.dev;
     if (channel > 1) {
         return -EINVAL;
     }
 
-    //int32_t old_rxdsp_freqoff = d->rxdsp_freq_offset;
     unsigned tx_lo = d->base.tx_lo;
     unsigned rx_lo = d->base.rx_lo;
     unsigned rx_rfic_lna = d->base.lmsstate.rfe[channel].path;
     unsigned tx_rfic_band = d->base.lmsstate.trf[channel].path;
 
-    // TODO: txdsp != 0 || rxdsp != 0 makes incorrect calibration
+    d->meas_cnt = 1; //One extra measurement for stability
 
     if (sarray) {
         memset(sarray, 0, sizeof(int) * 8);
     }
 
     res = (res) ? res : xsdrcal_init_calibrate(d, &cops, channel);
-    // res = (res) ? res : xsdr_rfic_streaming_xflags(d, channel == 1 ? RFIC_SWAP_AB : 0, 0);
     res = (res) ? res : lms7002m_mac_set(&d->base.lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
     if (res)
         return res;
@@ -2528,10 +2541,10 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
         res = (res) ? res : calibrate_rxiqimb(&cops);
 
         if (tx_lo) {
-            res = (res) ? res : lms7002m_sxx_tune(&d->base.lmsstate, SXX_RX, d->base.fref, tx_lo, false);
+            res = (res) ? res : lms7002m_sxx_tune(&d->base.lmsstate, SXX_TX, d->base.fref, tx_lo, false);
         } else {
             // Looks like TX was off, turn it off
-            res = (res) ? res : lms7002m_sxx_disable(&d->base.lmsstate, SXX_RX);
+            res = (res) ? res : lms7002m_sxx_disable(&d->base.lmsstate, SXX_TX);
         }
         if (res) {
             USDR_LL_LOG(dev, "LMS7", USDR_LOG_WARNING, " RXIQIMB failed: res=%d\n", res);
@@ -2551,6 +2564,7 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
             // No RBB[0] was set; defaulting to current rx samplerate 1000000
             ///////////////////////////////////////////////////////////////////////////////// HACK!!!!!!!!!!!!!!!!!
             res = (res) ? res : lms7002m_rbb_bandwidth(&d->base, 1000000, false);
+            res = res ? res : usleep(750000); // Since RX wasn't active we need time to bring power
         }
         if (res)
             return res;
@@ -2623,12 +2637,13 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     res = (res) ? res : xsdr_rfic_tfe_set_path(d, old_tx_lna);
     res = (res) ? res : xsdr_tx_antennat_port_cfg(d, old_dsp_txcfg);
     res = (res) ? res : lms7002m_mac_set(&d->base.lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
-
+    if (gc_corr[channel] != d->base.lmsstate.reg_tbb_gc_corr[channel]) {
+        res = (res) ? res : lms7002m_tbb_gain(&d->base.lmsstate, gc_corr[channel]);
+    }
     res = (res) ? res : lms7002m_update_bandwidth(&d->base, true, d->s_txrate / d->s_tx_int, true);
     res = (res) ? res : lms7002m_update_bandwidth(&d->base, false, d->s_rxrate / d->s_rx_dec, true);
 
 restore_rxcfg:
-    // res = (res) ? res : xsdr_rfic_streaming_xflags(d, old_dsp_rxcfg, 0);
     res = (res) ? res : xsdrcal_set_tx_testsig(d, channel, 0, UINT_MAX);
 
     return res;

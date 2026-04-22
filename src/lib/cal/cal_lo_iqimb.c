@@ -139,7 +139,7 @@ int calibrate_txlo(struct calibrate_ops* ops)
     return res;
 }
 
-static int _calibrate_txpwr(struct calibrate_ops* ops, int32_t freqoffset, int* opwr)
+static int _calibrate_txpwr(struct calibrate_ops* ops, int32_t freqoffset, bool txcal, int* opwr)
 {
     int ampl = 128;
     int pwr_r = -120000;
@@ -159,6 +159,26 @@ static int _calibrate_txpwr(struct calibrate_ops* ops, int32_t freqoffset, int* 
             break;
     }
 
+    if (pwr_r < -10000) {
+        for (unsigned gc = 0; gc < 32; gc++) {
+            res = ops->set_corr_param(ops->param, ops->channel,
+                                      CORR_OP_SET_GAIN | (txcal ? CORR_DIR_RX : CORR_DIR_TX), gc);
+            if (res == -E2BIG) {
+                break; // Reached maximum
+            } else if (res) {
+                return res;
+            }
+
+            res = ops->do_meas_nco_avg(ops->param, ops->channel, 0, &pwr_r);
+            if (res)
+                return res;
+
+            USDR_LOG("UDEV", USDR_LOG_WARNING, "CAL_IQIMB: Extra gain %d => %d pwr\n", gc, pwr_r);
+            if (pwr_r > -10000)
+                break;
+        }
+    }
+
     *opwr = pwr_r;
     if (pwr_r < -70000) {
         USDR_LOG("UDEV", USDR_LOG_WARNING, "CAL_IQIMB: Signal is too low to perform calibration, giving up!\n");
@@ -169,6 +189,7 @@ static int _calibrate_txpwr(struct calibrate_ops* ops, int32_t freqoffset, int* 
 }
 
 int _calibrate_iqimb_generic(struct calibrate_ops* ops,
+                             bool txcal,
                              int32_t freqoffset,
                              int32_t rximoff,
                              int32_t rxreoff,
@@ -191,7 +212,8 @@ int _calibrate_iqimb_generic(struct calibrate_ops* ops,
     res = res ? res : ops->set_corr_param(ops->param, ops->channel, CORR_DIR_TX | CORR_OP_SET_BW,
                                           freqoffset * ops->txbw_factor);
     res = res ? res : ops->set_nco_rx_offset(ops->param, ops->channel, rxreoff);
-    res = res ? res : _calibrate_txpwr(ops, freqoffset, &pwr_r);
+    res = res ? res : _calibrate_txpwr(ops, freqoffset, txcal, &pwr_r);
+
     if (res)
         return res;
 
@@ -245,7 +267,7 @@ int calibrate_rxiqimb(struct calibrate_ops* ops)
     if (res)
         return res;
 
-    return _calibrate_iqimb_generic(ops, 0, freqoff, -freqoff, _evaluate_rxaiq);
+    return _calibrate_iqimb_generic(ops, false, 0, freqoff, -freqoff, _evaluate_rxaiq);
 }
 
 
@@ -270,6 +292,7 @@ int calibrate_txiqimb(struct calibrate_ops* ops)
         return res;
 
     return _calibrate_iqimb_generic(ops,
+                                    true,
                                     rxiqimboff,
                                     -freqoff + rxiqimboff,
                                     -freqoff - rxiqimboff,

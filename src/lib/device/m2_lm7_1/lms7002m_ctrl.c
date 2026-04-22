@@ -1208,7 +1208,15 @@ int lms7002m_set_corr_param(lms7002_dev_t* d, int channel, int corr_type, int va
         } else {
             return lms7002m_tbb_bandwidth(d, (unsigned)value, false);
         }
+    case CORR_OP_SET_GAIN:
+        if (rx) {
+            return -E2BIG;
+        } else {
+            if (value > 32)
+                return -E2BIG;
 
+            return lms7002m_tbb_gain(&d->lmsstate, (unsigned)value);
+        }
     default:
         return -EINVAL;
     }
@@ -1221,14 +1229,16 @@ int lms7002m_set_tx_testsig(lms7002_dev_t* d, int channel, int32_t freqoffset, u
 {
     int res = 0;
     int32_t dsp_reg;
-
+    bool switch_to_normal = (pwr == UINT_MAX);
     res = res ? res : lms7002m_mac_set(&d->lmsstate, channel == 0 ? LMS7_CH_A : LMS7_CH_B);
     res = res ? res : lms7002m_xxtsp_gen(&d->lmsstate, LMS_TXTSP,
-                                         (pwr == UINT_MAX) ?  XXTSP_NORMAL: XXTSP_DC,
+                                         switch_to_normal ?  XXTSP_NORMAL: XXTSP_DC,
                                          pwr & 0x7fff, pwr & 0x7fff);
+    if (switch_to_normal)
+        return res;
+
     res = res ? res : lms7002m_bb_translate(d, true, freqoffset, &dsp_reg);
     res = res ? res : lms7002m_xxtsp_cmix(&d->lmsstate, LMS_TXTSP, dsp_reg);
-
     return res;
 }
 

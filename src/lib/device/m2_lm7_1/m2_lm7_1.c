@@ -1592,9 +1592,18 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
             return res;
         }
 
-        res = create_sfetrx4_stream(dev, CORE_SFETX_DMA32_R0, dformat, channels->count, &lchans, pktsyms,
-                                    flags, M2PCI_REG_WR_TXDMA_CNF_L, M2PCI_REG_WR_SYNC_CTRL, M2PCI_REG_RD_TXDMA_STAT,
-                                    0, 0, &d->tx, &hwchs);
+        if (d->xdev.exttx) {
+            // Reset extended core
+            res = res ? res : xsdr_reset_extfe(&d->xdev);
+        }
+
+        res = create_sfetrx4_stream(dev, d->xdev.exttx ? CORE_EXFETX_DMA32_R0_2 : CORE_SFETX_DMA32_R0,
+                                    dformat, channels->count, &lchans, pktsyms,
+                                    flags,
+                                    d->xdev.exttx ? M2PCI_REG_WR_TXDMA_CFG0 : M2PCI_REG_WR_TXDMA_CNF_L,
+                                    M2PCI_REG_WR_SYNC_CTRL,
+                                    M2PCI_REG_RD_TXDMA_STAT,
+                                    0, CSR_TFE4_BASE, &d->tx, &hwchs);
         if (res) {
             return res;
         }
