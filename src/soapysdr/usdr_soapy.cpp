@@ -1022,6 +1022,13 @@ void SoapyUSDR::writeSetting(const std::string &key, const std::string &value)
 {
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::writeSetting(%s, %s)", key.c_str(), value.c_str());
 
+    if (key == "calibrate") {
+        int res = usdr_dme_set_uint(_dev->dev(), "/dm/sdr/0/calibrate", (uintptr_t)value.c_str());
+        if (res) {
+            throw std::invalid_argument("SoapyUSDR::writeSetting("+key+") failed");
+        }
+    }
+
     throw std::runtime_error("unknown setting key: " + key);
 }
 
