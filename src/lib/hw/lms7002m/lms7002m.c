@@ -531,31 +531,49 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
 
 
 
-int _lms7002m_fill_pos(lms7002m_lml_map_t l, lms7002m_lml_map_t* o)
+int _lms7002m_fill_pos(lms7002m_lml_map_t l, bool siso, lms7002m_lml_map_t* o)
 {
     lms7002m_lml_map_t p = {{0, 0, 0, 0}};
-    for (unsigned i = 0; i < 4; i++) {
-        switch (l.m[i]) {
-        case LML_0X0024_LML1_S0S_AI: p.m[LML_AI] = i; break;
-        case LML_0X0024_LML1_S0S_AQ: p.m[LML_AQ] = i; break;
-        case LML_0X0024_LML1_S0S_BI: p.m[LML_BI] = i; break;
-        case LML_0X0024_LML1_S0S_BQ: p.m[LML_BQ] = i; break;
-        default:
-            return -EINVAL;
+    if (siso) {
+        for (unsigned i = 0; i < 2; i++) {
+            switch (l.m[i]) {
+            case LML_0X0024_LML1_S0S_AI:
+            case LML_0X0024_LML1_S0S_BI:
+                p.m[LML_AI] = i;
+                p.m[LML_BI] = i;
+                break;
+            case LML_0X0024_LML1_S0S_AQ:
+            case LML_0X0024_LML1_S0S_BQ:
+                p.m[LML_AQ] = i;
+                p.m[LML_BQ] = i;
+                break;
+            default:
+                return -EINVAL;
+            }
+        }
+    } else {
+        for (unsigned i = 0; i < 4; i++) {
+            switch (l.m[i]) {
+            case LML_0X0024_LML1_S0S_AI: p.m[LML_AI] = i; break;
+            case LML_0X0024_LML1_S0S_AQ: p.m[LML_AQ] = i; break;
+            case LML_0X0024_LML1_S0S_BI: p.m[LML_BI] = i; break;
+            case LML_0X0024_LML1_S0S_BQ: p.m[LML_BQ] = i; break;
+            default:
+                return -EINVAL;
+            }
         }
     }
-
     *o = p;
     return 0;
 }
 
 
-int lms7002m_limelight_map(lms7002m_state_t* m, lms7002m_lml_map_t l1m, lms7002m_lml_map_t l2m)
+int lms7002m_limelight_map(lms7002m_state_t* m, bool sisol1m, bool sisol2m, lms7002m_lml_map_t l1m, lms7002m_lml_map_t l2m)
 {
     lms7002m_lml_map_t l1p, l2p;
     int res = 0;
-    res = res ? res : _lms7002m_fill_pos(l1m, &l1p);
-    res = res ? res : _lms7002m_fill_pos(l2m, &l2p);
+    res = res ? res : _lms7002m_fill_pos(l1m, sisol1m, &l1p);
+    res = res ? res : _lms7002m_fill_pos(l2m, sisol2m, &l2p);
     if (res)
         return res;
 

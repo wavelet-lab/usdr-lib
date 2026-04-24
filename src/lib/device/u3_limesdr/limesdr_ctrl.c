@@ -62,7 +62,7 @@ enum {
 
 
 static
-const lms7002m_lml_map_t _limesdr_lml_portcfg(bool UNUSED rx, unsigned UNUSED chs, unsigned UNUSED flags, bool UNUSED no_siso_map)
+const lms7002m_lml_map_t _limesdr_lml_portcfg(bool UNUSED rx, unsigned UNUSED chs, unsigned UNUSED flags)
 {
     // During SISO DDR mode only 0 and 1 make sense
     static const lms7002m_lml_map_t diqarray[] = {

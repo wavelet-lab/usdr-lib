@@ -72,7 +72,7 @@ enum sigtype {
 
 typedef int (*on_change_signal_t)(lms7002_dev_t *d, enum sigtype t);
 typedef int (*on_change_antenna_port_sw_t)(lms7002_dev_t* dev, int direction, unsigned sw);
-typedef const lms7002m_lml_map_t (*on_get_lml_portcfg_t)(bool rx, unsigned chs, unsigned flags, bool no_siso_map);
+typedef const lms7002m_lml_map_t (*on_get_lml_portcfg_t)(bool rx, unsigned chs, unsigned flags);
 
 struct lms7002_dev
 {
@@ -97,8 +97,8 @@ struct lms7002_dev
     uint8_t rxtsp_div;
     uint8_t txtsp_div;
 
-    uint8_t rx_no_siso_map;
-    uint8_t tx_no_siso_map;
+    uint8_t rx_siso;
+    uint8_t tx_siso;
 
     uint16_t tx_dsp_inter;
     uint16_t rx_dsp_decim;
@@ -185,12 +185,6 @@ int lms7002m_streaming_down(lms7002_dev_t *d, unsigned dir);
 enum rfic_chan_flags {
     RFIC_SWAP_AB = BIT(0),
     RFIC_SWAP_IQ = BIT(1),
-    RFIC_SISO_MODE = BIT(2),
-    RFIC_SISO_SWITCH = BIT(3),
-
-    // Test flags
-    RFIC_SWAP_IQB = BIT(16),
-    RFIC_SWAP_IQA = BIT(15),
 
     RFIC_LFSR = BIT(12),
     RFIC_DIGITAL_LB = BIT(11),

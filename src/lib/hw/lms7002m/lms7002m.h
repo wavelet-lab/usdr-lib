@@ -119,7 +119,7 @@ struct lms7002m_limelight_conf {
 typedef struct lms7002m_limelight_conf lms7002m_limelight_conf_t;
 
 int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t params);
-int lms7002m_limelight_map(lms7002m_state_t* m, lms7002m_lml_map_t l1m, lms7002m_lml_map_t l2m);
+int lms7002m_limelight_map(lms7002m_state_t* m, bool sisol1m, bool sisol2m, lms7002m_lml_map_t l1m, lms7002m_lml_map_t l2m);
 
 // CGEN
 int lms7002m_cgen_disable(lms7002m_state_t* m);

@@ -317,10 +317,12 @@ static int _xsdr_rxserdes_reset(xsdr_dev_t *d) {
 
 static int _xsdr_txserdes_reset(xsdr_dev_t *d) {
     int res = 0;
+    unsigned sisosdrflag = d->dpump ? 16 : d->base.lml_mode.txsisoddr ? 16 : 0;
+
     // Reset OSERDESE2
-    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_CTRL, 0);
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_CTRL, 0 | sisosdrflag);
     res = res ? res : usleep(1);
-    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_CTRL, 1);
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_CTRL, 1 | sisosdrflag);
     return res;
 }
 
@@ -469,6 +471,13 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     cfg_raw.ports[CLKOUT_PORT_6].period_l = (vco_div_io + 1) / 2; // FCLK_TX
     cfg_raw.ports[CLKOUT_PORT_6].period_h = vco_div_io / 2;       // FCLK_TX
 
+    if (d->dpump) {
+        cfg_raw.ports[CLKOUT_PORT_5].period_l = vco_div_io;
+        cfg_raw.ports[CLKOUT_PORT_5].period_h = vco_div_io;
+        cfg_raw.ports[CLKOUT_PORT_6].period_l = vco_div_io;
+        cfg_raw.ports[CLKOUT_PORT_6].period_h = vco_div_io;
+    }
+
     unsigned total_budget = 8 * vco_div_io;
     unsigned phase = total_budget / 2;
     // Default 90deg F_CLK related to clocks
@@ -521,7 +530,7 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
     res = res ? res : mmcm_init_raw(d->base.lmsstate.dev, d->base.lmsstate.subdev, DRP_MMCM_PORT_TX, &cfg_raw);
 
     // Set IQSEL vector
-    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : 0b1100);
+    res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, (!d->dpump && d->base.lml_mode.txsisoddr) ? 0b1010 : 0b1100);
 
     // Reset MMCM
     // res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 1);
@@ -602,10 +611,17 @@ static bool noerrors_v4(unsigned errs[4], uint64_t* badness)
 
 static bool noerrors_v2(unsigned errs[4], uint64_t* badness)
 {
+#if 1
     if (badness) {
         *badness = (errs[0]*errs[0]) + (errs[1]*errs[1]);
     }
     return errs[0] == 0 && errs[1] == 0;
+#else
+    if (badness) {
+        *badness = (errs[0]*errs[0]) + (errs[2]*errs[2]);
+    }
+    return errs[0] == 0 && errs[2] == 0;
+#endif
 }
 
 int xsdr_txphase_ovr(xsdr_dev_t *d, unsigned v)
@@ -640,7 +656,7 @@ static int _xsdr_calibrate_txlfsr_check(xsdr_dev_t *d, unsigned check_to,
         res = res ? res : usleep(100);
         res = res ? res : xsdr_phy_lfsr_mimo_state(d, LFSR_CNTR_BER, errs);
         res = res ? res : xsdr_phy_lfsr_mimo_state_s(d, LFSR_CNTR_IQS << 2, piqserrs);
-        if (res || (!noerrors_v4(errs, pbadness)) || *piqserrs) {
+        if (res || (d->dpump ? !noerrors_v2(errs, pbadness) : !noerrors_v4(errs, pbadness)) || *piqserrs) {
             break;
         }
     }
@@ -885,7 +901,7 @@ recalibrate_rx:
 
                     USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX=%2d  [%6d/%6d/%6d/%6d - %6d] BD=%.3e\n", ph - 1,
                              errs[0], errs[1], errs[2], errs[3], iqserrs, (double)badness);
-                    if (res || (noerrors_v4(errs, &badness) /* && (iqserrs == 0)*/) || (rty > 1 && badness < 20)) {
+                    if (res || (d->dpump ? noerrors_v2(errs, &badness) : noerrors_v4(errs, &badness) /* && (iqserrs == 0)*/) || (rty > 1 && badness < 20)) {
                         phase_m = ph;
 
                         for (int g = 0; g < 24; g++) {
@@ -901,7 +917,7 @@ recalibrate_rx:
                             if ((rty == 0 && iqserrs != 0) || iqserrs > 40) {
                                 USDR_LL_LOG(dev, "XDEV", USDR_LOG_INFO, "PHASE_TX[%d]=%2d ABIQ=%d\n", g, ph - 1, iqserrs);
                                 unsigned msk[4] = { 0b1100, 0b0110, 0b0011, 0b1001 };
-                                res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : msk[(g + 1) % 4]);
+                                res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, (!d->dpump && d->base.lml_mode.txsisoddr) ? 0b1010 : msk[(g + 1) % 4]);
                                 //res = res ? res : _xsdr_txserdes_reset(d);
                                 res = res ? res : usleep(10);
                                 res = res ? res : lms7002m_limelight_reset(&d->base.lmsstate);
@@ -1237,52 +1253,22 @@ int _xsdr_antenna_port_switch(lms7002_dev_t *d, int dir, unsigned path)
     return -EINVAL;
 }
 
-
-
-//////////////////////////////////////////////////////////////////////////////
-
 static bool _xsdr_run_params_stream_is_swap(unsigned chs, unsigned flags)
 {
     return (chs == LMS7_CH_AB && (flags & RFIC_SWAP_AB)) ||
-            chs == LMS7_CH_A;
-}
-static bool _xsdr_run_params_stream_is_mimo(unsigned chs, unsigned flags)
-{
-    return (chs == LMS7_CH_AB && !(flags & RFIC_SISO_MODE));
+            chs == LMS7_CH_B;
 }
 
 static
-const lms7002m_lml_map_t lms7nfe_get_lml_portcfg(bool rx, unsigned chs, unsigned flags, bool no_siso_map)
+const lms7002m_lml_map_t lms7nfe_get_lml_portcfg(bool rx, unsigned chs, unsigned flags)
 {
-    static const lms7002m_lml_map_t diqarray_rx[] = {
-        // MIMO modes
+    static const lms7002m_lml_map_t diqarray[] = {
         {{ LML_AI, LML_AQ, LML_BI, LML_BQ }},
         {{ LML_AQ, LML_AI, LML_BQ, LML_BI }},
         {{ LML_BI, LML_BQ, LML_AI, LML_AQ }},
         {{ LML_BQ, LML_BI, LML_AQ, LML_AI }},
-
-        // SISO modes
-        {{ LML_AI, LML_AQ, LML_AI, LML_AQ }},
-        {{ LML_AQ, LML_AI, LML_AQ, LML_AI }},
-        {{ LML_BI, LML_BQ, LML_BI, LML_BQ }},
-        {{ LML_BQ, LML_BI, LML_BQ, LML_BI }},
     };
 
-    static const lms7002m_lml_map_t diqarray_tx[] = {
-        {{ LML_AQ, LML_AI, LML_BQ, LML_BI }},
-        {{ LML_AI, LML_AQ, LML_BI, LML_BQ }},
-        {{ LML_BQ, LML_BI, LML_AQ, LML_AI }},
-        {{ LML_BI, LML_BQ, LML_AI, LML_AQ }},
-
-         // SISO modes
-         {{ LML_AQ, LML_AI, LML_AQ, LML_AI }},
-         {{ LML_AI, LML_AQ, LML_AI, LML_AQ }},
-         {{ LML_BQ, LML_BI, LML_BQ, LML_BI }},
-         {{ LML_BI, LML_BQ, LML_BI, LML_BQ }},
-
-    };
-
-    const lms7002m_lml_map_t *diqarray = (rx) ? diqarray_rx : diqarray_tx;;
     unsigned diqidx = 0;
     if (flags & RFIC_SWAP_IQ)
         diqidx |= 1;
@@ -1290,11 +1276,7 @@ const lms7002m_lml_map_t lms7nfe_get_lml_portcfg(bool rx, unsigned chs, unsigned
     if (_xsdr_run_params_stream_is_swap(chs, flags))
         diqidx |= 2;
 
-    if (!no_siso_map && !_xsdr_run_params_stream_is_mimo(chs, flags))
-        diqidx |= 4;
-
     USDR_LOG("XDEV", USDR_LOG_WARNING, "%s_diqidx=%d\n", rx ? "rx" : "tx", diqidx);
-    assert(diqidx < 8);
     return diqarray[diqidx];
 }
 
@@ -1302,25 +1284,16 @@ int xsdr_rfic_streaming_xflags(xsdr_dev_t *d,
                                unsigned xor_rx_flags,
                                unsigned xor_tx_flags)
 {
-    int res;
-    unsigned rxf = (d->hwchans_rx == 1) ? RFIC_SISO_MODE : 0;
-    unsigned txf = (d->hwchans_tx == 1) ? RFIC_SISO_MODE : 0;
-
+    d->base.rx_siso = (d->hwchans_rx == 1 || d->dpump);
+    d->base.tx_siso = (d->hwchans_tx == 1 || d->dpump);
     d->dsp_rxcfg = xor_rx_flags;
-    d->base.map_rx = lms7nfe_get_lml_portcfg(true, d->base.lml_rx_chs, rxf | (d->base.lml_rx_flags ^ d->dsp_rxcfg), d->base.rx_no_siso_map);
-    d->base.map_tx = lms7nfe_get_lml_portcfg(false, d->base.lml_tx_chs, txf | (d->base.lml_tx_flags ^ xor_tx_flags), d->base.tx_no_siso_map);
-    res = lms7002m_limelight_map(&d->base.lmsstate,
-                                 d->base.lml_mode.rx_port == 1 ? d->base.map_rx : d->base.map_tx,
-                                 d->base.lml_mode.rx_port == 1 ? d->base.map_tx : d->base.map_rx);
-    if (res)
-        return res;
-
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // res = lms7002m_limelight_configure(&d->base.lmsstate, d->base.lml_mode);
-    // if (res)
-    //     return res;
-
-    return 0;
+    d->base.map_rx = lms7nfe_get_lml_portcfg(true, d->base.lml_rx_chs, (d->base.lml_rx_flags ^ d->dsp_rxcfg));
+    d->base.map_tx = lms7nfe_get_lml_portcfg(false, d->base.lml_tx_chs, (d->base.lml_tx_flags ^ xor_tx_flags));
+    return lms7002m_limelight_map(&d->base.lmsstate,
+                                  d->base.lml_mode.rx_port == 1 ? d->base.rx_siso : d->base.tx_siso,
+                                  d->base.lml_mode.rx_port == 1 ? d->base.tx_siso : d->base.rx_siso,
+                                  d->base.lml_mode.rx_port == 1 ? d->base.map_rx : d->base.map_tx,
+                                  d->base.lml_mode.rx_port == 1 ? d->base.map_tx : d->base.map_rx);
 }
 
 int xsdr_rfic_streaming_up(xsdr_dev_t *d, unsigned dir,
@@ -1495,7 +1468,7 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
     }
 
     // LO correction
-    res = res ? res : lms7002m_dc_corr_en(&d->base.lmsstate, d->base.rx_run[0], d->base.rx_run[1], d->base.tx_run[0], d->base.tx_run[1]);
+    // res = res ? res : lms7002m_dc_corr_en(&d->base.lmsstate, d->base.rx_run[0], d->base.rx_run[1], d->base.tx_run[0], d->base.tx_run[1]);
     return res;
 }
 

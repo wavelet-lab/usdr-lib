@@ -655,10 +655,9 @@ int lms7002m_streaming_down(lms7002_dev_t *d, unsigned dir)
 }
 
 
-static lms7002m_mac_mode_t _corr_ch(lms7002m_mac_mode_t mode,
-                                   unsigned flags)
+static lms7002m_mac_mode_t _corr_ch(lms7002m_mac_mode_t mode, unsigned flags, bool siso)
 {
-    if (((mode == LMS7_CH_AB) && (flags & RFIC_SISO_MODE)) && (!(flags & RFIC_SISO_SWITCH))) {
+    if (((mode == LMS7_CH_AB) && siso)) {
         if (flags & RFIC_SWAP_AB) {
             mode = LMS7_CH_B;
         } else {
@@ -686,11 +685,11 @@ int lms7002m_streaming_up(lms7002_dev_t *d, unsigned dir,
         if (_lms7002m_check_chan(rx_chs_i)) {
             return -EINVAL;
         }
-        rx_chs = _corr_ch(rx_chs_i, rx_flags);
+        rx_chs = _corr_ch(rx_chs_i, rx_flags, d->rx_siso);
         //d->chprx = params->rx;
         d->lml_rx_chs = rx_chs;
         d->lml_rx_flags = rx_flags;
-        d->map_rx = d->on_get_lml_portcfg(true, d->lml_rx_chs, d->lml_rx_flags, false /* d->rx_no_siso_map */);
+        d->map_rx = d->on_get_lml_portcfg(true, d->lml_rx_chs, d->lml_rx_flags);
 
         rxafen_a = rx_chs != LMS7_CH_B;
         rxafen_b = rx_chs != LMS7_CH_A;
@@ -699,17 +698,19 @@ int lms7002m_streaming_up(lms7002_dev_t *d, unsigned dir,
         if (_lms7002m_check_chan(tx_chs_i)) {
             return -EINVAL;
         }
-        tx_chs = _corr_ch(tx_chs_i, tx_flags);
+        tx_chs = _corr_ch(tx_chs_i, tx_flags, d->tx_siso);
         //d->chptx = params->tx;
         d->lml_tx_chs = tx_chs;
         d->lml_tx_flags = tx_flags;
-        d->map_tx = d->on_get_lml_portcfg(false, d->lml_tx_chs, d->lml_tx_flags, false /* d->tx_no_siso_map */);
+        d->map_tx = d->on_get_lml_portcfg(false, d->lml_tx_chs, d->lml_tx_flags);
 
         txafen_a = tx_chs != LMS7_CH_B;
         txafen_b = tx_chs != LMS7_CH_A;
     }
 
     res = lms7002m_limelight_map(&d->lmsstate,
+                                 d->lml_mode.rx_port == 1 ? d->rx_siso : d->tx_siso,
+                                 d->lml_mode.rx_port == 1 ? d->tx_siso : d->rx_siso,
                                  d->lml_mode.rx_port == 1 ? d->map_rx : d->map_tx,
                                  d->lml_mode.rx_port == 1 ? d->map_tx : d->map_rx);
     if (res)
