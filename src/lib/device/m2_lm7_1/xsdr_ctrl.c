@@ -1102,13 +1102,6 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
 
     res = res ? res : _xsdr_calibrate_lml(d);
 
-    // if (rxrate) {
-    //     if (!d->ssdr_pro) {
-    //         // Switch to clock meas
-    //         res = res ? res : lowlevel_reg_wr32(dev, subdev, REG_CFG_PHY_0, 0x02000000);
-    //     }
-    // }
-
     if (d->has_duc_ddc && rxrate && d->s_rx_dec != rx_dec) {
         // Optional RX DSP reset
         dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0xf);
@@ -1136,7 +1129,6 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
         d->s_tx_int = tx_inr;
     }
 
-   // lms7002m_rxtsp_dc_corr(&d->base.lmsstate, true, 0);
 /*
     int32_t a, b;
     int32_t q[4];

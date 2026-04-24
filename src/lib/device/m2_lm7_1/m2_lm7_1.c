@@ -449,7 +449,7 @@ struct dev_m2_lm7_1_gps {
 
     struct xsdr_dev xdev;
     struct dev_fe* fe;
-    bool bifurcation_en;
+
     bool nodecint;
     bool double_pump;
 
@@ -1041,7 +1041,6 @@ int dev_m2_lm7_1_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 
     //Simple SISO RX only
     return xsdr_set_samplerate_ex(&d->xdev, (unsigned)value, (unsigned)value, 0, 0,
-                                  (d->bifurcation_en) ? (XSDR_LML_SISO_DDR_RX | XSDR_LML_SISO_DDR_TX) : 0 |
                                   (d->nodecint ? 0 : XSDR_SR_MAXCONVRATE) | XSDR_SR_EXTENDED_CGEN);
 }
 
@@ -1066,7 +1065,6 @@ int dev_m2_lm7_1_rate_m_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
         return -ERANGE;
 
     return xsdr_set_samplerate_ex(&d->xdev, rx_rate, tx_rate, adc_rate, dac_rate,
-                                  (d->bifurcation_en) ? (XSDR_LML_SISO_DDR_RX | XSDR_LML_SISO_DDR_TX) : 0 |
                                   (d->nodecint ? 0 : XSDR_SR_MAXCONVRATE) | XSDR_SR_EXTENDED_CGEN);
 }
 
@@ -1389,16 +1387,12 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
     int res;
     const char* fe = NULL;
 
-    d->bifurcation_en = false;
     d->nodecint = false;
     d->double_pump = false;
 
     for (unsigned i = 0; i < pcount; i++) {
         if (strcmp(devparam[i], "fe") == 0) {
             fe = devval[i];
-        }
-        if (strcmp(devparam[i], "bifurcation") == 0) {
-            d->bifurcation_en = (devval[i]) ? atoi(devval[i]) : 1;
         }
         if (strcmp(devparam[i], "nodec") == 0) {
             d->nodecint = true;
@@ -1525,13 +1519,6 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
             return res;
         }
 
-        // Disable bifurcation for now, since calibration NCO loop doesn't support it
-        if (rxcfg.bifurcation_valid && d->bifurcation_en) {
-            d->xdev.siso_sdr_active_rx = true;
-            flags |= DMS_FLAG_BIFURCATION;
-            // TODO: update samplerate settings
-        }
-
         if (d->double_pump) {
             d->xdev.siso_sdr_active_rx = true;
         }
@@ -1574,13 +1561,6 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         res = xsdr_hwchans_cnt(&d->xdev, false, txcfg.logicchs);
         if (res) {
             return res;
-        }
-
-        // Add bifurcation flag
-        if (txcfg.bifurcation_valid && d->bifurcation_en) {
-            d->xdev.siso_sdr_active_tx = true;
-            flags |= DMS_FLAG_BIFURCATION;
-            // TODO: update samplerate settings
         }
 
         if (d->double_pump) {
