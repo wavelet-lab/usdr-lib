@@ -934,6 +934,7 @@ int lms7002m_samplerate(lms7002_dev_t *d,
         unsigned mindecint_tx = (sisoddr_tx || extclk_tx) ? 1 : 2;
         unsigned cgen_max = extended_cgen_range && (citer == 0) ? 370e6 : 320e6;
         cgen_rate = MAX(txmaster_min, rxmaster_min);
+        mpy_dac = 4; // Might be 4,2,1
 
         if (cgen_rate < 1) {
             cgen_rate = MAX(mindecint_rx * rxrate * rx_host_div * mpy_adc,
@@ -961,6 +962,13 @@ int lms7002m_samplerate(lms7002_dev_t *d,
         }
         if (txrate > 1) {
             txdiv = (cgen_rate / (txrate * tx_host_mul)) / mpy_dac;
+            if (txdiv <= 8) {
+                txdiv *= 4;
+                mpy_dac /= 4;
+            } else if (txdiv <= 8) {
+                txdiv *= 2;
+                mpy_dac /= 2;
+            }
         }
 
         if (rxrate > 1 && !_check_lime_decimation(rxdiv)) {
@@ -1011,11 +1019,11 @@ int lms7002m_samplerate(lms7002_dev_t *d,
 
     unsigned rxtsp_div = 1;
     if (rxrate > 0) {
-        rxtsp_div = (sisoddr_rx /*|| extclk_rx*/) ? rxdiv : (((rxdiv > 1) ? (rxdiv / 2) : 1));
+        rxtsp_div = (sisoddr_rx) ? rxdiv : (((rxdiv > 1) ? (rxdiv / 2) : 1));
     }
     unsigned txtsp_div = 1;
     if (txrate > 1) {
-        txtsp_div = (sisoddr_tx /*|| extclk_tx*/) ? txdiv : (((txdiv > 1) ? (txdiv / 2) : 1));
+        txtsp_div = (sisoddr_tx) ? txdiv : (((txdiv > 1) ? (txdiv / 2) : 1));
     }
 
     if (((rxrate > 40e6) || (txrate > 40e6))) {
@@ -1050,15 +1058,12 @@ int lms7002m_samplerate(lms7002_dev_t *d,
     cfg.rxdiv = rxtsp_div;
     cfg.rxsisoddr = sisoddr_rx;
     cfg.txsisoddr = sisoddr_tx;
+    cfg.txtspdelay = (txrate < 45e6) ? 3 : (txrate < 99e6) ? 1 : 0;
+    cfg.txlmldelay = (txrate < 45e6) ? 0 : (txrate < 99e6) ? 3 : 0;
 
     res = lms7002m_limelight_configure(&d->lmsstate, cfg);
     if (res)
         return res;
-
-    // Set ADS for bypass mode
-    // res = lms7002m_cds_set(&d->lmsstate, rxtsp_div == 1, rxtsp_div == 1);
-    // if (res)
-    //    return res;
 
     d->lml_mode = cfg;
     USDR_LL_LOG(d->lmsstate.dev, "XDEV", USDR_LOG_INFO, "rxrate=%.3fMHz txrate=%.3fMHz"

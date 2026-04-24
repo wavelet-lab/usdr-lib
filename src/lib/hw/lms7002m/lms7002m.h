@@ -115,6 +115,9 @@ struct lms7002m_limelight_conf {
 
     uint8_t rxdiv;
     uint8_t txdiv;
+
+    uint8_t txtspdelay;
+    uint8_t txlmldelay;
 };
 typedef struct lms7002m_limelight_conf lms7002m_limelight_conf_t;
 

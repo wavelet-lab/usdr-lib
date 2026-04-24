@@ -520,8 +520,8 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
                                  (params.txdiv > 1) ? 1u : 0,
                                  (params.rxdiv > 1) ? 1u : 0),
         MAKE_LMS7002M_LML_0x002C( params.txdiv / 2u - 1u, params.rxdiv / 2u - 1u ),
-        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, params.rxsisoddr && params.rxdiv == 1 ? 0 : 1, 1, 1),
-        MAKE_LMS7002M_CDS_0x00AE(3, 3, 0, 0, 0, 0, 0, 0),
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 1, params.txsisoddr && params.txdiv == 1 ? 0 : 1, 1, params.rxsisoddr && params.rxdiv == 1 ? 0 : 1, 1, 1),
+        MAKE_LMS7002M_CDS_0x00AE(params.txtspdelay, params.txtspdelay, 0, 0, params.txlmldelay, params.txlmldelay, 0, 0),
         MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac),
         MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac)
     };

@@ -611,17 +611,10 @@ static bool noerrors_v4(unsigned errs[4], uint64_t* badness)
 
 static bool noerrors_v2(unsigned errs[4], uint64_t* badness)
 {
-#if 1
     if (badness) {
         *badness = (errs[0]*errs[0]) + (errs[1]*errs[1]);
     }
     return errs[0] == 0 && errs[1] == 0;
-#else
-    if (badness) {
-        *badness = (errs[0]*errs[0]) + (errs[2]*errs[2]);
-    }
-    return errs[0] == 0 && errs[2] == 0;
-#endif
 }
 
 int xsdr_txphase_ovr(xsdr_dev_t *d, unsigned v)
@@ -679,16 +672,6 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
     const unsigned MAX_RTY = 5;
 
     g_clk_reduce = 0;
-
-    // Fixup for SSDR_PRO
-#if 0
-    if (d->ssdr_pro) {
-        // RX SISO DDR
-        res = res ? res : lowlevel_reg_wr32(d->base.lmsstate.dev, d->base.lmsstate.subdev, REG_CFG_PHY_0,
-                                            d->siso_sdr_active_rx ? (1u << 9) : 0);
-        return res;
-    }
-#endif
 
     if (d->mmcm_tx) {
         if (!d->ssdr_pro) {
