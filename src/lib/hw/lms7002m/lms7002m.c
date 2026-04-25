@@ -467,6 +467,24 @@ int lms7002m_limelight_toggle_ntx(lms7002m_state_t* m)
     return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
 }
 
+int lms7002m_limelight_switch_rx_mode(lms7002m_state_t* m, lms7002m_limelight_conf_t params)
+{
+    unsigned rxmux = params.rx_lfsr ? LML_0X002A_RX_MUX_LFSR :
+                         params.rx_tx_dig_loopback ? LML_0X002A_RX_MUX_TXFIFO : LML_0X002A_RX_MUX_RXTSP;
+    unsigned rdclk = (params.rx_ext_rd_fclk /* || params.rx_tx_dig_loopback */ ) ?
+                         ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_FCLK1 : LML_0X002A_RXRDCLK_MUX_FCLK2) :
+                         ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_MCLK1 : LML_0X002A_RXRDCLK_MUX_MCLK2);
+    uint32_t regs[] = {
+        MAKE_LMS7002M_LML_0x002A(rxmux,
+                                 params.rx_port ? LML_0X002A_TX_MUX_PORT2 : LML_0X002A_TX_MUX_PORT1,
+                                 LML_0X002A_TXRDCLK_MUX_TXTSPCLK,
+                                 params.rx_port ? LML_0X002A_TXWRCLK_MUX_FCLK2 : LML_0X002A_TXWRCLK_MUX_FCLK1,
+                                 rdclk,
+                                 LML_0X002A_RXWRCLK_MUX_RXTSPCLK ),
+    };
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
 int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t params)
 {
     unsigned txmclk = (params.txdiv <= 1) ? LML_0X002B_MCLK1SRC_TXTSPCLKA : LML_0X002B_MCLK1SRC_TXTSPCLKA_DIV;

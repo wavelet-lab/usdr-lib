@@ -1152,7 +1152,8 @@ int lms7002m_set_lmlrx_mode(lms7002_dev_t *d, unsigned mode)
         break;
     }
 
-    return lms7002m_limelight_configure(&d->lmsstate, d->lml_mode);
+    //return lms7002m_limelight_configure(&d->lmsstate, d->lml_mode);
+    return lms7002m_limelight_switch_rx_mode(&d->lmsstate, d->lml_mode);
 }
 
 
