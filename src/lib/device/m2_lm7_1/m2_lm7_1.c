@@ -451,7 +451,7 @@ struct dev_m2_lm7_1_gps {
     struct dev_fe* fe;
 
     bool nodecint;
-    bool double_pump;
+    //bool double_pump;
 
     int cal_data[8];
 
@@ -1386,9 +1386,8 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
     lldev_t dev = d->base.dev;
     int res;
     const char* fe = NULL;
-
-    d->nodecint = false;
-    d->double_pump = false;
+    bool double_pump = false;
+    d->nodecint = false;    
 
     for (unsigned i = 0; i < pcount; i++) {
         if (strcmp(devparam[i], "fe") == 0) {
@@ -1398,7 +1397,7 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
             d->nodecint = true;
         }
         if (strcmp(devparam[i], "dpump") == 0) {
-            d->double_pump = true;
+            double_pump = true;
         }
     }
 
@@ -1416,7 +1415,7 @@ int usdr_device_m2_lm7_1_initialize(pdevice_t udev, unsigned pcount, const char*
             USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "Unable to set device name \"xsdr\"!\n");
     }
 
-    d->xdev.dpump = d->double_pump;
+    d->xdev.dpump = double_pump;
 
     // Proxy operations
     memcpy(&d->my_ops, lowlevel_get_ops(dev), sizeof (lowlevel_ops_t));
@@ -1510,7 +1509,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         struct sfetrx4_config rxcfg;
         res = parse_sfetrx4(dformat, &lchans, pktsyms, channels->count, &rxcfg);
         if (res) {
-            USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_ERROR, "Unable to parse RX stream configuration!\n");
+            USDR_LL_LOG(d->base.dev, "XSDR", USDR_LOG_ERROR, "Unable to parse RX stream configuration!\n");
             return res;
         }
 
@@ -1519,17 +1518,12 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
             return res;
         }
 
-        if (d->double_pump) {
-            d->xdev.siso_sdr_active_rx = true;
-        }
-
-        // Reset samplerate with proper bifurcation flags
-        if (rxcfg.bifurcation_valid != ((d->xdev.s_flags & XSDR_LML_SISO_DDR_RX) ? true : false)) {
-            res = xsdr_set_samplerate_ex(&d->xdev, d->xdev.s_rxrate, d->xdev.s_txrate,
-                                         d->xdev.s_adcclk, d->xdev.s_dacclk, d->xdev.s_flags);
-            if (res) {
-                return res;
+        if (d->xdev.dpump) {
+            if (channels->count == 2) {
+                USDR_LL_LOG(d->base.dev, "XSDR", USDR_LOG_ERROR, "RX: In double pump mode only SISO mode is allowed, reduce samplerate or use single channel mode!\n");
+                return -EINVAL;
             }
+            d->xdev.siso_sdr_active_rx = true;
         }
 
         res = xsdr_prepare(&d->xdev, true, d->tx);
@@ -1554,7 +1548,7 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         struct sfetrx4_config txcfg;
         res = parse_sfetrx4(dformat, &lchans, pktsyms, channels->count, &txcfg);
         if (res) {
-            USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_ERROR, "Unable to parse TX stream configuration!\n");
+            USDR_LL_LOG(d->base.dev, "XSDR", USDR_LOG_ERROR, "Unable to parse TX stream configuration!\n");
             return res;
         }
 
@@ -1563,7 +1557,11 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
             return res;
         }
 
-        if (d->double_pump) {
+        if (d->xdev.dpump) {
+            if (channels->count == 2) {
+                USDR_LL_LOG(d->base.dev, "XSDR", USDR_LOG_ERROR, "TX: In double pump mode only SISO mode is allowed, reduce samplerate or use single channel mode!\n");
+                return -EINVAL;
+            }
             d->xdev.siso_sdr_active_tx = true;
         }
 

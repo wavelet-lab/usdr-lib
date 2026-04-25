@@ -48,6 +48,7 @@ enum {
 
 enum {
     XSDR_INT_REFCLK = 26000000,
+    XSDR_SISO_RATE = 72000000,
 };
 
 // 1001011 - PDAC80501MDQFT
@@ -1029,13 +1030,49 @@ int xsdr_reset_extfe(xsdr_dev_t *d)
     return res;
 }
 
+static int _xsdr_update_fe_dsp(xsdr_dev_t *d)
+{
+    int res = 0;
+    lldev_t dev = d->base.lmsstate.dev;
+
+    if (d->has_duc_ddc && d->s_rxrate && d->s_rx_dec != d->base.rx_dsp_decim) {
+        // Optional RX DSP reset
+        dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0xf);
+        usleep(10);
+        dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0x2);
+        usleep(10);
+        res = (res) ? res : fgearbox_load_fir_ex(dev, 0, IGPO_DSPCHAIN_RX_PRG << 24, d->base.rx_dsp_decim, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
+        usleep(10);
+        dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0x0);
+
+        d->s_rx_dec = d->base.rx_dsp_decim;
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Updated RX FE DSP to %d decimation\n", d->s_rx_dec);
+    }
+
+    if (d->has_duc_ddc && d->s_txrate && d->s_tx_int != d->base.tx_dsp_inter) {
+        // Optional TX DSP reset
+        usleep(10);
+        dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x3);
+        usleep(10);
+        dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x2);
+        usleep(10);
+        res = (res) ? res : fgearbox_load_fir_i_ex(dev, 0, IGPO_DSPCHAIN_TX_PRG << 24, d->base.tx_dsp_inter, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
+        usleep(10);
+        dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x0);
+
+        d->s_tx_int = d->base.tx_dsp_inter;
+        USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "Updated TE FE DSP to %d interpolation\n", d->s_tx_int);
+    }
+    return res;
+}
+
 int xsdr_set_samplerate_ex(xsdr_dev_t *d,
                            unsigned rxrate, unsigned txrate,
                            unsigned adcclk, unsigned dacclk,
                            unsigned flags)
 {
     lldev_t dev = d->base.lmsstate.dev;
-    subdev_t subdev = d->base.lmsstate.subdev;
+    // subdev_t subdev = d->base.lmsstate.subdev;
 
     int res;
 
@@ -1082,6 +1119,11 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
 
         // We need RxTSP & TxTSP configured for proper LML - TSP alignment before LFSR training
         d->afe_active = true;
+
+        if ((rxrate > XSDR_SISO_RATE || txrate > XSDR_SISO_RATE) && !d->dpump) {
+            d->dpump = true;
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING, "High samplerate set, activating double pump mode: only SISO mode is allowed!\n");
+        }
     }
 
     // flags |= XSDR_LML_EXT_FIFOCLK_RX | XSDR_LML_EXT_FIFOCLK_TX;
@@ -1101,33 +1143,7 @@ int xsdr_set_samplerate_ex(xsdr_dev_t *d,
     d->cfg_srate_siso_tx = (m_flags & XSDR_LML_SISO_DDR_TX) ? 1 : 0;
 
     res = res ? res : _xsdr_calibrate_lml(d);
-
-    if (d->has_duc_ddc && rxrate && d->s_rx_dec != rx_dec) {
-        // Optional RX DSP reset
-        dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0xf);
-        usleep(10);
-        dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0x2);
-        usleep(10);
-        res = (res) ? res : fgearbox_load_fir_ex(dev, 0, IGPO_DSPCHAIN_RX_PRG << 24, rx_dec, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
-        usleep(10);
-        dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0x0);
-
-        d->s_rx_dec = rx_dec;
-    }
-
-    if (d->has_duc_ddc && txrate && d->s_tx_int != tx_inr) {
-        // Optional TX DSP reset
-        usleep(10);
-        dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x3);
-        usleep(10);
-        dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x2);
-        usleep(10);
-        res = (res) ? res : fgearbox_load_fir_i_ex(dev, 0, IGPO_DSPCHAIN_TX_PRG << 24, tx_inr, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
-        usleep(10);
-        dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x0);
-
-        d->s_tx_int = tx_inr;
-    }
+    res = res ? res : _xsdr_update_fe_dsp(d);
 
 /*
     int32_t a, b;
