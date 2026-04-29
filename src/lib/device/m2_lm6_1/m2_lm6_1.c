@@ -222,6 +222,7 @@ static int dev_m2_lm6_1_sdr_tfe_gen_const_set(pdevice_t ud, pusdr_vfs_obj_t obj,
 static int usdr_device_m2_lm6_1_calibrate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int usdr_device_m2_lm6_1_calibrate_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 
+static int dev_m2_lm6_1_sdr_rx_dccorrmode_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static
 const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
@@ -278,6 +279,8 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
 
     { "/dm/sdr/0/rx/path",      { dev_m2_lm6_1_sdr_rx_path_set, NULL }},
     { "/dm/sdr/0/tx/path",      { dev_m2_lm6_1_sdr_tx_path_set, NULL }},
+
+    { "/dm/sdr/0/rx/dccorrmode",  { dev_m2_lm6_1_sdr_rx_dccorrmode_set, NULL }},
 
     { "/dm/sdr/0/rx/bandwidth", { dev_m2_lm6_1_sdr_rx_bandwidth_set, NULL }},
     { "/dm/sdr/0/tx/bandwidth", { dev_m2_lm6_1_sdr_tx_bandwidth_set, NULL }},
@@ -826,6 +829,12 @@ int dev_m2_lm6_1_sdr_tx_gain_vga2_set(pdevice_t ud, UNUSED pusdr_vfs_obj_t obj, 
     return usdr_rfic_set_gain(&d->d, GAIN_TX_VGA2, value, NULL);
 }
 
+int dev_m2_lm6_1_sdr_rx_dccorrmode_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
+    return usdr_set_rxdccorr(&d->d, value & 1);
+}
+
 int dev_m2_lm6_1_sdr_rx_bandwidth_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
@@ -992,8 +1001,27 @@ int dev_m2_lm6_1_sdr_rx_dc_meas_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t*
     return 0;
 }
 
+static int _phgaincorr_set(struct dev_m2_lm6_1 *d, bool tx, uint64_t value)
+{
+    unsigned ig = (value & 0xffff);
+    unsigned qg = ((value >> 16) & 0xffff);
+    int32_t pcorr = (int16_t)((value >> 48) & 0xffff);
+    int amp_imb;
+    if (ig < 2047) {
+        amp_imb = (2047 - ig) * 8;
+    } else {
+        amp_imb = - (2047 - qg) * 8;
+    }
+    pcorr *= 16;
+    USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "%cXGAC I=%d Q=%d A=%d => AMP_IMB=%d\n",
+                tx ? 'T' : 'R', ig, qg, pcorr, amp_imb);
+
+    return tx ? usdr_tx_iqimb_set(&d->d, amp_imb, pcorr) : usdr_rx_iqimb_set(&d->d, amp_imb, pcorr);
+}
+
 int dev_m2_lm6_1_sdr_tx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
+#if 0
     struct dev_m2_lm6_1 *d = (struct dev_m2_lm6_1 *)ud;
 
     unsigned ig = (value & 0xffff);
@@ -1009,11 +1037,13 @@ int dev_m2_lm6_1_sdr_tx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
     USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "TXGAC I=%d Q=%d A=%d => AMP_IMB=%d\n", ig, qg, pcorr, amp_imb);
 
     return usdr_tx_iqimb_set(&d->d, amp_imb, pcorr);
+#endif
+    return _phgaincorr_set((struct dev_m2_lm6_1 *)ud, true, value);
 }
 
 int dev_m2_lm6_1_sdr_rx_phgaincorr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
-    return -EINVAL;
+    return _phgaincorr_set((struct dev_m2_lm6_1 *)ud, false, value);
 }
 
 
@@ -1267,6 +1297,9 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         }
         d->d.rx_lchans = chans;
         *out_handle = d->rx;
+
+        // TODO: handle NCO changes
+        res = res ? res : usdr_rxupdate_cal(&d->d);
     } else if (strstr(sid, "tx") != NULL) {
         bool extended_core = (d->d.hwid & (1 << (24 + 2))) ? true : false;
 

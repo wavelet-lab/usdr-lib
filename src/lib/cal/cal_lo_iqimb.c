@@ -150,7 +150,7 @@ static int _calibrate_txpwr(struct calibrate_ops* ops, int32_t freqoffset, bool 
         if (res)
             return res;
 
-        res = ops->do_meas_nco_avg(ops->param, ops->channel, 0, &pwr_r);
+        res = ops->do_meas_nco_avg(ops->param, ops->channel, ops->deflogdur, &pwr_r);
         if (res)
             return res;
 
@@ -169,7 +169,7 @@ static int _calibrate_txpwr(struct calibrate_ops* ops, int32_t freqoffset, bool 
                 return res;
             }
 
-            res = ops->do_meas_nco_avg(ops->param, ops->channel, 0, &pwr_r);
+            res = ops->do_meas_nco_avg(ops->param, ops->channel, ops->deflogdur, &pwr_r);
             if (res)
                 return res;
 
@@ -218,7 +218,7 @@ int _calibrate_iqimb_generic(struct calibrate_ops* ops,
         return res;
 
     res = res ? res : ops->set_nco_rx_offset(ops->param, ops->channel, rximoff);
-    res = res ? res : ops->do_meas_nco_avg(ops->param, ops->channel, 0, &pwr_i);
+    res = res ? res : ops->do_meas_nco_avg(ops->param, ops->channel, ops->deflogdur, &pwr_i);
     if (res)
         return res;
 

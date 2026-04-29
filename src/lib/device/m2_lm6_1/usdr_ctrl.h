@@ -128,6 +128,7 @@ struct usdr_dev
     bool has_txchain;
 
     bool rf_loopback_active;
+    bool cal_txlo_dig;
 
     unsigned rawsamplerate;
     unsigned rxbb_decim;
@@ -219,6 +220,7 @@ int usdr_reset_txfex(struct usdr_dev *d);
 int usdr_rxdccorr(struct usdr_dev *d, uint64_t *ov);
 
 int usdr_tx_gen_set(usdr_dev_t *d, bool enable, unsigned chanmsk, int16_t i, int16_t q);
+int usdr_set_rxdccorr(usdr_dev_t *d, bool enable);
 
 enum {
     USDR_CAL_RXLO = 1,
@@ -226,6 +228,7 @@ enum {
     USDR_CAL_RXIQIMB = 4,
     USDR_CAL_TXIQIMB = 8,
 
+    USDR_CAL_DUAL_RXLO = 128,
     USDR_CAL_EXT_FB = 256,
     USDR_CAL_COARSE_1 = 512,
     USDR_CAL_COARSE_2 = 1024,
@@ -281,7 +284,7 @@ int usdr_rxupdate_cal(struct usdr_dev *d);
 int usdr_update_cal(struct usdr_dev *d, bool rx);
 
 int usdr_tx_iqimb_set(usdr_dev_t* d, int iq_amp_imb, int phase_imb);
-
+int usdr_rx_iqimb_set(usdr_dev_t* d, int iq_amp_imb, int phase_imb);
 
 #endif
 

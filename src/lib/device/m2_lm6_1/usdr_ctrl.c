@@ -442,6 +442,10 @@ int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob)
 
 #define TARGET_RATE 30720000
 
+int usdr_set_rxdccorr(usdr_dev_t *d, bool enable)
+{
+    return lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_0, MAKE_PHY_WR_REG(CFG_REG_DCCTRL, enable));
+}
 
 int usdr_reset_txfex(struct usdr_dev *d)
 {
@@ -459,6 +463,51 @@ int usdr_reset_txnco(struct usdr_dev *d)
     return res;
 }
 
+static void usdr_calc_iqimb(struct imb_data *d, int32_t imbd_data[4])
+{
+    // CFG_AMP_I
+    // CFG_AMP_Q
+    // CFG_TAN_I
+    // CFG_TAN_Q
+
+    // I = CFG_AMP_I * i + CFG_TAN_Q * q
+    // Q = CFG_AMP_Q * q + CFG_TAN_I * i
+    // Symmetric correction to I/Q:
+    // c = math.cos(phi / 2.0)
+    // s = math.sin(phi / 2.0)
+    // I = (c / alpha) * Id + (s / beta) * Qd
+    // Q = (c / beta)  * Qd -(s / alpha) * Id
+
+    float c = cos(M_PI_4 * d->pahse / IMB_PHASE_MAX);
+    float s = sin(M_PI_4 * d->pahse / IMB_PHASE_MAX);
+
+    float alpha = (d->ampl > 0) ? 1.0 - (((double)d->ampl) / IMB_AMPL_MAX) : 1.0;
+    float beta = (d->ampl < 0) ? 1.0 + (((double)d->ampl) / IMB_AMPL_MAX) : 1.0;
+
+    // 18 bits -> 16 bits
+    // probably we need extra headroom for DC and IQimb correction, but leave as an extra option
+    //
+    // AMP_COMP_2CH_3DB: 17bit * SQRT(2)  | MAX * 0.35355
+    // AMP_COMP_2CH_0DB: 17bit            | MAX * 0.5
+    // AMP_COMP_1CH_3DB: 16bit * SQRT(2)  | MAX * 0.7071
+    // AMP_COMP_1CH_0DB: 16bit            | MAX
+    float scale =
+        (d->amp_corr == AMP_COMP_1CH_0DB) ? 1.0 :
+            (d->amp_corr == AMP_COMP_1CH_3DB) ? 0.7071 :
+            (d->amp_corr == AMP_COMP_2CH_0DB) ? 0.5 : 0.35355;
+
+    float fcfg_amp_i = scale * c * alpha;
+    float fcfg_amp_q = scale * c * beta;
+    float fcfg_tan_q = scale * s * beta;
+    float fcfg_tan_i = - scale * s * alpha;
+
+    int32_t dsp_amp_max = 8388607;
+    imbd_data[0] = dsp_amp_max * fcfg_amp_i;
+    imbd_data[1] = dsp_amp_max * fcfg_amp_q;
+    imbd_data[2] = dsp_amp_max * fcfg_tan_i;
+    imbd_data[3] = dsp_amp_max * fcfg_tan_q;
+}
+
 int usdr_update_cal(struct usdr_dev *d, bool rx)
 {
     return rx ? usdr_rxupdate_cal(d) : usdr_txupdate_cal(d);
@@ -466,11 +515,31 @@ int usdr_update_cal(struct usdr_dev *d, bool rx)
 
 int usdr_rxupdate_cal(struct usdr_dev *d)
 {
-    return 0;
+    int32_t imbd_data[4];
+    int res = 0;
+
+    usdr_calc_iqimb(&d->rx_corr, imbd_data);
+
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_0, MAKE_PHY_WR_REG(CFG_REG_IQIMB_0, imbd_data[0]));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_0, MAKE_PHY_WR_REG(CFG_REG_IQIMB_1, imbd_data[1]));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_0, MAKE_PHY_WR_REG(CFG_REG_IQIMB_2, imbd_data[2]));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_0, MAKE_PHY_WR_REG(CFG_REG_IQIMB_3, imbd_data[3]));
+    return res;
 }
 
 int usdr_txupdate_cal(struct usdr_dev *d)
 {
+    int32_t imbd_data[4];
+    int res = 0;
+
+    usdr_calc_iqimb(&d->tx_corr, imbd_data);
+
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_0, imbd_data[0]));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_1, imbd_data[1]));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_2, imbd_data[2]));
+    res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_3, imbd_data[3]));
+    return res;
+#if 0
     // CFG_AMP_I
     // CFG_AMP_Q
     // CFG_TAN_I
@@ -526,6 +595,7 @@ int usdr_txupdate_cal(struct usdr_dev *d)
     res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_2, cfg_tan_i));
     res = res ? res : lowlevel_reg_wr32(d->base.dev, 0, REG_CFG_PHY_1, MAKE_PHY_WR_REG(CFG_REG_IQIMB_3, cfg_tan_q));
     return res;
+#endif
 }
 
 static int usdr_restore_nco(struct usdr_dev *d, bool istx)
@@ -714,6 +784,8 @@ int usdr_ctor(lldev_t dev, subdev_t sub, struct usdr_dev *d)
     d->rx_rfic_path = USDR_RX_AUTO;
     d->tx_rfic_path = USDR_TX_AUTO;
 
+    d->rx_corr.amp_corr = AMP_COMP_2CH_0DB; //AMP_COMP_1CH_0DB;
+
     return 0;
 }
 
@@ -730,6 +802,13 @@ int usdr_tx_dccorr(usdr_dev_t *d, int16_t i, int16_t q)
 {
     uint32_t val = ((((uint16_t)q) & 0xfff) << 12) | (((uint16_t)i) & 0xfff);
     return lowlevel_reg_wr32(d->lms.dev, 0, REG_CFG_PHY_1, (1 << 24) | val);
+}
+
+int usdr_tx_vga1_dccorr(usdr_dev_t *d, int8_t i, int8_t q)
+{
+    int8_t ci = 0x80 + i;
+    int8_t cq = 0x80 + q;
+    return lms6002d_set_txvga1_dc(&d->lms, (uint8_t)ci, (uint8_t)cq);
 }
 
 int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
@@ -1185,7 +1264,7 @@ int usdr_rfic_set_gain(struct usdr_dev *d,
         d->rx_vga2b = 0;
 
         res = lms6002d_set_rxlna_gain(&d->lms, 1 + d->rx_lna);
-        val = _lms6002d_rxvga1_db_to_int(5 + d->rx_vga1);
+        val = _lms6002d_rxvga1_db_to_int(GAIN_RX_VGA1_MIN + d->rx_vga1);
         res = res ? res : lms6002d_set_rxvga1_gain(&d->lms, val);
         res = res ? res : lms6002d_set_rxvga2ab_gain(&d->lms, d->rx_vga2a, d->rx_vga2b);
 
@@ -1212,6 +1291,7 @@ int usdr_rfic_set_gain(struct usdr_dev *d,
         ngain = _usdr_gain_clamp(gain, GAIN_RX_VGA1_MIN, GAIN_RX_VGA1_MAX);
         val = _lms6002d_rxvga1_db_to_int(ngain);
         res = lms6002d_set_rxvga1_gain(&d->lms, val);
+        d->rx_vga1 = ngain - GAIN_RX_VGA1_MIN;
         break;
 
     case GAIN_RX_VGA2:
@@ -1354,6 +1434,14 @@ int usdr_tx_iqimb_set(usdr_dev_t* d, int iq_amp_imb, int phase_imb)
     return usdr_txupdate_cal(d);
 }
 
+int usdr_rx_iqimb_set(usdr_dev_t* d, int iq_amp_imb, int phase_imb)
+{
+    d->rx_corr.ampl = (int64_t)iq_amp_imb * IMB_AMPL_MAX / INT16_MAX;
+    d->rx_corr.pahse = phase_imb;
+
+    return usdr_rxupdate_cal(d);
+}
+
 int usdr_rxdccorr(struct usdr_dev *d, uint64_t *ov)
 {
     int out;
@@ -1387,7 +1475,9 @@ int usdr_set_corr_param(usdr_dev_t* d, int channel, int corr_type, int value)
         if (rx) {
             return -EINVAL;
         } else {
-            return usdr_tx_dccorr(d, imb_corr->dc_i, imb_corr->dc_q);
+            return d->cal_txlo_dig ?
+                usdr_tx_dccorr(d, imb_corr->dc_i, imb_corr->dc_q) :
+                usdr_tx_vga1_dccorr(d, imb_corr->dc_i, imb_corr->dc_q);
         }
 
     case CORR_PARAM_A:
@@ -1406,6 +1496,20 @@ int usdr_set_corr_param(usdr_dev_t* d, int channel, int corr_type, int value)
 
     case CORR_OP_SET_BW:
         return lms6002d_set_bandwidth(&d->lms, !rx, value);
+
+    case CORR_OP_SET_GAIN:
+        if (rx) {
+            unsigned ngain = d->rx_vga1 + value + GAIN_RX_VGA1_MIN;
+            if (ngain > GAIN_RX_VGA1_MAX)
+                return -E2BIG;
+
+            return lms6002d_set_rxvga1_gain(&d->lms, _lms6002d_rxvga1_db_to_int(ngain));
+        } else {
+            if (value > 21)
+                return -E2BIG;
+
+            return lms6002d_set_txvga1_gain(&d->lms, 10 + (unsigned)value);
+        }
 
     default:
         return -EINVAL;
@@ -1457,13 +1561,10 @@ int usdrcal_init_calibrate(usdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
     ops->rxsamplerate = ops->adcrate / d->rxbb_decim;
     ops->txsamplerate = ops->dacrate / d->txbb_intr;
 
-    ops->rxfrequency = d->rx_lo;
+    ops->rxfrequency = d->rfic_rx_lo;
     ops->txfrequency = d->tx_lo;
     ops->channel = channel;
-    ops->deflogdur = ops->rxsamplerate / 16;
-    if (ops->deflogdur > 131072) {
-        ops->deflogdur = 131072;
-    }
+    ops->deflogdur = ops->rxsamplerate / 20e6;
     ops->defstop = -120000;
     ops->param = d;
 
@@ -1476,7 +1577,7 @@ int usdrcal_init_calibrate(usdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
     ops->rxbw_factor = 2.45;
     ops->txbw_factor = 2.45;
 
-    ops->txlo_iq_corr.max = 2048;
+    ops->txlo_iq_corr.max = 2047;
     ops->txlo_iq_corr.min = -2047;
 
     ops->tximb_iq_corr.max = IMB_AMPL_MAX;
@@ -1507,8 +1608,9 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     int res = 0;
     struct calibrate_ops cops;
     lldev_t dev = d->lms.dev;
-    bool externallb = (param & USDR_CAL_EXT_FB) == USDR_CAL_EXT_FB;
+    bool externallb = ((param & USDR_CAL_EXT_FB) == USDR_CAL_EXT_FB);
     bool norestore = false;
+    bool usedualtx = ((param & USDR_CAL_DUAL_RXLO) == USDR_CAL_DUAL_RXLO);
 
     unsigned coarse = (((param & USDR_CAL_COARSE_1) == USDR_CAL_COARSE_1) ? 1 : 0) |
                       (((param & USDR_CAL_COARSE_2) == USDR_CAL_COARSE_2) ? 2 : 0);
@@ -1516,7 +1618,6 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     unsigned rx_lo = d->rx_lo;
     unsigned rfic_rx_lo = d->rfic_rx_lo;
     unsigned rfe_gain_lna_sel = (d->lms.rfe_gain_lna_sel & 0x30) >> 4; // Fixme!
-
     res = res ? res : usdrcal_init_calibrate(d, &cops, channel);
     cops.coarse_mode = coarse;
 
@@ -1525,8 +1626,40 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     }
 
     if ((param & USDR_CAL_RXIQIMB) && (rx_lo > 0)) {
-        // TODO if TX was disabled enable TX
         USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration RXIQIMB(%c) ------------------\n", 'A' + channel);
+        if (tx_lo == 0) {
+            res = res ? res : _usdr_pwr_state(d, true, true);
+            res = res ? res : usleep(500000);
+        }
+        if (!externallb) {
+            res = res ? res : lms6002d_rf_loopback_en(&d->lms);
+        }
+        res = (res) ? res : calibrate_rxiqimb(&cops);
+        if (res)
+            return res;
+        if (tx_lo) {
+            res = res ? res : lms6002d_tune_pll(&d->lms, true, tx_lo);
+            if (res == -ERANGE) {
+                USDR_LL_LOG(dev, "LMS6", USDR_LOG_ERROR, "Unable to restore TX_LO=%.3f: out of range\n", tx_lo / 1e6);
+                res = lms6002d_disable_pll(&d->lms, true);
+            } else if (res == -ENOLCK) {
+                USDR_LL_LOG(dev, "LMS6", USDR_LOG_ERROR, "Unable to restore TX_LO=%.3f: unable to lock PLL\n", tx_lo / 1e6);
+                res = 0;
+            }
+        } else {
+            res = res ? res : lms6002d_disable_pll(&d->lms, true);
+        }
+        if (!externallb) {
+            res = res ? res : lms6002d_rf_loopback_dis(&d->lms);
+        }
+        if (res) {
+            USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " RXIQIMB failed: res=%d\n", res);
+            return res;
+        }
+        if (sarray) {
+            sarray[ 2 * 2 + 0] = cops.i;
+            sarray[ 2 * 2 + 1] = cops.q;
+        }
     }
 
     if ((param & (USDR_CAL_TXLO | USDR_CAL_TXIQIMB)) && (tx_lo > 0)) {
@@ -1547,10 +1680,27 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
 
         if (param & USDR_CAL_TXLO) {
             USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration TXLO(%c) ------------------\n", 'A' + channel);
+            int8_t fst_i, fst_q;
+            if (usedualtx) {
+                d->cal_txlo_dig = false;
+                cops.txlo_iq_corr.max = 127;
+                cops.txlo_iq_corr.min = -128;
+                res = (res) ? res : calibrate_txlo(&cops);
+                if (res) {
+                    USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " TXLO first stage failed: res=%d\n", res);
+                    return res;
+                }
+                fst_i = cops.i;
+                fst_q = cops.q;
+            }
+            d->cal_txlo_dig = true;
             res = (res) ? res : calibrate_txlo(&cops);
             if (res) {
                 USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " TXLO failed: res=%d\n", res);
                 return res;
+            }
+            if (usedualtx) {
+                USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " TXLO Dual stage result: Fist={I=%d Q=%d} Second={I=%d Q=%d}\n", fst_i, fst_q, cops.i, cops.q);
             }
             if (sarray) {
                 sarray[ 2 * 1 + 0] = cops.i;
@@ -1577,6 +1727,13 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
         if (!norestore) {
             if (rfic_rx_lo > 0) {
                 res = res ? res : lms6002d_tune_pll(&d->lms, false, rfic_rx_lo);
+                if (res == -ERANGE) {
+                    USDR_LL_LOG(dev, "LMS6", USDR_LOG_ERROR, "Unable to restore RX_LO=%.3f: out of range\n", rfic_rx_lo / 1e6);
+                    res = lms6002d_disable_pll(&d->lms, false);
+                } else if (res == -ENOLCK) {
+                    USDR_LL_LOG(dev, "LMS6", USDR_LOG_ERROR, "Unable to restore RX_LO=%.3f: unable to lock PLL\n", rfic_rx_lo / 1e6);
+                    res = 0;
+                }
             } else {
                 res = res ? res : lms6002d_disable_pll(&d->lms, false);
             }
@@ -1584,6 +1741,7 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
                 res = res ? res : lms6002d_set_rx_path(&d->lms, rfe_gain_lna_sel);
                 res = res ? res : lms6002d_rf_loopback_dis(&d->lms);
             }
+            res = res ? res : lms6002d_set_rxvga1_gain(&d->lms, _lms6002d_rxvga1_db_to_int(d->rx_vga1 + GAIN_RX_VGA1_MIN));
             if (res) {
                 USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, "restore configuration failed: res=%d\n", res);
                 return res;
@@ -1614,6 +1772,8 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     if (rx_lo == 0) {
         _usdr_pwr_state(d, false, false);
     }
-
+    if (tx_lo == 0) {
+        _usdr_pwr_state(d, true, false);
+    }
     return res;
 }

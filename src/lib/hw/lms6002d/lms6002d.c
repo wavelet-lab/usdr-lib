@@ -868,6 +868,15 @@ int lms6002d_set_rxfedc(lms6002d_state_t* obj, int8_t dci, int8_t dcq)
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
 
+int lms6002d_set_txvga1_dc(lms6002d_state_t* obj, uint8_t dci, uint8_t dcq)
+{
+    uint16_t regs[] = {
+        MAKE_LMS6002D_TRF_VGA1DC_I(dci),
+        MAKE_LMS6002D_TRF_VGA1DC_Q(dcq),
+    };
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
+
 int lms6002d_set_tia_cfb(lms6002d_state_t* obj, uint8_t value)
 {
     uint16_t regs[] = {

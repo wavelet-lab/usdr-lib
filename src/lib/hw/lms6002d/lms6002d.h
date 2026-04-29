@@ -71,7 +71,6 @@ int lms6002d_set_txvga2_gain(lms6002d_state_t* obj, unsigned vga);
 
 int lms6002d_set_rx_extterm(lms6002d_state_t* obj, bool extterm);
 
-
 enum lms6002d_rx_path {
     RXPATH_OFF = 0,
     RXPATH_LNA1 = 1,
@@ -93,7 +92,7 @@ int lms6002d_set_tx_path(lms6002d_state_t* obj, unsigned path);
 
 int lms6002d_set_rxfedc(lms6002d_state_t* obj, int8_t dci, int8_t dcq);
 int lms6002d_set_rxfe_ip2corr(lms6002d_state_t* obj, int8_t i, int8_t q);
-
+int lms6002d_set_txvga1_dc(lms6002d_state_t* obj, uint8_t dci, uint8_t dcq);
 
 int lms6002d_cal_lpf(lms6002d_state_t* obj);
 int lms6002d_cal_txrxlpfdc(lms6002d_state_t* obj, bool tx);
