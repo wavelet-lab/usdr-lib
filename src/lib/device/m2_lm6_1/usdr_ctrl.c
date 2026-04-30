@@ -63,7 +63,7 @@ enum usdr_rev000 {
 
 enum lms6_vios {
     LMS6_VIO_NORM = 1800,
-    LMS6_VIO_BOOST = 1950,
+    LMS6_VIO_BOOST = 1925,
 };
 
 enum fpga_phy_regs {
@@ -442,6 +442,7 @@ int usdr_set_lob_freq(struct usdr_dev *d, unsigned freqlob)
 }
 
 #define TARGET_RATE 30720000
+#define SAFE_RATE   60000000
 
 int usdr_set_rxdccorr(usdr_dev_t *d, bool enable)
 {
@@ -638,22 +639,27 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
     unsigned ind = 0;
     unsigned int_dec_x[] = { 1, 2, 4, 8, 16, 32 /*, 64, 128, 256 */ };
 
+    // Use 50MSPS as safe range
     if (d->has_rxchain && d->has_txchain) {
         for (; ind < SIZEOF_ARRAY(int_dec_x); ind++) {
-            if (rate * int_dec_x[ind] >= TARGET_RATE)
+            if (rate * int_dec_x[ind] >= TARGET_RATE) {
+                if ((rate * int_dec_x[ind] > SAFE_RATE) && (ind > 0))
+                    ind--;
+
                 break;
+            }
         }
 
         rate *= int_dec_x[ind];
         nfo.out = rate << 1;
     }
 
-    if (rate >= 60e6 && !d->vio_boost) {
+    if (rate >= 62e6 && !d->vio_boost) {
         USDR_LOG("UDEV", USDR_LOG_WARNING, "Boosting Vio to get stable samplerates over 60Msps\n");
 
         res = res ? res : lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 3, LMS6_VIO_BOOST);
         d->vio_boost = true;
-    } else if (rate < 60e6 && d->vio_boost) {
+    } else if (rate < 62e6 && d->vio_boost) {
         res = res ? res : lp8758_vout_set(dev, d->subdev, I2C_BUS_LP8758, 3, LMS6_VIO_NORM);
         d->vio_boost = false;
     }
@@ -1184,7 +1190,7 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
                 if (res)
                     return res;
 
-                if (stat.vco_cap_max >= 1)
+                if (stat.vco_cap_max >= 2)
                     break;
             }
             if (res)
@@ -1665,17 +1671,22 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     unsigned coarse = (((param & USDR_CAL_COARSE_1) == USDR_CAL_COARSE_1) ? 1 : 0) |
                       (((param & USDR_CAL_COARSE_2) == USDR_CAL_COARSE_2) ? 2 : 0);
     unsigned tx_lo = d->tx_lo;
-    unsigned rx_lo = d->rx_lo;
-    unsigned rfic_rx_lo = d->rfic_rx_lo;
+    unsigned rx_lo = d->rfic_rx_lo;
     unsigned rfe_gain_lna_sel = (d->lms.rfe_gain_lna_sel & 0x30) >> 4; // Fixme!
     cops.coarse_mode = coarse;
 
-    if (tx_lo)
+    if (tx_lo) {
         tx_lo -= d->tx_exten_lo;
-    if (rx_lo)
+    }
+    if (rx_lo) {
         rx_lo -= d->rx_exten_lo;
-
+    }
     res = res ? res : usdrcal_init_calibrate(d, &cops, channel, rx_lo, tx_lo);
+
+    if (d->tx_exten_lo) {
+        // Extend meas to fit RX
+        cops.txfrequency += 0.2 * cops.txsamplerate;
+    }
 
     if ((param & USDR_CAL_RXLO) && (rx_lo > 0)) {
         USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration RXLO(%c) ------------------\n", 'A' + channel);
@@ -1726,15 +1737,20 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     }
 
     if ((param & (USDR_CAL_TXLO | USDR_CAL_TXIQIMB)) && (tx_lo > 0)) {
+        bool tx_set = true;
         if (rx_lo == 0 || !d->rx_pwren) {
             USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, "RX frontend was down, powering up and performing DC alignment\n");
             res = res ? res : _usdr_pwr_state(d, false, true);
             res = res ? res : usleep(500000);
             res = res ? res : lms6002d_tune_pll(&d->lms, false, 320e6);
             res = res ? res : usdr_calib_dc(d, true);
-            res = res ? res : lms6002d_tune_pll(&d->lms, true, tx_lo);
             res = res ? res : usdr_rxupdate_cal(d);
+            tx_set = false;
         }
+        if (tx_set || d->tx_exten_lo) {
+            res = res ? res : lms6002d_tune_pll(&d->lms, true, cops.txfrequency);
+        }
+
         if (!externallb) {
             unsigned lb_path = 1; // TODO select RX path for LB
             res = res ? res : lms6002d_set_rx_path(&d->lms, lb_path);
@@ -1795,13 +1811,16 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
         }
 
         if (!norestore) {
-            if (rfic_rx_lo > 0) {
-                res = res ? res : lms6002d_tune_pll(&d->lms, false, rfic_rx_lo);
+            if (d->tx_exten_lo) {
+                res = res ? res : lms6002d_tune_pll(&d->lms, true, tx_lo);
+            }
+            if (rx_lo > 0) {
+                res = res ? res : lms6002d_tune_pll(&d->lms, false, rx_lo);
                 if (res == -ERANGE) {
-                    USDR_LL_LOG(dev, "LMS6", USDR_LOG_ERROR, "Unable to restore RX_LO=%.3f: out of range\n", rfic_rx_lo / 1e6);
+                    USDR_LL_LOG(dev, "LMS6", USDR_LOG_ERROR, "Unable to restore RX_LO=%.3f: out of range\n", rx_lo / 1e6);
                     res = lms6002d_disable_pll(&d->lms, false);
                 } else if (res == -ENOLCK) {
-                    USDR_LL_LOG(dev, "LMS6", USDR_LOG_ERROR, "Unable to restore RX_LO=%.3f: unable to lock PLL\n", rfic_rx_lo / 1e6);
+                    USDR_LL_LOG(dev, "LMS6", USDR_LOG_ERROR, "Unable to restore RX_LO=%.3f: unable to lock PLL\n", rx_lo / 1e6);
                     res = 0;
                 }
             } else {

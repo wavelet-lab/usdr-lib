@@ -1328,6 +1328,7 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         *out_handle = d->tx;
 
         // TODO: handle NCO changes
+        res = res ? res : usdr_tx_gen_set(&d->d, false, 0, 0, 0);
         res = res ? res : usdr_txupdate_cal(&d->d);
     }
 
