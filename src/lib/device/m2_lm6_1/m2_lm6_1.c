@@ -251,7 +251,7 @@ const usdr_dev_param_func_t s_fparams_m2_lm6_1_rev000[] = {
     { "/dm/sdr/0/rx/ip2corr",   { dev_m2_lm6_1_sdr_rx_ip2corr_set, NULL }},
     { "/dm/sdr/0/tx/dccorr",    { dev_m2_lm6_1_sdr_tx_dccorr_set, NULL }},
 
-    { "/dm/sdr/0/calibrate",    { dev_m2_lm6_1_sdr_dc_calib, NULL }},
+    { "/dm/sdr/0/calibrate_dc", { dev_m2_lm6_1_sdr_dc_calib, NULL }},
 
     { "/dm/sdr/0/rx/frequency/lob",{ dev_m2_lm6_1_sdr_rx_freq_lob_set, NULL }},
     { "/dm/sdr/0/rx/frequency",  { dev_m2_lm6_1_sdr_rx_freq_set, NULL }},
