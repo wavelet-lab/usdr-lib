@@ -1106,7 +1106,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Devices in the array: %d", devices);
     }
 
-    res = usdr_dme_get_u32(dev, "/ll/sdr/max_sw_rx_chans", &swchmax);
+    res = usdr_dme_get_u32(dev, "/ll/sdr/max_hw_rx_chans", &swchmax);
     if (res == 0) {
         if (!chl_tx.chmsk_alter) {
             chl_tx.chmsk = (1ULL << devices * swchmax) - 1;
@@ -1425,8 +1425,6 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (calibrate) {
         res = usdr_dme_set_uint(dev, "/dm/sdr/0/calibrate", calibrate);
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "SDR Calibration done: %d\n", res);
-
-        res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
     }
 
     // Update BB freqs if set
