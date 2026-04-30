@@ -1604,15 +1604,15 @@ int usdrcal_set_nco_offset(void* param, int channel, int32_t freqoffset)
 }
 
 static
-int usdrcal_init_calibrate(usdr_dev_t *d, struct calibrate_ops* ops, unsigned channel)
+int usdrcal_init_calibrate(usdr_dev_t *d, struct calibrate_ops* ops, unsigned channel, unsigned rxlo, unsigned txlo)
 {
     ops->adcrate = d->adc_clk;
     ops->dacrate = d->dac_clk;
     ops->rxsamplerate = ops->adcrate / d->rxbb_decim;
     ops->txsamplerate = ops->dacrate / d->txbb_intr;
 
-    ops->rxfrequency = d->rfic_rx_lo;
-    ops->txfrequency = d->tx_lo;
+    ops->rxfrequency = rxlo;
+    ops->txfrequency = txlo;
     ops->channel = channel;
     ops->deflogdur = ops->rxsamplerate / 20e6;
     ops->defstop = -120000;
@@ -1668,8 +1668,14 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     unsigned rx_lo = d->rx_lo;
     unsigned rfic_rx_lo = d->rfic_rx_lo;
     unsigned rfe_gain_lna_sel = (d->lms.rfe_gain_lna_sel & 0x30) >> 4; // Fixme!
-    res = res ? res : usdrcal_init_calibrate(d, &cops, channel);
     cops.coarse_mode = coarse;
+
+    if (tx_lo)
+        tx_lo -= d->tx_exten_lo;
+    if (rx_lo)
+        rx_lo -= d->rx_exten_lo;
+
+    res = res ? res : usdrcal_init_calibrate(d, &cops, channel, rx_lo, tx_lo);
 
     if ((param & USDR_CAL_RXLO) && (rx_lo > 0)) {
         USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration RXLO(%c) ------------------\n", 'A' + channel);
