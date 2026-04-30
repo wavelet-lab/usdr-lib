@@ -140,8 +140,13 @@ struct usdr_dev
     unsigned rx_lo;
     unsigned tx_lo;
 
+    int rx_exten_lo; // Extention LO range by applying NCO-shift
+    int tx_exten_lo; // Extention LO range by applying NCO-shift
+
     unsigned rx_nco_distance; // Maximum distance from LO to the farest NCO
     unsigned tx_nco_distance;
+    unsigned rx_minimal_lo;   // Minimal LO to keep VCO lock, 0 -- not probed yet
+    unsigned tx_minimal_lo;
 
     freq_data_t rx_raw;
     freq_data_t tx_raw;

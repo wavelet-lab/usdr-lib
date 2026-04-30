@@ -47,6 +47,7 @@
 
 enum {
     USDR_INT_REFCLK = 26000000,
+    USDR_LO_LOW_RANGE = 250000000,
 };
 
 enum usdr_rev000 {
@@ -602,12 +603,13 @@ static int usdr_restore_nco(struct usdr_dev *d, bool istx)
 {
     int res = 0;
     freq_data_t* freqd = (istx) ? &d->tx_raw : &d->rx_raw;
+    int ext_lo_offset = (istx) ? d->tx_exten_lo : d->rx_exten_lo;
 
     for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
         if (freqd->bb[i].set) {
-            res = res ? res : _usdr_set_nco(d, !istx, i, (int32_t)freqd->bb[i].value);
+            res = res ? res : _usdr_set_nco(d, !istx, i, (int32_t)freqd->bb[i].value + ext_lo_offset);
         } else {
-            res = res ? res : _usdr_set_nco(d, !istx, i, 0);
+            res = res ? res : _usdr_set_nco(d, !istx, i, ext_lo_offset);
         }
     }
     return res;
@@ -616,7 +618,8 @@ static int usdr_restore_nco(struct usdr_dev *d, bool istx)
 static int _usdr_update_bandwidth(struct usdr_dev *d, bool istx)
 {
     unsigned rate = istx ? (d->dac_clk / d->txbb_intr) : (d->adc_clk / d->rxbb_decim);
-    unsigned bw = 2 * (istx ? d->tx_nco_distance : d->rx_nco_distance) + rate;
+    int ext_lo_offset = (istx) ? d->tx_exten_lo : d->rx_exten_lo;
+    unsigned bw = 2 * (istx ? d->tx_nco_distance : d->rx_nco_distance) + rate + ABS(2 * ext_lo_offset);
 
     USDR_LOG("UDEV", USDR_LOG_WARNING, "%s: Updating %s bandwidth to %.3f Mhz\n",
              lowlevel_get_devname(d->base.dev), istx ? "TX" : "RX", bw / 1e6);
@@ -1143,7 +1146,7 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
     if (!istx) {
         freq = d->rx_lo;
         d->rx_nco_distance = nco_distance;
-
+        d->rx_exten_lo = 0;
         if (d->mexir_en) {
             // upconverter mixer
             freq += d->mixer_lo;
@@ -1155,6 +1158,7 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
     } else {
         freq = d->tx_lo;
         d->tx_nco_distance = nco_distance;
+        d->tx_exten_lo = 0;
     }
 
     res = lms6002d_tune_pll(&d->lms, istx, freq);
@@ -1170,29 +1174,68 @@ int usdr_rfic_fe_set_freq(struct usdr_dev *d,
         res = lms6002d_tune_pll(&d->lms, istx, freq);
     }
     if (res == -ENOLCK) {
-        USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: %s_LO=%u unable to lock (pwr: %d)!\n",
-                 lowlevel_get_devname(d->base.dev), istx ? "TX" : "RX",
-                 istx ? d->tx_lo : d->rx_lo,
-                 istx ? d->tx_pwren : d->rx_pwren);
+        if (freq < USDR_LO_LOW_RANGE && (istx ? d->tx_minimal_lo == 0 : d->rx_minimal_lo == 0)) {
+            // Try to get low range in order to apply NCO correction to extend range
+            unsigned sweep_lo = freq;
+            lms6002_pll_stat_t stat;
+            for (; sweep_lo < USDR_LO_LOW_RANGE; sweep_lo += 1e6) {
+                res = lms6002d_tune_pll_stat(&d->lms, istx, sweep_lo, true, &stat);
+                if (res == -ENOLCK)
+                    continue;
+                if (res)
+                    return res;
+
+                if (stat.vco_cap_max >= 1)
+                    break;
+            }
+            if (res)
+                return res;
+
+            USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_WARNING, "Probed minimal %cX_LO is %d\n", istx ? 'T' : 'R', sweep_lo);
+            if (istx) {
+                d->tx_minimal_lo = sweep_lo;
+            } else {
+                d->rx_minimal_lo = sweep_lo;
+            }
+        } else if (freq < USDR_LO_LOW_RANGE) {
+            res = lms6002d_tune_pll_stat(&d->lms, istx, (istx ? d->tx_minimal_lo : d->rx_minimal_lo), true, NULL);
+        }
+
+        if (res == -ENOLCK) {
+            USDR_LOG("UDEV", USDR_LOG_ERROR, "%s: %s_LO=%u unable to lock (pwr: %d)!\n",
+                     lowlevel_get_devname(d->base.dev), istx ? "TX" : "RX",
+                     istx ? d->tx_lo : d->rx_lo,
+                     istx ? d->tx_pwren : d->rx_pwren);
+        }
+        if (res)
+            return res;
+
+        int64_t minimal_lo = (int64_t)(istx ? d->tx_minimal_lo : d->rx_minimal_lo);
+        int64_t offset = (int64_t)freq - minimal_lo;
+        unsigned dig_rate = istx ? d->dac_clk : d->adc_clk;
+        unsigned bb_rate = istx ? (d->dac_clk / d->txbb_intr) : (d->adc_clk / d->rxbb_decim);
+        unsigned rate_min = bb_rate + ABS(offset);
+        // Check if we can extend analog BW to support this offset, we need rate/2 + offset, assume 90% of usable digital BB rate
+        if (dig_rate * 0.45 < rate_min) {
+            USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_ERROR, "%cX_LO can't be sastisfied with extended NCO: required digital rate: %.3f (of %.3f NCO shift), increase samplerate in order to set that frequency!\n",
+                        istx ? 'T' : 'R', rate_min / 1.0e6, offset / 1.0e6);
+            return -ENOLCK;
+        }
+
+        if (istx) {
+            d->tx_exten_lo = offset;
+        } else {
+            d->rx_exten_lo = offset;
+        }
+
+        USDR_LL_LOG(d->base.dev, "UDEV", USDR_LOG_INFO, "%cX_LO set to %.3f with extention %.3f\n", istx ? 'T' : 'R', minimal_lo / 1.0e6, offset / 1.0e6);
     }
 
     // Update NCOs
-    for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
-        if (freqd->bb[i].set) {
-            res = res ? res : _usdr_set_nco(d, !istx, i, (int32_t)freqd->bb[i].value);
-        }
-    }
+    res = res ? res : usdr_restore_nco(d, istx);
 
     // Update BW
     if ((istx && !d->tx_bw.set) || (!istx && !d->rx_bw.set)) {
-        /*
-        unsigned rate = istx ? (d->dac_clk / d->txbb_intr) : (d->adc_clk / d->rxbb_decim);
-        unsigned bw = 2 * (istx ? d->tx_nco_distance : d->rx_nco_distance) + rate;
-
-        USDR_LOG("UDEV", USDR_LOG_WARNING, "%s: Updating %s bandwidth to %.3f Mhz\n",
-                 lowlevel_get_devname(d->base.dev), istx ? "TX" : "RX", bw / 1e6);
-        res = res ? res : lms6002d_set_bandwidth(&d->lms, istx, bw);
-        */
         res = res ? res : _usdr_update_bandwidth(d, istx);
     }
 
@@ -1208,9 +1251,17 @@ int usdr_rfic_bb_set_badwidth(struct usdr_dev *d,
     if (actualbw) *actualbw = bw;
 
     if (!dir_tx) {
-        opt_u32_set_val(&d->rx_bw, bw);
+        if (bw == 0) {
+            opt_u32_set_null(&d->rx_bw);
+        } else {
+            opt_u32_set_val(&d->rx_bw, bw);
+        }
     } else {
-        opt_u32_set_val(&d->tx_bw, bw);
+        if (bw == 0) {
+            opt_u32_set_null(&d->tx_bw);
+        } else {
+            opt_u32_set_val(&d->tx_bw, bw);
+        }
     }
 
     return lms6002d_set_bandwidth(&d->lms, dir_tx, bw);

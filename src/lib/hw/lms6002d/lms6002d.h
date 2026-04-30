@@ -38,6 +38,16 @@ typedef struct lms6002d_state lms6002d_state_t;
 
 
 int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms6002d_state_t* out);
+
+// Internal VCO+PLL state for fast LO settelment without calibration
+typedef struct lms6002_pll_stat {
+    uint8_t vco_cap_min;
+    uint8_t vco_cap_max;
+    uint8_t vco_num;
+    uint8_t vco_div;
+} lms6002_pll_stat_t;
+
+int lms6002d_tune_pll_stat(lms6002d_state_t* obj, bool tx, unsigned freq, bool mkstat, lms6002_pll_stat_t* pstat);
 int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq);
 int lms6002d_disable_pll(lms6002d_state_t* obj, bool tx);
 
