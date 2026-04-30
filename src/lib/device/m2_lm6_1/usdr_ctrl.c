@@ -701,10 +701,9 @@ int usdr_set_samplerate_ex(struct usdr_dev *d,
         res = res ? res : usdr_restore_nco(d, (rxgrp == 1));
     }
 
-    uint32_t v = 0;
-    res = res ? res : lowlevel_reg_rd32(dev, 0, REG_CFG_PHY_0, &v);
-
-    USDR_LOG("UDEV", USDR_LOG_WARNING, "V=%08x\n", v);
+    //uint32_t v = 0;
+    //res = res ? res : lowlevel_reg_rd32(dev, 0, REG_CFG_PHY_0, &v);
+    //USDR_LOG("UDEV", USDR_LOG_WARNING, "V=%08x\n", v);
 
     d->rxbb_decim = int_dec_x[ind];
     d->txbb_intr = int_dec_x[ind];
@@ -1678,16 +1677,23 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
 
     if ((param & USDR_CAL_RXIQIMB) && (rx_lo > 0)) {
         USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration RXIQIMB(%c) ------------------\n", 'A' + channel);
-        if (tx_lo == 0) {
+        if (tx_lo == 0 || !d->tx_pwren) {
+            USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, "TX frontend was down, powering up\n");
             res = res ? res : _usdr_pwr_state(d, true, true);
             res = res ? res : usleep(500000);
+            res = res ? res : usdr_txupdate_cal(d);
         }
         if (!externallb) {
             res = res ? res : lms6002d_rf_loopback_en(&d->lms);
         }
         res = (res) ? res : calibrate_rxiqimb(&cops);
-        if (res)
+        if (res == -ENAVAIL) {
+            USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " RXIQIMB failed!\n");
+            res = 0;
+            cops.i = cops.q = 0;
+        } else if (res) {
             return res;
+        }
         if (tx_lo) {
             res = res ? res : lms6002d_tune_pll(&d->lms, true, tx_lo);
             if (res == -ERANGE) {
@@ -1714,12 +1720,14 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
     }
 
     if ((param & (USDR_CAL_TXLO | USDR_CAL_TXIQIMB)) && (tx_lo > 0)) {
-        if (rx_lo == 0) {
+        if (rx_lo == 0 || !d->rx_pwren) {
+            USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, "RX frontend was down, powering up and performing DC alignment\n");
             res = res ? res : _usdr_pwr_state(d, false, true);
             res = res ? res : usleep(500000);
             res = res ? res : lms6002d_tune_pll(&d->lms, false, 320e6);
             res = res ? res : usdr_calib_dc(d, true);
             res = res ? res : lms6002d_tune_pll(&d->lms, true, tx_lo);
+            res = res ? res : usdr_rxupdate_cal(d);
         }
         if (!externallb) {
             unsigned lb_path = 1; // TODO select RX path for LB
@@ -1764,6 +1772,11 @@ int usdr_calibrate(usdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
             USDR_LL_LOG(dev, "LMS6", USDR_LOG_INFO, "------------------ Calibration TXIQIMB(%c) ------------------\n", 'A' + channel);
             res = res ? res : lms6002d_set_txvga1_gain(&d->lms, 28);
             res = res ? res : calibrate_txiqimb(&cops);
+            if (res == -ENAVAIL) {
+                USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " TXIQIMB failed!\n");
+                res = 0;
+                cops.i = cops.q = 0;
+            }
             res = res ? res : lms6002d_set_txvga1_gain(&d->lms, old_txvga1);
             if (res) {
                 USDR_LL_LOG(dev, "LMS6", USDR_LOG_WARNING, " TXIQIMB failed: res=%d\n", res);
