@@ -44,6 +44,7 @@ struct calibrate_ops
     int rxtxlo_frac;
     int rxiqimb_frac;  // Relative position (-1; 1) to feed test tx sig for RXIQIMB & TXLO
     int txiqimb_frac;  // Relative position (-1; 1) to feed test tx sig for TXIQIMB
+    int rxiqtmb_tx_off;
     int coarse_mode;
 
     float rxbw_factor; // Extend RX bandwith from required observation frequency

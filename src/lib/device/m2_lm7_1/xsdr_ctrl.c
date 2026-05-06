@@ -2346,9 +2346,11 @@ int xsdrcal_init_calibrate(xsdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
     ops->param = d;
 
     // Make very odd fraction not to fall harmonics into the same bins after nyquist
-    ops->rxtxlo_frac = ((uint64_t)INT_MAX + 1) / 9.0187;
+    ops->rxtxlo_frac = ((uint64_t)INT_MAX + 1) / 23.0187; //((uint64_t)INT_MAX + 1) / 9.0187;
     ops->rxiqimb_frac = ((uint64_t)INT_MAX + 1) / 5.1031;
     ops->txiqimb_frac = ((uint64_t)INT_MAX + 1) / 11.1076;
+    ops->rxiqtmb_tx_off = -ops->rxsamplerate / 7;
+
     ops->coarse_mode = 0;
 
     ops->rxbw_factor = 2.33;

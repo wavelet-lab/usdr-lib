@@ -1628,6 +1628,8 @@ int usdrcal_init_calibrate(usdr_dev_t *d, struct calibrate_ops* ops, unsigned ch
     ops->rxtxlo_frac = ((uint64_t)INT_MAX + 1) / 9.0187;
     ops->rxiqimb_frac = ((uint64_t)INT_MAX + 1) / 5.1031;
     ops->txiqimb_frac = ((uint64_t)INT_MAX + 1) / 11.1076;
+    ops->rxiqtmb_tx_off = 0;
+
     ops->coarse_mode = 0;
 
     ops->rxbw_factor = 2.45;

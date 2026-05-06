@@ -210,7 +210,7 @@ int _calibrate_iqimb_generic(struct calibrate_ops* ops,
     res = res ? res : ops->set_corr_param(ops->param, ops->channel, CORR_DIR_RX | CORR_OP_SET_BW,
                                           required_bw * ops->rxbw_factor);
     res = res ? res : ops->set_corr_param(ops->param, ops->channel, CORR_DIR_TX | CORR_OP_SET_BW,
-                                          freqoffset * ops->txbw_factor);
+                                          ABS(freqoffset) * ops->txbw_factor);
     res = res ? res : ops->set_nco_rx_offset(ops->param, ops->channel, rxreoff);
     res = res ? res : _calibrate_txpwr(ops, freqoffset, txcal, &pwr_r);
 
@@ -263,11 +263,14 @@ int calibrate_rxiqimb(struct calibrate_ops* ops)
              ops->rxfrequency, freqoff, ops->rxiqimb_frac / (float)INT_MAX);
 
     res = ops->set_corr_param(ops->param, ops->channel, CORR_DIR_TX | CORR_OP_SET_FREQ,
-                              ops->rxfrequency + freqoff);
+                              ops->rxfrequency + freqoff - ops->rxiqtmb_tx_off);
     if (res)
         return res;
 
-    return _calibrate_iqimb_generic(ops, false, 0, freqoff, -freqoff, _evaluate_rxaiq);
+    return _calibrate_iqimb_generic(ops, false,
+                                    ops->rxiqtmb_tx_off,
+                                    freqoff,
+                                    -freqoff, _evaluate_rxaiq);
 }
 
 
