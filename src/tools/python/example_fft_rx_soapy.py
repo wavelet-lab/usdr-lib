@@ -44,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--window", default="hann", help="Scipy window name (e.g. hann, blackman, flattop)")
     parser.add_argument("--channel", type=int, default=0, help="RX channel index")
     parser.add_argument("--timeout-ms", type=int, default=1000, help="Receive timeout in milliseconds")
+    parser.add_argument("--calibrate", action="store_true", help="Enable LO & IQ Imbalance calibration")
 
     return parser.parse_args()
 
@@ -102,6 +103,9 @@ def main() -> None:
 
     timeout_us = int(args.timeout_ms * 1000)
 
+    if args.calibrate:
+        dev.writeSetting("calibrate", "rx")
+
     # Receive and accumulate FFT frames
     for _ in range(int(args.accumulation)):
         buf = aligned_empty((fft_size,), np.complex64, alignment=64)
@@ -121,7 +125,7 @@ def main() -> None:
     dev.closeStream(rx_stream)
 
     # Close device
-    if dev.close is not None:
+    if hasattr(dev, 'close'):
         dev.close()  # Not strictly necessary, but good practice
     dev = None
 

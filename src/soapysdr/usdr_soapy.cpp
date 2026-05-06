@@ -1027,9 +1027,9 @@ void SoapyUSDR::writeSetting(const std::string &key, const std::string &value)
         if (res) {
             throw std::invalid_argument("SoapyUSDR::writeSetting("+key+") failed");
         }
+    } else {
+        throw std::runtime_error("unknown setting key: " + key);
     }
-
-    throw std::runtime_error("unknown setting key: " + key);
 }
 
 SoapySDR::ArgInfoList SoapyUSDR::getSettingInfo(const int direction, const size_t channel) const

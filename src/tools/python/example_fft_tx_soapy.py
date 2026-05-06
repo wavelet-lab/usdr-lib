@@ -44,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-bursts", type=int, default=128, help="Number of bursts to transmit (0 = infinite)")
     parser.add_argument("--channel", type=int, default=0, help="TX channel index")
     parser.add_argument("--timeout-ms", type=int, default=1000, help="Write timeout in milliseconds")
-
+    parser.add_argument("--calibrate", action="store_true", help="Enable LO & IQ Imbalance calibration")
     return parser.parse_args()
 
 
@@ -126,6 +126,8 @@ def main() -> None:
     print(f"  samplerate={args.samplerate:.0f}  amplitude={args.amplitude}  "
           f"burst_size={burst_size}  num_bursts={'inf' if infinite else num_bursts}")
 
+    if args.calibrate:
+        dev.writeSetting("calibrate", "tx")
     # Transmit sine-wave bursts
     burst_idx = 0
     try:
@@ -154,7 +156,7 @@ def main() -> None:
     dev.closeStream(tx_stream)
 
     # Close device
-    if dev.close is not None:
+    if hasattr(dev, 'close'):
         dev.close()  # Not strictly necessary, but good practice
     dev = None
 
