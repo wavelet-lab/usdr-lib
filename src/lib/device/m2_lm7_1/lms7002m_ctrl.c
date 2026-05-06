@@ -549,6 +549,15 @@ int lms7002m_bb_set_badwidth(lms7002_dev_t *d,
         else if (channel == LMS7_CH_B && j == LMS7_CH_A)
             continue;
 
+        if (bw == 0) {
+            if (!dir_tx) {
+                opt_u32_set_null(&d->rx_bw[(j == LMS7_CH_A) ? 0 : 1]);
+            } else {
+                opt_u32_set_null(&d->tx_bw[(j == LMS7_CH_A) ? 0 : 1]);
+            }
+            continue;
+        }
+
         res = lms7002m_mac_set(&d->lmsstate, j);
         if (res)
             return res;
@@ -1058,8 +1067,8 @@ int lms7002m_samplerate(lms7002_dev_t *d,
     cfg.rxdiv = rxtsp_div;
     cfg.rxsisoddr = sisoddr_rx;
     cfg.txsisoddr = sisoddr_tx;
-    cfg.txtspdelay = (txrate < 45e6) ? 3 : (txrate < 99e6) ? 1 : 0;
-    cfg.txlmldelay = (txrate < 45e6) ? 0 : (txrate < 99e6) ? 3 : 0;
+    cfg.txtspdelay = (txrate > 40e6 && txrate < 45e6) ? 2 : 1; // (txrate < 45e6) ? 3 : (txrate < 99e6) ? 1 : 0;
+    cfg.txlmldelay = 0; //(txrate < 45e6) ? 0 : (txrate < 99e6) ? 3 : 0;
 
     res = lms7002m_limelight_configure(&d->lmsstate, cfg);
     if (res)

@@ -259,8 +259,10 @@ int calibrate_rxiqimb(struct calibrate_ops* ops)
     // Set RX to be TXLO - sampl
     int32_t freqoff = (((int64_t)ops->rxsamplerate * ops->rxiqimb_frac) >> 31);
 
-    USDR_LOG("UDEV", USDR_LOG_WARNING, "CAL_RXIQIMB: Set RX measeure freq %d - %d (from %.3f)\n",
-             ops->rxfrequency, freqoff, ops->rxiqimb_frac / (float)INT_MAX);
+    USDR_LOG("UDEV", USDR_LOG_WARNING, "CAL_RXIQIMB: Set RX measeure freq %u - %d = %.3f Mhz (from %.3f)\n",
+             ops->rxfrequency, freqoff,
+             ((unsigned)ops->rxfrequency + freqoff - ops->rxiqtmb_tx_off) / 1e6,
+             ops->rxiqimb_frac / (float)INT_MAX);
 
     res = ops->set_corr_param(ops->param, ops->channel, CORR_DIR_TX | CORR_OP_SET_FREQ,
                               ops->rxfrequency + freqoff - ops->rxiqtmb_tx_off);

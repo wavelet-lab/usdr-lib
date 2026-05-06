@@ -124,6 +124,8 @@ typedef struct lms7002m_limelight_conf lms7002m_limelight_conf_t;
 int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t params);
 int lms7002m_limelight_map(lms7002m_state_t* m, bool sisol1m, bool sisol2m, lms7002m_lml_map_t l1m, lms7002m_lml_map_t l2m);
 int lms7002m_limelight_switch_rx_mode(lms7002m_state_t* m, lms7002m_limelight_conf_t params);
+int lms7002m_limelight_toggle_tsp_clk(lms7002m_state_t* m, lms7002m_limelight_conf_t params, uint8_t set);
+int lms7002m_limelight_upd_delay(lms7002m_state_t* m, lms7002m_limelight_conf_t params);
 
 // CGEN
 int lms7002m_cgen_disable(lms7002m_state_t* m);
@@ -174,6 +176,7 @@ typedef enum lms7002m_xxtsp lms7002m_xxtsp_t;
 // TSTPs
 int lms7002m_rxtsp_dc_corr(lms7002m_state_t* m, bool byp, unsigned wnd);
 int lms7002m_xxtsp_bst(lms7002m_state_t* m, lms7002m_xxtsp_t tsp);
+int lms7002m_xxtsp_bst_isdone(lms7002m_state_t* m, lms7002m_xxtsp_t tsp, bool* done);
 int lms7002m_xxtsp_enable(lms7002m_state_t* m, lms7002m_xxtsp_t tsp, bool enable);
 int lms7002m_xxtsp_int_dec(lms7002m_state_t* m, lms7002m_xxtsp_t tsp, unsigned intdec_ord);
 
@@ -185,6 +188,7 @@ enum lms7002m_xxtsp_gen {
 };
 typedef enum lms7002m_xxtsp_gen lms7002m_xxtsp_gen_t;
 
+int lms7002m_xxtsp_reset(lms7002m_state_t* m, lms7002m_xxtsp_t tsp);
 int lms7002m_xxtsp_gen(lms7002m_state_t* m, lms7002m_xxtsp_t tsp, lms7002m_xxtsp_gen_t gen,
                        int16_t dci, int16_t dcq);
 
@@ -267,6 +271,7 @@ enum lms7002m_rbb_mode {
     RBB_MODE_DISABLE,
     RBB_MODE_NORMAL,
     RBB_MODE_LOOPBACK,
+    RBB_MODE_LOOPBACK_ADC,
     // RBB_MODE_EXT_ADC,  TODO
 };
 typedef enum lms7002m_rbb_mode lms7002m_rbb_mode_t;
@@ -293,6 +298,7 @@ enum lms7002m_tbb_mode {
     TBB_MODE_NORMAL,
     TBB_MODE_LOOPBACK,
     TBB_MODE_LOOPBACK_SWAPIQ,
+    TBB_MODE_LOOPBACK_DAC,
 };
 typedef enum lms7002m_tbb_mode lms7002m_tbb_mode_t;
 

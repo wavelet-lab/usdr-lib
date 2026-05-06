@@ -243,6 +243,8 @@ static int dev_m2_lm7_1_dev_atcrbs_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64
 
 static int dev_m2_lm7_1_dev_dac_vctcxo_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_phyrxlm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_checkrxtx_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_dumpcaldata_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static int dev_m2_lm7_1_phy_rx_dly_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_phy_rx_lfsr_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
@@ -270,6 +272,9 @@ static int dev_m2_lm7_1_lms8_switchover_set(pdevice_t ud, pusdr_vfs_obj_t obj, u
 static int dev_m2_lm7_1_lms8_switchover_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t *ovalue);
 
 static int dev_m2_lm7_1_sdr_vio_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_bb_loopback_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+
+static int dev_m2_lm7_1_dumprx_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
 static
 const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
@@ -278,6 +283,8 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
 
     { "/dm/debug/all",            { NULL, dev_m2_lm7_1_debug_all_get }},
     { "/dm/power/en",             { dev_m2_lm7_1_pwren_set, NULL }},
+
+    { "/dm/sdr/0/dumprx",         { dev_m2_lm7_1_dumprx_set, NULL }},
 
     { "/dm/sdr/channels",         { NULL, NULL }},
     { "/dm/sensor/temp",          { NULL, dev_m2_lm7_1_senstemp_get }},
@@ -292,6 +299,8 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/0/lnb",             { dev_m2_lm7_1_lnb_set, dev_m2_lm7_1_lnb_get }},
     { "/dm/sdr/0/lms8_intmode",    { dev_m2_lm7_1_lms8_intmode_set, dev_m2_lm7_1_lms8_intmode_get }},
     { "/dm/sdr/0/lms8_switchover", { dev_m2_lm7_1_lms8_switchover_set, dev_m2_lm7_1_lms8_switchover_get }},
+
+    { "/dm/sdr/0/bb/loopback",     { dev_m2_lm7_1_bb_loopback_set, NULL }},
 
     { "/dm/sdr/0/tx/phase_ovr", { dev_m2_lm7_1_sdr_tx_phase_ovr_set, NULL }},
     { "/dm/sdr/0/tx/phase_ovr_iq", { dev_m2_lm7_1_sdr_tx_phase_ovr_iq_set, NULL }},
@@ -376,6 +385,9 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/0/phy_tx_iqsel",     { dev_m2_lm7_1_phy_tx_iqsel_set, NULL }},
 
     { "/dm/sdr/0/phyrxlml",         { dev_m2_lm7_1_phyrxlm_set, NULL }},
+    { "/dm/sdr/0/checkrxtx",         { dev_m2_lm7_1_checkrxtx_set, NULL }},
+    { "/dm/sdr/0/dumpcaldata",       { dev_m2_lm7_1_dumpcaldata_set, NULL }},
+
     { "/debug/hw/lms7002m/0/rxlml", { dev_m2_lm7_1_lms7002rxlml_set, NULL }},
     { "/debug/clk_info",            { dev_m2_lm7_1_debug_clkinfo_set, NULL }},
 
@@ -579,6 +591,17 @@ int dev_m2_lm7_1_phyrxlm_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     return xsdr_phy_tune_rx(&((struct dev_m2_lm7_1_gps *)ud)->xdev, value);
 }
 
+int dev_m2_lm7_1_checkrxtx_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return xsdr_check_rxtx_quality(&((struct dev_m2_lm7_1_gps *)ud)->xdev, value);
+}
+
+int dev_m2_lm7_1_dumpcaldata_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    ((struct dev_m2_lm7_1_gps *)ud)->xdev.dump_cal_data = value;
+    return 0;
+}
+
 int dev_m2_lm7_1_phy_rx_dly_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     unsigned type = (value >> 8) & 0x1f;
@@ -604,6 +627,19 @@ int dev_m2_lm7_1_phy_tx_iqsel_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t va
     return xsdr_phy_tx_iqsel(&((struct dev_m2_lm7_1_gps *)ud)->xdev, value);
 }
 
+int dev_m2_lm7_1_bb_loopback_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    return xsdr_bb_loopback(&((struct dev_m2_lm7_1_gps *)ud)->xdev);
+}
+
+int dev_m2_lm7_1_dumprx_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    uint32_t cha[128];
+    uint32_t chb[128];
+
+    return xsdr_capture_rxiq(&d->xdev, cha, chb);
+}
 
 int dev_m2_lm7_1_phy_rx_lfsr_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
@@ -1588,6 +1624,9 @@ int usdr_device_m2_lm7_1_create_stream(device_t* dev, const char* sid, const cha
         *out_handle = d->tx;
 
         res = res ? res : xsdr_hwchans_cnt(&d->xdev, false, hwchs);
+        res = res ? res : lms7002m_mac_set(&d->xdev.base.lmsstate, LMS7_CH_AB);
+        res = res ? res : lms7002m_xxtsp_bst(&d->xdev.base.lmsstate, LMS_TXTSP);
+
         res = res ? res : lms7002m_dc_corr_en(&d->xdev.base.lmsstate, d->xdev.base.rx_run[0], d->xdev.base.rx_run[1], d->xdev.base.tx_run[0], d->xdev.base.tx_run[1]);
     }
 

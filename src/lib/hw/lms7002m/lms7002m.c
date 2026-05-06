@@ -485,6 +485,23 @@ int lms7002m_limelight_switch_rx_mode(lms7002m_state_t* m, lms7002m_limelight_co
     return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
 }
 
+int lms7002m_limelight_toggle_tsp_clk(lms7002m_state_t* m, lms7002m_limelight_conf_t params, uint8_t set)
+{
+    uint32_t regs[] = {
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, set, set, 1, 1, 1, params.txsisoddr && params.txdiv == 1 ? 0 : 1, 1, params.rxsisoddr && params.rxdiv == 1 ? 0 : 1, 1, 1),
+    };
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms7002m_limelight_upd_delay(lms7002m_state_t* m, lms7002m_limelight_conf_t params)
+{
+    uint32_t regs[] = {
+        MAKE_LMS7002M_CDS_0x00AE(params.txtspdelay, params.txtspdelay, 0, 0, params.txlmldelay, params.txlmldelay, 0, 0),
+    };
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
+
 int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t params)
 {
     unsigned txmclk = (params.txdiv <= 1) ? LML_0X002B_MCLK1SRC_TXTSPCLKA : LML_0X002B_MCLK1SRC_TXTSPCLKA_DIV;
@@ -538,7 +555,7 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
                                  (params.txdiv > 1) ? 1u : 0,
                                  (params.rxdiv > 1) ? 1u : 0),
         MAKE_LMS7002M_LML_0x002C( params.txdiv / 2u - 1u, params.rxdiv / 2u - 1u ),
-        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 1, params.txsisoddr && params.txdiv == 1 ? 0 : 1, 1, params.rxsisoddr && params.rxdiv == 1 ? 0 : 1, 1, 1),
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 1, 1, 1, 1, 1, params.txsisoddr && params.txdiv == 1 ? 0 : 1, 1, params.rxsisoddr && params.rxdiv == 1 ? 0 : 1, 1, 1),
         MAKE_LMS7002M_CDS_0x00AE(params.txtspdelay, params.txtspdelay, 0, 0, params.txlmldelay, params.txlmldelay, 0, 0),
         MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac),
         MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac)
@@ -957,6 +974,66 @@ int lms7002m_xxtsp_bst(lms7002m_state_t* m, lms7002m_xxtsp_t tsp)
         (tsp == LMS_RXTSP) ? reg_rxmod_s : reg_txmod_s,
     };
     return lms7002m_spi_post(m, xxtsp_regs, SIZEOF_ARRAY(xxtsp_regs));
+}
+
+int lms7002m_xxtsp_bst_isdone(lms7002m_state_t* m, lms7002m_xxtsp_t tsp, bool* done)
+{
+    int res = 0;
+    uint16_t data = 0;
+    if (tsp == LMS_RXTSP) {
+        uint32_t reg_rxmod = MAKE_LMS7002M_RXTSP_0x0400(0,
+                                                        RXTSP_0X0400_CAPSEL_BSIGI_BSTATE,    //CAPSEL
+                                                        RXTSP_0X0400_CAPSEL_ADC_RXTSP_INPUT, //CAPSEL_ADC
+                                                        RXTSP_0X0400_TSGFC_NEG6DB, //TSGFC,
+                                                        RXTSP_0X0400_TSGFCW_DIV8, //TSGFCW,
+                                                        0, //TSGDCLDQ
+                                                        0, //TSGDCLDI
+                                                        0, //TSGSWAPIQ,
+                                                        RXTSP_0X0400_TSGMODE_DC, //TSGMODE,
+                                                        RXTSP_0X0400_INSEL_LML, //INSEL,
+                                                        0, //BSTART,
+                                                        1);
+        uint32_t regs[] = {
+            reg_rxmod,
+            reg_rxmod | (1 << RXTSP_0X0400_CAPTURE_OFF),
+        };
+        res = res ? res : lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+    }
+
+    res = res ? res : lms7002m_spi_rd(m, (tsp == LMS_TXTSP) ? 0x0209 : 0x040E, &data);
+    *done = (data & 1) ? false : true;
+
+    return res;
+}
+
+int lms7002m_xxtsp_reset(lms7002m_state_t* m, lms7002m_xxtsp_t tsp)
+{
+    uint32_t reg_rxmod = MAKE_LMS7002M_RXTSP_0x0400(0,
+                                                    RXTSP_0X0400_CAPSEL_RSSI, //CAPSEL
+                                                    RXTSP_0X0400_CAPSEL_ADC_RXTSP_INPUT, //CAPSEL_ADC
+                                                    RXTSP_0X0400_TSGFC_NEG6DB, //TSGFC,
+                                                    RXTSP_0X0400_TSGFCW_DIV8, //TSGFCW,
+                                                    0, //TSGDCLDQ
+                                                    0, //TSGDCLDI
+                                                    0, //TSGSWAPIQ,
+                                                    RXTSP_0X0400_TSGMODE_DC, //TSGMODE,
+                                                    RXTSP_0X0400_INSEL_LML, //INSEL,
+                                                    0, //BSTART,
+                                                    0);
+    uint32_t reg_txmod = MAKE_LMS7002M_TXTSP_0x0200(TXTSP_0X0200_TSGFC_NEG6DB, //TSGFC,
+                                                    TXTSP_0X0200_TSGFCW_DIV8, //TSGFCW,
+                                                    0, //TSGDCLDQ
+                                                    0, //TSGDCLDI
+                                                    0, //TSGSWAPIQ,
+                                                    TXTSP_0X0200_TSGMODE_DC, //TSGMODE,
+                                                    TXTSP_0X0200_INSEL_LML, //INSEL,
+                                                    0, //BSTART,
+                                                    0);
+    uint32_t regs[] = {
+        (tsp == LMS_RXTSP) ? reg_rxmod : reg_txmod,
+        (tsp == LMS_RXTSP) ? reg_rxmod | 1 : reg_txmod | 1,
+    };
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
 }
 
 // xxTSP
@@ -1454,8 +1531,8 @@ int lms7002m_rbb_path(lms7002m_state_t* m, lms7002m_rbb_path_t path, lms7002m_rb
 
         MAKE_LMS7002M_RBB_0x0118(
             (path == RBB_LBF) ? RBB_0X0118_INPUT_CTL_PGA_RBB_LPFL :
-                (path == RBB_HBF) ? RBB_0X0118_INPUT_CTL_PGA_RBB_LPFH :
-                (mode == RBB_MODE_LOOPBACK && path == RBB_BYP) ? RBB_0X0118_INPUT_CTL_PGA_RBB_TBB : RBB_0X0118_INPUT_CTL_PGA_RBB_BYPASS,
+            (path == RBB_HBF) ? RBB_0X0118_INPUT_CTL_PGA_RBB_LPFH :
+            (mode == RBB_MODE_LOOPBACK && path == RBB_BYP) ? RBB_0X0118_INPUT_CTL_PGA_RBB_TBB : RBB_0X0118_INPUT_CTL_PGA_RBB_BYPASS,
             24,
             24),
     };
@@ -1537,11 +1614,14 @@ int lms7002m_tbb_path(lms7002m_state_t* m, lms7002m_tbb_path_t path, lms7002m_tb
     bool en = mode != TBB_MODE_DISABLE;
     _lms7002m_mask_field_set(m, m->reg_en_dir, SXX_0X0124_EN_DIR_TBB_OFF, SXX_0X0124_EN_DIR_TBB_MSK, en);
 
+    if (mode == TBB_MODE_LOOPBACK_DAC)
+        path = TBB_BYP;
+
     uint32_t tbb_regs[] = {
         MAKE_LMS7002M_TBB_0x0105(
             0, //STATPULSE_TBB,
             mode == TBB_MODE_LOOPBACK_SWAPIQ ? 1 : 0,
-            mode == TBB_MODE_NORMAL ? TBB_0X0105_LOOPB_NORMAL : TBB_0X0105_LOOPB_LB_TBB_OUT,
+            mode == TBB_MODE_NORMAL ? TBB_0X0105_LOOPB_NORMAL : mode == TBB_MODE_LOOPBACK_DAC ? TBB_0X0105_LOOPB_LB_DAC : TBB_0X0105_LOOPB_LB_TBB_OUT,
             (path == TBB_HBF) ? 0 : 1u, //PD_LPFH_TBB,
             0, //PD_LPFIAMP_TBB,
             (path == TBB_LAD) ? 0 : 1u, //PD_LPFLAD_TBB,

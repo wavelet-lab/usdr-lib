@@ -94,7 +94,7 @@ struct xsdr_dev
     bool xilinx_usp;
     bool has_duc_ddc;
     bool exttx;
-
+    bool dump_cal_data;
     bool dpump; //Dual pump data
     union {
         bool pmic_ch145_valid;
@@ -237,6 +237,8 @@ int xsdr_override_drp(xsdr_dev_t *d, lsopaddr_t ls_op_addr,
 
 int xsdr_config_rcvdly(xsdr_dev_t *d, unsigned type, unsigned val);
 
+int xsdr_bb_loopback(xsdr_dev_t *d);
+
 enum {
     XSDR_CAL_RXLO = 1,
     XSDR_CAL_TXLO = 2,
@@ -258,6 +260,8 @@ int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray)
 int xsdr_trspi_lms8(xsdr_dev_t *d, uint32_t out, uint32_t* in);
 
 int xsdr_reset_extfe(xsdr_dev_t *d);
+
+int xsdr_check_rxtx_quality(xsdr_dev_t *d, int fix);
 
 #ifndef NO_IGPO
 
@@ -309,6 +313,7 @@ enum {
 
 
 int xsdr_txphase_ovr(xsdr_dev_t *d, unsigned v);
+int xsdr_capture_rxiq(xsdr_dev_t* d, uint32_t *cha, uint32_t *chb);
 
 
 #endif
