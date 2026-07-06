@@ -404,8 +404,8 @@ int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** 
         }
 
         // Set no limit for RX USB transfers
-        res = res ? res : usb_uram_reg_out(dev, REG_WR_MBUS2_ADDR, 0x000000e0);
-        res = res ? res : usb_uram_reg_out(dev, REG_WR_MBUS2_DATA, 0xffffffff);
+        //res = res ? res : usb_uram_reg_out(dev, REG_WR_MBUS2_ADDR, 0x000000e0);
+        //res = res ? res : usb_uram_reg_out(dev, REG_WR_MBUS2_DATA, 0xffffffff);
     } else {
         USDR_LOG(USBG_LOG_TAG, USDR_LOG_WARNING, "Omit interrupt initialization on USB+PCIE mode\n");
     }
