@@ -237,7 +237,8 @@ static int pe_sync_power_on(pdevice_t udev)
 
     // Wait for all LDOs to settle
     res = res ? res : leds_fader(dev, 100000, 0, 0b10101010);
-    res = res ? res : leds_fader(dev, 1000000, 0b10101010, 0b01010101);
+    res = res ? res : leds_fader(dev, 500000, 0b10101010, 0b11111111);
+    res = res ? res : leds_fader(dev, 500000, 0b11111111, 0b01010101);
 
     return res;
 }
