@@ -2375,7 +2375,7 @@ int lmk05318_check_lock(lmk05318_state_t* d, unsigned* los_msk, bool silent)
     {
         char ss[255];
         lmk05318_decode_los_mask(losval, ss);
-        USDR_LOG("5318", USDR_LOG_ERROR, "LMK05318 LOS_MASK=[%s] %02x:%02x:%02x\n", ss, los[0], los[1], los[2]);
+        USDR_LOG("5318", USDR_LOG_INFO, "LMK05318 LOS_MASK=[%s] %02x:%02x:%02x\n", ss, los[0], los[1], los[2]);
     }
 
     *los_msk = losval;

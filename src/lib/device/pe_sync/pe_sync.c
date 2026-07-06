@@ -310,7 +310,7 @@ static int pe_sync_configure(pdevice_t udev)
 
     lmk05318_dpll_settings_t dpll;
     memset(&dpll, 0, sizeof(dpll));
-    dpll.enabled = true;
+    dpll.enabled = false; //true;
     dpll.en[LMK05318_PRIREF] = true;
     dpll.fref[LMK05318_PRIREF] = 1;
     dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
@@ -340,7 +340,7 @@ static int pe_sync_configure(pdevice_t udev)
     res = res ? res : lmk05318_port_request(&lmk_out[6], 6, lmk_freq[6], false, LVCMOS_P_N);
     res = res ? res : lmk05318_port_request(&lmk_out[7], 7, lmk_freq[7], false, LVCMOS_P_N);
 
-    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, 25000000, XO_CMOS, false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->gen, false /*dry_run*/);
+    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, 12800000, XO_CMOS, false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->gen, false /*dry_run*/);
     if(res)
         return res;
 
