@@ -1285,7 +1285,7 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
 
         for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
             if (d->d.rx_raw.lo[i].set) {
-                usdr_rfic_fe_set_freq(&d->d, FE_FREQ_LO_RX, 1 << i, d->d.rx_raw.lo[i].value, NULL);
+                usdr_rfic_fe_set_freq(&d->d, FE_FREQ_BB_RX, 1 << i, d->d.rx_raw.lo[i].value, NULL);
             }
         }
 
