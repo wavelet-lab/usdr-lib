@@ -1267,7 +1267,7 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
         }
 
         if (d->d.rx_lo == 0) {
-            res = usdr_rfic_fe_set_freq(&d->d, false, ~0U, 320e6, NULL);
+            res = usdr_rfic_fe_set_freq(&d->d, FE_FREQ_LO_RX, ~0U, 320e6, NULL);
             if (res) {
                 return res;
             }
@@ -1285,7 +1285,7 @@ int usdr_device_m2_lm6_1_create_stream(device_t* dev, const char* sid, const cha
 
         for (unsigned i = 0; i < MAX_NCO_STREAMS; i++) {
             if (d->d.rx_raw.lo[i].set) {
-                usdr_rfic_fe_set_freq(&d->d, false, 1 << i, d->d.rx_raw.lo[i].value, NULL);
+                usdr_rfic_fe_set_freq(&d->d, FE_FREQ_LO_RX, 1 << i, d->d.rx_raw.lo[i].value, NULL);
             }
         }
 
