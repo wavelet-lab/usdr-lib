@@ -55,6 +55,7 @@ int main(int argc, char** argv)
     bool crc_check = true;
     uint64_t master_offset = MASTER_IMAGE_OFF;
     uint64_t qspi_base = 10;
+    unsigned readback_size = 0;
 
     memset(outa, 0xff, SIZEOF_ARRAY(outa));
     memset(outb, 0xff, SIZEOF_ARRAY(outb));
@@ -62,8 +63,11 @@ int main(int argc, char** argv)
     usdrlog_setlevel(NULL, USDR_LOG_WARNING);
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCvkE")) != -1) {
+    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCvkES:")) != -1) {
         switch (opt) {
+        case 'S':
+            readback_size = atoi(optarg);
+            break;
         case 'U':
             busname = optarg;
             break;
@@ -199,6 +203,9 @@ int main(int argc, char** argv)
 
     uint32_t off = (golden) ? 0 : master_offset;
     unsigned total_length = SIZEOF_ARRAY(outa);
+    if (rdwr == ACTION_READBACK && readback_size) {
+        total_length = readback_size;
+    }
     if (rdwr == ACTION_WRITE || rdwr == ACTION_INFO) {
         FILE* w = fopen(filename, "rb");
         if (w == NULL) {
