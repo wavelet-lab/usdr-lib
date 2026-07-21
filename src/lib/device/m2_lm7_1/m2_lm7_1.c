@@ -473,7 +473,7 @@ struct dev_m2_lm7_1_gps {
 
 static int lms7002m_channel_info_string_parse(char* chanlist, unsigned max_chans, lms7002m_mac_mode_t* cinfo)
 {
-    lms7002m_mac_mode_t ch = LMS7_CH_NONE;
+    unsigned ch = LMS7_CH_NONE;
     const char* delim = ":_-/";
     char* saveptr;
     char* str1;
@@ -503,7 +503,7 @@ static int lms7002m_channel_info_string_parse(char* chanlist, unsigned max_chans
         ch |= 1 << chn;
     }
 
-    *cinfo = ch;
+    *cinfo = (lms7002m_mac_mode_t)(ch);
     return 0;
 }
 

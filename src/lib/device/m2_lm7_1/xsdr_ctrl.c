@@ -1248,7 +1248,7 @@ static int _xsdr_update_fe_dsp(xsdr_dev_t *d)
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0x2);
         usleep(10);
-        res = (res) ? res : fgearbox_load_fir_ex(dev, 0, IGPO_DSPCHAIN_RX_PRG << 24, d->base.rx_dsp_decim, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
+        res = (res) ? res : fgearbox_load_fir_ex(dev, 0, IGPO_DSPCHAIN_RX_PRG << 24, (fgearbox_firs_t)d->base.rx_dsp_decim, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_RX_RST, 0x0);
 
@@ -1267,7 +1267,7 @@ static int _xsdr_update_fe_dsp(xsdr_dev_t *d)
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x2);
         usleep(10);
-        res = (res) ? res : fgearbox_load_fir_i_ex(dev, 0, IGPO_DSPCHAIN_TX_PRG << 24, d->base.tx_dsp_inter, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
+        res = (res) ? res : fgearbox_load_fir_i_ex(dev, 0, IGPO_DSPCHAIN_TX_PRG << 24, (fgearbox_firs_t)d->base.tx_dsp_inter, d->ssdr_pro ? DSP_USSERIES : DSP_7SERIES, 1);
         usleep(10);
         dev_gpo_set(dev, IGPO_DSPCHAIN_TX_RST, 0x0);
 
