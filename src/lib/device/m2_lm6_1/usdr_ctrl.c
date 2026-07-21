@@ -886,8 +886,8 @@ int usdr_init(struct usdr_dev *d, int ext_clk, unsigned ext_fref)
     d->hw_board_hasmixer = false;
     d->hw_board_rev = (d->hwid >> 8) & 0xff;
 
-    d->has_rxchain = ((d->hwid >> 16) & 2) ? true : false;
-    d->has_txchain = ((d->hwid >> 16) & 1) ? true : false;
+    d->has_rxchain = ((d->hwid >> 24) & 2) ? true : false;
+    d->has_txchain = ((d->hwid >> 24) & 1) ? true : false;
 
     USDR_LOG("XDEV", USDR_LOG_WARNING, "HWID %08x USDR Board rev.%d Device `%s` FirmwareID %08x (%lld)\n",
              d->hwid, d->hw_board_rev, lowlevel_get_devname(dev), uaccess, (long long)get_xilinx_rev_h(uaccess));
