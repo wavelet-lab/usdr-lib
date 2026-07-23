@@ -141,6 +141,27 @@ static int check_global_api(SoapySDRDevice *sdr)
     print_ranges("Master clock ranges", ranges, length);
     free(ranges);
 
+    ranges = SoapySDRDevice_getReferenceClockRates(sdr, &length);
+    if (SoapySDRDevice_lastStatus() != 0) return fail("getReferenceClockRates");
+    print_ranges("Reference clock ranges", ranges, length);
+    free(ranges);
+
+    double ref_clock_rate = SoapySDRDevice_getReferenceClockRate(sdr);
+    if (SoapySDRDevice_lastStatus() != 0) return fail("getReferenceClockRate");
+    printf("Reference clock rate: %g\n", ref_clock_rate);
+    if (ref_clock_rate > 0.0) {
+        if (SoapySDRDevice_setReferenceClockRate(sdr, ref_clock_rate) != 0) return fail("setReferenceClockRate");
+        printf("Reference clock set/read: requested=%g actual=%g\n",
+               ref_clock_rate, SoapySDRDevice_getReferenceClockRate(sdr));
+        if (SoapySDRDevice_lastStatus() != 0) return fail("getReferenceClockRate after set");
+    } else {
+        printf("Reference clock set/read: SKIP current rate is unavailable\n");
+    }
+
+    void *native_handle = SoapySDRDevice_getNativeDeviceHandle(sdr);
+    if (SoapySDRDevice_lastStatus() != 0) return fail("getNativeDeviceHandle");
+    printf("Native device handle: %p\n", native_handle);
+
     strings = SoapySDRDevice_listTimeSources(sdr, &length);
     if (SoapySDRDevice_lastStatus() != 0) return fail("listTimeSources");
     print_strings("Time sources", strings, length);
@@ -205,6 +226,18 @@ static int check_channel(SoapySDRDevice *sdr, int direction, const char *label, 
     print_arg_infos("  Stream args", arg_infos, length);
     SoapySDRArgInfoList_clear(arg_infos, length);
 
+    printf("  Has IQ balance mode: %s\n", SoapySDRDevice_hasIQBalanceMode(sdr, direction, channel) ? "true" : "false");
+    if (SoapySDRDevice_lastStatus() != 0) return fail("hasIQBalanceMode");
+    if (SoapySDRDevice_setIQBalanceMode(sdr, direction, channel, false) != 0) return fail("setIQBalanceMode(false)");
+    printf("  IQ balance mode read: %s\n", SoapySDRDevice_getIQBalanceMode(sdr, direction, channel) ? "true" : "false");
+    if (SoapySDRDevice_lastStatus() != 0) return fail("getIQBalanceMode");
+
+    printf("  Has frequency correction: %s\n", SoapySDRDevice_hasFrequencyCorrection(sdr, direction, channel) ? "true" : "false");
+    if (SoapySDRDevice_lastStatus() != 0) return fail("hasFrequencyCorrection");
+    if (SoapySDRDevice_setFrequencyCorrection(sdr, direction, channel, 0.0) != 0) return fail("setFrequencyCorrection(0)");
+    printf("  Frequency correction read: %g\n", SoapySDRDevice_getFrequencyCorrection(sdr, direction, channel));
+    if (SoapySDRDevice_lastStatus() != 0) return fail("getFrequencyCorrection");
+
     strings = SoapySDRDevice_listFrequencies(sdr, direction, channel, &length);
     if (SoapySDRDevice_lastStatus() != 0) return fail("listFrequencies");
     print_strings("  Frequency components", strings, length);
@@ -254,10 +287,19 @@ static int check_channel(SoapySDRDevice *sdr, int direction, const char *label, 
         if (SoapySDRDevice_setBandwidth(sdr, direction, channel, bw) != 0) return fail("setBandwidth");
         printf("  Bandwidth set/read: requested=%g actual=%g\n", bw, SoapySDRDevice_getBandwidth(sdr, direction, channel));
     }
+    double *bandwidths = SoapySDRDevice_listBandwidths(sdr, direction, channel, &length);
+    if (SoapySDRDevice_lastStatus() != 0) return fail("listBandwidths");
+    printf("  Listed bandwidths: %zu entries\n", length);
+    free(bandwidths);
 
     strings = SoapySDRDevice_listGains(sdr, direction, channel, &length);
     if (SoapySDRDevice_lastStatus() != 0) return fail("listGains");
     print_strings("  Gains", strings, length);
+    printf("  Has gain mode: %s\n", SoapySDRDevice_hasGainMode(sdr, direction, channel) ? "true" : "false");
+    if (SoapySDRDevice_lastStatus() != 0) return fail("hasGainMode");
+    if (SoapySDRDevice_setGainMode(sdr, direction, channel, false) != 0) return fail("setGainMode(false)");
+    printf("  Gain mode read: %s\n", SoapySDRDevice_getGainMode(sdr, direction, channel) ? "true" : "false");
+    if (SoapySDRDevice_lastStatus() != 0) return fail("getGainMode");
     for (size_t i = 0; i < length; i++) {
         SoapySDRRange range = SoapySDRDevice_getGainElementRange(sdr, direction, channel, strings[i]);
         if (SoapySDRDevice_lastStatus() != 0) return fail("getGainElementRange");

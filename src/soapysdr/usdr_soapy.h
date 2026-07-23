@@ -3,6 +3,7 @@
 
 #include <SoapySDR/Device.hpp>
 #include <SoapySDR/Logger.hpp>
+#include <SoapySDR/Version.h>
 #include <mutex>
 #include <chrono>
 #include <map>
@@ -181,13 +182,17 @@ public:
 
     std::complex<double> getIQBalance(const int direction, const size_t channel) const;
 
-    // inherited default: bool hasIQBalanceMode(const int direction, const size_t channel) const;
-    // inherited default: void setIQBalanceMode(const int direction, const size_t channel, const bool automatic);
-    // inherited default: bool getIQBalanceMode(const int direction, const size_t channel) const;
+    bool hasIQBalanceMode(const int direction, const size_t channel) const;
 
-    // inherited default: bool hasFrequencyCorrection(const int direction, const size_t channel) const;
-    // inherited default: void setFrequencyCorrection(const int direction, const size_t channel, const double value);
-    // inherited default: double getFrequencyCorrection(const int direction, const size_t channel) const;
+    void setIQBalanceMode(const int direction, const size_t channel, const bool automatic);
+
+    bool getIQBalanceMode(const int direction, const size_t channel) const;
+
+    bool hasFrequencyCorrection(const int direction, const size_t channel) const;
+
+    void setFrequencyCorrection(const int direction, const size_t channel, const double value);
+
+    double getFrequencyCorrection(const int direction, const size_t channel) const;
 
     /*******************************************************************
      * Gain API
@@ -195,9 +200,11 @@ public:
 
     std::vector<std::string> listGains(const int direction, const size_t channel) const;
 
-    // inherited default: bool hasGainMode(const int direction, const size_t channel) const;
-    // inherited default: void setGainMode(const int direction, const size_t channel, const bool automatic);
-    // inherited default: bool getGainMode(const int direction, const size_t channel) const;
+    bool hasGainMode(const int direction, const size_t channel) const;
+
+    void setGainMode(const int direction, const size_t channel, const bool automatic);
+
+    bool getGainMode(const int direction, const size_t channel) const;
 
     void setGain(const int direction, const size_t channel, const double value);
 
@@ -255,7 +262,7 @@ public:
     double getBandwidth(const int direction, const size_t channel) const;
 
     // Deprecated by SoapySDR: use getBandwidthRange() as the authoritative API.
-    // inherited default: std::vector<double> listBandwidths(const int direction, const size_t channel) const;
+    std::vector<double> listBandwidths(const int direction, const size_t channel) const;
 
     SoapySDR::RangeList getBandwidthRange(const int direction, const size_t channel) const;
 
@@ -269,9 +276,11 @@ public:
 
     SoapySDR::RangeList getMasterClockRates(void) const;
 
-    // inherited default: void setReferenceClockRate(const double rate);
-    // inherited default: double getReferenceClockRate(void) const;
-    // inherited default: SoapySDR::RangeList getReferenceClockRates(void) const;
+    void setReferenceClockRate(const double rate);
+
+    double getReferenceClockRate(void) const;
+
+    SoapySDR::RangeList getReferenceClockRates(void) const;
 
     std::vector<std::string> listClockSources(void) const;
 
@@ -340,7 +349,11 @@ public:
 
     SoapySDR::ArgInfoList getSettingInfo(void) const;
 
+#ifdef SOAPY_SDR_API_HAS_GET_SPECIFIC_SETTING_INFO
+    SoapySDR::ArgInfo getSettingInfo(const std::string &key) const;
+#else
     // inherited default in SoapySDR 0.8.2+: SoapySDR::ArgInfo getSettingInfo(const std::string &key) const;
+#endif
 
     void writeSetting(const std::string &key, const std::string &value);
 
@@ -352,7 +365,11 @@ public:
 
     SoapySDR::ArgInfoList getSettingInfo(const int direction, const size_t channel) const;
 
+#ifdef SOAPY_SDR_API_HAS_GET_SPECIFIC_SETTING_INFO
+    SoapySDR::ArgInfo getSettingInfo(const int direction, const size_t channel, const std::string &key) const;
+#else
     // inherited default in SoapySDR 0.8.2+: SoapySDR::ArgInfo getSettingInfo(const int direction, const size_t channel, const std::string &key) const;
+#endif
 
     void writeSetting(const int direction, const size_t channel, const std::string &key, const std::string &value);
 
@@ -400,7 +417,7 @@ public:
      * Native device API
      ******************************************************************/
 
-    // inherited default: void* getNativeDeviceHandle(void) const;
+    void* getNativeDeviceHandle(void) const;
 protected:
     void setUParam(const int direction, const char* param, const char* sub, unsigned pval);
     SoapySDRLogLevel callLogLvl() const { return _dump_calls ? SOAPY_SDR_ERROR : SOAPY_SDR_INFO; }
@@ -477,4 +494,5 @@ private:
     int64_t calc_ts = -1LL;
 
     std::string _clk_source = "internal";
+    double _ref_clock_rate = 0.0;
 };

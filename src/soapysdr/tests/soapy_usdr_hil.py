@@ -91,6 +91,8 @@ class Runner:
             result = fn()
             self.report["checks"].append({"name": name, "status": "PASS"})
             print(f"PASS {name}")
+            if self.verbose:
+                print(f"  {json.dumps(result, sort_keys=True)}")
             return result
         except SkipCheck as exc:
             self.skip(name, str(exc))
@@ -200,6 +202,22 @@ def check_control_plane(runner: Runner, dev: Any, args: argparse.Namespace) -> N
                 f"{prefix} getStreamArgsInfo",
                 lambda d=direction, c=channel: arg_info_list(dev.getStreamArgsInfo(d, c)),
             )
+            item["has_iq_balance_mode"] = runner.check(
+                f"{prefix} hasIQBalanceMode",
+                lambda d=direction, c=channel: bool(dev.hasIQBalanceMode(d, c)),
+            )
+            runner.check(
+                f"{prefix} set/getIQBalanceMode(false)",
+                lambda d=direction, c=channel: iq_balance_mode_roundtrip(dev, d, c, False),
+            )
+            item["has_frequency_correction"] = runner.check(
+                f"{prefix} hasFrequencyCorrection",
+                lambda d=direction, c=channel: bool(dev.hasFrequencyCorrection(d, c)),
+            )
+            runner.check(
+                f"{prefix} set/getFrequencyCorrection(0)",
+                lambda d=direction, c=channel: frequency_correction_roundtrip(dev, d, c, 0.0),
+            )
 
             item["freq_names"] = runner.check(
                 f"{prefix} listFrequencies",
@@ -252,10 +270,22 @@ def check_control_plane(runner: Runner, dev: Any, args: argparse.Namespace) -> N
                     f"{prefix} set/getBandwidth",
                     lambda d=direction, c=channel, bw=target_bw: bandwidth_roundtrip(dev, d, c, bw),
                 )
+            runner.check(
+                f"{prefix} listBandwidths",
+                lambda d=direction, c=channel: finite_list(dev.listBandwidths(d, c)),
+            )
 
             item["gains"] = runner.check(
                 f"{prefix} listGains",
                 lambda d=direction, c=channel: call_list(dev, "listGains", d, c),
+            )
+            item["has_gain_mode"] = runner.check(
+                f"{prefix} hasGainMode",
+                lambda d=direction, c=channel: bool(dev.hasGainMode(d, c)),
+            )
+            runner.check(
+                f"{prefix} set/getGainMode(false)",
+                lambda d=direction, c=channel: gain_mode_roundtrip(dev, d, c, False),
             )
             for gain_name in item["gains"] or []:
                 gain_range = runner.check(
@@ -392,10 +422,36 @@ def gain_roundtrip(dev: Any, direction: int, channel: int, name: str, gain: floa
     return {"requested": gain, "actual": actual}
 
 
+def gain_mode_roundtrip(dev: Any, direction: int, channel: int, automatic: bool) -> Dict[str, bool]:
+    dev.setGainMode(direction, channel, automatic)
+    actual = bool(dev.getGainMode(direction, channel))
+    if actual != automatic:
+        raise AssertionError(f"gain mode readback mismatch: requested={automatic} actual={actual}")
+    return {"requested": automatic, "actual": actual}
+
+
+def iq_balance_mode_roundtrip(dev: Any, direction: int, channel: int, automatic: bool) -> Dict[str, bool]:
+    dev.setIQBalanceMode(direction, channel, automatic)
+    actual = bool(dev.getIQBalanceMode(direction, channel))
+    if actual != automatic:
+        raise AssertionError(f"IQ balance mode readback mismatch: requested={automatic} actual={actual}")
+    return {"requested": automatic, "actual": actual}
+
+
+def frequency_correction_roundtrip(dev: Any, direction: int, channel: int, value: float) -> Dict[str, float]:
+    dev.setFrequencyCorrection(direction, channel, value)
+    actual = finite_float(dev.getFrequencyCorrection(direction, channel))
+    if actual != value:
+        raise AssertionError(f"frequency correction readback mismatch: requested={value} actual={actual}")
+    return {"requested": value, "actual": actual}
+
+
 def sensor_read(dev: Any, direction: int, channel: int, sensor: str) -> Dict[str, str]:
     info = dev.getSensorInfo(direction, channel, sensor)
     value = dev.readSensor(direction, channel, sensor)
-    return {"key": getattr(info, "key", sensor), "value": str(value)}
+    result = {"key": getattr(info, "key", sensor), "name": getattr(info, "name", ""), "value": str(value)}
+    print(f"  Sensor {result['key']} {result['name']} value={result['value']}")
+    return result
 
 
 def check_global_functions(runner: Runner, dev: Any) -> None:
@@ -408,6 +464,17 @@ def check_global_functions(runner: Runner, dev: Any) -> None:
         "getMasterClockRates",
         lambda: ranges_to_json(dev.getMasterClockRates()),
     )
+    global_info["reference_clock_rates"] = runner.check(
+        "getReferenceClockRates",
+        lambda: ranges_to_json(dev.getReferenceClockRates()),
+    )
+    reference_clock_rate = runner.check("getReferenceClockRate", lambda: finite_float(dev.getReferenceClockRate()))
+    if reference_clock_rate and reference_clock_rate > 0:
+        runner.check("set/getReferenceClockRate current", lambda r=reference_clock_rate: reference_clock_roundtrip(dev, r))
+    else:
+        runner.skip("set/getReferenceClockRate current", "current reference clock rate is unavailable")
+    if has_method(dev, "getNativeDeviceHandle"):
+        runner.check("getNativeDeviceHandle", lambda: str(dev.getNativeDeviceHandle()))
     global_info["time_sources"] = runner.check("listTimeSources", lambda: call_list(dev, "listTimeSources"))
     runner.check("hasHardwareTime", lambda: bool(dev.hasHardwareTime()))
     runner.check("getHardwareTime", lambda: int(dev.getHardwareTime()))
@@ -422,10 +489,18 @@ def clock_source_roundtrip(dev: Any, source: str) -> str:
     return str(dev.getClockSource())
 
 
+def reference_clock_roundtrip(dev: Any, rate: float) -> Dict[str, float]:
+    dev.setReferenceClockRate(rate)
+    actual = finite_float(dev.getReferenceClockRate())
+    return {"requested": rate, "actual": actual}
+
+
 def global_sensor_read(dev: Any, sensor: str) -> Dict[str, str]:
     info = dev.getSensorInfo(sensor)
     value = dev.readSensor(sensor)
-    return {"key": getattr(info, "key", sensor), "value": str(value)}
+    result = {"key": getattr(info, "key", sensor), "name": getattr(info, "name", ""), "value": str(value)}
+    print(f"Sensor {result['key']} {result['name']} value={result['value']}")
+    return result
 
 
 def check_rx_stream(runner: Runner, dev: Any, args: argparse.Namespace) -> None:
