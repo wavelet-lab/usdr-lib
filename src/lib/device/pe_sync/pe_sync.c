@@ -165,37 +165,46 @@ int dev_pe_sync_rate_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
     return -EINVAL;
 }
 
-static void usdr_device_pe_sync_destroy(pdevice_t udev)
-{
-    struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
-    lldev_t dev = d->base.dev;
-
-    dev_gpo_set(dev, IGPO_DISTRIB_CTRL, 0);
-    dev_gpo_set(dev, IGPO_SY0_CTRL, 0);
-    dev_gpo_set(dev, IGPO_SY1_CTRL, 0);
-
-    usdr_device_base_destroy(udev);
-    USDR_LOG("SYNC", USDR_LOG_WARNING, "PESync destroyed");
-}
-
 static int i2c_reg_rd8(lldev_t dev, unsigned lsaddr, uint8_t reg, uint8_t* val)
 {
     uint8_t addr[1] = { reg };
     return lowlevel_ls_op(dev, 0, USDR_LSOP_I2C_DEV, lsaddr, 1, val, 1, addr);
 }
 
-static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const char** devparam, const char** devval)
+static int leds_fader(lldev_t dev, unsigned delay_us, uint8_t from_mask, uint8_t to_mask)
+{
+    // gpo_led_ctrl[0] -- LEDG[0]
+    // gpo_led_ctrl[1] -- LEDR[0]
+    // gpo_led_ctrl[2] -- LEDG[1]
+    // gpo_led_ctrl[3] -- LEDR[1]
+    // gpo_led_ctrl[4] -- LEDG[2]
+    // gpo_led_ctrl[5] -- LEDR[2]
+    // gpo_led_ctrl[6] -- LEDG[3]
+    // gpo_led_ctrl[7] -- LEDR[3]
+    {
+        const unsigned iter_count = 100;
+        const unsigned full_len = delay_us / iter_count;
+
+        float brightness = 0.0f;
+        float bstep = 1.0f / iter_count;
+
+        for(unsigned i = 0; i < iter_count; ++i, brightness += bstep) {
+            const unsigned eff_len = (unsigned)(brightness * full_len);
+
+            dev_gpo_set(dev, IGPO_LED_CTRL, to_mask);
+            usleep(eff_len);
+            dev_gpo_set(dev, IGPO_LED_CTRL, from_mask);
+            usleep(full_len - eff_len);
+        }
+    }
+    return dev_gpo_set(dev, IGPO_LED_CTRL, to_mask);
+}
+
+static int pe_sync_power_on(pdevice_t udev)
 {
     struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
     lldev_t dev = d->base.dev;
     int res = 0;
-    uint32_t v = 0, s0 = 0, s1 = 0, s2 = 0, s3 = 0;
-    uint8_t r = 0, r4 = 0, r5 = 0;
-
-    if (getenv("USDR_BARE_DEV")) {
-        USDR_LOG("SYNC", USDR_LOG_WARNING, "USDR_BARE_DEV is set, skipping initialization!\n");
-        return 0;
-    }
 
     // gpo_in_ctrl[0] --  0 - Disable input 1PPS / 10Mhz buffer and REF ADC for 1PPS
     // gpo_in_ctrl[1] --  0 - external SMA, 1 - feedback from LCK_FB
@@ -214,9 +223,9 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     // gpo_gen_ctrl[2] -- En LDO for OCXO and OCXO DAC
     // gpo_gen_ctrl[3] -- En distribution buffer REFCLK
     // gpo_gen_ctrl[4] -- En distribution buffer 1PPS
-    // gpo_gen_ctrl[5] -- clk_gpio[0]
-    // gpo_gen_ctrl[6] -- clk_gpio[1]
-    // gpo_gen_ctrl[7] -- clk_gpio[2]
+    // gpo_gen_ctrl[5] -- clk_gpio[0] LMK05318B GPIO/SYNCN
+    // gpo_gen_ctrl[6] -- clk_gpio[1] LMK05318B GPIO1/SCS
+    // gpo_gen_ctrl[7] -- clk_gpio[2] LMK05318B GPIO2/SDO/FINC
     res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL, (1 << 0) | (1 << 1) | (1 << 2) | (1 << 5) | (1 << 3) | (1 << 4));
 
     // gpo_distrib_ctrl[0]   -- En global LDO for all distribution logic
@@ -227,17 +236,39 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : dev_gpo_set(dev, IGPO_DISTRIB_CTRL, (1 << 0) | (15 << 1));
 
     // Wait for all LDOs to settle
-    usleep(200000);
+    res = res ? res : leds_fader(dev, 100000, 0, 0b10101010);
+    res = res ? res : leds_fader(dev, 500000, 0b10101010, 0b11111111);
+    res = res ? res : leds_fader(dev, 500000, 0b11111111, 0b01010101);
 
-    // gpo_led_ctrl[0] -- LEDG[0]
-    // gpo_led_ctrl[1] -- LEDR[0]
-    // gpo_led_ctrl[2] -- LEDG[1]
-    // gpo_led_ctrl[3] -- LEDR[1]
-    // gpo_led_ctrl[4] -- LEDG[2]
-    // gpo_led_ctrl[5] -- LEDR[2]
-    // gpo_led_ctrl[6] -- LEDG[3]
-    // gpo_led_ctrl[7] -- LEDR[3]
-    res = res ? res : dev_gpo_set(dev, IGPO_LED_CTRL, 0xff);
+    return res;
+}
+
+static int pe_sync_power_off(pdevice_t udev)
+{
+    struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
+    lldev_t dev = d->base.dev;
+    int res = 0;
+
+    res = res ? res : dev_gpo_set(dev, IGPO_LED_CTRL,     0);
+    res = res ? res : dev_gpo_set(dev, IGPO_DISTRIB_CTRL, 0);
+    res = res ? res : dev_gpo_set(dev, IGPO_GEN_CTRL,     0);
+    res = res ? res : dev_gpo_set(dev, IGPO_SY0_CTRL,     0);
+    res = res ? res : dev_gpo_set(dev, IGPO_SY1_CTRL,     0);
+    res = res ? res : dev_gpo_set(dev, IGPO_IN_CTRL,      0);
+
+    res = res ? res : leds_fader(dev, 1000000, 0b01010101, 0);
+
+    return res;
+}
+
+static int pe_sync_check_status(pdevice_t udev)
+{
+    struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
+    lldev_t dev = d->base.dev;
+    int res = 0;
+
+    uint32_t v = 0, s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+    uint8_t r = 0, r4 = 0, r5 = 0;
 
     res = res ? res : dev_gpi_get32(dev, IGPI_STAT, &v);
     res = res ? res : i2c_reg_rd8(dev, I2C_BUS_LP87524, 0x01, &r);
@@ -257,6 +288,15 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     USDR_LOG("SYNC", USDR_LOG_WARNING, "STAT=%08x LP87524_OTP=%02x LMS2820[0/1]=%04x/%04x LMX1204/LMX1214=%04x/%04x LMK1D1208I_LCK/LRF=%02x/%02x\n",
              v, r, s0, s1, s2, s3, r4, r5);
 
+    return res;
+}
+
+static int pe_sync_configure(pdevice_t udev)
+{
+    struct dev_pe_sync *d = (struct dev_pe_sync *)udev;
+    lldev_t dev = d->base.dev;
+    int res = 0;
+
     // Initialize LMK05318B
     // XO: 25Mhz
     //
@@ -269,12 +309,9 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     // OUT6: Dual CMOS   10.000 Mhz
     // OUT7: Dual CMOS        1 Hz
 
-    if(res)
-        return res;
-
     lmk05318_dpll_settings_t dpll;
     memset(&dpll, 0, sizeof(dpll));
-    dpll.enabled = true;
+    dpll.enabled = false; //true;
     dpll.en[LMK05318_PRIREF] = true;
     dpll.fref[LMK05318_PRIREF] = 1;
     dpll.type[LMK05318_PRIREF] = DPLL_REF_TYPE_DIFF_NOTERM;
@@ -304,7 +341,7 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     res = res ? res : lmk05318_port_request(&lmk_out[6], 6, lmk_freq[6], false, LVCMOS_P_N);
     res = res ? res : lmk05318_port_request(&lmk_out[7], 7, lmk_freq[7], false, LVCMOS_P_N);
 
-    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, 25000000, XO_CMOS, false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->gen, false /*dry_run*/);
+    res = res ? res : lmk05318_create(dev, 0, I2C_BUS_LMK05318B, 12800000, XO_CMOS, false, &dpll, lmk_out, SIZEOF_ARRAY(lmk_out), &d->gen, false /*dry_run*/);
     if(res)
         return res;
 
@@ -572,6 +609,33 @@ static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const
     //
 
     return res;
+}
+
+static int usdr_device_pe_sync_initialize(pdevice_t udev, unsigned pcount, const char** devparam, const char** devval)
+{
+    if (getenv("USDR_BARE_DEV")) {
+        USDR_LOG("SYNC", USDR_LOG_WARNING, "USDR_BARE_DEV is set, skipping initialization!\n");
+        return 0;
+    }
+
+    int res = pe_sync_power_on(udev);
+    {
+        res = res ? res : pe_sync_check_status(udev);
+        res = res ? res : pe_sync_configure(udev);
+    }
+    //we should switch power off in the event of an initialization error
+    if(res)
+        pe_sync_power_off(udev);
+
+    return res;
+}
+
+static void usdr_device_pe_sync_destroy(pdevice_t udev)
+{
+    pe_sync_power_off(udev);
+
+    usdr_device_base_destroy(udev);
+    USDR_LOG("SYNC", USDR_LOG_WARNING, "PESync destroyed");
 }
 
 static int usdr_device_pe_sync_create_stream(device_t* dev, const char* sid, const char* dformat,
