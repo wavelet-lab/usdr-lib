@@ -16,6 +16,9 @@ extern "C" {
 #include "../common/ring_circbuf.h"
 }
 
+SoapySDR::Kwargs usdrSoapyDeviceArgs(const SoapySDR::Kwargs &args);
+std::string usdrSoapyDeviceString(const SoapySDR::Kwargs &args);
+bool usdrSoapyIsDeviceArg(const std::string &key);
 
 #include <stdio.h>
 

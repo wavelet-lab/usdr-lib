@@ -20,6 +20,43 @@
 
 std::map<std::string, std::weak_ptr<usdr_handle>> usdr_handle::s_created;
 
+static const std::set<std::string> USDR_SOAPY_DEVICE_ARGS = {
+    "bus",
+    "device",
+    "fe",
+    "extclk",
+    "extref",
+};
+
+static void usdr_soapy_apply_device_arg(const SoapySDR::Kwargs &args, SoapySDR::Kwargs &dev_args, const char *key)
+{
+    if (args.count(key)) {
+        dev_args[key] = args.at(key);
+    }
+}
+
+SoapySDR::Kwargs usdrSoapyDeviceArgs(const SoapySDR::Kwargs &args)
+{
+    SoapySDR::Kwargs dev_args = SoapySDR::KwargsFromString((args.count("dev")) ? args.at("dev") : "");
+
+    for (const auto &key : USDR_SOAPY_DEVICE_ARGS) {
+        usdr_soapy_apply_device_arg(args, dev_args, key.c_str());
+    }
+
+    return dev_args;
+}
+
+std::string usdrSoapyDeviceString(const SoapySDR::Kwargs &args)
+{
+    return SoapySDR::KwargsToString(usdrSoapyDeviceArgs(args));
+}
+
+bool usdrSoapyIsDeviceArg(const std::string &key)
+{
+    // "dev" is a packed Soapy device string, not a lower-level device parameter.
+    return key == "dev" || USDR_SOAPY_DEVICE_ARGS.count(key) != 0;
+}
+
 std::shared_ptr<usdr_handle> usdr_handle::get(const std::string& name)
 {
     auto idx = s_created.find(name);
@@ -324,38 +361,7 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
         loglevel = std::stoi(args.at("loglevel"));
     }
 
-    SoapySDR::Kwargs dev_args = SoapySDR::
-        KwargsFromString((args.count("dev")) ? args.at("dev") : "");
-
-    if (args.count("bus")) {
-        dev_args["bus"] = args.at("bus");
-    }
-
-    if (args.count("device")) {
-        dev_args["device"] = args.at("device");
-    }
-
-    if (args.count("fe")) {
-        dev_args["fe"] = args.at("fe");
-    }
-
-    if (args.count("extclk")) {
-        dev_args["extclk"] = args.at("extclk");
-    }
-
-    if (args.count("extref")) {
-        dev_args["extref"] = args.at("extref");
-    }
-
-    bool first = true;
-    std::string dev = "";
-    for (const auto &dev_arg : dev_args) {
-        if (first)
-            first = false;
-        else
-            dev += ",";
-        dev += dev_arg.first + "=" + dev_arg.second;
-    }
+    const std::string dev = usdrSoapyDeviceString(args);
 
     if (args.count("txcorr")) {
         _txcorr = atoi(args.at("txcorr").c_str());
