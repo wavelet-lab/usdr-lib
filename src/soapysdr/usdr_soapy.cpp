@@ -2022,13 +2022,39 @@ int SoapyUSDR::writeStream(SoapySDR::Stream *stream,
         avg_gap = (1 - alpha) * avg_gap + alpha * lag;
     }
 
-    SoapySDR::logf(SOAPY_SDR_DEBUG, "writeStream::writeStream(%s) @ %lld num %d should be %d\n", ustr->stream, ts, numElems, ustr->nfo.pktsyms);
+    SoapySDR::logf(SOAPY_SDR_DEBUG, "writeStream::writeStream(%s) @ %lld num %d mtu %d\n",
+                   ustr->stream, ts, (unsigned)numElems, ustr->nfo.pktsyms);
 
-    unsigned toSend = numElems;
+    const size_t mtu = ustr->nfo.pktsyms;
+    if (mtu == 0 || ustr->nfo.pktbszie == 0 || _tx_log_chans == 0 ||
+        (ustr->nfo.pktbszie % ustr->nfo.pktsyms) != 0) {
+        return SOAPY_SDR_STREAM_ERROR;
+    }
+
+    const size_t bytes_per_sample = ustr->nfo.pktbszie / ustr->nfo.pktsyms;
+    std::vector<const void*> chunk_buffs(_tx_log_chans);
+    size_t sent = 0;
+    int res = 0;
+    while (sent < numElems) {
+        const size_t chunk_elems = std::min(mtu, numElems - sent);
+        const size_t offset = sent * bytes_per_sample;
+        for (unsigned i = 0; i < _tx_log_chans; i++) {
+            chunk_buffs[i] = static_cast<const char*>(buffs[i]) + offset;
+        }
+
+        const dm_time_t chunk_ts = (ts >= 0) ? (dm_time_t)(ts + sent) : (dm_time_t)-1;
     // TODO: decide how to handle alignment requirements for user-provided stream buffers.
-    int res = usdr_dms_send(ustr->strm, (const void **) buffs, numElems, ts, timeoutUs / 1000);
+        res = usdr_dms_send(ustr->strm, chunk_buffs.data(), (unsigned)chunk_elems,
+                            chunk_ts, timeoutUs / 1000);
+        if (res) {
+            break;
+        }
+
+        sent += chunk_elems;
+    }
+
     if (this->calc_ts >= 0)
-        this->calc_ts += numElems;
+        this->calc_ts += sent;
 
     if (tx_pkts % 1000 == 0) {
         SoapySDR::logf(_dump_calls ? SOAPY_SDR_ERROR : SOAPY_SDR_TRACE,
@@ -2036,7 +2062,7 @@ int SoapyUSDR::writeStream(SoapySDR::Stream *stream,
     }
 
     tx_pkts++;
-    return (res) ? SOAPY_SDR_TIMEOUT : toSend;
+    return (res && sent == 0) ? SOAPY_SDR_TIMEOUT : (int)sent;
 }
 
 int SoapyUSDR::readStreamStatus(
