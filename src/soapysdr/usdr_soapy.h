@@ -11,10 +11,8 @@
 #include <memory>
 #include <atomic>
 
+#include "rx_packet_buffer.h"
 #include "../lib/models/dm_all.h"
-extern "C" {
-#include "../common/ring_circbuf.h"
-}
 
 SoapySDR::Kwargs usdrSoapyDeviceArgs(const SoapySDR::Kwargs &args);
 std::string usdrSoapyDeviceString(const SoapySDR::Kwargs &args);
@@ -440,7 +438,7 @@ private:
         bool setup = false;
         std::atomic<bool> active;
 
-        std::vector<ring_circbuf_t*> rxcbuf;
+        std::unique_ptr<RxPacketBuffer> rxbuf;
     };
 
     uint64_t max_sw_chans(const int direction) const;

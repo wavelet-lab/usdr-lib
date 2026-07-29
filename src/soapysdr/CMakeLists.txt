@@ -17,7 +17,7 @@ SOAPY_SDR_MODULE_UTIL(
     DESTINATION
         ${CMAKE_INSTALL_LIBDIR}/SoapySDR/modules${SOAPY_SDR_ABI_VERSION}/
     SOURCES
-        usdr_soapy.cpp usdr_soapy_reg.cpp
+        usdr_soapy.cpp usdr_soapy_reg.cpp rx_packet_buffer.cpp
     LIBRARIES
         usdr
 )
@@ -25,6 +25,16 @@ SOAPY_SDR_MODULE_UTIL(
 if(ENABLE_TESTS)
     add_executable(test_usdr_soapy tests/test_usdr_soapy.c)
     target_link_libraries(test_usdr_soapy ${SoapySDR_LIBRARIES})
+    set_target_properties(test_usdr_soapy PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tests
+    )
+
+    add_executable(test_rx_packet_buffer tests/test_rx_packet_buffer.cpp rx_packet_buffer.cpp)
+    target_link_libraries(test_rx_packet_buffer usdr)
+    set_target_properties(test_rx_packet_buffer PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tests
+    )
+    add_test(NAME rx_packet_buffer COMMAND $<TARGET_FILE:test_rx_packet_buffer>)
 endif(ENABLE_TESTS)
 
 option(ENABLE_SOAPY_HIL_TESTS "Enable SoapySDR hardware-in-the-loop tests" OFF)
