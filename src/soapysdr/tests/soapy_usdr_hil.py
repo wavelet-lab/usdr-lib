@@ -533,6 +533,27 @@ def check_rx_stream(runner: Runner, dev: Any, args: argparse.Namespace) -> None:
     frequency = pick_in_range(freq_ranges, args.frequency)
     bandwidth = pick_in_range(bw_ranges, args.bandwidth) if bw_ranges else 0.0
 
+    def parse_sample_sizes(value: str) -> List[int]:
+        sizes: List[int] = []
+        for item in value.split(","):
+            item = item.strip()
+            if not item:
+                continue
+            size = int(item)
+            if size <= 0:
+                raise ValueError(f"stream read size should be positive: {size}")
+            sizes.append(size)
+        return sizes
+
+    def check_next_timestamp(prev: Dict[str, Any], item: Dict[str, Any]) -> None:
+        if prev["timeNs"] == 0 or item["timeNs"] == 0:
+            return
+        delta_samples = round((item["timeNs"] - prev["timeNs"]) * sample_rate / 1e9)
+        if abs(delta_samples - prev["ret"]) > 1:
+            raise AssertionError(
+                f"timestamp step mismatch: expected {prev['ret']} samples, got {delta_samples}"
+            )
+
     def run_stream() -> Dict[str, Any]:
         dev.setSampleRate(SOAPY_SDR_RX, channel, sample_rate)
         dev.setFrequency(SOAPY_SDR_RX, channel, frequency)
@@ -542,6 +563,9 @@ def check_rx_stream(runner: Runner, dev: Any, args: argparse.Namespace) -> None:
         stream_args = {"bufferLength": str(args.rx_samples), "linkFormat": args.link_format}
         stream = dev.setupStream(SOAPY_SDR_RX, "CF32", [channel], stream_args)
         reads: List[Dict[str, Any]] = []
+        variable_reads: List[Dict[str, Any]] = []
+        variable_sizes = parse_sample_sizes(args.rx_variable_sizes)
+        max_read_size = max([args.rx_samples] + variable_sizes)
         try:
             mtu = int(dev.getStreamMTU(stream))
             inactive = dev.readStream(stream, [np.empty(args.rx_samples, np.complex64)], args.rx_samples, timeoutUs=10000)
@@ -560,12 +584,78 @@ def check_rx_stream(runner: Runner, dev: Any, args: argparse.Namespace) -> None:
                         "mean_abs": float(np.mean(np.abs(buff[:ret]))),
                     }
                 )
+            prev_read: Optional[Dict[str, Any]] = reads[-1] if reads else None
+            for requested in variable_sizes:
+                buff = np.empty(max_read_size, np.complex64)
+                result = dev.readStream(stream, [buff], requested, timeoutUs=args.timeout_ms * 1000)
+                ret = int(getattr(result, "ret", result))
+                if ret != requested:
+                    raise AssertionError(f"readStream requested {requested}, returned {ret}")
+                item = {
+                    "requested": requested,
+                    "ret": ret,
+                    "flags": int(getattr(result, "flags", 0)),
+                    "timeNs": int(getattr(result, "timeNs", 0)),
+                    "mean_abs": float(np.mean(np.abs(buff[:ret]))),
+                }
+                if prev_read is not None:
+                    check_next_timestamp(prev_read, item)
+                variable_reads.append(item)
+                prev_read = item
             dev.deactivateStream(stream)
-            return {"channel": channel, "mtu": mtu, "inactive_read_ret": int(getattr(inactive, "ret", inactive)), "reads": reads}
+            return {
+                "channel": channel,
+                "mtu": mtu,
+                "inactive_read_ret": int(getattr(inactive, "ret", inactive)),
+                "reads": reads,
+                "variable_reads": variable_reads,
+            }
         finally:
             dev.closeStream(stream)
 
     runner.report["rx_stream"] = runner.check("RX setup/activate/read/deactivate/close stream", run_stream)
+
+
+def check_tx_stream(runner: Runner, dev: Any, args: argparse.Namespace) -> None:
+    tx_channels = int(dev.getNumChannels(SOAPY_SDR_TX))
+    if tx_channels <= 0:
+        runner.skip("TX stream", "device has no TX channels")
+        return
+
+    try:
+        import numpy as np
+    except Exception as exc:
+        runner.skip("TX stream", f"numpy is not available: {exc}")
+        return
+
+    channel = min(args.tx_channel, tx_channels - 1)
+    sample_rate = pick_in_range(dev.getSampleRateRange(SOAPY_SDR_TX, channel), args.sample_rate)
+    frequency = pick_in_range(dev.getFrequencyRange(SOAPY_SDR_TX, channel), args.frequency)
+
+    def run_stream() -> Dict[str, Any]:
+        dev.setSampleRate(SOAPY_SDR_TX, channel, sample_rate)
+        dev.setFrequency(SOAPY_SDR_TX, channel, frequency)
+        stream = dev.setupStream(SOAPY_SDR_TX, "CF32", [channel], {"bufferLength": str(args.tx_packet_samples)})
+        active = False
+        try:
+            mtu = int(dev.getStreamMTU(stream))
+            write_elems = max(args.tx_samples, mtu * 2)
+            buff = np.zeros(write_elems, np.complex64)
+            dev.activateStream(stream)
+            active = True
+            result = dev.writeStream(stream, [buff], write_elems, timeoutUs=args.timeout_ms * 1000)
+            ret = int(getattr(result, "ret", result))
+            dev.deactivateStream(stream)
+            active = False
+            if ret != write_elems:
+                raise AssertionError(f"writeStream requested {write_elems}, returned {ret}")
+            return {"channel": channel, "mtu": mtu, "requested": write_elems, "ret": ret}
+        finally:
+            if active:
+                dev.deactivateStream(stream)
+            dev.closeStream(stream)
+
+    runner.report["tx_stream"] = runner.check("TX large writeStream chunking", run_stream)
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -579,6 +669,15 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--rx-channel", type=int, default=0, help="RX channel to stream")
     parser.add_argument("--rx-samples", type=int, default=4096, help="Samples per RX read")
     parser.add_argument("--rx-reads", type=int, default=4, help="Number of RX reads")
+    parser.add_argument(
+        "--rx-variable-sizes",
+        default="17,1024,4095,4096,4097,8193",
+        help="Comma-separated RX read sizes used to test packet buffering",
+    )
+    parser.add_argument("--tx-stream", action="store_true", help="Run TX writeStream chunking smoke test")
+    parser.add_argument("--tx-channel", type=int, default=0, help="TX channel to stream")
+    parser.add_argument("--tx-packet-samples", type=int, default=4096, help="Hardware packet size for TX stream setup")
+    parser.add_argument("--tx-samples", type=int, default=8192, help="Minimum TX samples to write in one large call")
     parser.add_argument("--link-format", default="CS16", choices=("CS16", "CS12"), help="RX link format")
     parser.add_argument("--timeout-ms", type=int, default=1000, help="Stream timeout")
     parser.add_argument("--json", dest="json_path", default="", help="Optional JSON report path")
@@ -614,6 +713,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         check_control_plane(runner, dev, args)
         if args.rx_stream:
             check_rx_stream(runner, dev, args)
+        if args.tx_stream:
+            check_tx_stream(runner, dev, args)
     finally:
         if hasattr(dev, "close"):
             dev.close()
