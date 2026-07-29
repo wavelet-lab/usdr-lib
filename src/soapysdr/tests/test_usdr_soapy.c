@@ -27,8 +27,8 @@ static int fail(const char *what)
 
 static void usage(const char *argv0)
 {
-    printf("Usage: %s [-d bus] [-c channels] [-i packet_size] [-n reads] [-r rate] [-f freq] [-b bw] [-g gain] [-Q] [-T]\n", argv0);
-    printf("  -d bus          USDR bus string, e.g. usb@3/3/6 or pci,device=/dev/usdr0\n");
+    printf("Usage: %s [-d bus] [-c channels] [-i packet_size] [-n reads] [-r rate] [-f freq] [-b bw] [-g gain] [-Q] [-T] [-Z]\n", argv0);
+    printf("  -d bus          USDR bus string, e.g. usb@3/1/6 or pci,device=/dev/usdr0\n");
     printf("  -c channels     RX channels to stream, default 1\n");
     printf("  -i samples      RX samples per read, default 4096\n");
     printf("  -n reads        RX reads, default 4\n");
@@ -38,6 +38,7 @@ static void usage(const char *argv0)
     printf("  -g gain         Preferred gain, default 15\n");
     printf("  -Q              Query/control-plane only, skip RX stream\n");
     printf("  -T              Include TX writeStream chunking smoke test\n");
+    printf("  -Z              Fill RX timestamp gaps with zero samples\n");
 }
 
 static void print_kwargs(const SoapySDRKwargs *kwargs)
@@ -359,7 +360,8 @@ static int check_timestamp_step(long long prev_time_ns, int prev_ret, long long 
     return EXIT_SUCCESS;
 }
 
-static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet_size, unsigned reads, double sample_rate)
+static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet_size, unsigned reads,
+                         double sample_rate, bool zero_fill_gaps)
 {
     int status = EXIT_FAILURE;
     SoapySDRStream *rx_stream = NULL;
@@ -394,8 +396,10 @@ static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet
     SoapySDRKwargs stream_args = {};
     SoapySDRKwargs_set(&stream_args, "bufferLength", packet_size_str);
     SoapySDRKwargs_set(&stream_args, "linkFormat", SOAPY_SDR_CS16);
+    SoapySDRKwargs_set(&stream_args, "rxGapFill", zero_fill_gaps ? "zero" : "none");
 
-    printf("\nRX stream: channels=%u packet_size=%u reads=%u\n", channels, packet_size, reads);
+    printf("\nRX stream: channels=%u packet_size=%u reads=%u gap_mode=%s\n",
+           channels, packet_size, reads, zero_fill_gaps ? "zero" : "none");
 #if (SOAPY_SDR_API_VERSION < 0x00080000)
     if (SoapySDRDevice_setupStream(sdr, &rx_stream, SOAPY_SDR_RX, SOAPY_SDR_CF32, act_channels, channels, &stream_args) != 0) {
         SoapySDRKwargs_clear(&stream_args);
@@ -581,9 +585,10 @@ int main(int argc, char **argv)
     double gain = 15.0;
     bool query_only = false;
     bool tx_stream = false;
+    bool zero_fill_gaps = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "hd:c:i:n:r:f:b:g:QT")) != -1) {
+    while ((opt = getopt(argc, argv, "hd:c:i:n:r:f:b:g:QTZ")) != -1) {
         switch (opt) {
         case 'd': device = optarg; break;
         case 'c': channels = (unsigned)atoi(optarg); break;
@@ -595,6 +600,7 @@ int main(int argc, char **argv)
         case 'g': gain = atof(optarg); break;
         case 'Q': query_only = true; break;
         case 'T': tx_stream = true; break;
+        case 'Z': zero_fill_gaps = true; break;
         case 'h':
         default:
             usage(argv[0]);
@@ -650,7 +656,7 @@ int main(int argc, char **argv)
         status = check_channel(sdr, SOAPY_SDR_TX, "TX", i, sample_rate, rx_freq, bandwidth, gain);
     }
     if (status == EXIT_SUCCESS && !query_only) {
-        status = run_rx_stream(sdr, channels, packet_size, reads, sample_rate);
+        status = run_rx_stream(sdr, channels, packet_size, reads, sample_rate, zero_fill_gaps);
     }
     if (status == EXIT_SUCCESS && tx_stream) {
         status = run_tx_stream(sdr, packet_size);

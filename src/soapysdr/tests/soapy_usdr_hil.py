@@ -560,7 +560,11 @@ def check_rx_stream(runner: Runner, dev: Any, args: argparse.Namespace) -> None:
         if bandwidth > 0:
             dev.setBandwidth(SOAPY_SDR_RX, channel, bandwidth)
 
-        stream_args = {"bufferLength": str(args.rx_samples), "linkFormat": args.link_format}
+        stream_args = {
+            "bufferLength": str(args.rx_samples),
+            "linkFormat": args.link_format,
+            "rxGapFill": args.rx_gap_fill,
+        }
         stream = dev.setupStream(SOAPY_SDR_RX, "CF32", [channel], stream_args)
         reads: List[Dict[str, Any]] = []
         variable_reads: List[Dict[str, Any]] = []
@@ -674,6 +678,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default="17,1024,4095,4096,4097,8193",
         help="Comma-separated RX read sizes used to test packet buffering",
     )
+    parser.add_argument("--rx-gap-fill", default="none", choices=("none", "zero"), help="RX timestamp gap fill mode")
     parser.add_argument("--tx-stream", action="store_true", help="Run TX writeStream chunking smoke test")
     parser.add_argument("--tx-channel", type=int, default=0, help="TX channel to stream")
     parser.add_argument("--tx-packet-samples", type=int, default=4096, help="Hardware packet size for TX stream setup")

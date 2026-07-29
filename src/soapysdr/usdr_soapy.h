@@ -461,6 +461,7 @@ private:
 
     unsigned _desired_rx_pkt;
 
+    RxPacketBuffer::GapFill _rx_gap_fill = RxPacketBuffer::GAP_FILL_NONE;
     bool _force_rx_wire12bit = false;
     bool _dump_calls = false;
 

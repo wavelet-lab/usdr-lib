@@ -57,6 +57,17 @@ bool usdrSoapyIsDeviceArg(const std::string &key)
     return key == "dev" || USDR_SOAPY_DEVICE_ARGS.count(key) != 0;
 }
 
+static RxPacketBuffer::GapFill parse_rx_gap_fill(const std::string &value, const char *context)
+{
+    if (value == "none") {
+        return RxPacketBuffer::GAP_FILL_NONE;
+    }
+    if (value == "zero") {
+        return RxPacketBuffer::GAP_FILL_ZERO;
+    }
+    throw std::runtime_error(std::string(context) + "([rxGapFill=" + value + "]) unsupported mode");
+}
+
 std::shared_ptr<usdr_handle> usdr_handle::get(const std::string& name)
 {
     auto idx = s_created.find(name);
@@ -430,6 +441,9 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
     }
     if (args.count("calls")) {
         _dump_calls = atoi(args.at("calls").c_str()) ? true : false;
+    }
+    if (args.count("rxGapFill")) {
+        _rx_gap_fill = parse_rx_gap_fill(args.at("rxGapFill"), "SoapyUSDR::SoapyUSDR");
     }
 
     usdrlog_setlevel(NULL, loglevel);
@@ -1671,6 +1685,19 @@ SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int direction, const si
         argInfos.push_back(info);
     }
 
+    if (direction == SOAPY_SDR_RX) {
+        SoapySDR::ArgInfo info;
+        info.key = "rxGapFill";
+        info.name = "RX Gap Fill";
+        info.description = "How RX stream buffering fills timestamp gaps.";
+        info.type = SoapySDR::ArgInfo::STRING;
+        info.options.push_back("none");
+        info.optionNames.push_back("Expose timestamp jumps");
+        info.options.push_back("zero");
+        info.optionNames.push_back("Fill missing samples with zeroes");
+        info.value = "none";
+        argInfos.push_back(info);
+    }
 
     return argInfos;
 }
@@ -1709,6 +1736,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     }
 
     unsigned pktSamples = 0;
+    RxPacketBuffer::GapFill rx_gap_fill = _rx_gap_fill;
 
     if (args.count("linkFormat")) {
         const std::string& link_fmt = args.at("linkFormat");
@@ -1738,6 +1766,10 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
         if (pktSamples > 128*1024) {
             throw std::runtime_error("SoapyUSDR::setupStream([bufferLength="+buffer_length+") is too large");
         }
+    }
+
+    if (args.count("rxGapFill")) {
+        rx_gap_fill = parse_rx_gap_fill(args.at("rxGapFill"), "SoapyUSDR::setupStream");
     }
 
     if (direction == SOAPY_SDR_RX && _force_rx_wire12bit) {
@@ -1815,7 +1847,8 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
         _rx_log_chans = num_channels;
         ustr->rxbuf.reset(new RxPacketBuffer(ustr->strm, num_channels,
                                              ustr->nfo.pktsyms,
-                                             ustr->nfo.pktbszie));
+                                             ustr->nfo.pktbszie,
+                                             rx_gap_fill));
     } else {
         _tx_log_chans = num_channels;
     }

@@ -14,6 +14,7 @@ struct FakeStream
     unsigned channels = 2;
     unsigned samples_per_packet = 4;
     dm_time_t next_time = 100;
+    dm_time_t gap_time = 108;
     unsigned recv_count = 0;
     bool jump_after_first_packet = false;
 };
@@ -37,7 +38,7 @@ static int fake_recv(pusdr_dms_t stream, void **buffs, unsigned /*timeout_ms*/, 
 
     fake->recv_count++;
     if (fake->jump_after_first_packet && fake->recv_count == 1) {
-        fake->next_time = 999;
+        fake->next_time = fake->gap_time;
     } else {
         fake->next_time += fake->samples_per_packet;
     }
@@ -59,6 +60,7 @@ static void test_variable_read_sizes()
                           fake.channels,
                           fake.samples_per_packet,
                           fake.samples_per_packet * sizeof(int16_t),
+                          RxPacketBuffer::GAP_FILL_NONE,
                           fake_recv);
 
     usdr_dms_recv_nfo_t nfo = {};
@@ -102,6 +104,7 @@ static void test_timestamp_gap_drops_buffered_tail()
                           fake.channels,
                           fake.samples_per_packet,
                           fake.samples_per_packet * sizeof(int16_t),
+                          RxPacketBuffer::GAP_FILL_NONE,
                           fake_recv);
 
     usdr_dms_recv_nfo_t nfo = {};
@@ -119,16 +122,99 @@ static void test_timestamp_gap_drops_buffered_tail()
 
     res = buffer.read(buffs, 4, 100000, sample_time, nfo);
     assert(res == 0);
-    assert(sample_time == 999);
+    assert(sample_time == 108);
     assert(fake.recv_count == 2);
     assert_samples(ch0, 4);
     assert_samples(ch1, 1004);
+}
+
+static void test_timestamp_gap_zero_fill()
+{
+    FakeStream fake;
+    fake.jump_after_first_packet = true;
+    fake.gap_time = 108;
+    RxPacketBuffer buffer(reinterpret_cast<pusdr_dms_t>(&fake),
+                          fake.channels,
+                          fake.samples_per_packet,
+                          fake.samples_per_packet * sizeof(int16_t),
+                          RxPacketBuffer::GAP_FILL_ZERO,
+                          fake_recv);
+
+    usdr_dms_recv_nfo_t nfo = {};
+    dm_time_t sample_time = 0;
+
+    std::vector<int16_t> ch0(8, -1);
+    std::vector<int16_t> ch1(8, -1);
+    void *buffs[] = { ch0.data(), ch1.data() };
+
+    int res = buffer.read(buffs, 2, 100000, sample_time, nfo);
+    assert(res == 0);
+    assert(sample_time == 100);
+    assert(fake.recv_count == 1);
+    assert_samples(std::vector<int16_t>(ch0.begin(), ch0.begin() + 2), 0);
+
+    res = buffer.read(buffs, 8, 100000, sample_time, nfo);
+    assert(res == 0);
+    assert(sample_time == 102);
+    assert(fake.recv_count == 2);
+    assert(ch0[0] == 2);
+    assert(ch0[1] == 3);
+    assert(ch1[0] == 1002);
+    assert(ch1[1] == 1003);
+    for (size_t i = 2; i < 6; i++) {
+        assert(ch0[i] == 0);
+        assert(ch1[i] == 0);
+    }
+    assert(ch0[6] == 4);
+    assert(ch0[7] == 5);
+    assert(ch1[6] == 1004);
+    assert(ch1[7] == 1005);
+}
+
+static void test_large_timestamp_gap_zero_fill_is_virtual()
+{
+    FakeStream fake;
+    fake.jump_after_first_packet = true;
+    fake.gap_time = 1000000000ULL;
+    RxPacketBuffer buffer(reinterpret_cast<pusdr_dms_t>(&fake),
+                          fake.channels,
+                          fake.samples_per_packet,
+                          fake.samples_per_packet * sizeof(int16_t),
+                          RxPacketBuffer::GAP_FILL_ZERO,
+                          fake_recv);
+
+    usdr_dms_recv_nfo_t nfo = {};
+    dm_time_t sample_time = 0;
+
+    std::vector<int16_t> ch0(6, -1);
+    std::vector<int16_t> ch1(6, -1);
+    void *buffs[] = { ch0.data(), ch1.data() };
+
+    int res = buffer.read(buffs, 2, 100000, sample_time, nfo);
+    assert(res == 0);
+    assert(sample_time == 100);
+    assert(fake.recv_count == 1);
+
+    res = buffer.read(buffs, 6, 100000, sample_time, nfo);
+    assert(res == 0);
+    assert(sample_time == 102);
+    assert(fake.recv_count == 2);
+    assert(ch0[0] == 2);
+    assert(ch0[1] == 3);
+    assert(ch1[0] == 1002);
+    assert(ch1[1] == 1003);
+    for (size_t i = 2; i < ch0.size(); i++) {
+        assert(ch0[i] == 0);
+        assert(ch1[i] == 0);
+    }
 }
 
 int main()
 {
     test_variable_read_sizes();
     test_timestamp_gap_drops_buffered_tail();
+    test_timestamp_gap_zero_fill();
+    test_large_timestamp_gap_zero_fill_is_virtual();
 
     std::cout << "RxPacketBuffer tests passed" << std::endl;
     return 0;
