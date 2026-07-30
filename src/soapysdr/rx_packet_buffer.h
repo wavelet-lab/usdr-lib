@@ -38,6 +38,7 @@ public:
              usdr_dms_recv_nfo_t &nfo);
 
     void reset();
+    bool empty() const;
 
 private:
     struct Segment {

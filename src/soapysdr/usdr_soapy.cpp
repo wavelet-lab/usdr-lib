@@ -1845,6 +1845,8 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
 
     if (direction == SOAPY_SDR_RX) {
         _rx_log_chans = num_channels;
+        ustr->rx_gap_fill = rx_gap_fill;
+        ustr->rx_direct_buffs.resize(num_channels);
         ustr->rxbuf.reset(new RxPacketBuffer(ustr->strm, num_channels,
                                              ustr->nfo.pktsyms,
                                              ustr->nfo.pktbszie,
@@ -1949,13 +1951,35 @@ int SoapyUSDR::readStream(
     }
 
     dm_time_t sample_time = 0;
-    res = ustr->rxbuf->read(buffs, numElems, timeoutUs, sample_time, nfo);
-    if (res) {
-        return SOAPY_SDR_TIMEOUT;
+    size_t returned_elems = numElems;
+    const bool direct_packet =
+        (ustr->rx_gap_fill == RxPacketBuffer::GAP_FILL_NONE) &&
+        ustr->rxbuf->empty() &&
+        (numElems == (size_t)ustr->nfo.pktsyms);
+
+    if (direct_packet) {
+        if (ustr->rx_direct_buffs.size() < _rx_log_chans) {
+            ustr->rx_direct_buffs.resize(_rx_log_chans);
+        }
+        for (unsigned i = 0; i < _rx_log_chans; i++) {
+            ustr->rx_direct_buffs[i] = buffs[i];
+        }
+
+        res = usdr_dms_recv(ustr->strm, ustr->rx_direct_buffs.data(), timeoutUs / 1000, &nfo);
+        if (res) {
+            return SOAPY_SDR_TIMEOUT;
+        }
+        sample_time = nfo.fsymtime;
+        returned_elems = (nfo.totsyms != 0) ? std::min((size_t)nfo.totsyms, numElems) : numElems;
+    } else {
+        res = ustr->rxbuf->read(buffs, numElems, timeoutUs, sample_time, nfo);
+        if (res) {
+            return SOAPY_SDR_TIMEOUT;
+        }
     }
 
     if (rd) {
-        const size_t bytes_per_channel = numElems * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
+        const size_t bytes_per_channel = returned_elems * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
         for (unsigned i = 0; i < _rx_log_chans; i++) {
             fwrite(buffs[i], bytes_per_channel, 1, rd);
         }
@@ -1967,8 +1991,8 @@ int SoapyUSDR::readStream(
     flags |= SOAPY_SDR_HAS_TIME;
     timeNs = SoapySDR::ticksToTimeNs((long long)sample_time, _actual_rx_rate);
 
-    last_recv_pkt_time = sample_time + numElems;
-    return numElems;
+    last_recv_pkt_time = sample_time + returned_elems;
+    return returned_elems;
 }
 
 int SoapyUSDR::writeStream(SoapySDR::Stream *stream,

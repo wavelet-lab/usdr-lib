@@ -250,3 +250,8 @@ void RxPacketBuffer::reset()
     _next_output_time = 0;
     _time_valid = false;
 }
+
+bool RxPacketBuffer::empty() const
+{
+    return _segments.empty() && _available == 0;
+}

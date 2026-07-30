@@ -10,6 +10,7 @@
 #include <set>
 #include <memory>
 #include <atomic>
+#include <vector>
 
 #include "rx_packet_buffer.h"
 #include "../lib/models/dm_all.h"
@@ -438,6 +439,8 @@ private:
         bool setup = false;
         std::atomic<bool> active;
 
+        RxPacketBuffer::GapFill rx_gap_fill = RxPacketBuffer::GAP_FILL_NONE;
+        std::vector<void*> rx_direct_buffs;
         std::unique_ptr<RxPacketBuffer> rxbuf;
     };
 
