@@ -237,6 +237,11 @@ int lms7002m_set_gain(lms7002_dev_t *d,
         return res;
 
     switch (gain_type) {
+    case RFIC_LMS7_RX_AUTO_GAIN:
+        //TODO Implement RX auto gain
+        res = lms7002m_rfe_gain(&d->lmsstate, RFE_GAIN_LNA, (gain - 30) * 10, &aret);
+        actual = (aret + 300) / 10;
+        break;
     case RFIC_LMS7_RX_LNA_GAIN:
         res = lms7002m_rfe_gain(&d->lmsstate, RFE_GAIN_LNA, (gain - 30) * 10, &aret);
         actual = (aret + 300) / 10;
@@ -261,6 +266,18 @@ int lms7002m_set_gain(lms7002_dev_t *d,
         //d->rfe_lb_atten = gain * 4;
         //res = lms7002m_rfe_lblna(&d->lmsstate, d->rfe_lb_atten, &aret);
         //actual = -(double)aret/4.0;
+        break;
+    case RFIC_LMS7_TX_AUTO_GAIN:
+        //TODO Implement TX auto gain
+        if (gain > 0)
+            gain = 0;
+        actual = gain;
+
+        res = lms7002m_trf_gain(&d->lmsstate, TRF_GAIN_PAD, -10 * gain, &aret);
+        if (channel & LMS7_CH_A)
+            d->tx_loss[0] = aret / -10;
+        if (channel & LMS7_CH_B)
+            d->tx_loss[1] = aret / -10;
         break;
     case RFIC_LMS7_TX_PAD_GAIN:
         if (gain > 0)

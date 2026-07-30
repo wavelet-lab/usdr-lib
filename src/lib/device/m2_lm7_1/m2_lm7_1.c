@@ -177,7 +177,9 @@ static int dev_m2_lm7_1_sdr_tdd_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint
 static int dev_m2_lm7_1_sdr_rx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_freq_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_rx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_sdr_rx_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
+static int dev_m2_lm7_1_sdr_tx_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_gainlb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 static int dev_m2_lm7_1_sdr_tx_gainbb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value);
 
@@ -327,7 +329,10 @@ const usdr_dev_param_func_t s_fparams_m2_lm7_1_rev000[] = {
     { "/dm/sdr/0/tx/freqency",  { dev_m2_lm7_1_sdr_tx_freq_set, NULL }},
 
     { "/dm/sdr/0/rx/gain",      { dev_m2_lm7_1_sdr_rx_gain_set, NULL }},
+    { "/dm/sdr/0/rx/gain/auto", { dev_m2_lm7_1_sdr_rx_gain_auto_set, NULL }},
+
     { "/dm/sdr/0/tx/gain",      { dev_m2_lm7_1_sdr_tx_gain_set, NULL }},
+    { "/dm/sdr/0/tx/gain/auto", { dev_m2_lm7_1_sdr_tx_gain_auto_set, NULL }},
     { "/dm/sdr/0/tx/gain/lb",   { dev_m2_lm7_1_sdr_tx_gainlb_set, NULL }},
     { "/dm/sdr/0/tx/gain/vga1", { dev_m2_lm7_1_sdr_tx_gainbb_set, NULL }},
 
@@ -407,7 +412,9 @@ static const usdr_dev_link_t s_links[] = {
     { "/dm/sdr/0/tx/frequency/bb/1", "/dm/sdr/0/tx/frequency/bb" },
 
     { "/dm/sdr/0/rx/gain/0",      "/dm/sdr/0/rx/gain" },
+    { "/dm/sdr/0/rx/gain/auto/0", "/dm/sdr/0/rx/gain/auto" },
     { "/dm/sdr/0/tx/gain/0",      "/dm/sdr/0/tx/gain" },
+    { "/dm/sdr/0/tx/gain/auto/0", "/dm/sdr/0/tx/gain/auto" },
     { "/dm/sdr/0/tx/gain/lb/0",   "/dm/sdr/0/tx/gain/lb" },
     { "/dm/sdr/0/tx/gain/vga1/0", "/dm/sdr/0/tx/gain/vga1" },
     { "/dm/sdr/0/rx/gain/pga/0",  "/dm/sdr/0/rx/gain/pga" },
@@ -415,7 +422,9 @@ static const usdr_dev_link_t s_links[] = {
     { "/dm/sdr/0/rx/gain/lna/0",  "/dm/sdr/0/rx/gain/lna" },
     { "/dm/sdr/0/rx/gain/lb/0",   "/dm/sdr/0/rx/gain/lb" },
     { "/dm/sdr/0/rx/gain/1",      "/dm/sdr/0/rx/gain" },
+    { "/dm/sdr/0/rx/gain/auto/1", "/dm/sdr/0/rx/gain/auto" },
     { "/dm/sdr/0/tx/gain/1",      "/dm/sdr/0/tx/gain" },
+    { "/dm/sdr/0/tx/gain/auto/1", "/dm/sdr/0/tx/gain/auto" },
     { "/dm/sdr/0/tx/gain/lb/1",   "/dm/sdr/0/tx/gain/lb" },
     { "/dm/sdr/0/tx/gain/vga1/1", "/dm/sdr/0/tx/gain/vga1" },
     { "/dm/sdr/0/rx/gain/pga/1",  "/dm/sdr/0/rx/gain/pga" },
@@ -1171,10 +1180,20 @@ int dev_m2_lm7_1_sdr_rx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t val
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
     return xsdr_rfic_set_gain(&d->xdev, LMS7_CH_AB, RFIC_LMS7_RX_LNA_GAIN, value, NULL);
 }
+int dev_m2_lm7_1_sdr_rx_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    return xsdr_rfic_set_gain(&d->xdev, LMS7_CH_AB, RFIC_LMS7_RX_AUTO_GAIN, value, NULL);
+}
 int dev_m2_lm7_1_sdr_tx_gain_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
     struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
     return xsdr_rfic_set_gain(&d->xdev, LMS7_CH_AB, RFIC_LMS7_TX_PAD_GAIN, value, NULL);
+}
+int dev_m2_lm7_1_sdr_tx_gain_auto_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
+{
+    struct dev_m2_lm7_1_gps *d = (struct dev_m2_lm7_1_gps *)ud;
+    return xsdr_rfic_set_gain(&d->xdev, LMS7_CH_AB, RFIC_LMS7_TX_AUTO_GAIN, value, NULL);
 }
 int dev_m2_lm7_1_sdr_tx_gainlb_set(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
 {
