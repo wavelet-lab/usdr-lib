@@ -201,6 +201,68 @@ static unsigned default_rx_packet_samples(double sample_rate)
     return RX_PACKET_POLICIES[sizeof(RX_PACKET_POLICIES) / sizeof(RX_PACKET_POLICIES[0]) - 1].packet_samples;
 }
 
+static void append_stepped_range(std::vector<double> &values, const SoapySDR::Range &range, double step)
+{
+    const double minimum = range.minimum();
+    const double maximum = range.maximum();
+    if (maximum < minimum || step <= 0.0) {
+        return;
+    }
+
+    auto push_unique = [&values](double value) {
+        if (values.empty() || values.back() != value) {
+            values.push_back(value);
+        }
+    };
+
+    push_unique(minimum);
+
+    const long long min_step = (long long)std::ceil(minimum / step);
+    const long long max_step = (long long)std::floor(maximum / step);
+    for (long long i = min_step; i <= max_step; i++) {
+        const double value = i * step;
+        if (value >= minimum && value <= maximum) {
+            push_unique(value);
+        }
+    }
+
+    push_unique(maximum);
+}
+
+static bool antenna_to_path(int direction, const std::string &name, const char **path, const char **soapy_name)
+{
+    struct antenna_map {
+        const char *soapy;
+        const char *path;
+    };
+
+    static const antenna_map rx_antennas[] = {
+        { "AUTO", "rx_auto" },
+        { "LNAL", "rxl" },
+        { "LNAW", "rxw" },
+        { "LNAH", "rxh" },
+    };
+    static const antenna_map tx_antennas[] = {
+        { "AUTO", "tx_auto" },
+        { "TXW", "txw" },
+        { "TXH", "txh" },
+    };
+
+    const antenna_map *antennas = (direction == SOAPY_SDR_TX) ? tx_antennas : rx_antennas;
+    const size_t count = (direction == SOAPY_SDR_TX) ?
+                         sizeof(tx_antennas) / sizeof(tx_antennas[0]) :
+                         sizeof(rx_antennas) / sizeof(rx_antennas[0]);
+
+    for (size_t i = 0; i < count; i++) {
+        if (name == antennas[i].soapy || name == antennas[i].path) {
+            *path = antennas[i].path;
+            *soapy_name = antennas[i].soapy;
+            return true;
+        }
+    }
+    return false;
+}
+
 static const device_ranges usdr_ranges {
     .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
     .samplerate_range = SoapySDR::Range(1e6, 85e6),
@@ -209,7 +271,7 @@ static const device_ranges usdr_ranges {
 
 static const device_ranges xsdr_ranges {
     .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
-    .samplerate_range = SoapySDR::Range(1e6, 125e6),
+    .samplerate_range = SoapySDR::Range(0.1e6, 125e6),
     .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
 };
 
@@ -531,12 +593,14 @@ std::vector<std::string> SoapyUSDR::listAntennas(const int direction, const size
     std::vector<std::string> ants;
     if (direction == SOAPY_SDR_RX)
     {
+        ants.push_back("AUTO");
         ants.push_back("LNAH");
         ants.push_back("LNAL");
         ants.push_back("LNAW");
     }
     if (direction == SOAPY_SDR_TX)
     {
+        ants.push_back("AUTO");
         ants.push_back("TXH");
         ants.push_back("TXW");
     }
@@ -549,16 +613,41 @@ void SoapyUSDR::setAntenna(const int direction, const size_t channel, const std:
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setAntenna(%d, %d, %s)", direction, int(channel), name.c_str());
 
+    const char *path = nullptr;
+    const char *soapy_name = nullptr;
+    if (!antenna_to_path(direction, name, &path, &soapy_name)) {
+        throw std::runtime_error("SoapyUSDR::setAntenna(" + name + ") unsupported antenna");
+    }
+
+    ensureSampleRateConfigured(direction, channel);
+
+    const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
+    const char* pname = get_sdr_param_chan(0, dir, "path", NULL, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    const int res = usdr_dme_set_string(_dev->dev(), pname, path);
+    if (res) {
+        throw std::runtime_error("SoapyUSDR::setAntenna(" + std::string(pname) + ") error");
+    }
+    for (size_t ch = 0; ch < max_sw_chans(direction); ch++) {
+        _actual_antenna[direction][ch] = soapy_name;
+    }
 }
 
 std::string SoapyUSDR::getAntenna(const int direction, const size_t channel) const
 {
     validateChannel(direction, channel);
 
-    std::string antenna = "";
+    std::string antenna = "AUTO";
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    const auto dir_it = _actual_antenna.find(direction);
+    if (dir_it != _actual_antenna.end()) {
+        const auto chan_it = dir_it->second.find(channel);
+        if (chan_it != dir_it->second.end()) {
+            antenna = chan_it->second;
+        }
+    }
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::getAntenna(%d, %d, %s)", direction, int(channel), antenna.c_str());
     return antenna;
@@ -1072,12 +1161,8 @@ std::vector<double> SoapyUSDR::listSampleRates(const int direction, const size_t
     const device_ranges *dev_ranges = get_ranges(device_type);
     if (!dev_ranges)
         return rates;
-    const int min_sr = (int)std::ceil(dev_ranges->samplerate_range.minimum() / 1e6);
-    const int max_sr = (int)std::floor(dev_ranges->samplerate_range.maximum() / 1e6);
-    for (int i = min_sr; i <= max_sr; ++i)
-    {
-        rates.push_back(i * 1e6);
-    }
+
+    append_stepped_range(rates, dev_ranges->samplerate_range, 1e6);
     return rates;
 }
 /*******************************************************************
@@ -1138,24 +1223,7 @@ std::vector<double> SoapyUSDR::listBandwidths(const int direction, const size_t 
     std::vector<double> bandwidths;
     SoapySDR::RangeList ranges = getBandwidthRange(direction, channel);
     for (const auto &range : ranges) {
-        const double minimum = range.minimum();
-        const double maximum = range.maximum();
-        if (maximum < minimum) {
-            continue;
-        }
-
-        bandwidths.push_back(minimum);
-        const int min_mhz = (int)std::ceil(minimum / 1e6);
-        const int max_mhz = (int)std::floor(maximum / 1e6);
-        for (int mhz = min_mhz; mhz <= max_mhz; mhz++) {
-            const double bandwidth = mhz * 1e6;
-            if (bandwidth > minimum && bandwidth < maximum) {
-                bandwidths.push_back(bandwidth);
-            }
-        }
-        if (maximum != minimum) {
-            bandwidths.push_back(maximum);
-        }
+        append_stepped_range(bandwidths, range, 1e6);
     }
     return bandwidths;
 }

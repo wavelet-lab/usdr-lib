@@ -182,10 +182,11 @@ def check_control_plane(runner: Runner, dev: Any, args: argparse.Namespace) -> N
                 f"{prefix} listAntennas",
                 lambda d=direction, c=channel: call_list(dev, "listAntennas", d, c),
             )
-            if item["antennas"]:
+            test_antenna = first_manual_antenna(item["antennas"])
+            if test_antenna:
                 runner.check(
-                    f"{prefix} set/getAntenna first option",
-                    lambda d=direction, c=channel, ant=item["antennas"][0]: antenna_roundtrip(dev, d, c, ant),
+                    f"{prefix} set/getAntenna({test_antenna})",
+                    lambda d=direction, c=channel, ant=test_antenna: antenna_roundtrip(dev, d, c, ant),
                 )
 
             item["stream_formats"] = runner.check(
@@ -257,6 +258,7 @@ def check_control_plane(runner: Runner, dev: Any, args: argparse.Namespace) -> N
                 f"{prefix} listSampleRates",
                 lambda d=direction, c=channel: finite_list(dev.listSampleRates(d, c)),
             )
+            # print(dev.listSampleRates(direction, channel))
 
             item["bandwidth_range"] = runner.check(
                 f"{prefix} getBandwidthRange",
@@ -274,6 +276,7 @@ def check_control_plane(runner: Runner, dev: Any, args: argparse.Namespace) -> N
                 f"{prefix} listBandwidths",
                 lambda d=direction, c=channel: finite_list(dev.listBandwidths(d, c)),
             )
+            # print(dev.listBandwidths(direction, channel))
 
             item["gains"] = runner.check(
                 f"{prefix} listGains",
@@ -318,6 +321,13 @@ def check_control_plane(runner: Runner, dev: Any, args: argparse.Namespace) -> N
 def antenna_roundtrip(dev: Any, direction: int, channel: int, antenna: str) -> str:
     dev.setAntenna(direction, channel, antenna)
     return str(dev.getAntenna(direction, channel))
+
+
+def first_manual_antenna(antennas: Any) -> Optional[str]:
+    for antenna in antennas or []:
+        if str(antenna).upper() != "AUTO":
+            return str(antenna)
+    return None
 
 
 def get_native_format(dev: Any, direction: int, channel: int) -> Dict[str, Any]:

@@ -489,6 +489,7 @@ private:
     device_type_t device_type = DEVICE_UNKNOWN;
 
     std::map<int, std::map<size_t, double>> _actual_bandwidth;
+    std::map<int, std::map<size_t, std::string>> _actual_antenna;
     std::map<int, std::map<size_t, std::map<std::string, double>>> _actual_frequency;
     std::map<int, std::map<size_t, std::map<std::string, double>>> _actual_gains;
 
