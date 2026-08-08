@@ -55,6 +55,16 @@ static void print_strings(const char *title, char **values, size_t length)
     printf("\n");
 }
 
+static const char *first_manual_antenna(char **values, size_t length)
+{
+    for (size_t i = 0; i < length; i++) {
+        if (strcmp(values[i], "AUTO") != 0) {
+            return values[i];
+        }
+    }
+    return NULL;
+}
+
 static void print_ranges(const char *title, const SoapySDRRange *ranges, size_t length)
 {
     printf("%s: ", title);
@@ -208,6 +218,14 @@ static int check_channel(SoapySDRDevice *sdr, int direction, const char *label, 
     char **strings = SoapySDRDevice_listAntennas(sdr, direction, channel, &length);
     if (SoapySDRDevice_lastStatus() != 0) return fail("listAntennas");
     print_strings("  Antennas", strings, length);
+    const char *test_antenna = first_manual_antenna(strings, length);
+    if (test_antenna != NULL) {
+        if (SoapySDRDevice_setAntenna(sdr, direction, channel, test_antenna) != 0) return fail("setAntenna");
+        char *antenna = SoapySDRDevice_getAntenna(sdr, direction, channel);
+        if (SoapySDRDevice_lastStatus() != 0) return fail("getAntenna");
+        printf("  Antenna set/read: requested=%s actual=%s\n", test_antenna, antenna);
+        free(antenna);
+    }
     SoapySDRStrings_clear(&strings, length);
 
     strings = SoapySDRDevice_getStreamFormats(sdr, direction, channel, &length);

@@ -40,10 +40,12 @@ enum rfic_lms7_rf_path {
 typedef enum rfic_lms7_rf_path rfic_lms7_rf_path_t;
 
 enum rfic_lms7_gain_types {
+    RFIC_LMS7_RX_AUTO_GAIN,
     RFIC_LMS7_RX_LNA_GAIN,
     RFIC_LMS7_RX_TIA_GAIN,
     RFIC_LMS7_RX_PGA_GAIN,
     RFIC_LMS7_RX_LB_GAIN,
+    RFIC_LMS7_TX_AUTO_GAIN,
     RFIC_LMS7_TX_PAD_GAIN,
     RFIC_LMS7_TX_LB_GAIN,
     RFIC_LMS7_TX_PGA_GAIN,
