@@ -877,25 +877,29 @@ bool dev_m2_dsdr_has_extfe0472(dev_m2_dsdr_t* d)
 int dev_m2_dsdr_lrxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
-    return d->logic_chcnt_rx;
+    *ovalue = d->logic_chcnt_rx;
+    return 0;
 }
 
 int dev_m2_dsdr_ltxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
-    return d->logic_chcnt_tx;
+    *ovalue = d->logic_chcnt_tx;
+    return 0;
 }
 
 int dev_m2_dsdr_htxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
-    return d->hw_chcnt_tx;
+    *ovalue = d->hw_chcnt_tx;
+    return 0;
 }
 
 int dev_m2_dsdr_hrxnumchans_get(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t* ovalue)
 {
     dev_m2_dsdr_t *d = (dev_m2_dsdr_t *)ud;
-    return d->hw_chcnt_rx;
+    *ovalue = d->hw_chcnt_rx;
+    return 0;
 }
 
 int dev_m2_dsdr_rx_enchan(pdevice_t ud, pusdr_vfs_obj_t obj, uint64_t value)
