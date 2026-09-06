@@ -672,11 +672,21 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
             unsigned swp_msk = (g + f);
 
             if (complex) {
+                if (newmap->ch_map[f / 2] == 0xff) {
+                    chmap_o[g + f] = g + f;
+                } else {
                 unsigned swap_iq = (newmap->ch_map[f / 2] & CH_SWAP_IQ_FLAG) ? 1 : 0;
+                    unsigned channel = newmap->ch_map[f / 2] & ~CH_SWAP_IQ_FLAG;
                 flag_swap_iq[g + f] = swap_iq;
-                chmap_o[g + f] = (2 * (newmap->ch_map[f / 2] & msk) + ((f % 2) ^ swap_iq));
+                    chmap_o[g + f] = (2 * (channel & msk) + ((f % 2) ^ swap_iq));
+                }
             } else  {
-                chmap_o[g + f] = (newmap->ch_map[f] & msk);
+                if (newmap->ch_map[f] == 0xff) {
+                    chmap_o[g + f] = g + f;
+                } else {
+                    unsigned channel = newmap->ch_map[f] & ~CH_SWAP_IQ_FLAG;
+                    chmap_o[g + f] = (channel & msk);
+                }
             }
             chmap[g + f] = chmap_o[g + f]  ^ (swp_msk);
         }
