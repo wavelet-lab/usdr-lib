@@ -57,6 +57,17 @@ bool usdrSoapyIsDeviceArg(const std::string &key)
     return key == "dev" || USDR_SOAPY_DEVICE_ARGS.count(key) != 0;
 }
 
+static RxPacketBuffer::GapFill parse_rx_gap_fill(const std::string &value, const char *context)
+{
+    if (value == "none") {
+        return RxPacketBuffer::GAP_FILL_NONE;
+    }
+    if (value == "zero") {
+        return RxPacketBuffer::GAP_FILL_ZERO;
+    }
+    throw std::runtime_error(std::string(context) + "([rxGapFill=" + value + "]) unsupported mode");
+}
+
 std::shared_ptr<usdr_handle> usdr_handle::get(const std::string& name)
 {
     auto idx = s_created.find(name);
@@ -430,6 +441,9 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
     }
     if (args.count("calls")) {
         _dump_calls = atoi(args.at("calls").c_str()) ? true : false;
+    }
+    if (args.count("rxGapFill")) {
+        _rx_gap_fill = parse_rx_gap_fill(args.at("rxGapFill"), "SoapyUSDR::SoapyUSDR");
     }
 
     usdrlog_setlevel(NULL, loglevel);
@@ -1671,6 +1685,19 @@ SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int direction, const si
         argInfos.push_back(info);
     }
 
+    if (direction == SOAPY_SDR_RX) {
+        SoapySDR::ArgInfo info;
+        info.key = "rxGapFill";
+        info.name = "RX Gap Fill";
+        info.description = "How RX stream buffering fills timestamp gaps.";
+        info.type = SoapySDR::ArgInfo::STRING;
+        info.options.push_back("none");
+        info.optionNames.push_back("Expose timestamp jumps");
+        info.options.push_back("zero");
+        info.optionNames.push_back("Fill missing samples with zeroes");
+        info.value = "none";
+        argInfos.push_back(info);
+    }
 
     return argInfos;
 }
@@ -1709,6 +1736,7 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     }
 
     unsigned pktSamples = 0;
+    RxPacketBuffer::GapFill rx_gap_fill = _rx_gap_fill;
 
     if (args.count("linkFormat")) {
         const std::string& link_fmt = args.at("linkFormat");
@@ -1738,6 +1766,10 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
         if (pktSamples > 128*1024) {
             throw std::runtime_error("SoapyUSDR::setupStream([bufferLength="+buffer_length+") is too large");
         }
+    }
+
+    if (args.count("rxGapFill")) {
+        rx_gap_fill = parse_rx_gap_fill(args.at("rxGapFill"), "SoapyUSDR::setupStream");
     }
 
     if (direction == SOAPY_SDR_RX && _force_rx_wire12bit) {
@@ -1813,6 +1845,12 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
 
     if (direction == SOAPY_SDR_RX) {
         _rx_log_chans = num_channels;
+        ustr->rx_gap_fill = rx_gap_fill;
+        ustr->rx_direct_buffs.resize(num_channels);
+        ustr->rxbuf.reset(new RxPacketBuffer(ustr->strm, num_channels,
+                                             ustr->nfo.pktsyms,
+                                             ustr->nfo.pktbszie,
+                                             rx_gap_fill));
     } else {
         _tx_log_chans = num_channels;
     }
@@ -1833,12 +1871,7 @@ void SoapyUSDR::closeStream(SoapySDR::Stream *stream)
         ustr->strm = NULL;
     }
 
-    if (ustr->rxcbuf.size() > 0) {
-        for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
-            ring_circbuf_destroy(ustr->rxcbuf[i]);
-        }
-        ustr->rxcbuf.resize(0);
-    }
+    ustr->rxbuf.reset();
 
     ustr->setup = false;
 }
@@ -1913,89 +1946,53 @@ int SoapyUSDR::readStream(
         numElems = std::min(numElems, (size_t)ustr->nfo.pktsyms);
     }
 
-    if (ustr->rxcbuf.size() > 0) {
-        size_t req_bytes = numElems * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
-        do {
-            // fprintf(stderr, "rxcb wpos=%lld rpos=%lld req_bytes=%lld\n",
-            //         (long long)ustr->rxcbuf->wpos,
-            //         (long long)ustr->rxcbuf->rpos,
-            //         (long long)req_bytes);
-
-            bool have_all_channels = true;
-            for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
-                if (ring_circbuf_rspace(ustr->rxcbuf[i]) < req_bytes) {
-                    have_all_channels = false;
-                    break;
-                }
-            }
-
-            if (have_all_channels) {
-                for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
-                    // TODO: decide how to handle alignment requirements for user-provided stream buffers.
-                    ring_circbuf_read(ustr->rxcbuf[i], buffs[i], req_bytes);
-                }
-
-                flags &= ~SOAPY_SDR_HAS_TIME;
-                timeNs = 0;
-                return numElems;
-            }
-
-            // We don't have enough data here
-            std::vector<void*> chans(ustr->rxcbuf.size());
-            for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
-                chans[i] = ring_circbuf_wptr(ustr->rxcbuf[i]);
-            }
-
-            res = usdr_dms_recv(ustr->strm, chans.data(), timeoutUs / 1000, &nfo);
-            if (res == 0) {
-                for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
-                    ustr->rxcbuf[i]->wpos += ustr->nfo.pktbszie;
-                }
-                last_recv_pkt_time = nfo.fsymtime;
-            }
-        } while (res == 0);
-
-        return SOAPY_SDR_TIMEOUT;
-    } else {
-        if (numElems != ustr->nfo.pktsyms) {
-            size_t blksz;
-            blksz = ustr->nfo.pktsyms * 16;
-            while (blksz < numElems * 2)
-                blksz <<= 1;
-
-            size_t blksz_bytes = blksz * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
-
-            SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::readStream(%s) requested %d but block is configured for %d, injecting jitter buffer of %d bytes. Performance will be degraded",
-                           ustr->stream, numElems, ustr->nfo.pktsyms, blksz_bytes);
-
-            ustr->rxcbuf.resize(_rx_log_chans);
-            for (unsigned i = 0; i < _rx_log_chans; i++) {
-                ustr->rxcbuf[i] = ring_circbuf_create(blksz_bytes);
-            }
-
-            // Reenter
-            return readStream(stream, buffs, numElems, flags, timeNs, timeoutUs);
-        }
-
-        // TODO: decide how to handle alignment requirements for user-provided stream buffers.
-        res = usdr_dms_recv(ustr->strm, (void**)buffs, timeoutUs / 1000, &nfo);
-
-        if (rd && res == 0) {
-            const size_t bytes_per_channel = nfo.totsyms * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
-            for (unsigned i = 0; i < _rx_log_chans; i++) {
-                fwrite(buffs[i], bytes_per_channel, 1, rd);
-            }
-
-            const float marker[2] = { -2.0f, 2.0f };
-            fwrite(marker, sizeof(marker), 1, rd);
-        }
-
-        flags |= SOAPY_SDR_HAS_TIME;
-        timeNs = SoapySDR::ticksToTimeNs(nfo.fsymtime, _actual_rx_rate);
-
-        last_recv_pkt_time = nfo.fsymtime;
-        return (res) ? SOAPY_SDR_TIMEOUT : nfo.totsyms;
+    if (!ustr->rxbuf) {
+        return SOAPY_SDR_STREAM_ERROR;
     }
+
+    dm_time_t sample_time = 0;
+    size_t returned_elems = numElems;
+    const bool direct_packet =
+        (ustr->rx_gap_fill == RxPacketBuffer::GAP_FILL_NONE) &&
+        ustr->rxbuf->empty() &&
+        (numElems == (size_t)ustr->nfo.pktsyms);
+
+    if (direct_packet) {
+        if (ustr->rx_direct_buffs.size() < _rx_log_chans) {
+            ustr->rx_direct_buffs.resize(_rx_log_chans);
+        }
+        for (unsigned i = 0; i < _rx_log_chans; i++) {
+            ustr->rx_direct_buffs[i] = buffs[i];
+        }
+
+        res = usdr_dms_recv(ustr->strm, ustr->rx_direct_buffs.data(), timeoutUs / 1000, &nfo);
+        if (res) {
+            return SOAPY_SDR_TIMEOUT;
+        }
+        sample_time = nfo.fsymtime;
+        returned_elems = (nfo.totsyms != 0) ? std::min((size_t)nfo.totsyms, numElems) : numElems;
+    } else {
+        res = ustr->rxbuf->read(buffs, numElems, timeoutUs, sample_time, nfo);
+        if (res) {
+            return SOAPY_SDR_TIMEOUT;
+        }
+    }
+
+    if (rd) {
+        const size_t bytes_per_channel = returned_elems * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
+        for (unsigned i = 0; i < _rx_log_chans; i++) {
+            fwrite(buffs[i], bytes_per_channel, 1, rd);
+        }
+
+        const float marker[2] = { -2.0f, 2.0f };
+        fwrite(marker, sizeof(marker), 1, rd);
+    }
+
+    flags |= SOAPY_SDR_HAS_TIME;
+    timeNs = SoapySDR::ticksToTimeNs((long long)sample_time, _actual_rx_rate);
+
+    last_recv_pkt_time = sample_time + returned_elems;
+    return returned_elems;
 }
 
 int SoapyUSDR::writeStream(SoapySDR::Stream *stream,
@@ -2022,13 +2019,39 @@ int SoapyUSDR::writeStream(SoapySDR::Stream *stream,
         avg_gap = (1 - alpha) * avg_gap + alpha * lag;
     }
 
-    SoapySDR::logf(SOAPY_SDR_DEBUG, "writeStream::writeStream(%s) @ %lld num %d should be %d\n", ustr->stream, ts, numElems, ustr->nfo.pktsyms);
+    SoapySDR::logf(SOAPY_SDR_DEBUG, "writeStream::writeStream(%s) @ %lld num %d mtu %d\n",
+                   ustr->stream, ts, (unsigned)numElems, ustr->nfo.pktsyms);
 
-    unsigned toSend = numElems;
-    // TODO: decide how to handle alignment requirements for user-provided stream buffers.
-    int res = usdr_dms_send(ustr->strm, (const void **) buffs, numElems, ts, timeoutUs / 1000);
+    const size_t mtu = ustr->nfo.pktsyms;
+    if (mtu == 0 || ustr->nfo.pktbszie == 0 || _tx_log_chans == 0 ||
+        (ustr->nfo.pktbszie % ustr->nfo.pktsyms) != 0) {
+        return SOAPY_SDR_STREAM_ERROR;
+    }
+
+    const size_t bytes_per_sample = ustr->nfo.pktbszie / ustr->nfo.pktsyms;
+    std::vector<const void*> chunk_buffs(_tx_log_chans);
+    size_t sent = 0;
+    int res = 0;
+    while (sent < numElems) {
+        const size_t chunk_elems = std::min(mtu, numElems - sent);
+        const size_t offset = sent * bytes_per_sample;
+        for (unsigned i = 0; i < _tx_log_chans; i++) {
+            chunk_buffs[i] = static_cast<const char*>(buffs[i]) + offset;
+        }
+
+        const dm_time_t chunk_ts = (ts >= 0) ? (dm_time_t)(ts + sent) : (dm_time_t)-1;
+        // TODO: decide how to handle alignment requirements for user-provided stream buffers.
+        res = usdr_dms_send(ustr->strm, chunk_buffs.data(), (unsigned)chunk_elems,
+                            chunk_ts, timeoutUs / 1000);
+        if (res) {
+            break;
+        }
+
+        sent += chunk_elems;
+    }
+
     if (this->calc_ts >= 0)
-        this->calc_ts += numElems;
+        this->calc_ts += sent;
 
     if (tx_pkts % 1000 == 0) {
         SoapySDR::logf(_dump_calls ? SOAPY_SDR_ERROR : SOAPY_SDR_TRACE,
@@ -2036,7 +2059,7 @@ int SoapyUSDR::writeStream(SoapySDR::Stream *stream,
     }
 
     tx_pkts++;
-    return (res) ? SOAPY_SDR_TIMEOUT : toSend;
+    return (res && sent == 0) ? SOAPY_SDR_TIMEOUT : (int)sent;
 }
 
 int SoapyUSDR::readStreamStatus(
