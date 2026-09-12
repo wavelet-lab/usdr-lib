@@ -40,10 +40,12 @@ enum rfic_lms7_rf_path {
 typedef enum rfic_lms7_rf_path rfic_lms7_rf_path_t;
 
 enum rfic_lms7_gain_types {
+    RFIC_LMS7_RX_AUTO_GAIN,
     RFIC_LMS7_RX_LNA_GAIN,
     RFIC_LMS7_RX_TIA_GAIN,
     RFIC_LMS7_RX_PGA_GAIN,
     RFIC_LMS7_RX_LB_GAIN,
+    RFIC_LMS7_TX_AUTO_GAIN,
     RFIC_LMS7_TX_PAD_GAIN,
     RFIC_LMS7_TX_LB_GAIN,
     RFIC_LMS7_TX_PGA_GAIN,
@@ -63,8 +65,16 @@ enum {
 struct lms7002_dev;
 typedef struct lms7002_dev lms7002_dev_t;
 
+enum sigtype {
+    XSDR_TX_LO_CHANGED,
+    XSDR_RX_LO_CHANGED,
+    XSDR_TX_LNA_CHANGED,
+    XSDR_RX_LNA_CHANGED,
+};
+
+typedef int (*on_change_signal_t)(lms7002_dev_t *d, enum sigtype t);
 typedef int (*on_change_antenna_port_sw_t)(lms7002_dev_t* dev, int direction, unsigned sw);
-typedef const lms7002m_lml_map_t (*on_get_lml_portcfg_t)(bool rx, unsigned chs, unsigned flags, bool no_siso_map);
+typedef const lms7002m_lml_map_t (*on_get_lml_portcfg_t)(bool rx, unsigned chs, unsigned flags);
 
 struct lms7002_dev
 {
@@ -73,6 +83,7 @@ struct lms7002_dev
     // Callbacks
     on_change_antenna_port_sw_t on_ant_port_sw;
     on_get_lml_portcfg_t on_get_lml_portcfg;
+    on_change_signal_t on_custom_signal;
 
     // RFIC state
     uint8_t rx_cfg_path;  // Configuration index in cfg_auto_rx
@@ -87,11 +98,12 @@ struct lms7002_dev
     uint8_t txcgen_div;
     uint8_t rxtsp_div;
     uint8_t txtsp_div;
-    uint8_t tx_host_inter;
-    uint8_t rx_host_decim;
 
-    uint8_t rx_no_siso_map;
-    uint8_t tx_no_siso_map;
+    uint8_t rx_siso;
+    uint8_t tx_siso;
+
+    uint16_t tx_dsp_inter;
+    uint16_t rx_dsp_decim;
 
     rfic_lms7_rf_path_t rx_rfic_path;
     rfic_lms7_rf_path_t tx_rfic_path;
@@ -109,6 +121,8 @@ struct lms7002_dev
     unsigned cgen_clk; // LMS7002 CGEN frequency
     unsigned rx_lo;
     unsigned tx_lo;
+    unsigned rx_nco_distance; // Maximum distance from LO to the farest NCO
+    unsigned tx_nco_distance;
 
     lms7002m_limelight_conf_t lml_mode;
 
@@ -162,6 +176,7 @@ int lms7002m_bb_set_badwidth(lms7002_dev_t *d,
                              unsigned bw,
                              unsigned* actualbw);
 
+int lms7002m_bb_translate(lms7002_dev_t *d, bool dir_tx, int freq, int32_t* lms_dsp_val);
 int lms7002m_bb_set_freq(lms7002_dev_t *d,
                         unsigned channel,
                         bool dir_tx,
@@ -172,12 +187,6 @@ int lms7002m_streaming_down(lms7002_dev_t *d, unsigned dir);
 enum rfic_chan_flags {
     RFIC_SWAP_AB = BIT(0),
     RFIC_SWAP_IQ = BIT(1),
-    RFIC_SISO_MODE = BIT(2),
-    RFIC_SISO_SWITCH = BIT(3),
-
-    // Test flags
-    RFIC_SWAP_IQB = BIT(16),
-    RFIC_SWAP_IQA = BIT(15),
 
     RFIC_LFSR = BIT(12),
     RFIC_DIGITAL_LB = BIT(11),
@@ -203,7 +212,8 @@ enum {
 int lms7002m_samplerate(lms7002_dev_t *d,
                         unsigned rxrate, unsigned txrate,
                         unsigned adcclk, unsigned dacclk,
-                        unsigned flags, const bool rx_port_1);
+                        unsigned flags, const bool rx_port_1,
+                        unsigned rx_dec, unsigned tx_int);
 
 
 enum {
@@ -216,6 +226,7 @@ int lms7002m_set_lmlrx_mode(lms7002_dev_t *d, unsigned mode);
 
 
 // Calibration
+int lms7002m_update_bandwidth(lms7002_dev_t *d, bool istx, unsigned bb_rate, bool force_upd);
 
 int lms7002m_set_corr_param(lms7002_dev_t* d, int channel, int corr_type, int value);
 int lms7002m_set_tx_testsig(lms7002_dev_t* d, int channel, int32_t freqoffset, unsigned pwr);

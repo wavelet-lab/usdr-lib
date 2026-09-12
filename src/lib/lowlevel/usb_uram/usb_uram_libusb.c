@@ -7,16 +7,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
 #include <fcntl.h>
-#include <arpa/inet.h>
 #include <string.h>
 #include <stdio.h>
-#include <endian.h>
-#include <semaphore.h>
-#include <signal.h>
-#include <assert.h>
 
 #include "usb_uram_generic.h"
 #include "../device/device.h"
@@ -62,7 +55,7 @@ enum {
     IN_NTFY_SIZE = 64, //256,
     IN_RB_SIZE = 256,
 
-    MAX_NTFY_REQS = 1,
+    MAX_NTFY_REQS = 32,
     MAX_RB_REQS = 1,
 
     MAX_REQUEST_RB_SIZE = 256,
@@ -72,7 +65,11 @@ enum {
 
     // Streams
     IN_STRM_SIZE     = 512,
+#ifdef __APPLE__
+    MAX_IN_STRM_REQS = 64,
+#else
     MAX_IN_STRM_REQS = 8,
+#endif
     MAX_OUT_STRM_REQS = 32,
 
     RX_PKT_TRAILER_EX = 16,
@@ -83,7 +80,7 @@ enum {
 enum {
     STREAM_MAX_SLOTS = 64,
 
-    MAX_RB_THREADS = 8,
+    MAX_RB_THREADS = MAX_NTFY_REQS,
 };
 
 struct stream_params {
@@ -99,13 +96,13 @@ struct usb_dev
     libusb_generic_dev_t gdev;
     usb_uram_generic_t uram_generic;
 
-    sem_t interrupts[MAX_INTERRUPTS];
+    usdr_sem_t interrupts[MAX_INTERRUPTS];
     uint32_t rbvalue[MAX_INTERRUPTS];
 
     bool stop;
-    sem_t tr_regout_a;
-    sem_t tr_rb_a;
-    sem_t rb_valid[MAX_RB_THREADS];
+    usdr_sem_t tr_regout_a;
+    usdr_sem_t tr_rb_a;
+    usdr_sem_t rb_valid[MAX_RB_THREADS];
 
     struct libusb_transfer *transfer_regout[MAX_REGOUT_REQS];
     struct libusb_transfer *transfer_rb[MAX_RB_REQS];
@@ -129,6 +126,7 @@ struct usb_dev
     unsigned rx_buffer_missed[1];
 
     uint32_t rb_valid_idx;
+    uint32_t rb_req_idx;
 
     uint32_t tx_stat_prev[4];
     uint32_t tx_stat_cnt;
@@ -152,13 +150,13 @@ int usb_async_start(usb_dev_t* dev)
     int res;
     unsigned i;
     for (i = 0; i < MAX_INTERRUPTS; i++) {
-        res = sem_init(&dev->interrupts[i], 0, 0);
+        res = usdr_sem_init(&dev->interrupts[i], 0, 0);
     }
 
-    res = sem_init(&dev->tr_regout_a, 0, MAX_REGOUT_REQS);
-    res = sem_init(&dev->tr_rb_a, 0, MAX_RB_REQS);
+    res = usdr_sem_init(&dev->tr_regout_a, 0, MAX_REGOUT_REQS);
+    res = usdr_sem_init(&dev->tr_rb_a, 0, MAX_RB_REQS);
     for (i = 0; i < MAX_RB_THREADS; i++) {
-        res = sem_init(&dev->rb_valid[i], 0, 0);
+        res = usdr_sem_init(&dev->rb_valid[i], 0, 0);
     }
 
     // Prepare transfer queues
@@ -190,6 +188,7 @@ int usb_async_start(usb_dev_t* dev)
     }
 
     dev->rb_valid_idx = 0;
+    dev->rb_req_idx = 0;
     dev->tx_stat_cnt = 0;
     dev->tx_stat_rate = 64; // TX stat update rate
     return libusb_generic_create_thread(&dev->gdev);
@@ -236,7 +235,7 @@ static int usb_post_regout(usb_dev_t* dev, uint32_t *regoutbuffer, unsigned coun
              dev->gdev.name, count_dw, tot_wrs, tot_rbs, tot_reqlen_dw,
              s_dump_buffer(regoutbuffer, count_dw * 4));
 
-    res = sem_wait(&dev->tr_regout_a);
+    res = usdr_sem_wait(&dev->tr_regout_a);
     if (res) {
         res = -errno;
         return res;
@@ -262,7 +261,7 @@ static int usb_post_regout(usb_dev_t* dev, uint32_t *regoutbuffer, unsigned coun
 static int usb_post_rb(usb_dev_t* dev, uint32_t* buffer, unsigned max_buffer_dw, unsigned* ridx)
 {
     int res;
-    res = sem_wait(&dev->tr_rb_a);
+    res = usdr_sem_wait(&dev->tr_rb_a);
     if (res) {
         res = -errno;
         return res;
@@ -295,7 +294,7 @@ void LIBUSB_CALL libusb_transfer_regout(struct libusb_transfer *transfer)
         return;
     }
 
-    sem_post(&dev->tr_regout_a);
+    usdr_sem_post(&dev->tr_regout_a);
 }
 
 void LIBUSB_CALL libusb_transfer_rb(struct libusb_transfer *transfer)
@@ -312,12 +311,12 @@ void LIBUSB_CALL libusb_transfer_rb(struct libusb_transfer *transfer)
                  transfer->status, transfer->actual_length);
         return;
     }
-    sem_post(&dev->tr_rb_a);
+    usdr_sem_post(&dev->tr_rb_a);
 
     //Signal reply ready
     unsigned pidx = (*arefptr) & (MAX_RB_THREADS - 1);
     *arefptr = alen;
-    sem_post(&dev->rb_valid[pidx]);
+    usdr_sem_post(&dev->rb_valid[pidx]);
 }
 
 void LIBUSB_CALL libusb_transfer_ntfy(struct libusb_transfer *transfer)
@@ -361,7 +360,7 @@ void LIBUSB_CALL libusb_transfer_ntfy(struct libusb_transfer *transfer)
             USDR_LOG("USBX", USDR_LOG_NOTE, "Got notification seq %04x event %d => %08x\n",
                      seqnum, event, buff[i + 1]);
             dev->rbvalue[event] = buff[++i];
-            sem_post(&dev->interrupts[event]);
+            usdr_sem_post(&dev->interrupts[event]);
         } else if ((i + 1 + blen) < packet_len / 4) {
             i += blen + 1;
 
@@ -412,7 +411,7 @@ static int usb_async_regread32(lldev_t d, unsigned addr, uint32_t* data, unsigne
     if (res) {
         return res;
     }
-    res = sem_wait(&dev->rb_valid[idx]);
+    res = usdr_sem_wait(&dev->rb_valid[idx]);
     if (res) {
         res = -errno;
         return res;
@@ -443,15 +442,15 @@ int usb_uram_generic_get(lldev_t dev, int generic_op, const char** pout)
 
 static int usb_uram_wait_msi(usb_dev_t* dev, unsigned i, int timeout_ms)
 {
-    return sem_wait_ex(&dev->interrupts[i], timeout_ms * 1000);
+    return usdr_sem_wait_ex(&dev->interrupts[i], timeout_ms * 1000 * 1000);
 }
 
 static int usb_read_bus(lldev_t dev, unsigned interrupt_number, UNUSED unsigned reg, size_t meminsz, void* pin)
 {
     int res;
     usb_dev_t* d = (usb_dev_t*)dev;
-
-    res = libusb_to_errno(libusb_submit_transfer(d->transfer_ntfy[0]));
+    unsigned idx = __atomic_fetch_add(&d->rb_req_idx, 1, __ATOMIC_SEQ_CST) & (MAX_NTFY_REQS - 1);
+    res = libusb_to_errno(libusb_submit_transfer(d->transfer_ntfy[idx]));
     if (res)
         return res;
 
@@ -461,11 +460,6 @@ static int usb_read_bus(lldev_t dev, unsigned interrupt_number, UNUSED unsigned 
 
     if (meminsz != 0) {
         *(uint32_t*)pin = d->rbvalue[interrupt_number];
-#if 0
-        res = usb_uram_reg_in(dev, reg, (uint32_t*)pin);
-        if (res)
-            return res;
-#endif
     }
     return res;
 }
@@ -518,6 +512,10 @@ int _usb_uram_init_rxstream(usb_dev_t* d,
 
     res = buffers_usb_init(&d->gdev, prxb, transfers, params->buffer_count,
                            params->block_size + trailer_sz, EP_IN_DEFSTREAM, eventtype);
+    if (res) {
+        USDR_LOG("USBX", USDR_LOG_ERROR, "Stream RX initialization failed: %d!\n", res);
+        return res;
+    }
 
     prxb->auto_restart = true;
     d->rx_buffer_missed[0] = 0;
@@ -658,8 +656,8 @@ int usb_uram_recv_dma_wait(lldev_t dev, subdev_t subdev, stream_t channel, void*
 
     USDR_LOG("USBX",
              (rxb->allocsz == bd->buffer_sz) ? USDR_LOG_DEBUG : USDR_LOG_ERROR,
-             "Buffer %d / %08x %08x  TO=%d SEQ=%16ld\n",
-             buffer_sz, bursts, skipped, timeout, cnt);
+             "Buffer %d / %08x %08x  TO=%d SEQ=%16lld\n",
+             buffer_sz, bursts, skipped, timeout, (long long)cnt);
 
     if (oob_size && *oob_size >= 8) {
         // memset(oob_ptr, 0, *oob_size);
@@ -712,7 +710,7 @@ int usb_uram_send_dma_get(lldev_t dev, subdev_t subdev, stream_t channel, void**
     unsigned bno = buffers_produce(rxb);
     *buffer = buffers_get_ptr(rxb, bno) + TXSTRM_META_SZ;
 
-    USDR_LOG("USBX", USDR_LOG_DEBUG, "TX Alloc BNO=%d %ld\n", bno, cnt);
+    USDR_LOG("USBX", USDR_LOG_DEBUG, "TX Alloc BNO=%d %lld\n", bno, (long long)cnt);
 
     // Trottle statistics to relax extra load
     if (oob_size) {
@@ -766,14 +764,18 @@ int usb_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, voi
         USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX incorrect pointer supplied\n");
         return -EINVAL;
     }
+    if (sz > 0x1ffff) {
+        USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX FPGA maximum buffer size oveflow!\n");
+        return -EINVAL;
+    }
 
     uint64_t rsamples = sz * 8 / d->tx_strms_params[0].bits_per_all_chs;
-    unsigned samples = rsamples - 1;
+    unsigned samples = rsamples - 1; // Ignored in new TXFE
 
     uint32_t* header = (uint32_t*)bx;
     header[0] = timestamp;
     header[1] = ((timestamp >> 32) & 0xffff) | ((samples & 0x7fff) << 16) | (timestamp < 0 ? 0x80000000 : 0);
-    header[2] = 0; // (samples >> 15) & 0x3;
+    header[2] = (((sz - 1) & 0x1ffff) << 15) | ((timestamp >> 48) & 0x7fff); // Ignored in old TXFE
     header[3] = 0;
 
     USDR_LOG("USBX", USDR_LOG_DEBUG, "TX post buffer %d: %08x.%08x.%08x.%08x -> %d bytes\n",
@@ -782,7 +784,7 @@ int usb_uram_send_dma_commit(lldev_t dev, subdev_t subdev, stream_t channel, voi
     // Add to senq
     res = buffers_usb_transfer_post(rxb, bno, sz + 16, bno);
     if (res) {
-        USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX%d unable to post busrt to sendq (error %d)\n", channel, res);
+        USDR_LOG("USBX", USDR_LOG_ERROR,"USB TX%d unable to post burst to sendq (error %d)\n", channel, res);
         return res;
     }
     return 0;
@@ -829,12 +831,12 @@ int usb_uram_destroy(lldev_t dev)
     libusb_close(d->gdev.dh);
 
     for (unsigned i = 0; i < MAX_INTERRUPTS; i++)
-        sem_destroy(&d->interrupts[i]);
+        usdr_sem_destroy(&d->interrupts[i]);
 
-    sem_destroy(&d->tr_regout_a);
-    sem_destroy(&d->tr_rb_a);
+    usdr_sem_destroy(&d->tr_regout_a);
+    usdr_sem_destroy(&d->tr_rb_a);
     for (unsigned i = 0; i < MAX_RB_THREADS; i++)
-        sem_destroy(&d->rb_valid[i]);
+        usdr_sem_destroy(&d->rb_valid[i]);
 
     free(d);
     return 0;
@@ -916,7 +918,7 @@ int usb_uram_plugin_create(unsigned pcount, const char** devparam,
     }
 
     for (unsigned i = 0; i < MAX_INTERRUPTS; i++) {
-        res = sem_init(&dev->interrupts[i], 0, 0);
+        res = usdr_sem_init(&dev->interrupts[i], 0, 0);
         if (res)
             goto usballoc_fail;
     }
@@ -953,7 +955,7 @@ remove_dev:
     //usb_async_stop(dev->mgr);
 usb_astart_fail:
     for (unsigned i = 0; i < MAX_INTERRUPTS; i++) {
-        sem_destroy(&dev->interrupts[i]);
+        usdr_sem_destroy(&dev->interrupts[i]);
     }
 usballoc_fail:
     free(dev);

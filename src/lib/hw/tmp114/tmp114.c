@@ -27,6 +27,16 @@ int tmp114_reg_get(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
                                         2, pv, 1, &taddr);
 }
 
+static
+int tmp114_reg_set(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
+                   uint8_t taddr, uint16_t pv)
+{
+    uint8_t cmd[3] = { taddr, pv >> 8, pv };
+    return lowlevel_get_ops(dev)->ls_op(dev, subdev,
+                                        USDR_LSOP_I2C_DEV, ls_op_addr,
+                                        0, NULL, 3, cmd);
+}
+
 int tmp114_temp_get(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
                     int* outtemp)
 {
@@ -36,6 +46,18 @@ int tmp114_temp_get(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
     return res;
 }
 
+int tmp114_config_get(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
+                      uint16_t* config)
+{
+    return tmp114_reg_get(dev, subdev, ls_op_addr, TMP114_Configuration, config);
+}
+
+int tmp114_config_set(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
+                      uint16_t config)
+{
+    return tmp114_reg_set(dev, subdev, ls_op_addr, TMP114_Configuration, config);
+}
+
 int tmp114_devid_get(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
                     int* devid)
 {
@@ -43,5 +65,19 @@ int tmp114_devid_get(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
     int res = tmp114_reg_get(dev, subdev, ls_op_addr, TMP114_Device_ID, (uint16_t *)&ldevid);
     *devid = ldevid;
     return res;
+}
+
+int tmp114_uid_get(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
+                   uint64_t* devuid)
+{
+    uint16_t uid[3];
+    for (int i = 0; i < 3; i++) {
+        int res = tmp114_reg_get(dev, subdev, ls_op_addr, TMP114_Unique_ID1 + i, &uid[i]);
+        if (res)
+            return res;
+    }
+
+    *devuid = ((uint64_t)uid[0] << 32) | ((uint64_t)uid[1] << 16) | ((uint64_t)uid[2] << 0);
+    return 0;
 }
 

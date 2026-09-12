@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "xdsp_utest_common.h"
-#include "../fftad_functions.h"
+#include "fftad_functions.h"
 
 #undef DEBUG_PRINT
 
@@ -17,7 +17,8 @@
 static_assert( STREAM_SIZE >= 4096, "STREAM_SIZE should be >= 4096!" );
 static const unsigned packet_lens[3] = { 256, 4096, STREAM_SIZE };
 
-#define SPEED_MEASURE_ITERS 1000000
+#define SPEED_MEASURE_ITERS 10000
+#define AVGS 256
 
 #define EPSILON 1E-4
 
@@ -35,11 +36,14 @@ static void setup(void)
 {
     srand( time(0) );
 
-    posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE);
-    posix_memalign((void**)&f_mant,     ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
-    posix_memalign((void**)&f_pwr,      ALIGN_BYTES, sizeof(int32_t)       * STREAM_SIZE);
-    posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    int res = 0;
+
+    res = res ? res : posix_memalign((void**)&in,         ALIGN_BYTES, sizeof(wvlt_fftwf_complex) * STREAM_SIZE);
+    res = res ? res : posix_memalign((void**)&f_mant,     ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    res = res ? res : posix_memalign((void**)&f_pwr,      ALIGN_BYTES, sizeof(int32_t)       * STREAM_SIZE);
+    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, sizeof(float)         * STREAM_SIZE);
+    ck_assert_int_eq(res, 0);
 
     //init input data
     for(unsigned i = 0; i < STREAM_SIZE; ++i)
@@ -148,7 +152,7 @@ END_TEST
 
 START_TEST(fftad_speed)
 {
-    fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
+    fprintf(stderr, "\n**** Compare SIMD implementations speed (%d adds + 1 norm within 1 iteration) ***\n", AVGS);
 
     const char* fn_name = NULL;
     fftad_init_function_t fn_init = NULL;
@@ -184,8 +188,11 @@ START_TEST(fftad_speed)
         //measuring
         uint64_t tk = clock_get_time();
         (*fn_init)(&acc, size);
-        for(unsigned i = 0; i < SPEED_MEASURE_ITERS; ++i) (*fn_add)(&acc, in, size);
-        (*fn_norm)(&acc, size, 1.0, 0.0, out);
+        for(unsigned i = 0; i < SPEED_MEASURE_ITERS; ++i)
+        {
+            for(unsigned j = 0; j < AVGS; ++j) (*fn_add)(&acc, in, size);
+            (*fn_norm)(&acc, size, 1.0, 0.0, out);
+        }
         uint64_t tk1 = clock_get_time() - tk;
 
         fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 cycle, ave speed = %" PRIu64 " cycles/s \n",
@@ -198,17 +205,12 @@ END_TEST
 
 Suite * fftad_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("xfft_ftad_functions");
-    tc_core = tcase_create("XFFT");
-    tcase_set_timeout(tc_core, 300);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, fftad_check);
-    tcase_add_loop_test(tc_core, fftad_speed, 0, 3);
-    suite_add_tcase(s, tc_core);
+    Suite* s = suite_create("xfft_ftad_functions");
+
+    ADD_REGRESS_TEST(s, fftad_check);
+    ADD_PERF_LOOP_TEST(s, fftad_speed, 300, 0, 3);
+
     return s;
 }

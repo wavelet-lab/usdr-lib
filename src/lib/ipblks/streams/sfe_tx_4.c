@@ -77,7 +77,7 @@ int sfe_extx4_push_ring_buffer(lldev_t dev,
         *creg2 = tsh;
     }
 
-    USDR_LOG("EXTX", USDR_LOG_DEBUG, "Push buffer %d [%08x:%08x:%08x:%08x] SZ=%d SPS=%d BRST=%d TS=%" PRId64 "\n",cfg_base,
+    USDR_LL_LOG(dev, "EXTX", USDR_LOG_DEBUG, "Push buffer %d [%08x:%08x:%08x:%08x] SZ=%d SPS=%d BRST=%d TS=%" PRId64 "\n",cfg_base,
              cfg0, cfg1, tsh, tsl, bytes, samples, bursts, timestamp);
 
     return res ? res : lowlevel_reg_wr32(dev, subdev, cfg_base + 3, tsl);

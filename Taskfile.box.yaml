@@ -7,7 +7,7 @@ vars:
   NOW:
     sh: "date +%Y%m%d%H%m%S"
   LABEL:
-    sh: "echo box-$(basename {{.ROOT_DIR}})"
+    sh: "echo box-$(basename {{.ROOT_DIR}} | tr '[:upper:]' '[:lower:]')"
   DOCKER_FILE_PREFIX: "docker/Dockerfile.box"
 
 tasks:

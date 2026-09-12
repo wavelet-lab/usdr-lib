@@ -30,6 +30,7 @@ set(USDR_IPBLKS_LIB_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/lms64c_proto.c
 
     ${CMAKE_CURRENT_SOURCE_DIR}/fgearbox.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dc_estim.c
 )
 
 

@@ -77,11 +77,13 @@ int mmcm_init_raw_clkout(lldev_t dev, subdev_t subdev,
     if (res)
         return res;
 
-    USDR_LOG("MMCM", USDR_LOG_ERROR, " CLKREG %02x OLD: PHASE=%d HIGH=%d LOW=%d | MX=%d EDGE=%d NO_CNT=%d DELAY=%d\n",
-               clkout_reg,
-               (clk1_reg_old >> 13) & 0x7, (clk1_reg_old >> 6) & 0x3f, clk1_reg_old & 0x3f,
-               (clk2_reg_old >> 8) & 0x3, (clk2_reg_old >> 7) & 1, (clk2_reg_old >> 6) & 1,
-               (clk2_reg_old & 0x3f));
+    USDR_LOG("MMCM", USDR_LOG_NOTE, " CLKREG %02x OLD: PHASE=%d HIGH=%d LOW=%d MX=%d EDGE=%d NO_CNT=%d DELAY=%2d | NEW: PHASE=%d HIGH=%d LOW=%d MX=%d EDGE=%d NO_CNT=%d DELAY=%2d\n",
+             clkout_reg,
+             (clk1_reg_old >> 13) & 0x7, (clk1_reg_old >> 6) & 0x3f, clk1_reg_old & 0x3f,
+             (clk2_reg_old >> 8) & 0x3, (clk2_reg_old >> 7) & 1, (clk2_reg_old >> 6) & 1, (clk2_reg_old & 0x3f),
+             (clk1_reg_out >> 13) & 0x7, (clk1_reg_out >> 6) & 0x3f, clk1_reg_out & 0x3f,
+             (clk2_reg_out >> 8) & 0x3, (clk2_reg_out >> 7) & 1, (clk2_reg_out >> 6) & 1, (clk2_reg_out & 0x3f)
+             );
     return 0;
 }
 
@@ -215,7 +217,8 @@ int mmcm_init_raw(lldev_t dev, subdev_t subdev,
     int res;
     unsigned clkfbdiv = cfg->ports[CLKOUT_PORT_FB].period_h + cfg->ports[CLKOUT_PORT_FB].period_l;
 
-    res = lowlevel_drp_wr16(dev, subdev, drp_port, PowerRegV7, 0xffff);
+    res = lowlevel_drp_wr16(dev, subdev, drp_port,
+                            (cfg->type == MT_7SERIES_MMCM || cfg->type == MT_7SERIES_PLLE2) ? PowerRegV7 : PowerRegUS, 0xffff);
     if (res) {
         USDR_LOG("MMCM", USDR_LOG_ERROR, " unable to turn it on\n");
         return res;
@@ -224,8 +227,11 @@ int mmcm_init_raw(lldev_t dev, subdev_t subdev,
     for (unsigned i = 0; i < MAX_MMCM_PORTS; i++) {
         res = mmcm_init_raw_clkout(dev, subdev, drp_port, CLKOUT5_ClkReg1 + 2 * i,
                                    &cfg->ports[i]);
-        if (res)
+        if (res) {
+            USDR_LOG("MMCM", USDR_LOG_ERROR, "Port%d: H/L=%d/%d DLY=%d Error=%d\n",
+                     i, cfg->ports[i].period_h, cfg->ports[i].period_l, cfg->ports[i].delay, res);
             return res;
+        }
     }
 
     // Input divide

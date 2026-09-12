@@ -54,7 +54,7 @@ void Initialize(const char* device_string, int loglevel,
     CheckErrorAndDie(res, "rx info");
 
     res = usdr_dms_sync(pdev->dev, "off", 2, pdev->strms);
-    CheckErrorAndDie(res, "tx & rx syncronization off");
+    CheckErrorAndDie(res, "tx & rx synchronization off");
 
     res = usdr_dms_op(pdev->strms[0], USDR_DMS_START, 0);
     CheckErrorAndDie(res, "rx stream precharge");
@@ -179,14 +179,14 @@ void SetRxPgaGain(sdr_data_t* pdev, int gain)
 void SetTxFreq(sdr_data_t* pdev, unsigned freq)
 {
     int res;
-    res = usdr_dme_set_uint(pdev->dev, "/dm/sdr/0/tx/freqency",
+    res = usdr_dme_set_uint(pdev->dev, "/dm/sdr/0/tx/frequency",
                             freq);
     CheckErrorAndDie(res, "SetTxFreq");
 }
 void SetRxFreq(sdr_data_t* pdev, unsigned freq)
 {
     int res;
-    res = usdr_dme_set_uint(pdev->dev, "/dm/sdr/0/rx/freqency",
+    res = usdr_dme_set_uint(pdev->dev, "/dm/sdr/0/rx/frequency",
                             freq);
     CheckErrorAndDie(res, "SetRxFreq");
 }
@@ -195,7 +195,7 @@ void SetBBTxFreq(sdr_data_t* pdev, int chan, int freq)
 {
     int res;
     uint64_t val = (((uint64_t)chan) << 32) | (uint32_t)freq;
-    res = usdr_dme_set_uint(pdev->dev, "/dm/sdr/0/tx/freqency/bb",
+    res = usdr_dme_set_uint(pdev->dev, "/dm/sdr/0/tx/frequency/bb",
                             val);
     CheckErrorAndDie(res, "SetBBTxFreq");
 }
@@ -203,7 +203,7 @@ void SetBBRxFreq(sdr_data_t* pdev, int chan, int freq)
 {
     int res;
     uint64_t val = (((uint64_t)chan) << 32) | (uint32_t)freq;
-    res = usdr_dme_set_uint(pdev->dev, "/dm/sdr/0/rx/freqency/bb",
+    res = usdr_dme_set_uint(pdev->dev, "/dm/sdr/0/rx/frequency/bb",
                             val);
     CheckErrorAndDie(res, "SetBBRxFreq");
 }

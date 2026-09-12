@@ -16,11 +16,20 @@
 #define RFIC_CHANS 2
 
 enum xsdr_devices {
-    SSDR_DEV = 0x31,
-    XSDR_DEV = 0x30,
-    XTRX_DEV = 0x2e,
+    SSDRPRO_DEV = 0x33,
+    //SSDR2_DEV = 0x32,
+    SSDR_DEV  = 0x31,
+    XSDR_DEV  = 0x30,
+    XTRX_DEV  = 0x2e,
 };
 
+enum xsdr_lml_phy_modes {
+    MODE_INVALID = 0,
+    MODE_SHARED_MMCM_RX_TX = 1, // Single MMCM for RX / TX
+    MODE_MMCM_TX_ONLY = 2,
+    MODE_DUAL_MMCM_RX_TX = 3,
+};
+typedef enum xsdr_lml_phy_modes xsdr_lml_phy_modes_t;
 
 // ===================================================================
 // Frequency       LMS7 DAC/ADC     LML interface        Baseband
@@ -41,24 +50,75 @@ struct xsdr_dev
     uint8_t hwchans_rx;
     uint8_t hwchans_tx;
 
+    unsigned s_rx_dec;
+    unsigned s_tx_int;
     unsigned s_rxrate;
     unsigned s_txrate;
     unsigned s_adcclk;
     unsigned s_dacclk;
     unsigned s_flags;
 
-    unsigned lms7_lob;
+    unsigned lms7_lob; // Preferred LMS7 lo if set
+    unsigned lms7_rxlo_last;
+    unsigned lms7_txlo_last;
+    unsigned lms8_switchover_freq;
+
+    uint64_t freq_rxlo; // LMS7 + LMS8
+    uint64_t freq_txlo; // LMS7 + LMS8
+    int64_t lms8_lo_freq;
+
+    int tx_override_phase;
+    int tx_override_phase_iq;
+    int rx_override_phase;
+
+    int lmlcal_tx_phase;
+    int lmlcal_rx_phase;
 
     bool afe_active;
+    bool cfg_srate_siso_rx;
+    bool cfg_srate_siso_tx;
     bool siso_sdr_active_rx;
     bool siso_sdr_active_tx;
+    bool rx_port_is_1;
+    bool mmcm_tx;
+    bool mmcm_rx;
+    bool mmcm_single;
+    bool sep_clkdiv;
     bool pwr_en;
     bool new_rev;
     bool ssdr;
+    bool ssdr_pro;
+    bool lms8_alive;
+    bool lms8_int_mode;
+    bool lms8_mode_b;
+    bool xilinx_usp;
+    bool has_duc_ddc;
+    bool exttx;
+    bool dump_cal_data;
+    bool dpump; //Dual pump data
     union {
         bool pmic_ch145_valid;
         bool dac_old_r5;
     };
+
+    // LMS8001 parameter
+    bool lms8_rx_path_active;
+    bool lms8_tx_path_active;
+
+    uint32_t lms8_rx_f_switchover;
+    uint32_t lms8_tx_f_switchover;
+    uint32_t lms8st_loopbw;
+    uint32_t lms8st_phasemargin;
+    uint32_t lms8st_bwef_1000;
+    uint32_t lms8st_flock_n;
+    uint32_t lms8st_iq_gen;
+    uint32_t lms8st_int_mod;
+    uint32_t lms8st_enabled;
+
+    uint8_t meas_cnt;
+    // Statistics
+    double actual_rx_freq;
+    double actual_tx_freq;
 };
 
 typedef struct xsdr_dev xsdr_dev_t;
@@ -108,9 +168,12 @@ int xsdr_rfic_fe_set_freq(xsdr_dev_t *d,
 
 int xsdr_rfic_fe_set_lna(xsdr_dev_t *d,
                          unsigned channel,
-                         //unsigned dir,
                          unsigned lna);
 
+int xsdr_rfic_rfe_set_path(xsdr_dev_t *d,
+                           unsigned path);
+int xsdr_rfic_tfe_set_path(xsdr_dev_t *d,
+                           unsigned path);
 
 int xsdr_rfic_streaming_xflags(xsdr_dev_t *d,
                                unsigned xor_rx_flags,
@@ -124,6 +187,8 @@ int xsdr_dtor(xsdr_dev_t *d);
 
 int xsdr_set_extref(xsdr_dev_t *d, bool ext, uint32_t freq);
 
+int xsdr_set_vio(xsdr_dev_t *d, unsigned vio_mv);
+int xsdr_set_lms125vdd(xsdr_dev_t *d, unsigned vdd_mv);
 
 // Enable RFIC, no streaming
 int xsdr_pwren(xsdr_dev_t *d, bool on);
@@ -131,6 +196,7 @@ int xsdr_pwren(xsdr_dev_t *d, bool on);
 int xsdr_prepare(xsdr_dev_t *d, bool rxen, bool txen);
 
 int xsdr_gettemp(xsdr_dev_t *d, int* temp256);
+int xsdr_gettemp_id(xsdr_dev_t *d, int* id);
 
 enum xsdr_tx_port_cfg_flags {
     MUTE_B = 0,
@@ -147,11 +213,31 @@ int xsdrcal_set_corr_param(void* param, int channel, int corr_type, int value);
 int xsdrcal_do_meas_nco_avg(void* param, int channel, unsigned logduration, int *func);
 //int (*set_tx_testsig_fs8)(void* param, int channel);
 
+int xsdr_phy_tx_iqsel(xsdr_dev_t *d, uint8_t iqsel);
 
-int xsdr_phy_tune(xsdr_dev_t *d, unsigned val);
+int xsdr_phy_en_lfsr_generator_mimo(xsdr_dev_t *d, bool en, bool lfsr);
+int xsdr_phy_en_lfsr_checker_mimo(xsdr_dev_t *d, bool en);
+int xsdr_phy_en_iqab_checker_mimo(xsdr_dev_t *d, bool en);
+enum lfsr_cntr_types {
+    LFSR_CNTR_SYNC = 0,
+    LFSR_CNTR_LOST = 1,
+    LFSR_CNTR_BER = 2,
+    LFSR_CNTR_IQS = 3,
+};
+
+int xsdr_phy_lfsr_mimo_state(xsdr_dev_t *d, int type, uint32_t v[4]);
+int xsdr_phy_tune_rx(xsdr_dev_t *d, unsigned val);
 int xsdr_clk_debug_info(xsdr_dev_t *d);
 
 int xsdr_hwchans_cnt(xsdr_dev_t *d, bool rx, unsigned chans);
+
+int xsdr_override_drp(xsdr_dev_t *d, lsopaddr_t ls_op_addr,
+                      size_t meminsz, void* pin, size_t memoutsz,
+                      const void* pout);
+
+int xsdr_config_rcvdly(xsdr_dev_t *d, unsigned type, unsigned val);
+
+int xsdr_bb_loopback(xsdr_dev_t *d);
 
 enum {
     XSDR_CAL_RXLO = 1,
@@ -165,12 +251,17 @@ enum {
     XSDR_DONT_SETBACK = 65536,
 };
 
+int xsdr_rxdccorr(xsdr_dev_t *d, uint64_t *ov);
 
 int xsdr_usbclk(xsdr_dev_t *d, bool uclk);
 
 int xsdr_calibrate(xsdr_dev_t *d, unsigned channel, unsigned param, int* sarray);
 
 int xsdr_trspi_lms8(xsdr_dev_t *d, uint32_t out, uint32_t* in);
+
+int xsdr_reset_extfe(xsdr_dev_t *d);
+
+int xsdr_check_rxtx_quality(xsdr_dev_t *d, int fix);
 
 #ifndef NO_IGPO
 
@@ -199,6 +290,12 @@ enum {
     IGPO_LDOLMS_EN  = 17,
     IGPO_LED        = 18,
     IGPO_PHYCAL     = 19,
+
+    IGPO_DSPCHAIN_RX_PRG = 20,
+    IGPO_DSPCHAIN_RX_RST = 21,
+    IGPO_DSPCHAIN_TX_PRG = 22,
+    IGPO_DSPCHAIN_TX_RST = 23,
+
 };
 
 enum {
@@ -215,7 +312,8 @@ enum {
 };
 
 
-
+int xsdr_txphase_ovr(xsdr_dev_t *d, unsigned v);
+int xsdr_capture_rxiq(xsdr_dev_t* d, uint32_t *cha, uint32_t *chb);
 
 
 #endif

@@ -8,7 +8,7 @@
 #ifndef SPIEXT_H
 #define SPIEXT_H
 
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) || defined(_WIN32) || defined(__APPLE__)
 #include <stdint.h>
 #include <errno.h>
 typedef uint8_t __u8;

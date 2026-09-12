@@ -1342,7 +1342,7 @@ pages:
         fields:
           - name: TIA
             bits: '3'
-            desc: A (RXVGA1) power down; 0 - block active (default); 1 - block inactive
+            desc: TIA (RXVGA1) power down; 0 - block active (default); 1 - block inactive
           - name: MXLOB
             bits: '2'
             desc: Mixer LO buffer power down; 0 - block active (default); 1 - block inactive
@@ -1352,4 +1352,5 @@ pages:
           - name: LNA
             bits: '0'
             desc: LNA power down; 0 - block active (default); 1 - block inactive
+
 

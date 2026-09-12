@@ -26,11 +26,13 @@ struct afe79xx_state {
 
     libcapi79xx_check_health_fn_t libcapi79xx_check_health;
 
+    libcapi79xx_set_tdd_fn_t libcapi79xx_set_tdd;
+
 };
 typedef struct afe79xx_state afe79xx_state_t;
 
 
-int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, afe79xx_state_t* out);
+int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipType, afe79xx_state_t* out);
 int afe79xx_init(afe79xx_state_t* afe, const char *configuration);
 
 
