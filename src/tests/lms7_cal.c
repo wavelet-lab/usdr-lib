@@ -162,14 +162,14 @@ int dev_initialize(const char* devstring, unsigned spb, unsigned loglevel, float
 
     fprintf(stderr, "Configured %d x %d buffs\n", blksz, bufcnt);
 
-    res = usdr_dme_set_uint(dev, usdr_dmd_find_entity(dev, "/dm/sdr/0/rx/freqency"), freq);
+    res = usdr_dme_set_uint(dev, usdr_dmd_find_entity(dev, "/dm/sdr/0/rx/frequency"), freq);
     if (res) {
         fprintf(stderr, "Unable to set rx frequency: errno %d\n", res);
         goto dev_close;
     }
 
     if (freq_tx > 0) {
-        res = usdr_dme_set_uint(dev, usdr_dmd_find_entity(dev, "/dm/sdr/0/tx/freqency"), freq_tx);
+        res = usdr_dme_set_uint(dev, usdr_dmd_find_entity(dev, "/dm/sdr/0/tx/frequency"), freq_tx);
         if (res) {
             fprintf(stderr, "Unable to set tx frequency: errno %d\n", res);
             goto dev_close;

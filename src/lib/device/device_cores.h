@@ -32,7 +32,7 @@ enum usdr_core_subtype {
     // internal MCU glue logic
     USDR_CS_MCU = 0x7,
 
-    // Syncronization core (1PPS, Sysref, etc.)
+    // Synchronization core (1PPS, Sysref, etc.)
     USDR_CS_SYNC = 0x8,
 
     // Int bucket
@@ -109,7 +109,7 @@ enum usdr_gpi_cores {
 #define USDR_CORE_GET_ID(c)     ((c) >> 8)
 
 
-// Prdefined cores
+// Predefined cores
 #define I2C_CORE_AUTO_LUTUPD  USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_DI2C_SIMPLE)
 #define SPI_CORE_32W          USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_SIMPLE)
 #define SPI_CORE_CFGW_CS8     USDR_MAKE_COREID(USDR_CS_BUS, USDR_BS_SPI_CFG_CS8)

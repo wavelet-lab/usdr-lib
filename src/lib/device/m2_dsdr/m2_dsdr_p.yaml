@@ -16,6 +16,13 @@ data_width:   24
 field_prefix: [ RegName ]
 field_macros: True
 
+x-tdd-fdd-opts: &tdd-fdd-opts
+    0b00: REV0_LNA_TO_RX_____REV2_SHUTDOWN
+    0b01: REV0_LNA_TO_TDDSW__REV2_LNA_TO_TDDSW
+    0b10: REV0_LNA_TO_RX_____REV2_LNA_TO_LB
+    0b11: REV0_LNA_TO_TDDSW__REV2_LNA_TO_RX
+
+
 pages:
   - name: FPGA_GPO
     regs:
@@ -39,15 +46,13 @@ pages:
           - bits: "5"
             name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
-          - bits: "3"
-            name: SW_HW_TDD_CTRL
-            desc: Hardware control of TRX antenna to TX/RX port based on burst boundaries. SW_PA_ONOFF, SW_RX_TDDFDD, SW_RXTX wont take effect in this mode
           - bits: "2"
             name: SW_PA_ONOFF
             desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
-          - bits: "1"
+          - bits: "3,1"
             name: SW_RX_TDDFDD
-            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+            desc: RX TDD-FDD switch
+            opts: *tdd-fdd-opts
           - bits: "0"
             name: SW_RXTX
             desc: Switch TRX antenna to TX(0) or RX(1)
@@ -64,15 +69,13 @@ pages:
           - bits: "5"
             name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
-          - bits: "3"
-            name: SW_HW_TDD_CTRL
-            desc: Hardware control of TRX antenna to TX/RX port based on burst boundaries. SW_PA_ONOFF, SW_RX_TDDFDD, SW_RXTX wont take effect in this mode
           - bits: "2"
             name: SW_PA_ONOFF
             desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
-          - bits: "1"
+          - bits: "3,1"
             name: SW_RX_TDDFDD
-            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+            desc: RX TDD-FDD switch
+            opts: *tdd-fdd-opts
           - bits: "0"
             name: SW_RXTX
             desc: Switch TRX antenna to TX(0) or RX(1)
@@ -89,15 +92,13 @@ pages:
           - bits: "5"
             name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
-          - bits: "3"
-            name: SW_HW_TDD_CTRL
-            desc: Hardware control of TRX antenna to TX/RX port based on burst boundaries. SW_PA_ONOFF, SW_RX_TDDFDD, SW_RXTX wont take effect in this mode
           - bits: "2"
             name: SW_PA_ONOFF
             desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
-          - bits: "1"
+          - bits: "3,1"
             name: SW_RX_TDDFDD
-            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+            desc: RX TDD-FDD switch
+            opts: *tdd-fdd-opts
           - bits: "0"
             name: SW_RXTX
             desc: Switch TRX antenna to TX(0) or RX(1)
@@ -114,15 +115,13 @@ pages:
           - bits: "5"
             name: EN_RX
             desc: Enable RX LNA & post-attenuator RX_RF amp
-          - bits: "3"
-            name: SW_HW_TDD_CTRL
-            desc: Hardware control of TRX antenna to TX/RX port based on burst boundaries. SW_PA_ONOFF, SW_RX_TDDFDD, SW_RXTX wont take effect in this mode
           - bits: "2"
             name: SW_PA_ONOFF
             desc: Route post-amped TX to RX, 0=PA->ANT, 1=PA->RX_LB
-          - bits: "1"
+          - bits: "3,1"
             name: SW_RX_TDDFDD
-            desc: RX TDD-FDD switch (0:FDD=ANT_RX->LNA, 1:TDD=TDD_SW->LNA)
+            desc: RX TDD-FDD switch
+            opts: *tdd-fdd-opts
           - bits: "0"
             name: SW_RXTX
             desc: Switch TRX antenna to TX(0) or RX(1)

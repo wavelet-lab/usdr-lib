@@ -328,7 +328,7 @@ filter_data_t* filter_data_alloc(unsigned origblksz,
     if (flags & FDAF_SEPARATED)
         return NULL;
 
-    int res = posix_memalign((void**)&f, CACHE_LINE, sizeof(filter_data_t) +
+    int res = usdr_alignalloc((void**)&f, CACHE_LINE, sizeof(filter_data_t) +
                              3 * tapssz + datasz);
     if (res) {
         return NULL;
@@ -424,7 +424,7 @@ filter_data_t* filter_data_alloc(unsigned origblksz,
 
 void filter_data_free(filter_data_t* o)
 {
-    free(o);
+    usdr_alignfree(o);
 }
 
 int16_t* filter_data_ptr(filter_data_t* o)

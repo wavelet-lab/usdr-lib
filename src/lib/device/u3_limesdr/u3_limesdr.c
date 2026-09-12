@@ -42,7 +42,13 @@ const usdr_dev_param_constant_t s_params_u3_limesdr_0[] = {
 
 
     { "/ll/sdr/0/rfic/0", (uintptr_t)"lms7002m" },
+    { "/ll/device/name",  (uintptr_t)"limemini"},
 
+    { "/ll/sdr/max_hw_rx_chans", 1 },
+    { "/ll/sdr/max_hw_tx_chans", 1 },
+
+    { "/ll/sdr/max_sw_rx_chans", 1 },
+    { "/ll/sdr/max_sw_tx_chans", 1 },
 };
 
 
@@ -85,8 +91,13 @@ const usdr_dev_param_func_t s_fparams_u3_limesdr_0[] = {
     { "/dm/sdr/refclk/path",    { dev_limesdr_refclk_path_set, NULL }},
     { "/dm/power/en",           { dev_limesdr_pwren_set, NULL }},
 
+    { "/dm/sdr/0/rx/frequency",  { dev_limesdr_sdr_rx_freq_set, NULL }},
+    { "/dm/sdr/0/tx/frequency",  { dev_limesdr_sdr_tx_freq_set, NULL }},
+
+    /* TODO: delete block below after several releases, these are just aliases to above due typo for compatibility with old code */
     { "/dm/sdr/0/rx/freqency",  { dev_limesdr_sdr_rx_freq_set, NULL }},
     { "/dm/sdr/0/tx/freqency",  { dev_limesdr_sdr_tx_freq_set, NULL }},
+
     { "/dm/sdr/0/rx/gain",      { dev_limesdr_sdr_rx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain",      { dev_limesdr_sdr_tx_gain_set, NULL }},
     { "/dm/sdr/0/tx/gain/lb",   { dev_limesdr_sdr_tx_gainlb_set, NULL }},

@@ -101,5 +101,7 @@ int board_ext_pciefe_best_path_set(board_ext_pciefe_t* ob,
                                    unsigned txlo, unsigned txbw);
 
 
+int board_ext_pciefe_set_dac(board_ext_pciefe_t* brd, unsigned value);
+
 
 #endif

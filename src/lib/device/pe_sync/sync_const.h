@@ -38,8 +38,8 @@ enum sync_base_regs {
 
 enum sync_base_ints {
     INT_SPI_0 = 0,
-    INT_SPI_1 = 2,
-    INT_SPI_2 = 3,
+    INT_SPI_1 = 1,
+    INT_SPI_2 = 2,
     INT_SPI_3 = 3,
     INT_SPI_4 = 4,
     INT_SPI_5 = 5,

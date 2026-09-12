@@ -9,24 +9,21 @@
 #include <math.h>
 
 enum lms8_vco_params {
-    LMS8_VCO1_MIN = 4100000000ULL, // 4400000000ULL,
-    LMS8_VCO1_MAX = 6600000000ULL,
+    LMS8_VCO1_MIN_MPW2015 = 4150000000ULL,
+    LMS8_VCO1_MIN_MPW2024 = 4550000000ULL,
 
-    LMS8_VCO2_MIN = 6200000000ULL,
-    LMS8_VCO2_MAX = 8300000000ULL,
-
-    LMS8_VCO3_MIN = 7700000000ULL,
-    LMS8_VCO3_MAX = 10400000000ULL,
-
-    // Safe values for LO range
-    LMS8_MIN_NIQ = 520000000U,
-    LMS8_MAX_NIQ = 9110000000ULL,
-    LMS8_MIN_IQ = LMS8_MIN_NIQ / 2,
-    LMS8_MAX_IQ = LMS8_MAX_NIQ / 2,
+    LMS8_VCO3_MAX_MPW2015 = 9150000000ULL,
+    LMS8_VCO3_MAX_MPW2024 = 9650000000ULL,
 };
 
 enum {
     LMS_LDO_1P25 = 101,
+
+    LMS_LDO_VDD_PLL_CP = 159,
+    LMS_LDO_VDD_PLL_DIV = 179,
+    LMS_LDO_VDD_PLL_CLKBUF = 215,
+
+    LMS_LDO_VCO_REG = 207,
 };
 
 
@@ -67,20 +64,29 @@ static int lms8001_spi_get(lms8001_state_t* obj, uint16_t addr, uint16_t* out)
 
 
 
-static int _lms8001_check_lo_range(uint64_t flo, bool geniq)
+static int _lms8001_check_lo_range(lms8001_state_t* obj, uint64_t flo, bool geniq)
 {
+    uint64_t LMS8_VCO1_MIN = (obj->stepping == LMS8_MPW2024) ? LMS8_VCO1_MIN_MPW2024 : LMS8_VCO1_MIN_MPW2015;
+    uint64_t LMS8_VCO3_MAX = (obj->stepping == LMS8_MPW2024) ? LMS8_VCO3_MAX_MPW2024 : LMS8_VCO3_MAX_MPW2015;
+    uint64_t LMS8_MIN_NIQ = LMS8_VCO1_MIN / 8;
+    uint64_t LMS8_MIN_IQ = LMS8_MIN_NIQ / 2;
+    uint64_t LMS8_MAX_IQ = LMS8_VCO3_MAX / 2;
+
     if (geniq && (!((flo >= LMS8_MIN_IQ) && (flo <= LMS8_MAX_IQ)))) {
-        USDR_LOG("8001", USDR_LOG_ERROR, "LO frequency should be between 260 MHz and 4.55 GHz when GenIQ is selected.\n");
+        USDR_LOG("8001", USDR_LOG_ERROR, "LO frequency should be between %d MHz and %d MHz when GenIQ is selected, requested %d Mhz\n",
+                 (unsigned)(LMS8_MIN_IQ / 1000000), (unsigned)(LMS8_MAX_IQ / 1000000), (unsigned)(flo / 1000000));
         return -EINVAL;
     }
 
-    if (!geniq && (!((flo >= LMS8_MIN_IQ) && (flo <= LMS8_MAX_NIQ)))) {
-        USDR_LOG("8001", USDR_LOG_ERROR, "LO frequency should be between 260 MHz and 9.11 GHz.\n");
+    if (!geniq && (!((flo >= LMS8_MIN_IQ) && (flo <= LMS8_VCO3_MAX)))) {
+        USDR_LOG("8001", USDR_LOG_ERROR, "LO frequency should be between %d MHz and %d MHz, requested %d Mhz\n",
+                 (unsigned)(LMS8_MIN_IQ / 1000000), (unsigned)(LMS8_VCO3_MAX / 1000000), (unsigned)(flo / 1000000));
         return -EINVAL;
     }
 
     if (!geniq && (((flo >= LMS8_MIN_IQ) && (flo <= LMS8_MIN_NIQ)))) {
-        USDR_LOG("8001", USDR_LOG_ERROR, "LO frequency values between 260 MHz and 520 MHz can only be generated when IQ=True.\n");
+        USDR_LOG("8001", USDR_LOG_ERROR, "LO frequency values between %d MHz and %d MHz can only be generated when IQ=True, requested %d Mhz\n",
+                 (unsigned)(LMS8_MIN_IQ / 1000000), (unsigned)(LMS8_MIN_NIQ / 1000000), (unsigned)(flo / 1000000));
         return -EINVAL;
     }
 
@@ -93,8 +99,10 @@ struct lms8001_vco_settings {
 };
 typedef struct lms8001_vco_settings lms8001_vco_settings_t;
 
-static int _lms8001_calc_vco(uint64_t outfreq, lms8001_vco_settings_t* ro)
+static int _lms8001_calc_vco(lms8001_state_t* obj, uint64_t outfreq, lms8001_vco_settings_t* ro)
 {
+    uint64_t LMS8_VCO1_MIN = (obj->stepping == LMS8_MPW2024) ? LMS8_VCO1_MIN_MPW2024 : LMS8_VCO1_MIN_MPW2015;
+    uint64_t LMS8_VCO3_MAX = (obj->stepping == LMS8_MPW2024) ? LMS8_VCO3_MAX_MPW2024 : LMS8_VCO3_MAX_MPW2015;
     lms8001_vco_settings_t r;
     r.divi = 0;
 
@@ -147,12 +155,10 @@ int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out)
 {
     lms8001_vco_settings_t st;
     uint16_t rb;
-    int res = _lms8001_calc_vco(out, &st);
+    int res = _lms8001_calc_vco(state, out, &st);
     if (res)
         return res;
 
-    // uint64_t nint = st.fvco / fref;
-    // uint64_t frac = (st.fvco - nint * fref) * ((uint64_t)1 << 20) / fref;
     lms8001_pll_settings_t pll = _lms8001_calc_pll(st.fvco, fref, 0);
 
     if (pll.nint > 1023) {
@@ -212,7 +218,7 @@ int lms8001_tune(lms8001_state_t* state, unsigned fref, uint64_t out)
     int cal_freq = GET_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO0_FREQ_FINAL(rb);
 
     if (!(fcst == 0 && vco_sel_v == 1 && freq_sel_v == 1)) {
-        USDR_LOG("8001", USDR_LOG_ERROR, "Can't perform VCO autocalibration! VCO = %.3f Mhz REF = %.3f Mhz\n", st.fvco / 1.0e6, fref / 1.0e6);
+        USDR_LOG("8001", USDR_LOG_ERROR, "Can't perform VCO autocallibration! VCO = %.3f Mhz REF = %.3f Mhz\n", st.fvco / 1.0e6, fref / 1.0e6);
         return -ERANGE;
     }
 
@@ -329,17 +335,17 @@ int lms8001b_hlmix_loss_set(lms8001_state_t* state, unsigned chan, unsigned loss
     return lms8001_spi_post(state, en_regs, SIZEOF_ARRAY(en_regs));
 }
 
-int lms8001_core_enable(lms8001_state_t* out, bool en)
+int lms8001_core_enable(lms8001_state_t* state, bool enbuf, bool endiv, bool encp)
 {
     uint32_t lms_init[] = {
-        MAKE_LMS8001_BIASLDOCONFIG_CLK_BUF_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
-        MAKE_LMS8001_BIASLDOCONFIG_PLL_DIV_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
-        MAKE_LMS8001_BIASLDOCONFIG_PLL_CP_LDO_Config(0, 0, en ? 1 : 0, LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_CLK_BUF_LDO_Config(0, 0, enbuf ? 1 : 0, state->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_CLKBUF : LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_DIV_LDO_Config(0, 0, endiv ? 1 : 0, state->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_DIV : LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_CP_LDO_Config(0, 0, encp ? 1 : 0, state->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_CP : LMS_LDO_1P25),
     };
-    return lms8001_spi_post(out, lms_init, SIZEOF_ARRAY(lms_init));
+    return lms8001_spi_post(state, lms_init, SIZEOF_ARRAY(lms_init));
 }
 
-int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms8001_state_t *out)
+int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned int stepping, lms8001_state_t *out)
 {
     int res;
     memset(&out->pll, 0, sizeof(out->pll));
@@ -348,16 +354,23 @@ int lms8001_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms8001_state_
     uint32_t lms_init[] = {
         MAKE_LMS8001_CHIPCONFIG_SPIConfig(1, 1, 1, 1, 1, 1, 1),
 
-        MAKE_LMS8001_BIASLDOCONFIG_CLK_BUF_LDO_Config(0, 0, 1, LMS_LDO_1P25),
-        MAKE_LMS8001_BIASLDOCONFIG_PLL_DIV_LDO_Config(0, 0, 1, LMS_LDO_1P25),
-        MAKE_LMS8001_BIASLDOCONFIG_PLL_CP_LDO_Config(0, 0, 1, LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_BiasConfig(1, 0, 9, 0, 0, 0, 0, 0),
+        MAKE_LMS8001_BIASLDOCONFIG_CLK_BUF_LDO_Config(0, 0, 1, out->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_CLKBUF : LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_DIV_LDO_Config(0, 0, 1, out->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_DIV : LMS_LDO_1P25),
+        MAKE_LMS8001_BIASLDOCONFIG_PLL_CP_LDO_Config(0, 0, 1, out->stepping == LMS8_MPW2024 ? LMS_LDO_VDD_PLL_CP : LMS_LDO_1P25),
 
-        MAKE_LMS8001_PLL_CONFIGURATION_PLL_VREG(1, 0, 1, 1, 32),
+        MAKE_LMS8001_PLL_CONFIGURATION_PLL_VREG(1, 0, 1, 1, 205),
         MAKE_LMS8001_PLL_CONFIGURATION_PLL_CFG_XBUF(1, 0, 1),
+        //MAKE_LMS8001_PLL_CONFIGURATION_PLL_CFG_XBUF(0, 0, 1),
 
         ////////////////////////////////////////////////////////////////////////////////////
         MAKE_LMS8001_PLL_PROFILE_0_PLL_ENABLE_n(1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1),
     };
+
+    if (stepping > LMS8_MPW2024)
+        return -EINVAL;
+
+    out->stepping = stepping;
 
     out->pll.PLL_VREG = lms_init[4];
     out->pll.PLL_CFG_XBUF = lms_init[5];
@@ -420,16 +433,17 @@ struct lms80001_tune_settings {
 };
 typedef struct lms80001_tune_settings lms80001_tune_settings_t;
 
-static void _lms80001_tune_settings_def(lms80001_tune_settings_t* s) {
-    s->vtune_vct = 1;
+static void _lms80001_tune_settings_def(lms8001_state_t* m, lms80001_tune_settings_t* s) {
+    s->vtune_vct = m->stepping == LMS8_MPW2024 ? 2 : 1;
     s->vco_sel_force = 0;
     s->vco_sel_init = 2;
     s->freq_init_pos = 7;
     s->freq_init  = 0;
     s->freq_settling_N = 4;
     s->vtune_wait_N = 128;
-    s->vco_sel_freq_max = 250;
-    s->vco_sel_freq_min = 5;
+    s->vco_sel_freq_max = 254;
+    s->vco_sel_freq_min = 1;
+
 }
 
 static uint32_t _mk_pav(lms8001_state_t* m, unsigned addr, uint16_t val)
@@ -437,7 +451,12 @@ static uint32_t _mk_pav(lms8001_state_t* m, unsigned addr, uint16_t val)
     return MAKE_LMS8001_REG_WR((PLL_PROFILE_1_PLL_ENABLE_n - PLL_PROFILE_0_PLL_ENABLE_n) * m->act_profile + addr, val);
 }
 
-static int _lms8001_vco_tune(lms8001_state_t* m, uint64_t fvco, int fref, uint32_t flags, const lms80001_tune_settings_t* s, double *actual)
+enum {
+    VCO_TUNE_TOO_LOW = 1,
+    VCO_TUNE_TOO_HIGH = 2,
+};
+
+static int _lms8001_vco_tune(lms8001_state_t* m, uint64_t fvco, int fref, uint32_t flags, const lms80001_tune_settings_t* s, double *actual, unsigned erange)
 {
     lms8001_pll_settings_t pll = _lms8001_calc_pll(fvco, fref, flags);
     bool xbuf_slfben = (flags & LMS8001_SELF_BIAS_XBUF) == LMS8001_SELF_BIAS_XBUF;
@@ -448,6 +467,9 @@ static int _lms8001_vco_tune(lms8001_state_t* m, uint64_t fvco, int fref, uint32
     double actual_freq = (double)fref * pll.nfix * (pll.nint + pll.nfrac / (double)(1 << 20));
 
     lms8001_pll_state_t* curr = &m->pll_profiles[m->act_profile];
+    if (pll.nfrac == 0) {
+        int_mode = true;
+    }
 
     // ======================= enablePLL part =======================
     // Enable VCO Biasing Block
@@ -487,7 +509,7 @@ static int _lms8001_vco_tune(lms8001_state_t* m, uint64_t fvco, int fref, uint32
 
     m->pll.PLL_CAL_AUTO1 = MAKE_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO1(s->vco_sel_force, s->vco_sel_init, s->freq_init_pos, s->freq_init);
     m->pll.PLL_CAL_AUTO2 = MAKE_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO2(s->freq_settling_N, s->vtune_wait_N);
-    m->pll.PLL_CAL_AUTO3 = MAKE_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO3(s->vco_sel_freq_max, s->vco_sel_freq_min);
+    m->pll.PLL_CAL_AUTO3 = MAKE_LMS8001_PLL_CONFIGURATION_PLL_CAL_AUTO3(s->vco_sel_freq_max - erange, s->vco_sel_freq_min + erange);
 
     uint32_t lms_init[] = {
         MAKE_LMS8001_REG_WR(PLL_CONFIGURATION_PLL_VREG, m->pll.PLL_VREG),
@@ -543,12 +565,25 @@ static int _lms8001_vco_tune(lms8001_state_t* m, uint64_t fvco, int fref, uint32
         res = res ? res : lms8001_spi_post(m, lms_init, SIZEOF_ARRAY(lms_init));
 
     } else {
-        USDR_LOG("8001", USDR_LOG_WARNING, "WARNING: Requested frequency fvco = %.3f Mhz could not be tuned.\n", fvco / 1.0e6);
+        USDR_LOG("8001", USDR_LOG_WARNING, "WARNING: Requested frequency fvco = %.3f Mhz could not be tuned FCAL/VCO/FREQ: %d/%d/%d.\n",
+                 fvco / 1.0e6, FCAL_start, VCO_sel_final_val, freq_sel_final_val);
         res = -ERANGE;
     }
 
+    bool too_low = (freq_final < erange);
+    bool too_high = (freq_final > 255 - erange);
 
-    if (actual) *actual = actual_freq;
+    USDR_LOG("8001", (too_low || too_high) ? USDR_LOG_INFO : USDR_LOG_NOTE, "VCO Calibration finished: %s VCO:%d CAP:%d\n",
+             (too_low || too_high) ? "FAIL" : "OK", VCO_final, freq_final);
+    USDR_LOG("8001", USDR_LOG_INFO, "VCO Calibration finished, VCO:%d CAP:%d\n", VCO_final, freq_final);
+
+    if (actual)
+        *actual = actual_freq;
+
+    if (too_low)
+        return VCO_TUNE_TOO_LOW;
+    if (too_high)
+        return VCO_TUNE_TOO_HIGH;
     return res;
 }
 
@@ -566,7 +601,7 @@ static int _lms8001_lock_status(lms8001_state_t* m, int* vtune_high, int* vtune_
     return 0;
 }
 
-static int _lms8001_change_pll_vco_cfg(lms8001_state_t* m, uint64_t fvco, int fref, uint32_t flags, lms80001_tune_settings_t* vco_settings)
+static int _lms8001_change_pll_vco_cfg(lms8001_state_t* m, uint64_t fvco, int fref, uint32_t flags, lms80001_tune_settings_t* vco_settings, unsigned erange)
 {
     int res = 0, vtune_high, vtune_low, pll_lock;
     lms8001_pll_state_t* curr = &m->pll_profiles[m->act_profile];
@@ -574,7 +609,7 @@ static int _lms8001_change_pll_vco_cfg(lms8001_state_t* m, uint64_t fvco, int fr
         _mk_pav(m, PLL_PROFILE_0_PLL_VCO_CFG_n, curr->VCO_CFG),
     };
     res = res ? res : lms8001_spi_post(m, lms_init, SIZEOF_ARRAY(lms_init));
-    res = res ? res : _lms8001_vco_tune(m, fvco, fref, flags, vco_settings, NULL);
+    res = res ? res : _lms8001_vco_tune(m, fvco, fref, flags, vco_settings, NULL, erange);
     res = res ? res : usleep(30000);
     res = res ? res :  _lms8001_lock_status(m, &vtune_high, &vtune_low, &pll_lock);
     if (res)
@@ -591,7 +626,7 @@ static int _lms8001_center_vtune(lms8001_state_t* m, uint64_t fvco, int fref, ui
     int res;
     lms8001_pll_state_t* curr = &m->pll_profiles[m->act_profile];
     lms80001_tune_settings_t vco_settings;
-    _lms80001_tune_settings_def(&vco_settings);
+    _lms80001_tune_settings_def(m, &vco_settings);
     vco_settings.vtune_vct = 1;
     vco_settings.vco_sel_force = 1;
     vco_settings.freq_init_pos = 4;
@@ -645,7 +680,7 @@ static int _lms8001_center_vtune(lms8001_state_t* m, uint64_t fvco, int fref, ui
         int vdiv_swvdd = swvdd_list[i];
         if (vdiv_swvdd_init != vdiv_swvdd) {
             SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VDIV_SWVDD_n(curr->VCO_CFG, vdiv_swvdd);
-            res = _lms8001_change_pll_vco_cfg(m, fvco, fref, flags, &vco_settings);
+            res = _lms8001_change_pll_vco_cfg(m, fvco, fref, flags, &vco_settings, 0);
             if (res == 1) {
                 USDR_LOG("8001", USDR_LOG_INFO, "VTUNE voltage centered successfuly by changing VDIV_SWVDD value = %d\n", vdiv_swvdd);
                 continue_vtune = false;
@@ -674,7 +709,7 @@ static int _lms8001_center_vtune(lms8001_state_t* m, uint64_t fvco, int fref, ui
             if (amp_init != amp) {
                 SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AMP_n(curr->VCO_CFG, amp);
                 SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AAC_EN_n(curr->VCO_CFG, 1);
-                res = _lms8001_change_pll_vco_cfg(m, fvco, fref, flags, &vco_settings);
+                res = _lms8001_change_pll_vco_cfg(m, fvco, fref, flags, &vco_settings, 0);
                 if (res == 1) {
                     USDR_LOG("8001", USDR_LOG_INFO, "VTUNE voltage centered successfuly by changing VCO_AMP value = %d\n", amp);
                     continue_vtune = false;
@@ -802,25 +837,30 @@ static int _lms8001_optim_pll_loopbw(lms8001_state_t* m, double PM_deg, double f
         return -EINVAL;
     }
 
-    double KVCO_avg;
+    double KVCO_avg = 0;
+    const static double s_kvco_s_mpw2015[4] = {0, 44.404e6, 33.924e6, 41.455e6};
+    const static double s_kvco_s_mpw2024[4] = {0, 6.2842e7, 6.4853e7, 9.1550e7};
 
     if (!fitKVCO) {
-        if (vco_sel == 1)
-            KVCO_avg = 44.404e6;
-        else if (vco_sel == 2)
-            KVCO_avg = 33.924e6;
-        else if (vco_sel == 3)
-            KVCO_avg = 41.455e6;
-    }
-    else {
-        // Use Fitted Values for KVCO in Calculations
+        KVCO_avg = (m->stepping == LMS8_MPW2015) ? s_kvco_s_mpw2015[vco_sel] : s_kvco_s_mpw2024[vco_sel];
+    } else if (m->stepping == LMS8_MPW2015) {
+        // Use Fitted Values for KVCO in Calculations for mpw 2015
         int CBANK = vco_freq;
         if (vco_sel == 1)
-            KVCO_avg = 24.71e6 * (2.09e-10*pow(CBANK, 4) + 2.77e-09*pow(CBANK, 3) + 1.13e-05*pow(CBANK, 2) + 3.73e-03*CBANK + 1.01e+00);
+            KVCO_avg = 24.71e6 * (2.09e-10 * pow(CBANK, 4) + 2.77e-09 * pow(CBANK, 3) + 1.13e-05 * pow(CBANK, 2) + 3.73e-03 * CBANK + 1.01e+00);
         else if (vco_sel == 2)
-            KVCO_avg = 21.05e6 * (-9.88e-11*pow(CBANK, 4) + 1.46e-07*pow(CBANK, 3) + (-2.14e-05)*pow(CBANK, 2) + 5.08e-03*CBANK + 9.99e-01);
+            KVCO_avg = 21.05e6 * (-9.88e-11 * pow(CBANK, 4) + 1.46e-07 * pow(CBANK, 3) + (-2.14e-05) * pow(CBANK, 2) + 5.08e-03 * CBANK + 9.99e-01);
         else if (vco_sel == 3)
-            KVCO_avg = 32.00e6 * (-1.04e-10*pow(CBANK, 4) + 8.72e-08*pow(CBANK, 3) + (-4.68e-06)*pow(CBANK, 2) + 3.68e-03*CBANK + 1.00e+00);
+            KVCO_avg = 32.00e6 * (-1.04e-10 * pow(CBANK, 4) + 8.72e-08 * pow(CBANK, 3) + (-4.68e-06) * pow(CBANK, 2) + 3.68e-03 * CBANK + 1.00e+00);
+    } else {
+        // Use Fitted Values for KVCO in Calculations for mpw 2024
+        int CBANK = vco_freq;
+        if (vco_sel == 1)
+            KVCO_avg = 3.8492e7 * (2.1005e-10 * pow(CBANK, 4) - 3.6267e-08 * pow(CBANK, 3) + 1.3634e-05 *pow(CBANK, 2) + 3.0541e-03 * CBANK + 1.0011e+00);
+        else if (vco_sel == 2)
+            KVCO_avg = 4.4058e7 * (6.4250e-11 * pow(CBANK, 4) + 2.1831e-10 * pow(CBANK, 3) + 5.7102e-06 *pow(CBANK, 2) + 2.6286e-03 * CBANK + 1.0011e+00);
+        else if (vco_sel == 3)
+            KVCO_avg = 6.2508e7 * (3.7053e-11 * pow(CBANK, 4) + 6.3153e-09 * pow(CBANK, 3) + 5.6397e-06 *pow(CBANK, 2) + 2.5792e-03 * CBANK + 9.9837e-01);
     }
 
     double Kvco = 2 * M_PI * KVCO_avg;
@@ -927,11 +967,11 @@ static int _lms8001_optim_cp_ld(lms8001_state_t* m)
 
     // Calculate OFS and LD_VCT optimal values
     if (INTMOD_EN) {
-        // Set Offset Current and Lock Detector Threashold for IntN - Operating Mode
+        // Set Offset Current and Lock Detector Threshold for IntN - Operating Mode
         LD_VCT = 2;
         OFS = 0;
     } else {
-        // Set Offset Current and Lock Detector Threashold for IntN - Operating Mode
+        // Set Offset Current and Lock Detector Threshold for IntN - Operating Mode
         LD_VCT = 0;
         double Icp = (25.0 * ICT_CP / 16.0) * PULSE;
         // Calculate Target Value for Offset Current, as 3 % of Pulse current value
@@ -994,14 +1034,15 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
     bool iq_gen = (tune_flags & LMS8001_IQ_GEN) == LMS8001_IQ_GEN;
     lms8001_pll_state_t* curr = &m->pll_profiles[m->act_profile];
     lms8001_vco_settings_t pll_s;
-    double actual_vco;
+    double actual_vco = 0;
+    uint64_t fvco;
 
     // Calculate Loop - Crossover frequency
     double fc = loopBW / 1.65;
 
     // Check LO range (that was inside setLOFREQ)
-    res = (res) ? res : _lms8001_check_lo_range(flo, iq_gen);
-    res = (res) ? res : _lms8001_calc_vco(iq_gen ? (flo << 1) : flo, &pll_s);
+    res = (res) ? res : _lms8001_check_lo_range(m, flo, iq_gen);
+    res = (res) ? res : _lms8001_calc_vco(m, iq_gen ? (flo << 1) : flo, &pll_s);
     if (res) {
         return res;
     }
@@ -1011,39 +1052,80 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
     SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AMP_n(curr->VCO_CFG, 3);
     SET_LMS8001_PLL_PROFILE_0_PLL_VCO_CFG_N_VCO_AAC_EN_n(curr->VCO_CFG, 1);
 
-    // Sets FF-DIV Modulus (former setFFDIV)
-    SET_LMS8001_PLL_PROFILE_0_PLL_FF_CFG_N_FF_MOD_n(curr->FF_CFG, pll_s.divi);
-    SET_LMS8001_PLL_PROFILE_0_PLL_FF_CFG_N_FFCORE_MOD_n(curr->FF_CFG, pll_s.divi);
-    SET_LMS8001_PLL_PROFILE_0_PLL_FF_CFG_N_FFDIV_SEL_n(curr->FF_CFG, pll_s.divi > 0 ? 1 : 0);
+    for (unsigned r = 0; r < 6; r++) {
+        // Sets FF-DIV Modulus (former setFFDIV)
+        SET_LMS8001_PLL_PROFILE_0_PLL_FF_CFG_N_FF_MOD_n(curr->FF_CFG, pll_s.divi);
+        SET_LMS8001_PLL_PROFILE_0_PLL_FF_CFG_N_FFCORE_MOD_n(curr->FF_CFG, pll_s.divi);
+        SET_LMS8001_PLL_PROFILE_0_PLL_FF_CFG_N_FFDIV_SEL_n(curr->FF_CFG, pll_s.divi > 0 ? 1 : 0);
 
-    SET_LMS8001_PLL_PROFILE_0_PLL_ENABLE_N_PLL_EN_FFCORE_n(curr->ENABLE,  pll_s.divi > 0 ? 1 : 0);
+        SET_LMS8001_PLL_PROFILE_0_PLL_ENABLE_N_PLL_EN_FFCORE_n(curr->ENABLE,  pll_s.divi > 0 ? 1 : 0);
 
-    uint32_t lms_init[] = {
-        _mk_pav(m, PLL_PROFILE_0_PLL_VCO_CFG_n, curr->VCO_CFG),
-        _mk_pav(m, PLL_PROFILE_0_PLL_FF_CFG_n, curr->FF_CFG),
+        uint32_t lms_init[] = {
+            _mk_pav(m, PLL_PROFILE_0_PLL_VCO_CFG_n, curr->VCO_CFG),
+            _mk_pav(m, PLL_PROFILE_0_PLL_FF_CFG_n, curr->FF_CFG),
 
-        // Enable register is going to be update late anyway, so skip this
-        // _mk_pav(m, PLL_PROFILE_0_PLL_ENABLE_n, curr->ENABLE),
-    };
-    res = lms8001_spi_post(m, lms_init, SIZEOF_ARRAY(lms_init));
-    if (res)
-        return res;
+            // Enable register is going to be update late anyway, so skip this
+            // _mk_pav(m, PLL_PROFILE_0_PLL_ENABLE_n, curr->ENABLE),
+        };
+        res = lms8001_spi_post(m, lms_init, SIZEOF_ARRAY(lms_init));
+        if (res)
+            return res;
 
-    // Calculate actual VCO frequency
-    uint64_t fvco = (iq_gen) ? (flo << (pll_s.divi + 1)) : (flo << pll_s.divi);
-    lms80001_tune_settings_t vco_settings;
-    _lms80001_tune_settings_def(&vco_settings);
+        // Calculate actual VCO frequency
+        fvco = (iq_gen) ? (flo << (pll_s.divi + 1)) : (flo << pll_s.divi);
+        lms80001_tune_settings_t vco_settings;
+        _lms80001_tune_settings_def(m, &vco_settings);
 
-    // Step 1 - Tune PLL to generate F_LO frequency at LODIST outputs that should be manualy enabled
-    // outside this method
-    res = _lms8001_vco_tune(m, fvco, fref, tune_flags, &vco_settings, &actual_vco);
+        USDR_LOG("8001", USDR_LOG_NOTE, "PLL Tuning to F_VCO=%.3f GHz DIV=%d\n", fvco / 1.0e9, pll_s.divi);
+        USDR_LOG("8001", USDR_LOG_INFO, "PLL Tuning to F_VCO=%.3f GHz DIV=%d\n", fvco / 1.0e9, pll_s.divi);
+
+        // Step 1 - Tune PLL to generate F_LO frequency at LODIST outputs that should be manualy enabled
+        // outside this method
+        res = _lms8001_vco_tune(m, fvco, fref, tune_flags, &vco_settings, &actual_vco, 3 - (r / 2));
+
+        // Try another divider and recalibrate
+        if (res == VCO_TUNE_TOO_LOW) {
+            if (pll_s.divi == 3) {
+                res = (m->stepping == LMS8_MPW2015) ? 0 : -ERANGE;
+                break;
+            }
+
+            pll_s.divi++;
+            pll_s.fvco *= 2;
+        } else if (res == VCO_TUNE_TOO_HIGH) {
+            if (pll_s.divi == 0) {
+                res = (m->stepping == LMS8_MPW2015) ? 0 : -ERANGE;
+                break;
+            }
+
+            pll_s.divi--;
+            pll_s.fvco /= 2;
+        } else if (res) {
+            return res;
+        } else {
+            break;
+        }
+    }
+
     if (res) {
         USDR_LOG("8001", USDR_LOG_WARNING, "PLL Tuning to F_LO=%.3f GHz failed!\n", flo / 1.0e9);
         return res;
     }
 
-    // Step 2 - Center VCO Tuning Voltage if needed
-    res =  _lms8001_center_vtune(m, fvco, fref, tune_flags);
+    int vtune_high, vtune_low, pll_lock;
+    res = _lms8001_lock_status(m, &vtune_high, &vtune_low, &pll_lock);
+    if (res)
+        return res;
+
+    if ((m->stepping == LMS8_MPW2024) && (vtune_high || vtune_low)) {
+        USDR_LOG("8001", USDR_LOG_WARNING, "PLL didn't lock [%d/%d/%d] F_LO=%.3f Ghz F_VCO=%.3f DIV=%d!\n",
+                 vtune_low, vtune_high, pll_lock,
+                 flo / 1.0e9, pll_s.fvco / 1.0e9, 1 << pll_s.divi);
+        return -ERANGE;
+    }
+
+    // Step 2 - Center VCO Tuning Voltage if needed only for MPW2015
+    res = (m->stepping == LMS8_MPW2024) ? res : _lms8001_center_vtune(m, fvco, fref, tune_flags);
     if (res) {
         return res;
     }
@@ -1054,7 +1136,7 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
         return res;
     }
 
-    // Step 4 - Optimize CP offset current Lock Detector Threashold depending on operating mode chosen(IntN or FracN)
+    // Step 4 - Optimize CP offset current Lock Detector Threshold depending on operating mode chosen(IntN or FracN)
     res = _lms8001_optim_cp_ld(m);
     if (res) {
         return res;
@@ -1079,6 +1161,7 @@ int lms8001_config_pll(lms8001_state_t* m, uint64_t flo, int fref,
 int lms8001_smart_tune(lms8001_state_t* m, unsigned tune_flags, uint64_t flo, int fref, int loopbw, float phasemargin, float bwef, int flock_N)
 {
     int res;
+    uint64_t LMS8_MIN_NIQ = ((m->stepping == LMS8_MPW2024) ? LMS8_VCO1_MIN_MPW2024 : LMS8_VCO1_MIN_MPW2015) / 8;
 
     // Set IQ gen for freq < 520 Mhz
     if (flo < LMS8_MIN_NIQ) {
@@ -1122,7 +1205,7 @@ int lms8001_smart_tune(lms8001_state_t* m, unsigned tune_flags, uint64_t flo, in
 
 int lms8001_reg_set(lms8001_state_t* m, uint16_t addr, uint16_t val)
 {
-    // Update internal state to syncronze cahce values
+    // Update internal state to synchronize cache values
 
     if (addr >= PLL_CONFIGURATION_PLL_VREG) {
         switch (addr) {

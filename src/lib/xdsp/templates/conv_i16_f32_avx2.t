@@ -56,11 +56,9 @@ void TEMPLATE_FUNC_NAME(const int16_t *__restrict indata,
 
 #undef CONVERT_I16_F32_BLOCK
 
-  if (i > 0) {
-      const int16_t *ldw = (const int16_t *)vp;
-      for (; i >= 2; i -= 2) {
-          *(outdata++) = *(ldw++) * inscale;
-      }
+  const int16_t *ldw = (const int16_t *)vp;
+  for (; i >= 2; i -= 2) {
+      *(outdata++) = *(ldw++) * CONV_SCALE;
   }
 }
 

@@ -27,10 +27,10 @@ int dma_rx32_reset(lldev_t lldev,
 
     if (tmp & 0x40000000) {
         if (tmp == 0xffffffff) {
-             USDR_LOG("DMRX", USDR_LOG_ERROR, "DMA engine is dead!\n");
+             USDR_LL_LOG(lldev, "DMRX", USDR_LOG_ERROR, "DMA engine is dead!\n");
              return -EIO;
         }
-        USDR_LOG("DMRX", USDR_LOG_WARNING, "DMA engine is active!\n");
+        USDR_LL_LOG(lldev, "DMRX", USDR_LOG_WARNING, "DMA engine is active!\n");
     }
 
     // DMA STOP, FE RESET
