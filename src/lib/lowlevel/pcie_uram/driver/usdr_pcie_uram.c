@@ -1678,11 +1678,7 @@ static int usdr_probe(struct pci_dev *pdev,
 
 	pci_set_master(pdev);
 
-	/* Reconfigure MaxReadReq to 1KB */
-	pcie_capability_clear_and_set_word(pdev, PCI_EXP_DEVCTL,
-					   PCI_EXP_DEVCTL_READRQ, PCI_EXP_DEVCTL_READRQ_1024B);
-
-                       if (tbridge) {
+	if (tbridge) {
 		printk(KERN_INFO PFX "Initialize ASM2806 bridge: %px\n", tbridge);
 	//	pci_write_config_byte(tbridge, 0xfff, 1); // Switch to GPIO control mode
 	//	pci_write_config_byte(tbridge, 0x920, 0x01);
