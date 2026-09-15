@@ -14,7 +14,10 @@ RUN apt-get install dwarves libusb-1.0-0-dev libsoapysdr-dev check -y
 
 RUN apt-get install dkms dh-make devscripts debhelper dh-dkms -y
 
-RUN sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+ARG TARGETARCH
+ARG TASK_VERSION=3.53.1
+RUN curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${TARGETARCH}.tar.gz" \
+    | tar -xz -C /usr/local/bin task
 
 RUN mkdir -p /work/build
 RUN mkdir -p /work/source

@@ -1,5 +1,5 @@
-# Ubuntu Noble Numbat (24.04)
-FROM ubuntu:24.04
+# Ubuntu Resolute Raccoon (26.04)
+FROM ubuntu:26.04
 
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -22,7 +22,7 @@ RUN curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSIO
 RUN mkdir -p /work/build
 RUN mkdir -p /work/source
 RUN mkdir -p /work/output
-ENV PACKAGE_DIR_NAME=ubuntu-noble
+ENV PACKAGE_DIR_NAME=ubuntu-resolute
 ENV PACKAGE_ARCH_NAME=unknown
 WORKDIR /work/
 
