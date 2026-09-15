@@ -19,18 +19,28 @@ generic_opts_t cpu_vcap_obtain(unsigned flags)
     cap = OPT_SSE41;
 
 #else
+#ifdef WVLT_AVX512VBMI
     unsigned max_cpu = OPT_AVX512VBMI;
+#else
+    unsigned max_cpu = OPT_AVX2;
+#endif
 
     if (flags & CVF_LIMIT_VCPU) {
         max_cpu = (flags & 0xffff);
     }
 
     __builtin_cpu_init();
+#ifdef WVLT_AVX512VBMI
     if (__builtin_cpu_supports("avx512vbmi") && max_cpu >= OPT_AVX512VBMI)
         cap = OPT_AVX512VBMI;
-    else if (__builtin_cpu_supports("avx512bw") && max_cpu >= OPT_AVX512BW)
+    else
+#endif
+#ifdef WVLT_AVX512BW
+    if (__builtin_cpu_supports("avx512bw") && max_cpu >= OPT_AVX512BW)
         cap = OPT_AVX512BW;
-    else if (__builtin_cpu_supports("avx2") && max_cpu >= OPT_AVX2)
+    else
+#endif
+    if (__builtin_cpu_supports("avx2") && max_cpu >= OPT_AVX2)
         cap = OPT_AVX2;
     else if (__builtin_cpu_supports("avx") && max_cpu >= OPT_AVX)
         cap = OPT_AVX;

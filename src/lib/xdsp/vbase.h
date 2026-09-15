@@ -41,8 +41,10 @@ typedef enum generic_opts generic_opts_t;
 #include <immintrin.h>
 
 #ifndef __EMSCRIPTEN__
+#ifndef WVLT_DISABLE_AVX512
 #define WVLT_AVX512VBMI
 #define WVLT_AVX512BW
+#endif
 #define WVLT_AVX2
 #define WVLT_AVX
 #define WVLT_SSE4_2
