@@ -26,6 +26,16 @@ static inline void rtsa_calc_depth(fft_rtsa_settings_t* st)
     st->lower_pwr_bound = st->upper_pwr_bound - st->rtsa_depth / st->divs_for_dB;
 }
 
+static inline bool rtsa_check_settings(const fft_rtsa_settings_t* st) {
+    if(st->upper_pwr_bound <= st->lower_pwr_bound)
+        return false;
+
+    if((st->upper_pwr_bound - st->lower_pwr_bound) * st->divs_for_dB != st->rtsa_depth)
+        return false;
+
+    return (st->rtsa_depth * sizeof(rtsa_pwr_t)) % cpu_vcap_align(cpu_vcap_get()) == 0;
+}
+
 static inline void rtsa_fill_hwi16_consts(const fft_rtsa_settings_t* st, unsigned fft_size, float scale, rtsa_hwi16_consts_t* c)
 {
     c->org_scale = scale * HWI16_SCALE_COEF;
