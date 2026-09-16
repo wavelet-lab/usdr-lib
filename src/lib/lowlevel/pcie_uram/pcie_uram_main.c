@@ -842,11 +842,31 @@ int pcie_uram_plugin_discovery(unsigned pcount, const char** filterparams, const
         if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0)
             continue;
 
-        if (pf.dev != NULL && strcmp(dir->d_name, pf.dev) != 0)
-            continue;
+        if (pf.dev != NULL) {
+            // pf.dev may be a bare device name (e.g. "usdr0") or a full path
+            // (e.g. "/dev/usdr0", when device=/dev/usdr0 is passed directly).
+            // dir->d_name from /sys/class/usdr/ is always a bare name, so strip
+            // any /dev/ prefix before comparing or a full-path filter never matches.
+            const char* cmpname = pf.dev;
+            if (strncmp(cmpname, "/dev/", 5) == 0) {
+                cmpname += 5;
+            }
+            if (strcmp(dir->d_name, cmpname) != 0)
+                continue;
+        }
 
         int cap = maxbuf - off;
-        int l = snprintf(outarray + off, cap, "bus=pci,device=%s\n", dir->d_name);
+        int l;
+        if (pf.dev != NULL && strncmp(pf.dev, "/dev/", 5) == 0) {
+            // Echo back the device= value in the exact format the caller queried
+            // with (e.g. a full /dev/ path), since SoapySDR's generic top-level
+            // find()/enumerate() filtering does an exact string match between the
+            // query args and the returned kwargs -- always emitting the bare name
+            // here would silently fail that match for full-path queries.
+            l = snprintf(outarray + off, cap, "bus=pci,device=%s\n", pf.dev);
+        } else {
+            l = snprintf(outarray + off, cap, "bus=pci,device=%s\n", dir->d_name);
+        }
         if (l < 0 || l > cap) {
             outarray[off] = 0;
             res = i;
@@ -881,7 +901,13 @@ int pcie_uram_plugin_create(unsigned pcount, const char** devparam, const char**
     bool mmapedio = true;
     unsigned iospacesz = 4096;
     char devname[128];
-    snprintf(devname, sizeof(devname), "/dev/%s", pf.dev);
+    if (strncmp(pf.dev, "/dev/", 5) == 0) {
+        // pf.dev is already a full device path (e.g. device=/dev/usdr0 was passed directly);
+        // do not prepend /dev/ again or we get an invalid doubled path like /dev//dev/usdr0.
+        snprintf(devname, sizeof(devname), "%s", pf.dev);
+    } else {
+        snprintf(devname, sizeof(devname), "/dev/%s", pf.dev);
+    }
 
     for (unsigned k = 0; k < pcount; k++) {
         if (strcmp(devparam[k], "mmapio") == 0) {
