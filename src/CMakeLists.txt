@@ -60,6 +60,7 @@ add_subdirectory(lib)
 add_subdirectory(tools)
 
 if(ENABLE_TESTS)
+    enable_testing()
     add_subdirectory(tests)
     add_subdirectory(utests)
 endif(ENABLE_TESTS)

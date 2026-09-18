@@ -17,7 +17,7 @@ Example:
     Parameter `device` can be any SoapySDR device string, e.g. "driver=usdr" or "driver=usdr,bus=<device_bus>"
     device_bus can be:
         - bus=pci,device=<device_path>, where <device_path> is the PCI device Path (e.g. /dev/usdr0)
-        - bus=usb@<usb_address>, where <usb_address> is the USB address (e.g. 3/3/6 for bus 3, device 3, function 6)
+        - bus=usb@<usb_address>, where <usb_address> is the USB address (e.g. 3/1/6 for bus 3, port 1, device 6)
 """
 
 from __future__ import annotations

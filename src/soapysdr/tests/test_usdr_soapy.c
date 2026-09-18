@@ -27,8 +27,8 @@ static int fail(const char *what)
 
 static void usage(const char *argv0)
 {
-    printf("Usage: %s [-d bus] [-c channels] [-i packet_size] [-n reads] [-r rate] [-f freq] [-b bw] [-g gain] [-Q]\n", argv0);
-    printf("  -d bus          USDR bus string, e.g. usb@3/3/6 or pci,device=/dev/usdr0\n");
+    printf("Usage: %s [-d bus] [-c channels] [-i packet_size] [-n reads] [-r rate] [-f freq] [-b bw] [-g gain] [-Q] [-T] [-Z]\n", argv0);
+    printf("  -d bus          USDR bus string, e.g. usb@3/1/6 or pci,device=/dev/usdr0\n");
     printf("  -c channels     RX channels to stream, default 1\n");
     printf("  -i samples      RX samples per read, default 4096\n");
     printf("  -n reads        RX reads, default 4\n");
@@ -37,6 +37,8 @@ static void usage(const char *argv0)
     printf("  -b bw           Preferred bandwidth, default 1e6\n");
     printf("  -g gain         Preferred gain, default 15\n");
     printf("  -Q              Query/control-plane only, skip RX stream\n");
+    printf("  -T              Include TX writeStream chunking smoke test\n");
+    printf("  -Z              Fill RX timestamp gaps with zero samples\n");
 }
 
 static void print_kwargs(const SoapySDRKwargs *kwargs)
@@ -345,7 +347,21 @@ static int check_channel(SoapySDRDevice *sdr, int direction, const char *label, 
     return EXIT_SUCCESS;
 }
 
-static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet_size, unsigned reads)
+static int check_timestamp_step(long long prev_time_ns, int prev_ret, long long time_ns, double sample_rate)
+{
+    if (prev_time_ns == 0 || time_ns == 0 || prev_ret <= 0 || sample_rate <= 0.0) {
+        return EXIT_SUCCESS;
+    }
+    double delta_samples = (double)(time_ns - prev_time_ns) * sample_rate / 1e9;
+    if (delta_samples < (double)prev_ret - 1.0 || delta_samples > (double)prev_ret + 1.0) {
+        printf("Timestamp step mismatch: expected %d samples, got %.3f\n", prev_ret, delta_samples);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet_size, unsigned reads,
+                         double sample_rate, bool zero_fill_gaps)
 {
     int status = EXIT_FAILURE;
     SoapySDRStream *rx_stream = NULL;
@@ -367,7 +383,8 @@ static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet
     }
     for (unsigned i = 0; i < channels; i++) {
         act_channels[i] = i;
-        const size_t buffer_size = 2u * packet_size * sizeof(float);
+        const size_t max_read_size = packet_size * 2u + 1u;
+        const size_t buffer_size = 2u * max_read_size * sizeof(float);
         if (usdr_alignalloc(&buffs[i], STREAM_ALIGN, buffer_size) != 0) {
             goto cleanup;
         }
@@ -379,8 +396,10 @@ static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet
     SoapySDRKwargs stream_args = {};
     SoapySDRKwargs_set(&stream_args, "bufferLength", packet_size_str);
     SoapySDRKwargs_set(&stream_args, "linkFormat", SOAPY_SDR_CS16);
+    SoapySDRKwargs_set(&stream_args, "rxGapFill", zero_fill_gaps ? "zero" : "none");
 
-    printf("\nRX stream: channels=%u packet_size=%u reads=%u\n", channels, packet_size, reads);
+    printf("\nRX stream: channels=%u packet_size=%u reads=%u gap_mode=%s\n",
+           channels, packet_size, reads, zero_fill_gaps ? "zero" : "none");
 #if (SOAPY_SDR_API_VERSION < 0x00080000)
     if (SoapySDRDevice_setupStream(sdr, &rx_stream, SOAPY_SDR_RX, SOAPY_SDR_CF32, act_channels, channels, &stream_args) != 0) {
         SoapySDRKwargs_clear(&stream_args);
@@ -409,6 +428,8 @@ static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet
         fail("activateStream");
         goto cleanup;
     }
+    long long prev_time_ns = 0;
+    int prev_ret = 0;
     for (unsigned i = 0; i < reads; i++) {
         flags = 0;
         time_ns = 0;
@@ -418,7 +439,43 @@ static int run_rx_stream(SoapySDRDevice *sdr, unsigned channels, unsigned packet
             SoapySDRDevice_deactivateStream(sdr, rx_stream, 0, 0);
             goto cleanup;
         }
+        if (check_timestamp_step(prev_time_ns, prev_ret, time_ns, sample_rate) != EXIT_SUCCESS) {
+            SoapySDRDevice_deactivateStream(sdr, rx_stream, 0, 0);
+            goto cleanup;
+        }
+        prev_time_ns = time_ns;
+        prev_ret = ret;
     }
+
+    const unsigned variable_sizes[] = {
+        17u,
+        packet_size / 2u,
+        packet_size - 1u,
+        packet_size,
+        packet_size + 1u,
+        packet_size * 2u + 1u
+    };
+    printf("RX variable read sizes:");
+    for (size_t i = 0; i < sizeof(variable_sizes) / sizeof(variable_sizes[0]); i++) {
+        const unsigned requested = variable_sizes[i];
+        flags = 0;
+        time_ns = 0;
+        ret = SoapySDRDevice_readStream(sdr, rx_stream, buffs, requested, &flags, &time_ns, 100000);
+        printf(" %u=>%d", requested, ret);
+        if (ret != (int)requested) {
+            printf("\n");
+            SoapySDRDevice_deactivateStream(sdr, rx_stream, 0, 0);
+            goto cleanup;
+        }
+        if (check_timestamp_step(prev_time_ns, prev_ret, time_ns, sample_rate) != EXIT_SUCCESS) {
+            printf("\n");
+            SoapySDRDevice_deactivateStream(sdr, rx_stream, 0, 0);
+            goto cleanup;
+        }
+        prev_time_ns = time_ns;
+        prev_ret = ret;
+    }
+    printf("\n");
     if (SoapySDRDevice_deactivateStream(sdr, rx_stream, 0, 0) != 0) {
         fail("deactivateStream");
         goto cleanup;
@@ -441,6 +498,81 @@ cleanup:
     return status;
 }
 
+static int run_tx_stream(SoapySDRDevice *sdr, unsigned packet_size)
+{
+    int status = EXIT_FAILURE;
+    SoapySDRStream *tx_stream = NULL;
+    size_t tx_channels = SoapySDRDevice_getNumChannels(sdr, SOAPY_SDR_TX);
+    if (tx_channels == 0) {
+        printf("\nSKIP TX stream: device has no TX channels\n");
+        return EXIT_SUCCESS;
+    }
+
+    size_t channel = 0;
+    void *buff = NULL;
+    const size_t write_size = packet_size * 2u;
+    const size_t buffer_size = 2u * write_size * sizeof(float);
+    if (usdr_alignalloc(&buff, STREAM_ALIGN, buffer_size) != 0) {
+        return EXIT_FAILURE;
+    }
+    memset(buff, 0, buffer_size);
+    const void *buffs[1] = {buff};
+
+    char packet_size_str[32];
+    snprintf(packet_size_str, sizeof(packet_size_str), "%u", packet_size);
+    SoapySDRKwargs stream_args = {};
+    SoapySDRKwargs_set(&stream_args, "bufferLength", packet_size_str);
+    size_t channels[1] = {channel};
+
+    printf("\nTX stream chunking: channel=%zu packet_size=%u write_size=%zu\n", channel, packet_size, write_size);
+#if (SOAPY_SDR_API_VERSION < 0x00080000)
+    if (SoapySDRDevice_setupStream(sdr, &tx_stream, SOAPY_SDR_TX, SOAPY_SDR_CF32, channels, 1, &stream_args) != 0) {
+        SoapySDRKwargs_clear(&stream_args);
+        fail("setupStream(TX)");
+        goto cleanup;
+    }
+#else
+    tx_stream = SoapySDRDevice_setupStream(sdr, SOAPY_SDR_TX, SOAPY_SDR_CF32, channels, 1, &stream_args);
+    if (tx_stream == NULL) {
+        SoapySDRKwargs_clear(&stream_args);
+        fail("setupStream(TX)");
+        goto cleanup;
+    }
+#endif
+    SoapySDRKwargs_clear(&stream_args);
+
+    size_t mtu = SoapySDRDevice_getStreamMTU(sdr, tx_stream);
+    printf("TX stream MTU: %zu\n", mtu);
+    if (SoapySDRDevice_activateStream(sdr, tx_stream, 0, 0, 0) != 0) {
+        fail("activateStream(TX)");
+        goto cleanup;
+    }
+    int flags = 0;
+    int ret = SoapySDRDevice_writeStream(sdr, tx_stream, buffs, write_size, &flags, 0, 100000);
+    printf("writeStream ret=%d flags=%d\n", ret, flags);
+    if (SoapySDRDevice_deactivateStream(sdr, tx_stream, 0, 0) != 0) {
+        fail("deactivateStream(TX)");
+        goto cleanup;
+    }
+    if (ret != (int)write_size) {
+        goto cleanup;
+    }
+    if (SoapySDRDevice_closeStream(sdr, tx_stream) != 0) {
+        tx_stream = NULL;
+        fail("closeStream(TX)");
+        goto cleanup;
+    }
+    tx_stream = NULL;
+    status = EXIT_SUCCESS;
+
+cleanup:
+    if (tx_stream != NULL) {
+        SoapySDRDevice_closeStream(sdr, tx_stream);
+    }
+    usdr_alignfree(buff);
+    return status;
+}
+
 int main(int argc, char **argv)
 {
     const char *device = "";
@@ -452,9 +584,11 @@ int main(int argc, char **argv)
     double bandwidth = 1e6;
     double gain = 15.0;
     bool query_only = false;
+    bool tx_stream = false;
+    bool zero_fill_gaps = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "hd:c:i:n:r:f:b:g:Q")) != -1) {
+    while ((opt = getopt(argc, argv, "hd:c:i:n:r:f:b:g:QTZ")) != -1) {
         switch (opt) {
         case 'd': device = optarg; break;
         case 'c': channels = (unsigned)atoi(optarg); break;
@@ -465,6 +599,8 @@ int main(int argc, char **argv)
         case 'b': bandwidth = atof(optarg); break;
         case 'g': gain = atof(optarg); break;
         case 'Q': query_only = true; break;
+        case 'T': tx_stream = true; break;
+        case 'Z': zero_fill_gaps = true; break;
         case 'h':
         default:
             usage(argv[0]);
@@ -520,7 +656,10 @@ int main(int argc, char **argv)
         status = check_channel(sdr, SOAPY_SDR_TX, "TX", i, sample_rate, rx_freq, bandwidth, gain);
     }
     if (status == EXIT_SUCCESS && !query_only) {
-        status = run_rx_stream(sdr, channels, packet_size, reads);
+        status = run_rx_stream(sdr, channels, packet_size, reads, sample_rate, zero_fill_gaps);
+    }
+    if (status == EXIT_SUCCESS && tx_stream) {
+        status = run_tx_stream(sdr, packet_size);
     }
 
     int unmake_status = SoapySDRDevice_unmake(sdr);
