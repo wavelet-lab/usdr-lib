@@ -5,8 +5,15 @@ cmake_minimum_required(VERSION 3.8)
 set(CMAKE_CXX_STANDARD 11)
 project(usdr-soapy C CXX)
 
-find_package(SoapySDR REQUIRED)
+find_package(SoapySDR QUIET)
 
+if(NOT SoapySDR_FOUND)
+    message(FATAL_ERROR
+        "SoapySDR package not found.\n"
+        "On Ubuntu, install it with:\n"
+        "  sudo apt install libsoapysdr-dev"
+    )
+endif()
 include_directories(../lib/port)
 include_directories(../lib/models)
 
