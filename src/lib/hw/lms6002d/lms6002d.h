@@ -30,12 +30,26 @@ struct lms6002d_state {
     uint8_t rxpll_vco_div_bufsel;
     uint8_t rfe_in1sel_dci;
     uint8_t rfe_gain_lna_sel;
+    uint8_t trf_pa_ctrl;
+
+    uint8_t trf_vga1_gain;
 };
 typedef struct lms6002d_state lms6002d_state_t;
 
 
 int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, lms6002d_state_t* out);
+
+// Internal VCO+PLL state for fast LO settelment without calibration
+typedef struct lms6002_pll_stat {
+    uint8_t vco_cap_min;
+    uint8_t vco_cap_max;
+    uint8_t vco_num;
+    uint8_t vco_div;
+} lms6002_pll_stat_t;
+
+int lms6002d_tune_pll_stat(lms6002d_state_t* obj, bool tx, unsigned freq, bool mkstat, lms6002_pll_stat_t* pstat);
 int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq);
+int lms6002d_disable_pll(lms6002d_state_t* obj, bool tx);
 
 //int lms6002d_rf_enable(lms6002d_state_t* obj, bool tx, bool en);
 
@@ -87,17 +101,20 @@ typedef enum lms6002d_tx_path lms6002d_tx_path_t;
 int lms6002d_set_tx_path(lms6002d_state_t* obj, unsigned path);
 
 int lms6002d_set_rxfedc(lms6002d_state_t* obj, int8_t dci, int8_t dcq);
-
+int lms6002d_set_rxfe_ip2corr(lms6002d_state_t* obj, int8_t i, int8_t q);
+int lms6002d_set_txvga1_dc(lms6002d_state_t* obj, uint8_t dci, uint8_t dcq);
 
 int lms6002d_cal_lpf(lms6002d_state_t* obj);
 int lms6002d_cal_txrxlpfdc(lms6002d_state_t* obj, bool tx);
 int lms6002d_cal_vga2(lms6002d_state_t* obj);
-int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode);
+int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode, bool do_tune);
 
 
 // For TIA calibration
 int lms6002d_set_tia_cfb(lms6002d_state_t* obj, uint8_t value);
 int lms6002d_set_tia_rfb(lms6002d_state_t* obj, uint8_t value);
 
+int lms6002d_rf_loopback_en(lms6002d_state_t* obj);
+int lms6002d_rf_loopback_dis(lms6002d_state_t* obj);
 
 #endif

@@ -5,8 +5,15 @@ cmake_minimum_required(VERSION 3.8)
 set(CMAKE_CXX_STANDARD 11)
 project(usdr-soapy C CXX)
 
-find_package(SoapySDR REQUIRED)
+find_package(SoapySDR QUIET)
 
+if(NOT SoapySDR_FOUND)
+    message(FATAL_ERROR
+        "SoapySDR package not found.\n"
+        "On Ubuntu, install it with:\n"
+        "  sudo apt install libsoapysdr-dev"
+    )
+endif()
 include_directories(../lib/port)
 include_directories(../lib/models)
 
@@ -23,6 +30,18 @@ SOAPY_SDR_MODULE_UTIL(
 )
 
 if(ENABLE_TESTS)
-    add_executable(test_usdr_soapy test_usdr_soapy.c)
+    add_executable(test_usdr_soapy tests/test_usdr_soapy.c)
     target_link_libraries(test_usdr_soapy ${SoapySDR_LIBRARIES})
 endif(ENABLE_TESTS)
+
+option(ENABLE_SOAPY_HIL_TESTS "Enable SoapySDR hardware-in-the-loop tests" OFF)
+if(ENABLE_TESTS AND ENABLE_SOAPY_HIL_TESTS)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(
+        NAME soapy_usdr_hil
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/soapy_usdr_hil.py
+            --require-device
+            --device driver=usdr
+    )
+endif()

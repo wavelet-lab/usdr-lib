@@ -74,6 +74,8 @@ int lms6002d_create(lldev_t dev, unsigned subdev, unsigned lsaddr, struct lms600
     out->top_enreg = (uint8_t)MAKE_LMS6002D_TOP_ENREG(0, 0, 0, 0, 0, 0, 0, 0);
     out->rxpll_vco_div_bufsel = (uint8_t)MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(0, 0, 1);
     out->rfe_gain_lna_sel = 0xc0;
+    out->trf_pa_ctrl = (uint8_t)MAKE_LMS6002D_TRF_PA_CTRL(0, 0);
+    out->trf_vga1_gain = (uint8_t)GET_LMS6002D_TRF_VGA1GAIN_VGA1GAIN(21);
 
     memset(out->rclpfcal, 3, sizeof(out->rclpfcal));
 
@@ -243,12 +245,35 @@ found:
     return 0;
 }
 
+int lms6002d_disable_pll(lms6002d_state_t* obj, bool tx)
+{
+    int res;
+    if (tx) {
+        SET_LMS6002D_TOP_ENREG_CLK_TX_DSM_SPI(obj->top_enreg, 0);
+    } else {
+        SET_LMS6002D_TOP_ENREG_CLK_RX_DSM_SPI(obj->top_enreg, 0);
+    }
+
+    uint16_t regs[] = {
+        MAKE_LMS6002D_REG_WR(TOP_ENREG, obj->top_enreg),
+        tx ? MAKE_LMS6002D_TXPLL_PLL_CFG(0, 0, 0, 0, 0) :
+             MAKE_LMS6002D_RXPLL_PLL_CFG(0, 0, 0, 0, 0),
+    };
+
+    res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+    return res;
+}
 
 int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
 {
+    return lms6002d_tune_pll_stat(obj, tx, freq, true, NULL);
+}
+
+int lms6002d_tune_pll_stat(lms6002d_state_t* obj, bool tx, unsigned freq, bool mkstat, lms6002_pll_stat_t* pstat)
+{
     int res;
     unsigned k;
-    if (freq < 200000000)
+    if (freq < 170000000)
         return -ERANGE;
 
     for (k = 0; k < SIZEOF_ARRAY(s_vco_ranges) - 1; k++) {
@@ -256,13 +281,15 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
             break;
     }
 
-    uint64_t vcofreq = (uint64_t)freq << (s_vco_ranges[k].vcodiv + 1);
+    uint8_t vco_div = mkstat ? s_vco_ranges[k].vcodiv : pstat->vco_div;
+    uint8_t vco_num = mkstat ? s_vco_ranges[k].vconum : pstat->vco_num;
+    uint8_t vco_cap = mkstat ? 0x20 : ((unsigned)pstat->vco_cap_max + pstat->vco_cap_min) / 2;
+
+    uint64_t vcofreq = (uint64_t)freq << (vco_div + 1);
     struct nint_nfrac nn = lms6002d_pll_calc(obj->fref, vcofreq);
-    unsigned vcon = s_vco_ranges[k].vconum;
-    //for (vcon = 4; vcon < 8; vcon++)
-    //{
-    USDR_LOG("6002", USDR_LOG_INFO, "pll %s: OUT=%u VCO_FREQ=%llu VCO_NUM=%d NINT=%u NFRAC=%u FREF=%u\n",
-             tx ? "tx" : "rx", freq, (unsigned long long)vcofreq, 8 - s_vco_ranges[k].vconum, nn.nint, nn.frac, obj->fref);
+
+    USDR_LOG("6002", USDR_LOG_INFO, "pll %s: OUT=%u VCO_FREQ=%llu VCO_NUM=%d VCO_DIV=%d NINT=%u NFRAC=%u FREF=%u VCO_CAP=%d\n",
+             tx ? "tx" : "rx", freq, (unsigned long long)vcofreq, 8 - vco_num, vco_div + 1, nn.nint, nn.frac, obj->fref, vco_cap);
 
     if (tx) {
         SET_LMS6002D_TOP_ENREG_CLK_TX_DSM_SPI(obj->top_enreg, 1);
@@ -284,10 +311,10 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
              MAKE_LMS6002D_RXPLL_NINT_NFRAC_BY3(nint_nfrac),
         tx ? MAKE_LMS6002D_TXPLL_PLL_CFG(1, 1, 1, 1, 0) :
              MAKE_LMS6002D_RXPLL_PLL_CFG(1, 1, 1, 1, 0),
-        tx ? MAKE_LMS6002D_TXPLL_VCO_DIV(vcon, 0, 0) :
-             MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(vcon, 0, 0),
-        tx ? MAKE_LMS6002D_TXPLL_VCO_DIV(vcon, s_vco_ranges[k].vcodiv | 4, 0) :
-             MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(vcon, s_vco_ranges[k].vcodiv | 4,
+        tx ? MAKE_LMS6002D_TXPLL_VCO_DIV(vco_num, 0, 0) :
+             MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(vco_num, 0, 0),
+        tx ? MAKE_LMS6002D_TXPLL_VCO_DIV(vco_num, vco_div | 4, 0) :
+             MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(vco_num, vco_div | 4,
                                                 GET_LMS6002D_RXPLL_VCO_DIV_BUFSEL_SELOUT(obj->rxpll_vco_div_bufsel)),
         tx ? MAKE_LMS6002D_TXPLL_PFD_UP(1, 0, 0, 6) :   //2
              MAKE_LMS6002D_RXPLL_PFD_UP(1, 0, 0, 6),    //2
@@ -295,8 +322,8 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
              MAKE_LMS6002D_RXPLL_VCO_REG_PFD_U(1, 1, 0, 0),
         tx ? MAKE_LMS6002D_TXPLL_VCO_REG_PFD_D(0, 2) :
              MAKE_LMS6002D_RXPLL_VCO_REG_PFD_D(0, 2),
-        tx ? MAKE_LMS6002D_TXPLL_PLL_CFG2(0, 0x20) :
-             MAKE_LMS6002D_RXPLL_PLL_CFG2(0, 0x20),
+        tx ? MAKE_LMS6002D_TXPLL_PLL_CFG2(0, vco_cap) :
+             MAKE_LMS6002D_RXPLL_PLL_CFG2(0, vco_cap),
         //tx ? MAKE_LMS6002D_TXPLL_VCO_REG_PFD_D(2, 0) :
         //     MAKE_LMS6002D_RXPLL_VCO_REG_PFD_D(2, 0),
         tx ? 0x9b76 : 0xab76,
@@ -331,13 +358,17 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
     if (res)
         return res;
 
+    // We set cahed values, no need to do VCO calibration
+    if (!mkstat)
+        return res;
+
     // TODO add thermal info
-    uint8_t vcocap = (lo + hi) / 2;
+    vco_cap = (lo + hi) / 2;
     uint16_t vregs[] = {
-        tx ? MAKE_LMS6002D_TXPLL_PLL_CFG2(0, vcocap) :
-             MAKE_LMS6002D_RXPLL_PLL_CFG2(0, vcocap),
-        tx ? MAKE_LMS6002D_TXPLL_VCO_DIV(vcon, s_vco_ranges[k].vcodiv | 4, 0) :
-             MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(vcon, s_vco_ranges[k].vcodiv | 4,
+        tx ? MAKE_LMS6002D_TXPLL_PLL_CFG2(0, vco_cap) :
+             MAKE_LMS6002D_RXPLL_PLL_CFG2(0, vco_cap),
+        tx ? MAKE_LMS6002D_TXPLL_VCO_DIV(vco_num, vco_div | 4, 0) :
+             MAKE_LMS6002D_RXPLL_VCO_DIV_BUFSEL(vco_num, vco_div | 4,
                                                 GET_LMS6002D_RXPLL_VCO_DIV_BUFSEL_SELOUT(obj->rxpll_vco_div_bufsel)),
         tx ? 0x9b7e : 0xab7e, //PD comparator
  //       tx ? MAKE_LMS6002D_LMS6002D_TXPLL_0x17(1, 1, 0, 2) :
@@ -348,7 +379,7 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
         return res;
 
     USDR_LOG("6002", USDR_LOG_INFO, "pll %s: vco_cap[%d;%d] => %d /%d / %02x -> %02x\n",
-             tx ? "tx" : "rx", lo, hi, vcocap, vcon, obj->rxpll_vco_div_bufsel, vregs[1] );
+             tx ? "tx" : "rx", lo, hi, vco_cap, vco_num, obj->rxpll_vco_div_bufsel, vregs[1] );
 
     if (!tx)
         obj->rxpll_vco_div_bufsel = vregs[1];
@@ -356,6 +387,12 @@ int lms6002d_tune_pll(lms6002d_state_t* obj, bool tx, unsigned freq)
     // TODO add more options for failed locks
     if (lo > hi && hi == 0) {
         return -ENOLCK;
+    }
+    if (pstat) {
+        pstat->vco_cap_min = lo;
+        pstat->vco_cap_max = hi;
+        pstat->vco_num = vco_num;
+        pstat->vco_div = vco_div;
     }
     return 0;
 }
@@ -431,8 +468,8 @@ int lms6002d_set_bandwidth(lms6002d_state_t* obj, bool tx, unsigned freq)
         (tx ? 0x3600 : 0x5600) | 0x8000 | (lpfcal << 4),
     };
 
-    USDR_LOG("6002", USDR_LOG_INFO, "LPF %d => BAND=%d RC=%d BYPASS=%d CAL=%d\n",
-             freq / 1000, band, lpfcal, b, obj->rclpfcal[band]);
+    USDR_LOG("6002", USDR_LOG_INFO, "LPF_%s %d => BAND=%d RC=%d BYPASS=%d CAL=%d\n",
+             tx ? "TX" : "RX", freq / 1000, band, lpfcal, b, obj->rclpfcal[band]);
 
     res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
     if (res)
@@ -476,7 +513,7 @@ int lms6002d_set_txvga1_gain(lms6002d_state_t* obj, unsigned vga)
     uint16_t regs[] = {
         MAKE_LMS6002D_TRF_VGA1GAIN(vga),
     };
-
+    obj->trf_vga1_gain = vga;
     res = lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
     if (res)
         return res;
@@ -555,8 +592,11 @@ int lms6002d_set_rx_path(lms6002d_state_t* obj, unsigned path)
 
 int lms6002d_set_tx_path(lms6002d_state_t* obj, unsigned path)
 {
+    SET_LMS6002D_TRF_PA_CTRL_EN12(obj->trf_pa_ctrl, path);
+    SET_LMS6002D_TRF_PA_CTRL_ENAUX(obj->trf_pa_ctrl, path == 3 ? 1 : 0);
+
     uint16_t regs[] = {
-        MAKE_LMS6002D_TRF_PA_CTRL(path, path == 3 ? 1 : 0),
+        MAKE_LMS6002D_REG_WR(TRF_PA_CTRL, obj->trf_pa_ctrl),
     };
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
@@ -790,7 +830,7 @@ fail_cal:
     return 0;
 }
 
-int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
+int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode, bool do_tune)
 {
     // TURN ON tx, SET tx to 320Mhz
     int res = 0;
@@ -801,7 +841,7 @@ int lms6002d_cal_lpf_bandwidth(lms6002d_state_t* obj, unsigned bcode)
     bool txen = GET_LMS6002D_TOP_ENCFG_STXEN(obj->top_encfg);
 
     res = res ? res : lms6002d_trf_enable(obj, 1);
-    res = res ? res : lms6002d_tune_pll(obj, true, 320000000);
+    res = (!do_tune || res) ? res : lms6002d_tune_pll(obj, true, 320000000);
 
     uint16_t regs_0[] = {
         MAKE_LMS6002D_TOP_LPF_CTRL(0, 0, 0, 0),
@@ -845,6 +885,15 @@ int lms6002d_set_rxfedc(lms6002d_state_t* obj, int8_t dci, int8_t dcq)
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }
 
+int lms6002d_set_txvga1_dc(lms6002d_state_t* obj, uint8_t dci, uint8_t dcq)
+{
+    uint16_t regs[] = {
+        MAKE_LMS6002D_TRF_VGA1DC_I(dci),
+        MAKE_LMS6002D_TRF_VGA1DC_Q(dcq),
+    };
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
+
 int lms6002d_set_tia_cfb(lms6002d_state_t* obj, uint8_t value)
 {
     uint16_t regs[] = {
@@ -857,6 +906,41 @@ int lms6002d_set_tia_rfb(lms6002d_state_t* obj, uint8_t value)
 {
     uint16_t regs[] = {
         MAKE_LMS6002D_RFE_RFB_TIA(value),
+    };
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms6002d_set_rxfe_ip2corr(lms6002d_state_t* obj, int8_t i, int8_t q)
+{
+    uint16_t regs[] = {
+        MAKE_LMS6002D_RFE_XLD_IP2I(0, i),
+        MAKE_LMS6002D_RFE_IP2Q(q),
+    };
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms6002d_rf_loopback_en(lms6002d_state_t* obj)
+{
+    int lna = GET_LMS6002D_RFE_GAIN_LNA_SEL_LNASEL(obj->rfe_gain_lna_sel);
+    uint16_t regs[] = {
+        MAKE_LMS6002D_RFE_PD(0, 0, 0, 1),
+        MAKE_LMS6002D_RFE_CTRL(1, 1),
+        MAKE_LMS6002D_TRF_PA_CTRL(0, 0),
+        MAKE_LMS6002D_TOP_POWER(0, 1, 0, 1, 1),
+        MAKE_LMS6002D_TOP_LOOPBACK(0, 0, 0, lna),
+    };
+
+    return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms6002d_rf_loopback_dis(lms6002d_state_t* obj)
+{
+    uint16_t regs[] = {
+        MAKE_LMS6002D_TOP_POWER(0, 1, 0, 1, 0),
+        MAKE_LMS6002D_TOP_LOOPBACK(0, 0, 0, 0),
+        MAKE_LMS6002D_REG_WR(TRF_PA_CTRL, obj->trf_pa_ctrl),
+        MAKE_LMS6002D_TOP_POWER(0, 1, 0, 1, 0),
+        MAKE_LMS6002D_RFE_PD(0, 0, 0, 0),
     };
     return lms6002d_spi_post(obj, regs, SIZEOF_ARRAY(regs));
 }

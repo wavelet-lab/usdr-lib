@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024 Wavelet Lab
+# Copyright (c) 2023-2026 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
 cmake_minimum_required(VERSION 3.8)
@@ -12,7 +12,7 @@ endif()
 
 
 file(READ "${PROJECT_SOURCE_DIR}/Changelog.txt" changelog_txt)
-string(REGEX MATCH "Release ([0-9]+\\.[0-9]+\\.[0-9]+) \\(" CHANGELOG_MATCH "${changelog_txt}")
+string(REGEX MATCH "Release ([^ ]+) \\(" CHANGELOG_MATCH "${changelog_txt}")
 if(NOT CHANGELOG_MATCH)
     message(FATAL_ERROR "Failed to extract version number from Changelog.txt")
 endif(NOT CHANGELOG_MATCH)
@@ -34,13 +34,19 @@ option(ENABLE_DMONITOR  "Enable debug tools" ON)
 option(ENABLE_VERILATOR "Enable verilator lowlevel bridge" OFF)
 option(ENABLE_SOAPY "Enable SopaySDR support" ON)
 option(ENABLE_GUI  "Enable USDR QT5 simple GUI" ON)
-option(ENABLE_TESTS  "Enable tests" ON)
+option(ENABLE_TESTS  "Enable tests" OFF)
+option(ENABLE_AVX512 "Enable AVX-512 optimized DSP implementations" ON)
 
 
 add_feature_info(VerilatorBridge ENABLE_VERILATOR "Verilator support for emulated devices")
 add_feature_info(SoapySDR ENABLE_SOAPY "SopaySDR plugin")
 add_feature_info(UsdrGUI ENABLE_GUI "USDR QT5 GUI")
+add_feature_info(AVX512 ENABLE_AVX512 "AVX-512 optimized DSP implementations")
 add_feature_info(LibUSB LIBUSB_1_FOUND "USB devices support")
+
+if(NOT ENABLE_AVX512)
+    add_definitions(-DWVLT_DISABLE_AVX512)
+endif(NOT ENABLE_AVX512)
 
 if (NOT BUILD_SHARED_LIBS)
     add_compile_options(-fPIC)
@@ -94,3 +100,8 @@ message(STATUS "Install libs: ${CMAKE_INSTALL_LIBDIR}")
 message(STATUS "Shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "Data dir: ${CMAKE_INSTALL_FULL_DATADIR}")
 message(STATUS "######################################################")
+
+include(cmake/UsdrPackage.cmake)
+
+# Use helper to generate/install CMake config, exported targets and pkg-config file
+usdr_install_package(NAME usdr VERSION ${USDR_VERSION} TARGETS usdrTargets PKGCONFIG ON)

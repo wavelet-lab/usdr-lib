@@ -1,0 +1,1719 @@
+# Copyright (c) 2025 Wavelet Lab
+# SPDX-License-Identifier: MIT
+
+name: LMX2820
+revision: 0.0.1
+processors: [ c ]
+bus:
+    type: SPI
+    rd_mask: 0x800000
+    usdr_path: /debug/hw/lmx2820/*/reg
+addr_width: 8
+data_width: 16
+
+pages:
+- name: Main
+  regs:
+  - addr: 0x0
+    name: R0
+    fields:
+    - bits: 0
+      name: POWERDOWN
+      mode: RW
+      dflt: 0x0
+      desc: Powers down the device.
+      opts:
+        0b0: Normal operation
+        0b1: Power down
+    - bits: 1
+      name: RESET
+      mode: RW
+      dflt: 0x0
+      desc: Resets all registers to silicon default values. This bit is self-clearing. 
+      opts:
+        0b0: Normal operation 
+        0b1: Reset
+    - bits: '3:2'
+      name: R0_RESERVED_3
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 4
+      name: FCAL_EN
+      mode: RW
+      dflt: 0x1
+      desc: Enables and activates VCO calibration. Writing register R0 with this bit set to a 1 enables and triggers VCO calibration.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: 5
+      name: R0_RESERVED_2
+      mode: RW
+      dflt: 0x1
+      desc: Program 0x1 to this field.
+    - bits: 6
+      name: DBLR_CAL_EN
+      mode: RW
+      dflt: 0x1
+      desc: Enables VCO doubler calibration.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '8:7'
+      name: FCAL_LPFD_ADJ
+      mode: RW
+      dflt: 0x0
+      desc: "Set this field in accordance to the phase detector frequency for optimal VCO calibration."
+      opts:
+        0x0: fPD >= 10 MHz
+        0x1: 10 MHz > fPD >= 5 MHz
+        0x2: 5 MHz > fPD >= 2.5 MHz
+        0x3: fPD < 2.5 MHz
+    - bits: '10:9'
+      name: FCAL_HPFD_ADJ
+      mode: RW
+      dflt: 0x0
+      desc: "Set this field in accordance to the phase detector frequency for optimal VCO calibration."
+      opts:
+        0x0: fPD <= 100 MHz
+        0x1: 100 MHz < fPD <= 150 MHz
+        0x2: 150 MHz < fPD <= 200 MHz
+        0x3: fPD > 200 MHz
+    - bits: '12:11'
+      name: R0_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 13
+      name: INSTCAL_SKIP_ACAL
+      mode: RW
+      dflt: 0x0
+      desc: Disable this bit when doing instant calibration. When not using instant calibration, it is recommended to enable it for faster VCO Calibration.
+    - bits: '15:14'
+      name: R0_RESERVED_0
+      mode: RW
+      dflt: 0x1
+      desc: Program 0x1 to this field.
+  - addr: 0x1
+    name: R1
+    fields:
+    - bits: 0
+      name: INSTCAL_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables instant calibration.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: 1
+      name: INSTCAL_DBLR_EN
+      mode: RW
+      dflt: 0x0
+      desc: Sets this bit to 1 if VCO doubler is engaged.
+      opts:
+        0b0: Normal operation
+        0b1: VCO doubler is engaged
+    - bits: '4:2'
+      name: R1_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 5
+      name: LD_VTUNE_EN
+      mode: RW
+      dflt: 0x1
+      desc: Selects lock detect type. VCOCal lock detect asserts a HIGH output after the VCO has finished calibration and the LD_DLY timeout counter is finished. VCOCal and Vtune lock detect asserts a HIGH output when VCOCal lock detect would assert a signal and the tuning voltage to the VCO is within acceptable limits.
+      opts:
+        0b0: VCOCal lock detect
+        0b1: VCOCal and Vtune lock detect
+    - bits: '14:6'
+      name: R1_RESERVED_0
+      mode: RW
+      dflt: 0x15E
+      desc: Program 0x15E to this field.
+    - bits: 15
+      name: PHASE_SYNC_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables phase synchronization. A Low-High-Low pulse is required at the PSYNC pin to trigger synchronization. Enable SYSREF requires PHASE_SYNC_EN = 1.
+      opts:
+        0b0: Normal operation
+        0b1: Phase synchronization enabled
+  - addr: 0x2
+    name: R2
+    fields:
+    - bits: 0
+      name: QUICK_RECAL_EN
+      mode: RW
+      dflt: 0x0
+      desc: Starts VCO calibration with the current VCO_SEL, VCO_CAPCTRL and VCO_DACISET values.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '11:1'
+      name: INSTCAL_DLY
+      mode: RW
+      dflt: 0x1F4
+      desc: "Sets the wait time for instant calibration. INSTCAL_DLY = T x fOSCIN / (2CAL_CLK_DIV). T = 2.5 x CBIASVCO / 4.7 mcF. CBIASVCO is the bypass capacitor at pin 3."
+    - bits: '14:12'
+      name: CAL_CLK_DIV
+      mode: RW
+      dflt: 0x3
+      desc: "Divides down the state machine clock (fsm) during VCO calibration. Maximum fsm is 200 MHz. fsm = fOSCIN / (2CAL_CLK_DIV)."
+      opts:
+        0x0: fOSCIN <= 200 MHz
+        0x1: fOSCIN <= 400 MHz
+        0x2: fOSCIN <= 800 MHz
+        0x3: All other fOSCIN values
+    - bits: 15
+      name: R2_RESERVED_0
+      mode: RW
+      dflt: 0x1
+      desc: Program 0x1 to this field.
+  - addr: 0x3
+    name: R3
+    fields:
+    - bits: '15:0'
+      name: R3_RESERVED_0
+      mode: RW
+      dflt: 0x41
+      desc: Program 0x41 to this field.
+  - addr: 0x4
+    name: R4
+    fields:
+    - bits: '15:0'
+      name: R4_RESERVED_0
+      mode: RW
+      dflt: 0x4204
+      desc: Program 0x4204 to this field.
+  - addr: 0x5
+    name: R5
+    fields:
+    - bits: '15:0'
+      name: R5_RESERVED_0
+      mode: RW
+      dflt: 0x3832
+      desc: Program 0x32 to this field.
+  - addr: 0x6
+    name: R6
+    fields:
+    - bits: '7:0'
+      name: R6_RESERVED_0
+      mode: RW
+      dflt: 0x43
+      desc: Program 0x43 to this field.
+    - bits: '15:8'
+      name: ACAL_CMP_DLY
+      mode: RW
+      dflt: 0xA
+      desc: VCO amplitude calibration delay. Lowering this value can speed up calibration time. If too low, phase noise may not be optimal due to insufficient time to reach final calibrated amplitude. Delay time = ACAL_CMP_DLY x 2 x state machine clock cycle.
+  - addr: 0x7
+    name: R7
+    fields:
+    - bits: '15:0'
+      name: R7_RESERVED_0
+      mode: RW
+      dflt: 0xC8
+      desc: Program 0x0 to this field.
+  - addr: 0x8
+    name: R8
+    fields:
+    - bits: '15:0'
+      name: R8_RESERVED_0
+      mode: RW
+      dflt: 0xC802
+      desc: Program 0xC802 to this field.
+  - addr: 0x9
+    name: R9
+    fields:
+    - bits: '15:0'
+      name: R9_RESERVED_0
+      mode: RW
+      dflt: 0x5
+      desc: Program 0x5 to this field.
+  - addr: 0xA
+    name: R10
+    fields:
+    - bits: '6:0'
+      name: R10_RESERVED_2
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 7
+      name: VCO_CAPCTRL_FORCE
+      mode: RW
+      dflt: 0x0
+      desc: Forces the VCO to use the sub-band specified by VCO_CAPCTRL. Useful for full-assisted VCO calibration and debugging purposes.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '10:8'
+      name: R10_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 11
+      name: VCO_DACISET_FORCE
+      mode: RW
+      dflt: 0x0
+      desc: Forces the VCO to use the current setting specified by VCO_DACISET. Useful for full-assisted VCO calibration and debugging purposes.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: 12
+      name: PFD_DLY_MANUAL
+      mode: RW
+      dflt: 0x0
+      desc: Enables manual PFD_DLY adjustment.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '15:13'
+      name: R10_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0xB
+    name: R11
+    fields:
+    - bits: '3:0'
+      name: R11_RESERVED_1
+      mode: RW
+      dflt: 0x3
+      desc: Program 0x2 to this field.
+    - bits: 4
+      name: OSC_2X
+      mode: RW
+      dflt: 0x0
+      desc: Enables reference input doubler.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '15:5'
+      name: R11_RESERVED_0
+      mode: RW
+      dflt: 0x30
+      desc: Program 0x30 to this field.
+  - addr: 0xC
+    name: R12
+    fields:
+    - bits: '9:0'
+      name: R12_RESERVED_1
+      mode: RW
+      dflt: 0x8
+      desc: Program 0x8 to this field.
+    - bits: '12:10'
+      name: MULT
+      mode: RW
+      dflt: 0x1
+      desc: Sets reference path frequency multiplier value.
+      opts:
+        0x1: Bypassed
+        0x3: x3
+        0x4: x4
+        0x5: x5
+        0x6: x6
+        0x7: x7
+    - bits: '15:13'
+      name: R12_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0xD
+    name: R13
+    fields:
+    - bits: '4:0'
+      name: R13_RESERVED_1
+      mode: RW
+      dflt: 0x18
+      desc: Program 0x18 to this field.
+    - bits: '12:5'
+      name: PLL_R
+      mode: RW
+      dflt: 0x1
+      desc: Sets reference path Post-R divider value.
+    - bits: '15:13'
+      name: R13_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0xE
+    name: R14
+    fields:
+    - bits: '11:0'
+      name: PLL_R_PRE
+      mode: RW
+      dflt: 0x1
+      desc: Sets reference path Pre-R divider value.
+    - bits: '15:12'
+      name: R14_RESERVED_0
+      mode: RW
+      dflt: 0x3
+      desc: Program 0x3 to this field.
+  - addr: 0xF
+    name: R15
+    fields:
+    - bits: '8:0'
+      name: R15_RESERVED_1
+      mode: RW
+      dflt: 0x1
+      desc: Program 0x1 to this field.
+    - bits: '10:9'
+      name: PFD_SINGLE
+      mode: RW
+      dflt: 0x0
+      desc: Uses single PFD when PFDIN input is enabled. The actual charge pump current is equal to half the current setting made in CPG.
+      opts:
+        0x0: Normal operation
+        0x3: Single PFD
+    - bits: 11
+      name: PFD_POL
+      mode: RW
+      dflt: 0x0
+      desc: Sets the polarity of phase detector. Internal VCO operation requires negative Vtune with non-inverting loop filter.
+      opts:
+        0b0: Negative Vtune
+        0b1: Positive Vtune
+    - bits: '15:12'
+      name: R15_RESERVED_0
+      mode: RW
+      dflt: 0x2
+      desc: Program 0x2 to this field.
+  - addr: 0x10
+    name: R16
+    fields:
+    - bits: 0
+      name: R16_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: '4:1'
+      name: CPG
+      mode: RW
+      dflt: 0xE
+      desc: Sets charge pump gain value.
+      opts:
+        0: Tri-state
+        1: 1.4 mA
+        4: 5.6 mA
+        5: 7 mA
+        6: 11.2 mA
+        7: 12.6 mA
+        8: 2.8 mA
+        9: 4.2 mA
+        12: 8.4 mA
+        13: 9.8 mA
+        14: 14 mA
+        15: 15.4 mA
+    - bits: '15:5'
+      name: R16_RESERVED_0
+      mode: RW
+      dflt: 0x138
+      desc: Program 0xB8 to this field.
+  - addr: 0x11
+    name: R17
+    fields:
+    - bits: '15:7'
+      name: R17_RESERVED_1
+      mode: RW
+      dflt: 0x28
+      desc: Program 0x2B to this field.
+    - bits: 6
+      name: LD_TYPE
+      mode: RW
+      dflt: 0x1
+      desc: Defines lock detect monitor type. One-Shot detects lock only after the VCO calibrates and the LD_DLY timeout counter is finished. Continuous lock detect checks for lock all the time, including when the input reference is removed.
+      opts:
+        0b0: One-Shot
+        0b1: Continuous
+    - bits: '5:0'
+      name: R17_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x12
+    name: R18
+    fields:
+    - bits: '15:0'
+      name: LD_DLY
+      mode: RW
+      dflt: 0x3E8
+      desc: Lock detect assertion delay. This is the delay that is added after the VCO calibration is completed before indicating lock. This delay is only applied if LD_VTUNE_EN = 1. Delay time = LD_DLY / fPD.
+  - addr: 0x13
+    name: R19
+    fields:
+    - bits: '2:0'
+      name: R19_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: '4:3'
+      name: TEMPSENSE_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables temperature sensor.
+      opts:
+        0x0: Disabled
+        0x3: Enabled
+    - bits: '15:5'
+      name: R19_RESERVED_0
+      mode: RW
+      dflt: 0x109
+      desc: Program 0x109 to this field.
+  - addr: 0x14
+    name: R20
+    fields:
+    - bits: '8:0'
+      name: VCO_DACISET
+      mode: RW
+      dflt: 0x12C
+      desc: User specified start VCO current setting for calibration. Unless QUICK_RECAL_EN = 1, VCO calibration will always start with the VCO current setting that is specified in this field.
+    - bits: '15:9'
+      name: R20_RESERVED_0
+      mode: RW
+      dflt: 0x13
+      desc: Program 0x13 to this field.
+  - addr: 0x15
+    name: R21
+    fields:
+    - bits: '15:0'
+      name: R21_RESERVED_0
+      mode: RW
+      dflt: 0x1C64
+      desc: Program 0x1C64 to this field.
+  - addr: 0x16
+    name: R22
+    fields:
+    - bits: '7:0'
+      name: VCO_CAPCTRL
+      mode: RW
+      dflt: 0xBF
+      desc: User specified start VCO sub-band for calibration. Valid values are 191 to 0, where the higher number represents a lower frequency band. Unless QUICK_RECAL_EN = 1, VCO calibration will always start with the VCO sub-band that is specified in this field.
+    - bits: '12:8'
+      name: R22_RESERVED_0
+      mode: RW
+      dflt: 0x2
+      desc: Program 0x2 to this field.
+    - bits: '15:13'
+      name: VCO_SEL
+      mode: RW
+      dflt: 0x7
+      desc: User specified start VCO core for calibration. Unless QUICK_RECAL_EN = 1, VCO calibration will always start with the VCO core that is specified in this field.
+      opts:
+        0x1: VCO1
+        0x2: VCO2
+        0x3: VCO3
+        0x4: VCO4
+        0x5: VCO5
+        0x6: VCO6
+        0x7: VCO7
+  - addr: 0x17
+    name: R23
+    fields:
+    - bits: 0
+      name: VCO_SEL_FORCE
+      mode: RW
+      dflt: 0x0
+      desc: Forces the VCO to use the core specified by VCO_SEL. Useful for full-assisted VCO calibration and debugging purposes.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '15:1'
+      name: R23_RESERVED_0
+      mode: RW
+      dflt: 0x881
+      desc: Program 0x881 to this field.
+  - addr: 0x18
+    name: R24
+    fields:
+    - bits: '15:0'
+      name: R24_RESERVED_0
+      mode: RW
+      dflt: 0xE34
+      desc: Program 0xE34 to this field.
+  - addr: 0x19
+    name: R25
+    fields:
+    - bits: '15:0'
+      name: R25_RESERVED_0
+      mode: RW
+      dflt: 0x624
+      desc: Program 0x624 to this field.
+  - addr: 0x1A
+    name: R26
+    fields:
+    - bits: '15:0'
+      name: R26_RESERVED_0
+      mode: RW
+      dflt: 0xDB0
+      desc: Program 0xDB0 to this field.
+  - addr: 0x1B
+    name: R27
+    fields:
+    - bits: '15:0'
+      name: R27_RESERVED_0
+      mode: RW
+      dflt: 0x8001
+      desc: Program 0x8001 to this field.
+  - addr: 0x1C
+    name: R28
+    fields:
+    - bits: '15:0'
+      name: R28_RESERVED_0
+      mode: RW
+      dflt: 0x639
+      desc: Program 0x639 to this field.
+  - addr: 0x1D
+    name: R29
+    fields:
+    - bits: '15:0'
+      name: R29_RESERVED_0
+      mode: RW
+      dflt: 0x318C
+      desc: Program 0x318C to this field.
+  - addr: 0x1E
+    name: R30
+    fields:
+    - bits: '15:0'
+      name: R30_RESERVED_0
+      mode: RW
+      dflt: 0xB18C
+      desc: Program 0xB18C to this field.
+  - addr: 0x1F
+    name: R31
+    fields:
+    - bits: '15:0'
+      name: R31_RESERVED_0
+      mode: RW
+      dflt: 0x401
+      desc: Program 0x401 to this field.
+  - addr: 0x20
+    name: R32
+    fields:
+    - bits: '5:0'
+      name: R32_RESERVED_1
+      mode: RW
+      dflt: 0x1
+      desc: Program 0x1 to this field.
+    - bits: '8:6'
+      name: CHDIVA
+      mode: RW
+      dflt: 0x0
+      desc: Sets divider value for RFOUTA.
+      opts:
+        0x0: 0x0 = Divide by 2
+        0x1: 0x1 = Divide by 4
+        0x2: 0x2 = Divide by 8
+        0x3: 0x3 = Divide by 16
+        0x4: 0x4 = Divide by 32
+        0x5: 0x5 = Divide by 64
+        0x6: 0x6 = Divide by 128
+    - bits: '11:9'
+      name: CHDIVB
+      mode: RW
+      dflt: 0x0
+      desc: Sets divider value for RFOUTB.
+      opts:
+        0x0: 0x0 = Divide by 2
+        0x1: 0x1 = Divide by 4
+        0x2: 0x2 = Divide by 8
+        0x3: 0x3 = Divide by 16
+        0x4: 0x4 = Divide by 32
+        0x5: 0x5 = Divide by 64
+        0x6: 0x6 = Divide by 128
+    - bits: '15:12'
+      name: R32_RESERVED_0
+      mode: RW
+      dflt: 0x1
+      desc: Program 0x1 to this field.
+  - addr: 0x21
+    name: R33
+    fields:
+    - bits: '15:0'
+      name: R33_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x22
+    name: R34
+    fields:
+    - bits: 0
+      name: EXTVCO_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables external VCO mode. Set this bit to 1 will enables RFIN input path but disables internal VCO, the synthesizer will try to lock to an external source appear at RFIN pin. In loop back mode, this bit has to be set to 0, RFIN input path will be enabled by the LOOPBACK_EN bit.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '3:1'
+      name: R34_RESERVED_2
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 4
+      name: EXTVCO_DIV
+      mode: RW
+      dflt: 0x1
+      desc: Sets external VCO input divider value.
+      opts:
+        0b0: Divide by 2
+        0b1: Bypassed
+    - bits: '10:5'
+      name: R34_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 11
+      name: LOOPBACK_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables loop back mode. In this mode, both RFIN input path and internal VCO are active, the synthesizer will try to lock to the internal VCO. EXTVCO_EN must be set to 0 in this mode.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '15:12'
+      name: R34_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x23
+    name: R35
+    fields:
+    - bits: '5:0'
+      name: R35_RESERVED_2
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 6
+      name: MASHSEED_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables MASHSEED for phase adjustment.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '8:7'
+      name: MASH_ORDER
+      mode: RW
+      dflt: 0x2
+      desc: Sets the MASH order.
+      opts:
+        0x0: Integer mode
+        0x1: First order
+        0x2: Second order
+        0x3: Third order
+    - bits: '11:9'
+      name: R35_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 12
+      name: MASH_RESET_N
+      mode: RW
+      dflt: 0x1
+      desc: Resets the MASH (active LOW).
+      opts:
+        0b0: Reset
+        0b1: Normal operation
+    - bits: '15:13'
+      name: R35_RESERVED_0
+      mode: RW
+      dflt: 0x1
+      desc: Program 0x1 to this field.
+  - addr: 0x24
+    name: R36
+    fields:
+    - bits: '14:0'
+      name: PLL_N
+      mode: RW
+      dflt: 0x38
+      desc: Sets N divider value (integer portion).
+    - bits: 15
+      name: R36_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x25
+    name: R37
+    fields:
+    - bits: '8:0'
+      name: R37_RESERVED_1
+      mode: RW
+      dflt: 0x100
+      desc: Program 0x100 to this field.
+    - bits: '14:9'
+      name: PFD_DLY
+      mode: RW
+      dflt: 0x2
+      desc: Sets N divider delay time in phase detector. Effective only when PFD_DLY_MANUAL = 1. 0x0 = Reserved All other values must be set in accordance to the N divider value
+    - bits: 15
+      name: R37_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x26
+    name: R38
+    fields:
+    - bits: '15:0'
+      name: PLL_DEN_U
+      mode: RW
+      dflt: 0x0
+      desc: Sets the upper 16 bits of fractional denominator (DEN).
+  - addr: 0x27
+    name: R39
+    fields:
+    - bits: '15:0'
+      name: PLL_DEN_L
+      mode: RW
+      dflt: 0x3E8
+      desc: Sets the lower 16 bits of fractional denominator (DEN).
+  - addr: 0x28
+    name: R40
+    fields:
+    - bits: '15:0'
+      name: MASH_SEED_U
+      mode: RW
+      dflt: 0x0
+      desc: Sets the upper 16 bits of MASH_SEED.
+  - addr: 0x29
+    name: R41
+    fields:
+    - bits: '15:0'
+      name: MASH_SEED_L
+      mode: RW
+      dflt: 0x0
+      desc: Sets the lower 16 bits of MASH SEED.
+  - addr: 0x2A
+    name: R42
+    fields:
+    - bits: '15:0'
+      name: PLL_NUM_U
+      mode: RW
+      dflt: 0x0
+      desc: Sets the upper 16 bits of fractional numerator (NUM).
+  - addr: 0x2B
+    name: R43
+    fields:
+    - bits: '15:0'
+      name: PLL_NUM_L
+      mode: RW
+      dflt: 0x0
+      desc: Sets the lower 16 bits of fractional numerator (NUM).
+  - addr: 0x2C
+    name: R44
+    fields:
+    - bits: '15:0'
+      name: INSTCAL_PLL_NUM_U
+      mode: RW
+      dflt: 0x0
+      desc: Sets the upper 16 bits of INSTCAL_PLL_NUM. INSTCAL_PLL_NUM = 232 x (PLL_NUM / PLL_DEN).
+  - addr: 0x2D
+    name: R45
+    fields:
+    - bits: '15:0'
+      name: INSTCAL_PLL_NUM_L
+      mode: RW
+      dflt: 0x0
+      desc: Sets the lower 16 bits of INSTCAL_PLL_NUM. INSTCAL_PLL_NUM = 232 x (PLL_NUM / PLL_DEN).
+  - addr: 0x2E
+    name: R46
+    fields:
+    - bits: '15:0'
+      name: R46_RESERVED_0
+      mode: RW
+      dflt: 0x300
+      desc: Program 0x300 to this field.
+  - addr: 0x2F
+    name: R47
+    fields:
+    - bits: '15:0'
+      name: R47_RESERVED_0
+      mode: RW
+      dflt: 0x300
+      desc: Program 0x300 to this field.
+  - addr: 0x30
+    name: R48
+    fields:
+    - bits: '15:0'
+      name: R48_RESERVED_0
+      mode: RW
+      dflt: 0x4180
+      desc: Program 0x4180 to this field.
+  - addr: 0x31
+    name: R49
+    fields:
+    - bits: '15:0'
+      name: R49_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x32
+    name: R50
+    fields:
+    - bits: '15:0'
+      name: R50_RESERVED_0
+      mode: RW
+      dflt: 0x80
+      desc: Program 0x80 to this field.
+  - addr: 0x33
+    name: R51
+    fields:
+    - bits: '15:0'
+      name: R51_RESERVED_0
+      mode: RW
+      dflt: 0x203F
+      desc: Program 0x203F to this field.
+  - addr: 0x34
+    name: R52
+    fields:
+    - bits: '15:0'
+      name: R52_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x35
+    name: R53
+    fields:
+    - bits: '15:0'
+      name: R53_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x36
+    name: R54
+    fields:
+    - bits: '15:0'
+      name: R54_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x37
+    name: R55
+    fields:
+    - bits: '15:0'
+      name: R55_RESERVED_0
+      mode: RW
+      dflt: 0x2
+      desc: Program 0x2 to this field.
+  - addr: 0x38
+    name: R56
+    fields:
+    - bits: '5:0'
+      name: EXTPFD_DIV
+      mode: RW
+      dflt: 0x1
+      desc: Sets external PFD input divider value. Set this field to 0 is not allowed. A value of 1 means bypassed.
+    - bits: '15:6'
+      name: R56_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x39
+    name: R57
+    fields:
+    - bits: 0
+      name: PFD_SEL
+      mode: RW
+      dflt: 0x1
+      desc: Enables PFDIN input. When using PFDIN input, the charge pump has to be set to single PFD by setting PFD_SINGLE = 0x3.
+      opts:
+        0b0: Enabled
+        0b1: Disabled
+    - bits: '15:1'
+      name: R57_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x3A
+    name: R58
+    fields:
+    - bits: '15:0'
+      name: R58_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x3B
+    name: R59
+    fields:
+    - bits: '15:0'
+      name: R59_RESERVED_0
+      mode: RW
+      dflt: 0x1388
+      desc: Program 0x1388 to this field.
+  - addr: 0x3C
+    name: R60
+    fields:
+    - bits: '15:0'
+      name: R60_RESERVED_0
+      mode: RW
+      dflt: 0x1F4
+      desc: Program 0x1F4 to this field.
+  - addr: 0x3D
+    name: R61
+    fields:
+    - bits: '15:0'
+      name: R61_RESERVED_0
+      mode: RW
+      dflt: 0x3E8
+      desc: Program 0x3E8 to this field.
+  - addr: 0x3E
+    name: R62
+    fields:
+    - bits: '15:0'
+      name: MASH_RST_COUNT_U
+      mode: RW
+      dflt: 0x0
+      desc: ' Sets the upper 16 bits of MASH reset delay. This is the delay that is necessary after the MASH engine is reset during phase synchronization when PLL_NUM is not equal to zero. The delay time must be set to greater than the lock time of the PLL. Delay time = MASH_RST_COUNT x (2CAL_CLK_DIV) / fOSCIN. This field can be set to 0 when PLL_NUM = 0.'
+  - addr: 0x3F
+    name: R63
+    fields:
+    - bits: '15:0'
+      name: MASH_RST_COUNT_L
+      mode: RW
+      dflt: 0xC350
+      desc: Sets the lower 16 bits of MASH reset delay.
+  - addr: 0x40
+    name: R64
+    fields:
+    - bits: 0
+      name: R64_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 1
+      name: SYSREF_REPEAT
+      mode: RW
+      dflt: 0x0
+      desc: Defines SYSREF mode. In master mode, SYSREF pulses are generated internally. In repeater mode, SYSREF pulses are generated in response to the SRREQ pins.
+      opts:
+        0b0: Master mode
+        0b1: Repeater mode
+    - bits: 2
+      name: SYSREF_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables SYSREF mode.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: 3
+      name: SYSREF_PULSE
+      mode: RW
+      dflt: 0x0
+      desc: Defines SYSREF master mode. In continuous mode, SYSREF pulses are generated continuously. Pulsed mode allows multiple pulses (as determined by SYSREF_PULSE_CNT) to be sent out whenever the SRREQ pins go HIGH.
+      opts:
+        0b0: Continuous mode
+        0b1: Pulsed mode
+    - bits: 4
+      name: SYSREF_REPEAT_NS
+      mode: RW
+      dflt: 0x0
+      desc: Enables asynchronous SYSREF repeater mode. In this mode, the SYSREF signal coming from the SRREQ pin will be passed through to the SROUT pin without reclocking.
+      opts:
+        0b0: If SYSREF_REPEAT = 1
+        0b1: Enabled
+    - bits: '7:5'
+      name: SYSREF_DIV_PRE
+      mode: RW
+      dflt: 0x4
+      desc: This divider is used to get the frequency input to SYSREF_DIV within acceptable limits.
+      opts:
+        0x1: Divide by 2
+        0x2: Divide by 4
+        0x4: Divide by 8
+    - bits: '9:8'
+      name: SYSREF_INP_FMT
+      mode: RW
+      dflt: 0x0
+      desc: "Sets SRREQ pin input format."
+      opts:
+        0x0: CMOS input at SRREQ_P pin, 1.8-V to 3.3-V logic
+        0x1: AC-couple CMOS input at SRREQ_P pin
+        0x2: AC-coupled differential LVDS input, requires external 100-Ohm differential termination
+        0x3: DC-coupled differential LVDS input, requires external 100-Ohm differential termination
+    - bits: '15:10'
+      name: R64_RESERVED_0
+      mode: RW
+      dflt: 0x10
+      desc: Program 0x10 to this field.
+  - addr: 0x41
+    name: R65
+    fields:
+    - bits: '10:0'
+      name: SYSREF_DIV
+      mode: RW
+      dflt: 0x1
+      desc: This divider further divides the output frequency for the SYSREF.
+    - bits: '15:11'
+      name: R65_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x42
+    name: R66
+    fields:
+    - bits: '5:0'
+      name: JESD_DAC1_CTRL
+      mode: RW
+      dflt: 0x3F
+      desc: Programmable delay adjustment for SYSREF mode.
+    - bits: '11:6'
+      name: JESD_DAC2_CTRL
+      mode: RW
+      dflt: 0x0
+      desc: Programmable delay adjustment for SYSREF mode.
+    - bits: '15:12'
+      name: R66_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x43
+    name: R67
+    fields:
+    - bits: '5:0'
+      name: JESD_DAC3_CTRL
+      mode: RW
+      dflt: 0x0
+      desc: Programmable delay adjustment for SYSREF mode.
+    - bits: '11:6'
+      name: JESD_DAC4_CTRL
+      mode: RW
+      dflt: 0x0
+      desc: Programmable delay adjustment for SYSREF mode.
+    - bits: '15:12'
+      name: SYSREF_PULSE_CNT
+      mode: RW
+      dflt: 0x0
+      desc: Defines how many pulses are sent in SYSREF pulsed mode.
+  - addr: 0x44
+    name: R68
+    fields:
+    - bits: 0
+      name: PSYNC_INP_FMT
+      mode: RW
+      dflt: 0x0
+      desc: "Sets PSYNC pin input format."
+      opts:
+        0b0: CMOS input, 1.8-V to 3.3-V logic
+        0b1: AC-coupled differential LVDS input, requires external 100-Ohm differential termination
+    - bits: '4:1'
+      name: R68_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 5
+      name: INPIN_IGNORE
+      mode: RW
+      dflt: 0x0
+      desc: Disables PSYNC pin. Keep this bit equals 1 unless phase sync is required.
+      opts:
+        0b0: Enables
+        0b1: Disables pin
+    - bits: '15:6'
+      name: R68_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x45
+    name: R69
+    fields:
+    - bits: '3:0'
+      name: R69_RESERVED_1
+      mode: RW
+      dflt: 0x1
+      desc: Program 0x1 to this field.
+    - bits: 4
+      name: SROUT_PD
+      mode: RW
+      dflt: 0x1
+      desc: Powerdowns SYSREF output buffer.
+      opts:
+        0b0: Normal operation
+        0b1: Power down
+    - bits: '15:5'
+      name: R69_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x46
+    name: R70
+    fields:
+    - bits: '3:0'
+      name: R70_RESERVED_1
+      mode: RW
+      dflt: 0xE
+      desc: Program 0xE to this field.
+    - bits: 4
+      name: DBLBUF_PLL_EN
+      mode: RW
+      dflt: 0x1
+      desc: Enables double buffering for PLL_N, PLL_NUM, PLL_DEN, MULT, PLL_R, PLL_R_PRE, MASH_ORDER and PFD_DLY. Changes of these registers will only be effective after R0 is programmed.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: 5
+      name: DBLBUF_CHDIV_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables double buffering for CHDIVA and CHDIVB. Changes of these registers will only be effective after R0 is programmed.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: 6
+      name: DBLBUF_OUTBUF_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables double buffering for OUTA_PD and OUTB_PD. Changes of these registers will only be effective after R0 is programmed.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: 7
+      name: DBLBUF_OUTMUX_EN
+      mode: RW
+      dflt: 0x0
+      desc: Enables double buffering for OUTA_MUX and OUTB_MUX. Changes of these registers will only be effective after R0 is programmed.
+      opts:
+        0b0: Disabled
+        0b1: Enabled
+    - bits: '15:8'
+      name: R70_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x47
+    name: R71
+    fields:
+    - bits: '15:0'
+      name: R71_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x48
+    name: R72
+    fields:
+    - bits: '15:0'
+      name: R72_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x49
+    name: R73
+    fields:
+    - bits: '15:0'
+      name: R73_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x4A
+    name: R74
+    fields:
+    - bits: '1:0'
+      name: R74_RESERVED_1
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+    - bits: '4:2'
+      name: RB_VCO_SEL
+      mode: R
+      dflt: 0x0
+      desc: Reads back the actual VCO that the VCO calibration has selected.
+      opts:
+        0x0: Invalid
+        0x1: VCO1
+        0x2: VCO2
+        0x3: VCO3
+        0x4: VCO4
+        0x5: VCO5
+        0x6: VCO6
+        0x7: VCO7
+    - bits: '12:5'
+      name: RB_VCO_CAPCTRL
+      mode: R
+      dflt: 0x0
+      desc: Reads back the actual CAPCTRL value that the VCO calibration has chosen.
+    - bits: 13
+      name: R74_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+    - bits: '15:14'
+      name: RB_LD
+      mode: R
+      dflt: 0x0
+      desc: Reads back lock detect status.
+      opts:
+        0x0: Unlocked0
+        0x1: Unlocked1
+        0x2: Locked
+        0x3: Invalid
+  - addr: 0x4B
+    name: R75
+    fields:
+    - bits: '8:0'
+      name: RB_VCO_DACISET
+      mode: R
+      dflt: 0x0
+      desc: Reads back the actual DACISET value that the VCO calibration has chosen.
+    - bits: '15:9'
+      name: R75_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x4C
+    name: R76
+    fields:
+    - bits: '10:0'
+      name: RB_TEMP_SENS
+      mode: R
+      dflt: 0x0
+      desc: "Reads back temperature sensor code. Temperature in C = 0.85 x code - 415. Resolution is 0.6C per code. Measurement accuracy is 5 degrees."
+    - bits: '15:11'
+      name: R76_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x4D
+    name: R77
+    fields:
+    - bits: '7:0'
+      name: R77_RESERVED_1
+      mode: RW
+      dflt: 0xCC
+      desc: Program 0x8 to this field.
+    - bits: 8
+      name: PINMUTE_POL
+      mode: RW
+      dflt: 0x0
+      desc: Sets the polarity of mute control for MUTE pin.
+      opts:
+        0b0: Active HIGH
+        0b1: Active LOW
+    - bits: '15:9'
+      name: R77_RESERVED_0
+      mode: RW
+      dflt: 0x2B
+      desc: Program 0x3 to this field.
+  - addr: 0x4E
+    name: R78
+    fields:
+    - bits: '1:0'
+      name: OUTA_MUX
+      mode: RW
+      dflt: 0x1
+      desc: Selects the input source to RFOUTA.
+      opts:
+        0x0: Channel divider
+        0x1: VCO
+        0x2: VCO doubler
+    - bits: '3:2'
+      name: R78_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 4
+      name: OUTA_PD
+      mode: RW
+      dflt: 0x0
+      desc: Power downs RFOUTA.
+      opts:
+        0b0: Normal operation
+        0b1: Power down
+    - bits: '15:5'
+      name: R78_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x4F
+    name: R79
+    fields:
+    - bits: 0
+      name: R79_RESERVED_2
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: '3:1'
+      name: OUTA_PWR
+      mode: RW
+      dflt: 0x7
+      desc: Adjusts RFOUTA output power. Higher numbers give more output power.
+    - bits: '5:4'
+      name: OUTB_MUX
+      mode: RW
+      dflt: 0x1
+      desc: Selects the input source to RFOUTB.
+      opts:
+        0x0: Channel divider
+        0x1: VCO
+        0x2: VCO doubler
+    - bits: '7:6'
+      name: R79_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: 8
+      name: OUTB_PD
+      mode: RW
+      dflt: 0x1
+      desc: Power downs RFOUTB.
+      opts:
+        0b0: Normal operation
+        0b1: Power down
+    - bits: '15:9'
+      name: R79_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x50
+    name: R80
+    fields:
+    - bits: '5:0'
+      name: R80_RESERVED_1
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+    - bits: '8:6'
+      name: OUTB_PWR
+      mode: RW
+      dflt: 0x7
+      desc: Adjusts RFOUTB output power. Higher numbers give more output power.
+    - bits: '15:9'
+      name: R80_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x51
+    name: R81
+    fields:
+    - bits: '15:0'
+      name: R81_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x52
+    name: R82
+    fields:
+    - bits: '15:0'
+      name: R82_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x53
+    name: R83
+    fields:
+    - bits: '15:0'
+      name: R83_RESERVED_0
+      mode: RW
+      dflt: 0xF00
+      desc: Program 0xF00 to this field.
+  - addr: 0x54
+    name: R84
+    fields:
+    - bits: '15:0'
+      name: R84_RESERVED_0
+      mode: RW
+      dflt: 0x40
+      desc: Program 0x40 to this field.
+  - addr: 0x55
+    name: R85
+    fields:
+    - bits: '15:0'
+      name: R85_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x56
+    name: R86
+    fields:
+    - bits: '15:0'
+      name: R86_RESERVED_0
+      mode: RW
+      dflt: 0x40
+      desc: Program 0x40 to this field.
+  - addr: 0x57
+    name: R87
+    fields:
+    - bits: '15:0'
+      name: R87_RESERVED_0
+      mode: RW
+      dflt: 0xFF00
+      desc: Program 0xFF00 to this field.
+  - addr: 0x58
+    name: R88
+    fields:
+    - bits: '15:0'
+      name: R88_RESERVED_0
+      mode: RW
+      dflt: 0x3FF
+      desc: Program 0x3FF to this field.
+  - addr: 0x59
+    name: R89
+    fields:
+    - bits: '15:0'
+      name: R89_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x5A
+    name: R90
+    fields:
+    - bits: '15:0'
+      name: R90_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x5B
+    name: R91
+    fields:
+    - bits: '15:0'
+      name: R91_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x5C
+    name: R92
+    fields:
+    - bits: '15:0'
+      name: R92_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x5D
+    name: R93
+    fields:
+    - bits: '15:0'
+      name: R93_RESERVED_0
+      mode: RW
+      dflt: 0x1000
+      desc: Program 0x1000 to this field.
+  - addr: 0x5E
+    name: R94
+    fields:
+    - bits: '15:0'
+      name: R94_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x5F
+    name: R95
+    fields:
+    - bits: '15:0'
+      name: R95_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x60
+    name: R96
+    fields:
+    - bits: '15:0'
+      name: R96_RESERVED_0
+      mode: RW
+      dflt: 0x17F8
+      desc: Program 0x17F8 to this field.
+  - addr: 0x61
+    name: R97
+    fields:
+    - bits: '15:0'
+      name: R97_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x62
+    name: R98
+    fields:
+    - bits: '15:0'
+      name: R98_RESERVED_0
+      mode: RW
+      dflt: 0x1C80
+      desc: Program 0x1C80 to this field.
+  - addr: 0x63
+    name: R99
+    fields:
+    - bits: '15:0'
+      name: R99_RESERVED_0
+      mode: RW
+      dflt: 0x19B9
+      desc: Program 0x19B9 to this field.
+  - addr: 0x64
+    name: R100
+    fields:
+    - bits: '15:0'
+      name: R100_RESERVED_0
+      mode: RW
+      dflt: 0x533
+      desc: Program 0x533 to this field.
+  - addr: 0x65
+    name: R101
+    fields:
+    - bits: '15:0'
+      name: R101_RESERVED_0
+      mode: RW
+      dflt: 0x3E8
+      desc: Program 0x3E8 to this field.
+  - addr: 0x66
+    name: R102
+    fields:
+    - bits: '15:0'
+      name: R102_RESERVED_0
+      mode: RW
+      dflt: 0x28
+      desc: Program 0x28 to this field.
+  - addr: 0x67
+    name: R103
+    fields:
+    - bits: '15:0'
+      name: R103_RESERVED_0
+      mode: RW
+      dflt: 0x14
+      desc: Program 0x14 to this field.
+  - addr: 0x68
+    name: R104
+    fields:
+    - bits: '15:0'
+      name: R104_RESERVED_0
+      mode: RW
+      dflt: 0x14
+      desc: Program 0x14 to this field.
+  - addr: 0x69
+    name: R105
+    fields:
+    - bits: '15:0'
+      name: R105_RESERVED_0
+      mode: RW
+      dflt: 0xA
+      desc: Program 0xA to this field.
+  - addr: 0x6A
+    name: R106
+    fields:
+    - bits: '15:0'
+      name: R106_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x6B
+    name: R107
+    fields:
+    - bits: '15:0'
+      name: R107_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x6C
+    name: R108
+    fields:
+    - bits: '15:0'
+      name: R108_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x6D
+    name: R109
+    fields:
+    - bits: '15:0'
+      name: R109_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x6E
+    name: R110
+    fields:
+    - bits: '15:0'
+      name: R110_RESERVED_0
+      mode: RW
+      dflt: 0x1F
+      desc: Program 0x1F to this field.
+  - addr: 0x6F
+    name: R111
+    fields:
+    - bits: '15:0'
+      name: R111_RESERVED_0
+      mode: RW
+      dflt: 0x0
+      desc: Program 0x0 to this field.
+  - addr: 0x70
+    name: R112
+    fields:
+    - bits: '15:0'
+      name: R112_RESERVED_0
+      mode: RW
+      dflt: 0xFFFF
+      desc: Program 0xFFFF to this field.
+  - addr: 0x71
+    name: R113
+    fields:
+    - bits: '15:0'
+      name: R113_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x72
+    name: R114
+    fields:
+    - bits: '15:0'
+      name: R114_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x73
+    name: R115
+    fields:
+    - bits: '15:0'
+      name: R115_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x74
+    name: R116
+    fields:
+    - bits: '15:0'
+      name: R116_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x75
+    name: R117
+    fields:
+    - bits: '15:0'
+      name: R117_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x76
+    name: R118
+    fields:
+    - bits: '15:0'
+      name: R118_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x77
+    name: R119
+    fields:
+    - bits: '15:0'
+      name: R119_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x78
+    name: R120
+    fields:
+    - bits: '15:0'
+      name: R120_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x79
+    name: R121
+    fields:
+    - bits: '15:0'
+      name: R121_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.
+  - addr: 0x7A
+    name: R122
+    fields:
+    - bits: '15:0'
+      name: R122_RESERVED_0
+      mode: R
+      dflt: 0x0
+      desc: Not used. Read back only.

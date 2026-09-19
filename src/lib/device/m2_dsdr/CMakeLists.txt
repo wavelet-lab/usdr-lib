@@ -6,10 +6,11 @@ set(USDR_DSDR_LIB_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/dsdr_hiper.c
 )
 
-set(HW_FILES m2_dsdr_e m2_dsdr_p m2_dsdr_usr)
+set(HW_FILES m2_dsdr_e m2_dsdr_e_v2 m2_dsdr_p m2_dsdr_usr)
 foreach(I ${HW_FILES})
     message(STATUS "Generating header for ${I}")
     GENERATE_YAML_H(${CMAKE_CURRENT_SOURCE_DIR}/${I}.yaml ${CMAKE_CURRENT_BINARY_DIR}/def_${I}.h)
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${I}.yaml DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/usdr/schema/)
 
     list(APPEND USDR_DEPEND_TARGETS generate_${I})
 endforeach()
@@ -20,8 +21,3 @@ list(APPEND USDR_LIBRARY_FILES ${USDR_DSDR_LIB_FILES})
 set(USDR_LIBRARY_FILES ${USDR_LIBRARY_FILES} PARENT_SCOPE)
 set(USDR_DEPEND_TARGETS ${USDR_DEPEND_TARGETS} PARENT_SCOPE)
 set(USDR_INCLUDE_DIRS ${USDR_INCLUDE_DIRS} PARENT_SCOPE)
-
-# Extra yaml files
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/m2_dsdr.yaml DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/usdr/schema/)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/m2_dsdr_e.yaml DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/usdr/schema/)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/m2_dsdr_p.yaml DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/usdr/schema/)

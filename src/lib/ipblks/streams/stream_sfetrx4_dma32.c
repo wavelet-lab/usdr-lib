@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <assert.h>
 #include <inttypes.h>
 
@@ -56,7 +57,7 @@ struct stream_sfetrx_dma32 {
     // Cached values
     unsigned cnf_base;
     unsigned sync_base;  // TODO: for compatibility with OLD APIs
-    unsigned cnfrd_base; // Reabdack address for OLD API
+    unsigned cnfrd_base; // Readback address for OLD API
 
     unsigned pkt_symbs;  // Total number of symbols in a transaction (all bursts)
     unsigned pkt_bytes;  // Wire bytes for a transaction (excl. packing overhead)
@@ -80,12 +81,15 @@ struct stream_sfetrx_dma32 {
     uint8_t  fe_old_tx_mute; // keep OLD TX FE in sync with host state
     uint8_t  fe_old_tx_swap; // keep OLD TX FE in sync with host state
     unsigned fe_chans;       // Number of active channels in frontend
-    unsigned fe_complex;     // Compex data streaming
+    unsigned fe_complex;     // Complex data streaming
     union {
         sfe_cfg_t srx4;
     } storage;
 
     extxcfg_cache_t cstx4;
+
+    uint64_t hw_pwr_mask; // Powered chans (hw)
+    uint8_t pack_3x16;
 };
 typedef struct stream_sfetrx_dma32 stream_sfetrx_dma32_t;
 
@@ -100,11 +104,11 @@ int _sfetrx4_destroy(stream_handle_t* str)
     stream_sfetrx_dma32_t* stream = (stream_sfetrx_dma32_t*)str;
     lldev_t dev = stream->base.dev->dev;
 
-    USDR_LOG("DSTR", USDR_LOG_DEBUG, "Destroying strem %d\n", stream->ll_streamo);
+    USDR_LL_LOG(dev, "DSTR", USDR_LOG_DEBUG, "Destroying strem %d\n", stream->ll_streamo);
     int res;
 
     if (stream->type == USDR_ZCPY_RX) {
-        //Grcefull stop
+        //Gracefull stop
         res = lowlevel_reg_wr32(dev, 0,
                                 stream->cnf_base + 1, 0);
         if (res)
@@ -158,23 +162,60 @@ int _sfetrx4_stream_recv(stream_handle_t* str,
     res = ops->recv_dma_wait(dev, 0,
                              stream->ll_streamo,
                              (void**)&dma_buf, &oob_data, &oob_size, timeout);
-    if (res < 0)
+    if (res == -ETIMEDOUT) {
+    } else if (res < 0)
         return res;
+
+    uint32_t dma_stat = oob_data[1];
+    unsigned dbno_inram;     // BUF# filled in FIFO RAM
+    unsigned dbno_xfred;     // BUF# transferred to host
+    unsigned dbno_ntfysent;  // BUF# notification sent
+    unsigned dbno_confirmed; // BUF# confirmed by user (can reuse again)
+    unsigned fe_stat;        // BUF# in FE
+    bool srdy = dma_stat >> 31;
+    fe_stat = (((dma_stat >> 22) & 3) << 4) |
+              (((dma_stat >> 14) & 3) << 2) |
+              (((dma_stat >> 6) & 3) << 0);
+    dbno_confirmed = (dma_stat >> 0) & 0x3f;
+    dbno_xfred = (dma_stat >> 8) & 0x3f;
+    dbno_inram = (dma_stat >> 16) & 0x3f;
+    dbno_ntfysent = (dma_stat >> 24) & 0x3f;
+
+#if DEBUG_DMA_BUFFERS
+    bool santify_fail = false;
+    {
+        unsigned a = dbno_inram, b = dbno_xfred, c = dbno_ntfysent;
+        unsigned d1 = (a - b) & 0x3f;
+        unsigned d2 = (b - c) & 0x3f;
+        if ((d1 >= 32) || (d2 >= 32)) {
+            santify_fail = true;
+        }
+    }
+#else
+#define santify_fail false
+#endif
+
+    if (res == -ETIMEDOUT) {
+        USDR_LL_LOG(dev, "UDMS", santify_fail ? USDR_LOG_ERROR : USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " TIMEDOUT:%d buf=%p seq=%16" PRIu64 " %d.%2d/%2d/%2d/%2d/%2d\n", oob_data[0], oob_data[1], res, dma_buf,
+                 stream->rcnt, srdy, fe_stat, dbno_inram, dbno_xfred, dbno_ntfysent, dbno_confirmed);
+        return res;
+    }
 
     if (oob_data[0] & 0xffffff) {
         unsigned pkt_lost = oob_data[0] & 0xffffff;
-        USDR_LOG("UDMS", USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " EXTRA:%d buf=%p seq=%16" PRIu64 "\n", oob_data[0], oob_data[1], res, dma_buf,
-                 stream->rcnt);
+        USDR_LL_LOG(dev, "UDMS", santify_fail ? USDR_LOG_ERROR : USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " EXTRA:%d buf=%p seq=%16" PRIu64 " %d.%2d/%2d/%2d/%2d/%2d\n", oob_data[0], oob_data[1], res, dma_buf,
+                 stream->rcnt, srdy, fe_stat, dbno_inram, dbno_xfred, dbno_ntfysent, dbno_confirmed);
 
         stream->stats.fe_drop += pkt_lost;
         stream->r_ts += stream->pkt_symbs * pkt_lost;
     } else if ((oob_data[0] >> 32) != stream->burst_mask) {
-        USDR_LOG("UDMS", USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " [%08x] EXTRA:%d buf=%p seq=%16" PRIu64 "\n", oob_data[0], oob_data[1], stream->burst_mask, res, dma_buf,
-                stream->rcnt);
+        USDR_LL_LOG(dev, "UDMS", santify_fail ? USDR_LOG_ERROR : USDR_LOG_INFO, "Recv %016" PRIx64 ".%016" PRIx64 " [%08x] EXTRA:%d buf=%p seq=%16" PRIu64 " %d.%2d/%2d/%2d/%2d/%2d\n", oob_data[0], oob_data[1], stream->burst_mask, res, dma_buf,
+                stream->rcnt, srdy, fe_stat, dbno_inram, dbno_xfred, dbno_ntfysent, dbno_confirmed);
 
     } else {
-        USDR_LOG("UDMS", USDR_LOG_DEBUG, "Recv %016" PRIx64 ".%016" PRIx64 " EXTRA:- buf=%p seq=%16" PRIu64 "\n", oob_data[0], oob_data[1], dma_buf,
-                 stream->rcnt);
+        USDR_LL_LOG(dev, "UDMS",
+                 santify_fail ? USDR_LOG_ERROR : USDR_LOG_DEBUG, "Recv %016" PRIx64 ".%016" PRIx64 " EXTRA:- buf=%p seq=%16" PRIu64 " %d.%2d/%2d/%2d/%2d/%2d\n", oob_data[0], oob_data[1], dma_buf,
+                 stream->rcnt, srdy, fe_stat, dbno_inram, dbno_xfred, dbno_ntfysent, dbno_confirmed);
     }
 
     stream->stats.pktok ++;
@@ -255,7 +296,7 @@ void parse_txcore_stat(uint32_t stat[4], txcore_statistics_t* s)
     // Understanding counters (PCIe mode)
     // usrbuf_posted     --     PCIe Buffer metadata posted
     // usrbuf_requested  --     PCIe Buffer all MemRd requests are sent
-    // usrbuf_completed  --     PCIe Beffer data has been placed into FIFO RAM
+    // usrbuf_completed  --     PCIe Buffer data has been placed into FIFO RAM
     // usrbuf_aired      --     PCIe Buffer has been completly played out (available for reuse)
 
     bool usb = (stat[0] & 0x8);
@@ -321,7 +362,7 @@ int _sfetrx4_stream_send(stream_handle_t* str,
     if (stream->type != USDR_ZCPY_TX)
         return -ENOTSUP;
 
-    if (stream->storage.srx4.cfg_fecore_id == CORE_EXFETX_DMA32_R0) {
+    if (stream->storage.srx4.cfg_fecore_id == CORE_EXFETX_DMA32_R0 || stream->storage.srx4.cfg_fecore_id == CORE_EXFETX_DMA32_R0_2 || stream->storage.srx4.cfg_fecore_id == CORE_EXFETX_DMA32_R0_8) {
         res = _extx_burstup(samples, brst_samples, &lgbursts);
         if (res)
             return res;
@@ -366,7 +407,7 @@ int _sfetrx4_stream_send(stream_handle_t* str,
             }
             parse_txcore_stat(stat, &st);
 
-            USDR_LOG("UDMS", USDR_LOG_ERROR, "Send timed out (Pstd/Reqd/Cpld/Aired) %2d/%2d/%2d/%2d TAGS:%d FIFO:%d DROP_DMA:%d DROP_FE:%d OVF:%d FULL:%d CPL_NO_DATA:%d FE_SENT:%d READY:%d -- %08x.%08x.%08x.%08x --\n",
+            USDR_LL_LOG(dev, "UDMS", USDR_LOG_ERROR, "Send timed out (Pstd/Reqd/Cpld/Aired) %2d/%2d/%2d/%2d TAGS:%d FIFO:%d DROP_DMA:%d DROP_FE:%d OVF:%d FULL:%d CPL_NO_DATA:%d FE_SENT:%d READY:%d -- %08x.%08x.%08x.%08x --\n",
                      st.usrbuf_posted, st.usrbuf_requested, st.usrbuf_completed, st.usrbuf_aired,
                      st.pcietags, st.fifo_used, st.drop_dma, st.drop_fe,
                      st.stat_dmareq_ovf, st.fifo_full, st.stat_cpl_nodata, st.bursts_sent, st.core_ready,
@@ -402,7 +443,7 @@ int _sfetrx4_stream_send(stream_handle_t* str,
         //unsigned burst_lost = (stream->stats.fe_drop - pfe) + (stream->stats.dma_drop - pda);
         stream->stats.pktok ++;
 
-        USDR_LOG("UDMS", USDR_LOG_DEBUG, "Send stat %d -- %08x.%08x.%08x.%08x -- HOST:%d WIRE:%d\n"
+        USDR_LL_LOG(dev, "UDMS", USDR_LOG_DEBUG, "Send stat %d -- %08x.%08x.%08x.%08x -- HOST:%d WIRE:%d\n"
                                         "    Buff (Pstd/Reqd/Cpld/Aired) %2d/%2d/%2d/%2d  DropFE:%" PRId64 " DropDMA:%" PRId64 " TAGS:%d FIFO:%d\n",
                  stat_sz, stat[0], stat[1], stat[2], stat[3], host_bytes, wire_bytes,
                  st.usrbuf_posted, st.usrbuf_requested, st.usrbuf_completed, st.usrbuf_aired,
@@ -442,7 +483,7 @@ int _sfetrx4_stream_send(stream_handle_t* str,
         stream->tf_data((const void**)stream_buffs, host_bytes * bursts, &buffer, wire_len);
     }
 
-    USDR_LOG("UDMS", USDR_LOG_DEBUG, "Send %lld [TS:%lld LG:%d BRST:%d]\n",
+    USDR_LL_LOG(dev, "UDMS", USDR_LOG_DEBUG, "Send %lld [TS:%lld LG:%d BRST:%d]\n",
              (long long)stream->rcnt, (long long)timestamp, lgbursts, (unsigned)wire_len);
 
     stream->rcnt++;
@@ -472,7 +513,7 @@ static int _sfetrx4_op(stream_handle_t* str,
         start = true;
         break;
     default:
-        USDR_LOG("UDMS", USDR_LOG_INFO, "Stream[%d] STOP; STATS bytes = %" PRIu64 ", samples = %" PRIu64 ", dropped_fe/dropped_dma/rcvd = %" PRIu64 "/%" PRIu64 "/%" PRIu64 "\n",
+        USDR_LL_LOG(dev, "UDMS", USDR_LOG_INFO, "Stream[%d] STOP; STATS bytes = %" PRIu64 ", samples = %" PRIu64 ", dropped_fe/dropped_dma/rcvd = %" PRIu64 "/%" PRIu64 "/%" PRIu64 "\n",
                 stream->ll_streamo, stream->stats.wirebytes, stream->stats.symbols, stream->stats.fe_drop, stream->stats.dma_drop, stream->stats.pktok);
         start = false;
     }
@@ -488,7 +529,7 @@ static int _sfetrx4_op(stream_handle_t* str,
         if (res)
             return res;
     } else {
-        // Assuming Compex IQ
+        // Assuming Complex IQ
         unsigned lgchcnt = (stream->fe_chans == 1) ? 0 :
                            (stream->fe_chans == 2) ? 1 :
                            (stream->fe_chans == 4) ? 2 : 3;
@@ -535,10 +576,14 @@ int _sfetrx4_option_set(stream_handle_t* str, const char* name, int64_t in_val)
         const channel_info_t *new_map = (const channel_info_t *)in_val;
 
         if (stream->type == USDR_ZCPY_RX) {
-            if (stream->storage.srx4.cfg_fecore_id != CORE_EXFERX_DMA32_R0)
+            if (stream->storage.srx4.cfg_fecore_id != CORE_EXFERX_DMA32_R0 &&
+                stream->storage.srx4.cfg_fecore_id != CORE_EXFERX_DMA32_R0_2 &&
+                stream->storage.srx4.cfg_fecore_id != CORE_EXFERX_DMA32_R0_8)
                 return -ENOTSUP;
         } else if (stream->type == USDR_ZCPY_TX) {
-            if (stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0) {
+            if (stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0 &&
+                stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0_2 &&
+                stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0_8) {
                 unsigned swap_ab_flag;
                 int res = fe_tx4_swap_ab_get(stream->fe_chans, new_map, &swap_ab_flag);
                 if (res)
@@ -560,10 +605,11 @@ int _sfetrx4_option_set(stream_handle_t* str, const char* name, int64_t in_val)
         return exfe_trx4_update_chmap(&stream->storage.srx4,
                                       stream->type == USDR_ZCPY_TX,
                                       stream->fe_complex,
-                                      (stream->fe_complex ? 2 : 1) * stream->fe_chans,
+                                      stream->pack_3x16,
+                                      (stream->fe_complex ? 2 : 1) * (stream->pack_3x16 ? (stream->fe_chans * 4 / 3) : stream->fe_chans),
                                       (const channel_info_t *)in_val);
     } else if (stream->type == USDR_ZCPY_TX && (strcmp(name, "mute") == 0)) {
-        if (stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0) {
+        if (stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0 && stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0_2 && stream->storage.srx4.cfg_fecore_id != CORE_EXFETX_DMA32_R0_8) {
             stream->fe_old_tx_mute = in_val & 3;
             return sfe_tx4_upd(&stream->storage.srx4,
                                stream->sync_base,
@@ -620,7 +666,7 @@ int parse_sfetrx4(const char* dformat, const channel_info_t *channels, unsigned 
     bool bifurcation = true;
     struct parsed_data_format pfmt;
 
-    strncpy(out->dfmt, dformat, sizeof(out->dfmt));
+    snprintf(out->dfmt, sizeof(out->dfmt), "%s", dformat);
     if (stream_parse_dformat(out->dfmt, &pfmt)) {
         return -EINVAL;
     }
@@ -676,9 +722,11 @@ static int initialize_stream_rx_32(device_t* device,
                                    bool data_lane_bifurcation)
 {
     int res;
+    lldev_t dev = device->dev;
     stream_sfetrx_dma32_t* strdev;
+    uint64_t hw_chan_msk = 0;
 
-    res = dma_rx32_reset(device->dev, 0, sx_base);
+    res = dma_rx32_reset(dev, 0, sx_base);
     if (res)
         return res;
 
@@ -700,7 +748,7 @@ static int initialize_stream_rx_32(device_t* device,
     res = sfe_rx4_check_format(&sc);
     if (res) {
         if (pfmt.wire_fmt != NULL) {
-            USDR_LOG("DSTR", USDR_LOG_ERROR, "Unsupported wire format '%s' by the core\n",
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "Unsupported wire format '%s' by the core\n",
                      sc.sfmt);
             return res;
         }
@@ -708,6 +756,7 @@ static int initialize_stream_rx_32(device_t* device,
         // Wire format not supported, need transform function
         // suppose i16 but maintain complex / real format
         sc.sfmt = (*pfmt.host_fmt == 'C' || *pfmt.host_fmt == 'c') ? "ci16" : "i16";
+        res = 0;
     }
 
     //Find transform function
@@ -716,12 +765,12 @@ static int initialize_stream_rx_32(device_t* device,
                                               1,
                                               logicchs);
     if (funcs.cfunc == NULL || funcs.sfunc == NULL) {
-        USDR_LOG("DSTR", USDR_LOG_ERROR, "No transform function '%s'->'%s' are available for 1->%d demux\n",
+        USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "No transform function '%s'->'%s' are available for 1->%d demux\n",
                  sc.sfmt, pfmt.host_fmt, logicchs);
         return -EINVAL;
     }
     if (is_transform_dummy(funcs.cfunc)) {
-        USDR_LOG("DSTR", USDR_LOG_INFO, "No transformation!\n");
+        USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "No transformation!\n");
     }
 
     struct bitsfmt bfmt = get_bits_fmt(sc.sfmt);
@@ -738,11 +787,11 @@ static int initialize_stream_rx_32(device_t* device,
             sc.channels.ch_map[2] = sc.channels.ch_map[0] + 2;
             sc.channels.ch_map[3] = sc.channels.ch_map[1] + 2;
         } else {
-            USDR_LOG("DSTR", USDR_LOG_ERROR, "Bifurcation is only valid for single channel complex\n");
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "Bifurcation is only valid for single channel complex\n");
             return -EINVAL;
         }
         if (sc.spburst % 2) {
-            USDR_LOG("DSTR", USDR_LOG_ERROR, "In Bifurcation number of samples should be even\n");
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "In Bifurcation number of samples should be even\n");
             return -EINVAL;
         }
 
@@ -750,9 +799,10 @@ static int initialize_stream_rx_32(device_t* device,
     }
 
     // TODO obtain exfe configuration constants
-    res = (fecfg->cfg_fecore_id == CORE_EXFERX_DMA32_R0) ?
-        exfe_rx4_configure(fecfg, &sc, &fc) :
-        sfe_rx4_configure(fecfg, &sc, &fc);
+    bool pack_3x16 = false;
+    res = (fecfg->cfg_fecore_id == CORE_EXFERX_DMA32_R0 || fecfg->cfg_fecore_id == CORE_EXFERX_DMA32_R0_2 || fecfg->cfg_fecore_id == CORE_EXFERX_DMA32_R0_8) ?
+        exfe_rx4_configure(fecfg, &sc, &fc, &pack_3x16) :
+        sfe_rx4_configure(fecfg, &sc, &fc, &hw_chan_msk);
     if (res)
         return res;
 
@@ -803,7 +853,7 @@ static int initialize_stream_rx_32(device_t* device,
     strdev->pkt_bytes = sparams.block_size;
     strdev->host_bytes = funcs.sfunc(sparams.block_size, false);
 
-    strdev->wire_bps = 8 * strdev->pkt_bytes / strdev->pkt_symbs;
+    strdev->wire_bps = 8 * strdev->pkt_bytes / strdev->pkt_symbs / strdev->channels;
 
     strdev->tf_data = funcs.cfunc;
     strdev->tf_size = funcs.sfunc;
@@ -828,8 +878,10 @@ static int initialize_stream_rx_32(device_t* device,
     strdev->fe_complex = bfmt.complex;
     strdev->storage.srx4 = *fecfg;
 
-    USDR_LOG("DSTR", USDR_LOG_INFO, "RX: Samples=%d Bps=%d WireBytes=%d HostBytes=%d Bursts=%d\n",
-             strdev->pkt_symbs, strdev->wire_bps, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count);
+    strdev->hw_pwr_mask = hw_chan_msk;
+    strdev->pack_3x16 = pack_3x16;
+    USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "RX: Samples=%d Bps=%dx%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%" PRIx64 " Pack3x16=%d\n",
+             strdev->pkt_symbs, strdev->wire_bps, strdev->channels, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask, strdev->pack_3x16);
 
     *outu = strdev;
     return 0;
@@ -880,8 +932,9 @@ static int initialize_stream_tx_32(device_t* device,
                                    bool dont_check_fw)
 {
     int res;
+    lldev_t dev = device->dev;
     stream_sfetrx_dma32_t* strdev;
-
+    uint64_t pwr_hw_mask = 0;
     struct stream_config sc;
     unsigned logicchs = chcount;
 
@@ -898,10 +951,10 @@ static int initialize_stream_tx_32(device_t* device,
         uint64_t fwid;
         res = usdr_device_vfs_obj_val_get_u64(device, "/dm/revision", &fwid);
         if (res) {
-            USDR_LOG("DSTR", USDR_LOG_ERROR, "Unable to check comatability firmware!\n");
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "Unable to check comatability firmware!\n");
         }
         if (get_xilinx_rev_h(fwid & 0xffffffff) < get_xilinx_rev_h(MINIM_FWID_COMPAT)) {
-            USDR_LOG("DSTR", USDR_LOG_ERROR, "You're running outdated firmware, please update! CurrentID=%08x MinimalID=%08x\n",
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "You're running outdated firmware, please update! CurrentID=%08x MinimalID=%08x\n",
                      (uint32_t)(fwid & 0xffffffff),
                      MINIM_FWID_COMPAT);
             return -ECONNRESET;
@@ -917,7 +970,7 @@ static int initialize_stream_tx_32(device_t* device,
     res = sfe_tx4_check_format(&sc);
     if (res) {
         if (pfmt.wire_fmt != NULL) {
-            USDR_LOG("DSTR", USDR_LOG_ERROR, "TX Stream:Unsupported wire format '%s' by the core\n",
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "TX Stream:Unsupported wire format '%s' by the core\n",
                      sc.sfmt);
             return res;
         }
@@ -925,6 +978,7 @@ static int initialize_stream_tx_32(device_t* device,
         // Wire format not supported, need transform function
         // suppose i16 but maintain complex / real format
         sc.sfmt = (*pfmt.host_fmt == 'C' || *pfmt.host_fmt == 'c') ? "ci16" : "i16";
+        res = 0;
     }
 
     //Find transform function
@@ -933,12 +987,12 @@ static int initialize_stream_tx_32(device_t* device,
                                               logicchs,
                                               1);
     if (funcs.cfunc == NULL || funcs.sfunc == NULL) {
-        USDR_LOG("DSTR", USDR_LOG_ERROR, "TX Stream: No transform function '%s'->'%s' are available for %d->1 mux\n",
+        USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "TX Stream: No transform function '%s'->'%s' are available for %d->1 mux\n",
                  pfmt.host_fmt, sc.sfmt, logicchs);
         return -EINVAL;
     }
     if (is_transform_dummy(funcs.cfunc)) {
-        USDR_LOG("DSTR", USDR_LOG_INFO, "TX Stream: No transformation!\n");
+        USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "TX Stream: No transformation!\n");
     }
 
     struct bitsfmt bfmt = get_bits_fmt(sc.sfmt);
@@ -949,19 +1003,18 @@ static int initialize_stream_tx_32(device_t* device,
         if ((bfmt.complex) && (sc.chcnt == 1)) {
             sc.chcnt = 2;
         } else {
-            USDR_LOG("DSTR", USDR_LOG_ERROR, "Bifurcation is only valid for single channel complex");
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "Bifurcation is only valid for single channel complex");
             return -EINVAL;
         }
     }
 
-    unsigned bits_per_single_sym = bfmt.bits * (bfmt.complex ? 2 : 1);
-
     // Check core fe sanity
+    bool pack_3x16 = false;
     unsigned fe_old_tx_swap = 0;
     unsigned fe_old_tx_mute = 0;
     if (fecfg->cfg_fecore_id == CORE_SFETX_DMA32_R0) {
         if (!bfmt.complex || bfmt.bits != 16) {
-            USDR_LOG("DSTR", USDR_LOG_ERROR, "Only 16 bit complex signals supported in Simple TX FE!\n");
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "Only 16 bit complex signals supported in Simple TX FE!\n");
             return -EINVAL;
         }
 
@@ -974,12 +1027,24 @@ static int initialize_stream_tx_32(device_t* device,
         }
 
         fe_old_tx_mute = (sc.chcnt == 1) ? (fe_old_tx_swap ? 1 : 2) : 0;
+        pwr_hw_mask = (sc.chcnt == 2) ? 0b1111 : (fe_old_tx_swap ? 0b1100 : 0b0011);
     } else {
         if (sc.chcnt > (fecfg->cfg_raw_chans / (bfmt.complex ? 2 : 1)))
             return -EINVAL;
 
+        // Frontend register is a must
+        if (fecfg->cfg_base == 0)
+            return -EINVAL;
+
         unsigned llcanhs = (bfmt.complex ? 2 : 1) * sc.chcnt;
         unsigned expand;
+        unsigned lbits = bfmt.bits;
+        if ((lbits == 16) && (llcanhs == 6 || llcanhs == 12 || llcanhs == 24 || llcanhs == 48)) {
+            llcanhs = (llcanhs / 3) * 4;
+            pack_3x16 = true;
+            lbits = 12;
+        }
+
         switch (llcanhs) {
         case 1: expand = 0; break;
         case 2: expand = 1; break;
@@ -988,12 +1053,13 @@ static int initialize_stream_tx_32(device_t* device,
         case 16: expand = 4; break;
         case 32: expand = 5; break;
         default:
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_ERROR, "TX: Unable to deliver %d chans in %d bits!\n", llcanhs, lbits);
             return -EINVAL;
         }
 
         res = res ? res : exfe_tx4_mute(fecfg, 0);
-        res = res ? res : exfe_tx4_config(fecfg, bfmt.bits, expand);
-        res = res ? res : exfe_trx4_update_chmap(fecfg, true, bfmt.complex, llcanhs, &sc.channels);
+        res = res ? res : exfe_tx4_config(fecfg, lbits, expand, pack_3x16);
+        res = res ? res : exfe_trx4_update_chmap(fecfg, true, bfmt.complex, pack_3x16, llcanhs, &sc.channels);
 
         if (res) {
             return res;
@@ -1004,6 +1070,7 @@ static int initialize_stream_tx_32(device_t* device,
     if (res)
         return res;
 
+    unsigned bits_per_single_sym = bfmt.bits * (bfmt.complex ? 2 : 1);
     lowlevel_stream_params_t sparams;
     stream_t sid;
     lowlevel_ops_t* dops = lowlevel_get_ops(device->dev);
@@ -1027,19 +1094,19 @@ static int initialize_stream_tx_32(device_t* device,
 
     sparams.out_max_bursts = 1;
     if (sparams.block_size > max_mtu) {
-        if (fecfg->cfg_fecore_id == CORE_EXFETX_DMA32_R0) {
+        if (fecfg->cfg_fecore_id == CORE_EXFETX_DMA32_R0 || fecfg->cfg_fecore_id == CORE_EXFETX_DMA32_R0_2 || fecfg->cfg_fecore_id == CORE_EXFETX_DMA32_R0_8) {
             unsigned max_burst_sps = 8 * max_mtu / sparams.bits_per_sym;
             unsigned lgbrst;
             res = _extx_burstup(pktsyms, max_burst_sps, &lgbrst);
             if (res) {
-                USDR_LOG("DSTR", USDR_LOG_CRITICAL_WARNING, "TX Stream couldn't breakup %d bytes in bursts, maximum per burst is %d!\n",
+                USDR_LL_LOG(dev, "DSTR", USDR_LOG_CRITICAL_WARNING, "TX Stream couldn't breakup %d bytes in bursts, maximum per burst is %d!\n",
                          sparams.block_size, max_mtu);
                 goto fail_dealloc;
             }
 
             sparams.out_max_bursts = (1 << lgbrst);
         } else {
-            USDR_LOG("DSTR", USDR_LOG_CRITICAL_WARNING, "TX Stream maximum MTU is %d bytes, we need %d to deliver %d samples blocksize!\n",
+            USDR_LL_LOG(dev, "DSTR", USDR_LOG_CRITICAL_WARNING, "TX Stream maximum MTU is %d bytes, we need %d to deliver %d samples blocksize!\n",
                      max_mtu, sparams.block_size, pktsyms);
             res = -EINVAL;
             goto fail_dealloc;
@@ -1048,7 +1115,7 @@ static int initialize_stream_tx_32(device_t* device,
 
     res = dops->stream_initialize(device->dev, 0, &sparams, &sid);
     if (res) {
-        USDR_LOG("DSTR", USDR_LOG_CRITICAL_WARNING, "TX Stream couldn't initialize for %d block size\n", sparams.block_size);
+        USDR_LL_LOG(dev, "DSTR", USDR_LOG_CRITICAL_WARNING, "TX Stream couldn't initialize for %d block size\n", sparams.block_size);
         goto fail_dealloc;
     }
 
@@ -1059,7 +1126,7 @@ static int initialize_stream_tx_32(device_t* device,
         }
 
         pktsyms = 8 * sparams.out_mtu_size / (hardware_channels * bits_per_single_sym);
-        USDR_LOG("DSTR", USDR_LOG_INFO, "TX Stream: No desired packetsize were set, assuminng maximum %d x %d sps (%d blocksize per burst)\n",
+        USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "TX Stream: No desired packetsize were set, assuminng maximum %d x %d sps (%d blocksize per burst)\n",
                  pktsyms, sparams.out_max_bursts, (unsigned)sparams.out_mtu_size);
 
         sparams.block_size = sparams.out_mtu_size;
@@ -1101,7 +1168,9 @@ static int initialize_stream_tx_32(device_t* device,
 
     strdev->burst_mask = 0;
     strdev->burst_count = sparams.out_max_bursts;
-    strdev->burst_align_bytes = (fecfg->cfg_fecore_id == CORE_EXFETX_DMA32_R0) ? 16 : 1;
+    strdev->burst_align_bytes = (fecfg->cfg_fecore_id == CORE_EXFETX_DMA32_R0_8) ? 32 :
+                                (fecfg->cfg_fecore_id == CORE_EXFETX_DMA32_R0) ? 16 :
+                                (fecfg->cfg_fecore_id == CORE_EXFETX_DMA32_R0_2) ? 8 : 1;
 
     strdev->fe_old_tx_mute = fe_old_tx_mute;
     strdev->fe_old_tx_swap = fe_old_tx_swap;
@@ -1110,8 +1179,10 @@ static int initialize_stream_tx_32(device_t* device,
     strdev->storage.srx4 = *fecfg;
     extxcfg_cache_init(&strdev->cstx4);
 
-    USDR_LOG("DSTR", USDR_LOG_INFO, "TX: Samples=%d Bps=%d WireBytes=%d HostBytes=%d Bursts=%d\n",
-             strdev->pkt_symbs, strdev->wire_bps, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count);
+    strdev->hw_pwr_mask = pwr_hw_mask;
+    strdev->pack_3x16 = pack_3x16;
+    USDR_LL_LOG(dev, "DSTR", USDR_LOG_INFO, "TX: Samples=%d Bps=%dx%d WireBytes=%d HostBytes=%d Bursts=%d PwrMask=%" PRIx64 " Pack3x16=%d\n",
+             strdev->pkt_symbs, strdev->wire_bps, strdev->channels, strdev->pkt_bytes, strdev->host_bytes, strdev->burst_count, strdev->hw_pwr_mask, strdev->pack_3x16);
     *outu = strdev;
     return 0;
 
@@ -1149,7 +1220,7 @@ int create_sfetrx4_stream(device_t* device,
     fecfg.cfg_base = fe_base;
     fecfg.cfg_fifomaxbytes = fe_fifobsz;
 
-    strncpy(dfmt, dformat, sizeof(dfmt));
+    snprintf(dfmt, sizeof(dfmt), "%s", dformat);
     struct parsed_data_format pfmt;
     if (stream_parse_dformat(dfmt, &pfmt)) {
         return -EINVAL;
@@ -1157,10 +1228,12 @@ int create_sfetrx4_stream(device_t* device,
 
     switch (core_id) {
     case CORE_SFERX_DMA32_R0:
+    case CORE_EXFERX_DMA32_R0_2:
     case CORE_EXFERX_DMA32_R0:
+    case CORE_EXFERX_DMA32_R0_8:
         // TODO obtain dynamic config
-        fecfg.cfg_word_bytes = (core_id == CORE_SFERX_DMA32_R0) ? 8 : 16;
-        fecfg.cfg_raw_chans = (core_id == CORE_SFERX_DMA32_R0) ? 4 : 8;
+        fecfg.cfg_word_bytes = (core_id == CORE_SFERX_DMA32_R0 || core_id == CORE_EXFERX_DMA32_R0_2) ? 8 : (core_id == CORE_EXFERX_DMA32_R0) ? 16 : 32;
+        fecfg.cfg_raw_chans = (core_id == CORE_SFERX_DMA32_R0 || core_id == CORE_EXFERX_DMA32_R0_2) ? 4 : (core_id == CORE_EXFERX_DMA32_R0) ? 8 : 16;
         fecfg.cfg_dma_align_bytes = fecfg.cfg_word_bytes;
 
         res = initialize_stream_rx_32(device, chcount, channels, pktsyms,
@@ -1169,10 +1242,12 @@ int create_sfetrx4_stream(device_t* device,
                                       need_fd, bifurcation);
         break;
     case CORE_SFETX_DMA32_R0:
+    case CORE_EXFETX_DMA32_R0_2:
     case CORE_EXFETX_DMA32_R0:
+    case CORE_EXFETX_DMA32_R0_8:
         // TODO obtain dynamic config
-        fecfg.cfg_word_bytes = (core_id == CORE_SFETX_DMA32_R0) ? 8 : 16;
-        fecfg.cfg_raw_chans = (core_id == CORE_SFETX_DMA32_R0) ? 4 : 8;
+        fecfg.cfg_word_bytes = (core_id == CORE_SFETX_DMA32_R0 || core_id == CORE_EXFETX_DMA32_R0_2) ? 8 : (core_id == CORE_EXFETX_DMA32_R0) ? 16 : 32;
+        fecfg.cfg_raw_chans = (core_id == CORE_SFETX_DMA32_R0 || core_id == CORE_EXFETX_DMA32_R0_2) ? 4 : (core_id == CORE_EXFETX_DMA32_R0) ? 8 : 16;
         fecfg.cfg_dma_align_bytes = fecfg.cfg_word_bytes;
 
         res = initialize_stream_tx_32(device, chcount, channels, pktsyms,
@@ -1212,7 +1287,7 @@ int sfetrx4_stream_sync(device_t* device,
     stream_sfetrx_dma32_t** pstream = (stream_sfetrx_dma32_t**)pstr;
     res = usdr_device_vfs_obj_val_get_u64(device, "/ll/sync/0/base", &sync_base);
     if (res) {
-        USDR_LOG("DSTR", USDR_LOG_ERROR, "SYNC: Broken device! Coulnd't obtain sync addr: %d\n", res);
+        USDR_LL_LOG(device->dev, "DSTR", USDR_LOG_ERROR, "SYNC: Broken device! Couldn't obtain sync addr: %d\n", res);
         return res;
     }
     retimer_base = sync_base;
@@ -1258,7 +1333,7 @@ int sfetrx4_stream_sync(device_t* device,
         res = -EINVAL;
     }
 
-    USDR_LOG("DSTR", USDR_LOG_NOTE, "SYNC[%x] Streams %d: %s => %d\n", retimer_base, scount, synctype, res);
+    USDR_LL_LOG(device->dev, "DSTR", USDR_LOG_NOTE, "SYNC[%x] Streams %d: %s => %d\n", retimer_base, scount, synctype, res);
     return res;
 }
 

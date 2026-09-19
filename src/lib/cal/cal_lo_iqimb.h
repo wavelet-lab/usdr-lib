@@ -44,6 +44,11 @@ struct calibrate_ops
     int rxtxlo_frac;
     int rxiqimb_frac;  // Relative position (-1; 1) to feed test tx sig for RXIQIMB & TXLO
     int txiqimb_frac;  // Relative position (-1; 1) to feed test tx sig for TXIQIMB
+    int rxiqtmb_tx_off;
+    int coarse_mode;
+
+    float rxbw_factor; // Extend RX bandwith from required observation frequency
+    float txbw_factor; // Extend TX bandwith from required observation frequency
 
     void* param;
 
@@ -64,7 +69,7 @@ struct calibrate_ops
     int bestmeas;
 
     // functions
-    int (*set_nco_offset)(void* param, int channel, int32_t freqoffset);
+    int (*set_nco_rx_offset)(void* param, int channel, int32_t freqoffset);
     int (*set_corr_param)(void* param, int channel, int corr_type, int value);
     int (*do_meas_nco_avg)(void* param, int channel, unsigned logduration, int* fout);
     int (*set_tx_testsig)(void* param, int channel, int32_t freqoffset, unsigned pwr);

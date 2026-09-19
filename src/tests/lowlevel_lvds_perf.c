@@ -479,7 +479,7 @@ int main(int argc, char** argv)
     usdrlog_setlevel(NULL, USDR_LOG_TRACE);
     usdrlog_enablecolorize(NULL);
     unsigned iten = 100; // Iterate over smaplerate
-    unsigned cont = 0; // Continous test
+    unsigned cont = 0; // Continuous test
     unsigned longtest = 0;
     unsigned loglevel = 2;
     unsigned verbosity = 1;

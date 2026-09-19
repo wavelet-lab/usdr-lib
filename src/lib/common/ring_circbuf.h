@@ -4,8 +4,7 @@
 #ifndef RING_CIRCBUF_H
 #define RING_CIRCBUF_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include <usdr_port.h>
 
 // Simple circbuffer
 struct ring_circbuf {

@@ -83,7 +83,7 @@ pages:
             desc: Activate TX - RX loopback, while TX is still active; Inverted
           - bits: "2:0"
             name: DUPL_PATH
-            desc: Dumplexer path
+            desc: Duplexer path
             opts:
                 0b001: RF1_BAND5
                 0b010: RF2_BAND8
@@ -209,7 +209,7 @@ pages:
             desc: Activate TX - RX loopback, while TX is still active; Inverted
           - bits: "2:0"
             name: ADUPL_PATH
-            desc: Dumplexer path
+            desc: Duplexer path
             opts:
                 0b000: ARF1_BAND2
                 0b100: ARF2_BAND7
@@ -244,7 +244,7 @@ pages:
             desc: Enable RX LNA 1
           - bits: "9:7"
             name: DUPL_PATH
-            desc: Dumplexer path
+            desc: Duplexer path
             opts:
                 0b001: RF1_BAND5
                 0b010: RF2_BAND8

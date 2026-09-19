@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+# Find dependencies used by the usdr package
+include(CMakeFindDependencyMacro)
+find_dependency(LIBUSB_1 REQUIRED)
+
+# Import the targets exported by the usdr build
+include("${CMAKE_CURRENT_LIST_DIR}/usdrTargets.cmake")

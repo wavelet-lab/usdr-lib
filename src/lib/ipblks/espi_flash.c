@@ -330,7 +330,7 @@ int espi_flash_erase(lldev_t dev, subdev_t subdev, unsigned cfg_base,
 int espi_flash_write(lldev_t dev, subdev_t subdev, unsigned cfg_base, unsigned cfg_mmap_base,
                      const uint8_t* in, uint32_t size, uint32_t flash_off, unsigned flags)
 {
-    int res;
+    int res = -EINVAL;
     if ((flags & ESPI_FLASH_DONT_ERASE) != ESPI_FLASH_DONT_ERASE) {
         res = _espi_flash_erase(dev, subdev, cfg_base, flash_off, size);
         if (res)

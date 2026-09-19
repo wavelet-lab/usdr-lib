@@ -388,7 +388,7 @@ int si5332_init(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, unsigned div,
        // CLKIN_2_CLK_SEL, 1,
 
         IMUX_SEL, ext_in2 ? IMUX_IN_2 : IMUX_XOSC,
-        CLKIN_2_CLK_SEL, ext_in2 ? IMUX_INX_CMOS_AC : IMUX_INX_DISABLED,
+        CLKIN_2_CLK_SEL, ext_in2 ? IMUX_INX_DIFF /*IMUX_INX_CMOS_AC*/ : IMUX_INX_DISABLED,
         CLKIN_3_CLK_SEL, 0,
 
         0x3C, 0,
@@ -497,10 +497,12 @@ int si5532_set_ext_clock_sw(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr, b
     {
         USYS_CTRL, 0x01, //READY
         IMUX_SEL, set_flag ? IMUX_IN_2 : IMUX_XOSC,
-        CLKIN_2_CLK_SEL, set_flag ? IMUX_INX_CMOS_AC : IMUX_INX_DISABLED,
+        CLKIN_2_CLK_SEL, set_flag ? IMUX_INX_DIFF /* IMUX_INX_CMOS_AC */ : IMUX_INX_DISABLED,
         0xB9, set_flag ? (B9_XOSC_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/) : (B9_IBUF0_DIS /*| B9_PLL_DIS | B9_PDIV_DIS*/),
         USYS_CTRL, 0x02, //ACTIVE
     };
+
+    USDR_LOG("5332", USDR_LOG_INFO, "Si5332 ExtClock=%d\n", set_flag);
 
     int res = 0;
 
@@ -560,6 +562,14 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
     unsigned idpa_den = 32767;
     unsigned idpa_res = (uint64_t)idpa_den * idpa_frac / pllfreq;
 
+    unsigned error;
+    for (idpa_den = 2; idpa_den < 32767; idpa_den++) {
+        error = (idpa_den * idpa_frac) % pllfreq;
+        if (error == 0)
+            break;
+    }
+    idpa_res = (uint64_t)idpa_den * idpa_frac / pllfreq;
+
     unsigned pll_freq_div = 0;
 
     bool jdiv = false;
@@ -575,20 +585,9 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
     if (vcofreq) {
         *vcofreq = vco;
     }
-    // TODO alternative PLL ref
-    // if (altref) {
-    //     pll_freq_div = (vco + 41000000) / 41000000;
-    //     *altref = pll_freq_div;
-    // }
 
-
-    USDR_LOG("5332", USDR_LOG_INFO, "VCO=%u IDPA_INTG=%u IDPA_RES=%u HSDIV=%u ODIV=%u JDIV=%d MXLO=%u\n",
-             vco, idpa_intg, idpa_res, hsdiv, odiv, jdiv, vco / lodiv);
-
-        // terms of an a + b/c desired divider settingmust be processed into
-        //IDPA_INTG, ID-PA_RES, and IDPA_DEN register
-        //terms.intg =floor(((a*c+b)*128/c) - 512).
-        //res = mod(b*128, c)
+    USDR_LOG("5332", USDR_LOG_INFO, "VCO=%u IDPA_INTG=%u IDPA_RES/DEV=%u/%u HSDIV=%u ODIV=%u JDIV=%d MXLO=%u OLD=%d\n",
+             vco, idpa_intg, idpa_res, idpa_den, hsdiv, odiv, jdiv, vco / lodiv, old);
 
     // slew 0 -- fastest ; 3 -- slowest
     const uint8_t program_regs_init[] = {
@@ -602,7 +601,7 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
         IDPA_DEN_L, idpa_den >> 8,
 
         PDIV_DIV, prescaler, //Prescaler
-        PLL_MODE,  (pllfreq > 30e6) ? 11 : 4, // 4 - 500kHz  | 7 - 175khz
+        PLL_MODE,  (pllfreq > 30e6) ? 8 : 4, // 4 - 500kHz  | 7 - 175khz
 
         HSDIV0A_DIV, hsdiv,
         HSDIV0B_DIV, hsdiv,
@@ -610,8 +609,9 @@ int si5332_set_layout(lldev_t dev, subdev_t subdev, lsopaddr_t lsopaddr,
         HSDIV1A_DIV, pll_freq_div,
         HSDIV2A_DIV, pll_freq_div,
 
-        old ? OUT0_CMOS_SLEW : OUT1_CMOS_SLEW, (nfo->out > 110e6) ? 1 : (nfo->out > 50e6) ? 1 : 2,
-        OUT2_CMOS_SLEW, (nfo->out > 110e6) ? 1 : (nfo->out > 50e6) ? 1 : 2,
+
+        old ? OUT0_CMOS_SLEW : OUT1_CMOS_SLEW, (nfo->out > 110e6) ? 0 : (nfo->out > 50e6) ? 1 : (nfo->out > 25e6) ? 2 : 3,
+        OUT2_CMOS_SLEW, (nfo->out > 110e6) ? 0 : (nfo->out > 50e6) ? 1 : (nfo->out > 25e6) ? 2 : 3,
 
         old ? OUT0_DIV : OUT1_DIV, odiv,
         OUT2_DIV, odiv,

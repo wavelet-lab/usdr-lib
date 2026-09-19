@@ -3,6 +3,7 @@
 
 #include "sfe_rx_4.h"
 #include <string.h>
+#include "stream_sfetrx4_dma32.h"
 
 enum sfe_rx_regs {
     FE_CMD_REG_ROUTE,
@@ -173,15 +174,15 @@ struct rfe_burster_data {
 };
 typedef struct rfe_burster_data rfe_burster_data_t;
 
-static int burst_fe_calculate(const rfe_config_t* cfg, const struct stream_config* psc, unsigned chans_raw, unsigned ch_bits, rfe_burster_data_t* out)
+static int burst_fe_calculate(lldev_t lldev, const rfe_config_t* cfg, const struct stream_config* psc, unsigned chans_raw, unsigned ch_bits, rfe_burster_data_t* out)
 {
     if (psc->burstspblk > cfg->cfg_max_bursts) {
-        USDR_LOG("STRM", USDR_LOG_ERROR, "SFERX4: bursts count `%d' exeeds maximum %d!\n",
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_ERROR, "SFERX4: bursts count `%d' exeeds maximum %d!\n",
                  psc->burstspblk, cfg->cfg_max_bursts);
         return -EINVAL;
     }
     if (chans_raw > cfg->cfg_data_lanes) {
-        USDR_LOG("STRM", USDR_LOG_ERROR, "SFERX4: channel count %d isn't supported!\n", chans_raw);
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_ERROR, "SFERX4: channel count %d isn't supported!\n", chans_raw);
         return -EINVAL;
     }
 
@@ -196,7 +197,7 @@ static int burst_fe_calculate(const rfe_config_t* cfg, const struct stream_confi
     unsigned fifo_capacity = cfg->cfg_fifo_ram_bytes / (bwords * cfg->cfg_data_lanes_bytes);
 
     if ((bursts != 0) && (bwords > cfg->limit_burst_words)) {
-        USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: %d samples @%s exeeds max burst size: %d words!\n",
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: %d samples @%s exeeds max burst size: %d words!\n",
                  psc->spburst, psc->sfmt, cfg->limit_burst_words);
         return -EINVAL;
     }
@@ -238,10 +239,10 @@ static int burst_fe_calculate(const rfe_config_t* cfg, const struct stream_confi
                 unsigned ex_bytes = ((bwords + best_bursts - 1) / best_bursts) * cfg->cfg_data_lanes_bytes -
                                     (samplerperbursts / best_bursts) * bps / 8;
 
-                USDR_LOG("STRM", USDR_LOG_INFO, "SFERX4: Adding stub %d bytes to transfer for %d burst configuration\n", ex_bytes, best_bursts);
+                USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "SFERX4: Adding stub %d bytes to transfer for %d burst configuration\n", ex_bytes, best_bursts);
                 bursts = best_bursts;
             } else {
-                USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: %d samples @%s can't be represented with any burst count, capacity %d (FIFO is %d)!\n",
+                USDR_LL_LOG(lldev, "STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: %d samples @%s can't be represented with any burst count, capacity %d (FIFO is %d)!\n",
                          psc->spburst, psc->sfmt, fifo_capacity, cfg->cfg_fifo_ram_bytes);
                 return -EINVAL;
             }
@@ -260,13 +261,13 @@ static int burst_fe_calculate(const rfe_config_t* cfg, const struct stream_confi
     }
 
     if (samplerperbursts % cfg->limit_samples_mod) {
-        USDR_LOG("STRM", USDR_LOG_ERROR, "SFERX4: Burst size should be multiple of %d, requested %d x %d!\n",
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_ERROR, "SFERX4: Burst size should be multiple of %d, requested %d x %d!\n",
                  cfg->limit_samples_mod, samplerperbursts, bursts);
         return -EINVAL;
     }
 
     if (fifo_capacity > SFE_CMD_BF_BTOTAL_MASK) {
-        USDR_LOG("STRM", USDR_LOG_WARNING, "SFERX4: fifo capacity exceeds fe capabilities, requested: %d!",
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_WARNING, "SFERX4: fifo capacity exceeds fe capabilities, requested: %d!",
                  fifo_capacity);
         fifo_capacity = SFE_CMD_BF_BTOTAL_MASK;
     }
@@ -301,6 +302,7 @@ static int _configure_simple_fe_generic(const sfe_cfg_t* fe,
                                         unsigned chns,
                                         struct fifo_config* pfc)
 {
+    lldev_t lldev = fe->dev;
     // Some constants are derived from IPBLK_PARAM_BUFFER_SIZE_ADDR
     // and any other value may break configuration
     if ((1 << IPBLK_PARAM_BUFFER_SIZE_ADDR) != fe->cfg_fifomaxbytes)
@@ -317,7 +319,7 @@ static int _configure_simple_fe_generic(const sfe_cfg_t* fe,
     cfg.limit_burst_samples = (1u << IPBLK_PARAM_BWORDS); // Replace to cfg_fifomaxbytes
     rfe_burster_data_t data;
 
-    res = burst_fe_calculate(&cfg, psc, chns, bps, &data);
+    res = burst_fe_calculate(lldev, &cfg, psc, chns, bps, &data);
     if (res) {
         return res;
     }
@@ -327,7 +329,7 @@ static int _configure_simple_fe_generic(const sfe_cfg_t* fe,
     unsigned fifo_capacity = data.capacity;
     unsigned samplerperbursts = data.samples;
 
-    USDR_LOG("STRM", USDR_LOG_INFO, "SFERX4: Stream %s/%d configured in %d words (%d samples) X %d bursts (%d bits per sym); fifo capacity %d (FMT:%x FE:%d)\n",
+    USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "SFERX4: Stream %s/%d configured in %d words (%d samples) X %d bursts (%d bits per sym); fifo capacity %d (FMT:%x FE:%d)\n",
              psc->sfmt, samples_mod, bwords, samplerperbursts, bursts, bps, fifo_capacity, chfmt, fe_format);
 
     // Put everything into reset
@@ -355,8 +357,10 @@ static int _configure_simple_fe_generic(const sfe_cfg_t* fe,
 
 int sfe_rx4_configure(const sfe_cfg_t* fe,
                       const struct stream_config* psc,
-                      struct fifo_config* pfc)
+                      struct fifo_config* pfc,
+                      uint64_t *pwr_ch_mask)
 {
+    lldev_t lldev = fe->dev;
     struct bitsfmt bfmt = get_bits_fmt(psc->sfmt);
     if (strcmp((const char*)bfmt.func, &DSPFUNC_CFFT_LPWR_I16[1]) == 0) {
         unsigned fft_size = 512;
@@ -365,14 +369,14 @@ int sfe_rx4_configure(const sfe_cfg_t* fe,
 
         // Check why /2 is here
         if ((psc->burstspblk != 0) && (bwords > ((1u << SFE_CMD_BF_BWORDS_WIDTH)/2))) {
-            USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: FFT512 %d samples @%s exeeds max burst size!\n",
+            USDR_LL_LOG(lldev, "STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: FFT512 %d samples @%s exeeds max burst size!\n",
                      psc->spburst, psc->sfmt);
             return -EINVAL;
         }
 
         return _configure_simple_fe_generic(fe, psc, bps, fft_size, IFMT_DSP, IFMT_CH_xx10, 1, pfc);
     } else if (bfmt.bits == 0) {
-        USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: RX Stream format `%s' not supported!\n",
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: RX Stream format `%s' not supported!\n",
                  psc->sfmt);
         return -EINVAL;
     }
@@ -424,19 +428,31 @@ int sfe_rx4_configure(const sfe_cfg_t* fe,
     }
 
     if (chns == 0) {
-        USDR_LOG("STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: RX channel count %d is not supported in configuration [%d, %d, %d, %d, %d, %d, %d, %d ... ]!\n",
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_CRITICAL_WARNING, "SFERX4: RX channel count %d is not supported in configuration [%d, %d, %d, %d, %d, %d, %d, %d ... ]!\n",
                  psc->chcnt, psc->channels.ch_map[0], psc->channels.ch_map[1], psc->channels.ch_map[2], psc->channels.ch_map[3],
                  psc->channels.ch_map[4], psc->channels.ch_map[5], psc->channels.ch_map[6], psc->channels.ch_map[7]);
         return -EINVAL;
     }
 
+    switch (chfmt) {
+    case IFMT_CH_3210: *pwr_ch_mask = 0b1111; break;
+    case IFMT_CH_xx10: *pwr_ch_mask = 0b0011; break;
+    case IFMT_CH_xxx0: *pwr_ch_mask = 0b0001; break;
+    case IFMT_CH_xx1x: *pwr_ch_mask = 0b0010; break;
+    case IFMT_CH_x2x0: *pwr_ch_mask = 0b0101; break;
+    case IFMT_CH_32xx: *pwr_ch_mask = 0b1100; break;
+    case IFMT_CH_x2xx: *pwr_ch_mask = 0b0100; break;
+    case IFMT_CH_3xxx: *pwr_ch_mask = 0b1000; break;
+    }
+
     unsigned fe_format = ((bfmt.bits == 8) ? IFMT_8BIT : (bfmt.bits == 12) ? IFMT_12BIT : IFMT_16BIT);
-    return _configure_simple_fe_generic(fe, psc, bfmt.bits, 1, fe_format,chfmt, chns, pfc);
+    return _configure_simple_fe_generic(fe, psc, bfmt.bits, 1, fe_format, chfmt, chns, pfc);
 }
 
 
 int sfe_rx4_throttle(const sfe_cfg_t* fe, bool enable, uint8_t send, uint8_t skip)
 {
+    lldev_t lldev = fe->dev;
     int res;
 
     // Put everything into reset
@@ -448,9 +464,9 @@ int sfe_rx4_throttle(const sfe_cfg_t* fe, bool enable, uint8_t send, uint8_t ski
         return res;
 
     if (!enable) {
-        USDR_LOG("STRM", USDR_LOG_INFO, "SFERX4: burst throttling is disabled\n");
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "SFERX4: burst throttling is disabled\n");
     } else {
-        USDR_LOG("STRM", USDR_LOG_INFO, "SFERX4: burst throttling is enabled %d/%d\n",
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "SFERX4: burst throttling is enabled %d/%d\n",
                  send + 1, (unsigned)send + skip + 2);
     }
     return 0;
@@ -459,11 +475,12 @@ int sfe_rx4_throttle(const sfe_cfg_t* fe, bool enable, uint8_t send, uint8_t ski
 
 int sfe_rx4_startstop(const sfe_cfg_t* fe, bool start)
 {
+    lldev_t lldev = fe->dev;
     int res = _sfe_srx4_reg_set(fe, FE_CMD_RESET, (start) ? RX_SCMD_START_IMM : RX_SCMD_STOP_IMM);
     if (res)
         return res;
 
-    USDR_LOG("STRM", USDR_LOG_NOTE, "SFERX4: RX Stream configured to %s\n", (start) ? "start" : "stop");
+    USDR_LL_LOG(lldev, "STRM", USDR_LOG_NOTE, "SFERX4: RX Stream configured to %s\n", (start) ? "start" : "stop");
     return 0;
 }
 
@@ -478,13 +495,13 @@ int sfe_rf4_nco_enable(const sfe_cfg_t* fe, bool enable, unsigned iqaccum)
         res = (res) ? res : lowlevel_reg_wr32(fe->dev, fe->subdev, fe->cfg_base + FE_CMD_REG_CFG_CORDIC, 0);
     }
 
-    USDR_LOG("STRM", USDR_LOG_INFO, "SFERX4: NCO Active: %d\n", enable);
+    USDR_LL_LOG(fe->dev, "STRM", USDR_LOG_INFO, "SFERX4: NCO Active: %d\n", enable);
     return res;
 }
 
 int sfe_rf4_nco_freq(const sfe_cfg_t* fe, int32_t freq)
 {
-    USDR_LOG("STRM", USDR_LOG_INFO, "SFERX4: NCO FREQ Set to %d\n", freq);
+    USDR_LL_LOG(fe->dev, "STRM", USDR_LOG_INFO, "SFERX4: NCO FREQ Set to %d\n", freq);
     return lowlevel_reg_wr32(fe->dev, fe->subdev, fe->cfg_base + FE_CMD_REG_FREQ_CORDIC, freq);
 }
 
@@ -492,17 +509,26 @@ int sfe_rf4_nco_freq(const sfe_cfg_t* fe, int32_t freq)
 #define MAX_EXLG_CHANS  4
 #define MAX_EX_CHANS    (1<<MAX_EXLG_CHANS)
 
-int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, struct fifo_config* pfc)
+int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, struct fifo_config* pfc, bool* out_pack_3x16)
 {
+    lldev_t lldev = fe->dev;
     struct bitsfmt bfmt = get_bits_fmt(psc->sfmt);
     unsigned bps = bfmt.bits;
     if (bps != 12 && bps != 16) {
-        USDR_LOG("STRM", USDR_LOG_ERROR, "EXFERX: sample size %d isn't supported!\n", bps);
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_ERROR, "EXFERX: sample size %d isn't supported!\n", bps);
         return -EINVAL;
     }
     unsigned chns = psc->chcnt;
+    bool pack_3x16 = false;
+
     if (bfmt.complex) {
         chns *= 2;
+    }
+
+    if ((bps == 16) && (chns == 6 || chns == 12 || chns == 24 || chns == 48)) {
+        chns = (chns / 3) * 4;
+        pack_3x16 = true;
+        bps = 12;
     }
 
     unsigned j, chlg = 0;
@@ -511,11 +537,11 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
             break;
     }
     if (j > fe->cfg_raw_chans || j == 0) {
-        USDR_LOG("STRM", USDR_LOG_ERROR, "EXFERX: Unsupported channel count %d!\n", chns);
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_ERROR, "EXFERX: Unsupported channel count %d!\n", chns);
         return -EINVAL;
     }
-    if (fe->cfg_raw_chans >= MAX_EX_CHANS) {
-        USDR_LOG("STRM", USDR_LOG_ERROR, "EXFERX: Maximum channel count supported by the core is 16, requested %d!", fe->cfg_raw_chans);
+    if (fe->cfg_raw_chans > MAX_EX_CHANS) {
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_ERROR, "EXFERX: Maximum channel count supported by the core is 16, requested %d!", fe->cfg_raw_chans);
         return -EINVAL;
     }
 
@@ -530,7 +556,7 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
     cfg.limit_burst_samples = fe->cfg_fifomaxbytes;
     rfe_burster_data_t data;
 
-    res = burst_fe_calculate(&cfg, psc, chns, bps, &data);
+    res = burst_fe_calculate(lldev, &cfg, psc, chns, bps, &data);
     if (res) {
         return res;
     }
@@ -541,8 +567,8 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
     unsigned samplerperbursts = data.samples;
     unsigned raw_burst_sz = (bps == 12) ? (chns * samplerperbursts * 12 + 7) / 8 : chns * samplerperbursts * 2;
 
-    USDR_LOG("STRM", USDR_LOG_INFO, "EXFERX: Stream %s configured in %d bytes (%d samples x %d chans x %d bits) X %d bursts; naked burst size %d; fifo capacity %d\n",
-             psc->sfmt, bbytes, samplerperbursts, 1 << chlg, bps, bursts, raw_burst_sz, fifo_capacity);
+    USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "EXFERX: Stream %s configured in %d bytes (%d samples x %d chans x %d bits %s) X %d bursts; naked burst size %d; fifo capacity %d\n",
+             psc->sfmt, bbytes, samplerperbursts, 1 << chlg, bps, pack_3x16 ? "3x16 mode" : "", bursts, raw_burst_sz, fifo_capacity);
 
 
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_RESET, RX_SCMD_IDLE |
@@ -554,14 +580,15 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_BURST_BYTES, bbytes - 1);
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_BURST_CAPACITY, fifo_capacity);
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_COMPACTER, chlg);
-    res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_PACKER, bps == 12 ? 1 : 0);
+    res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_PACKER, pack_3x16 ? 3 : bps == 12 ? 1 : 0);
 
-    res = res ? res : exfe_trx4_update_chmap(fe, false, bfmt.complex, chns, &psc->channels);
+    res = res ? res : exfe_trx4_update_chmap(fe, false, bfmt.complex, pack_3x16, chns, &psc->channels);
 
     pfc->bpb = bbytes;
     pfc->burstspblk = bursts;
     pfc->oob_len = 0;
     pfc->oob_off = 0;
+    *out_pack_3x16 = pack_3x16;
     return res;
 }
 
@@ -569,9 +596,11 @@ int exfe_rx4_configure(const sfe_cfg_t* fe, const struct stream_config* psc, str
 int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
                            bool mask,
                            bool complex,
+                           bool pack_3x16,
                            unsigned total_chan_num,
-                           const channel_info_t* newmap)
+                           const channel_info_t* newmap_orig)
 {
+    lldev_t lldev = fe->dev;
     int res = 0;
     uint8_t chmap[MAX_EX_CHANS];
     uint8_t chmap_o[MAX_EX_CHANS];
@@ -579,20 +608,85 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     uint16_t ch_remapped[MAX_EXLG_CHANS];
     memset(ch_remapped, 0, sizeof(ch_remapped));
     memset(flag_swap_iq, 0, sizeof(flag_swap_iq));
-
+    channel_info_t pack_3x16_mmap;
+    channel_info_t reverse_map;
     unsigned lg_chans = (fe->cfg_raw_chans == 16) ? 4 : (fe->cfg_raw_chans == 8) ? 3 : (fe->cfg_raw_chans == 4) ? 2 : (fe->cfg_raw_chans == 2) ? 1 : 0;
     unsigned msk = mask ? ((complex ? total_chan_num / 2 : total_chan_num) - 1) : 0xff;
+
+    if (pack_3x16) {
+        // Every 7th and 8-th channel is ignored since it coinatins garbage anyway
+        for (unsigned g = 0, h = 0; g < fe->cfg_raw_chans; g++) {
+            if (complex) {
+                if ((g % 4) == 3) {
+                    pack_3x16_mmap.ch_map[g] = 0xff; //newmap_orig->ch_map[h + (g % 4) - h];
+                } else {
+                    pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h++];
+                }
+            } else {
+                if ((g % 8) == 6 || (g % 8) == 7) {
+                    pack_3x16_mmap.ch_map[g] = 0xff; //newmap_orig->ch_map[h + (g % 8) - 8];
+                } else {
+                    pack_3x16_mmap.ch_map[g] = newmap_orig->ch_map[h++];
+                }
+            }
+        }
+    }
+    const channel_info_t* newmap = (pack_3x16) ? &pack_3x16_mmap : newmap_orig;
+
+    // For TX we need invert in and out
+    if (fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0 || fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_2 || fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_8) {
+        memset(reverse_map.ch_map, ~CH_SWAP_IQ_FLAG, sizeof(reverse_map.ch_map));
+
+        for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
+            if (newmap->ch_map[g] == 0xff)
+                continue;
+
+            unsigned idx = (newmap->ch_map[g] & ~CH_SWAP_IQ_FLAG);
+            if (idx >= fe->cfg_raw_chans)
+                return -EINVAL;
+
+            reverse_map.ch_map[idx] = g;
+        }
+
+        for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
+            if (newmap->ch_map[g] == 0xff)
+                continue;
+
+            if (newmap->ch_map[g] & CH_SWAP_IQ_FLAG) {
+                reverse_map.ch_map[g] |= CH_SWAP_IQ_FLAG;
+            }
+        }
+
+        newmap = &reverse_map;
+    }
+
+
+    USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "NEW_MAP %d x %d CHANS:\n", total_chan_num, complex ? 2 : 1);
+    for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "NEW_MAP[%d]: %d => %d\n", g,
+                 newmap_orig->ch_map[g], newmap->ch_map[g]);
+    }
 
     for (unsigned g = 0; g < fe->cfg_raw_chans; g = g + total_chan_num) {
         for (unsigned f = 0; f < total_chan_num; f++) {
             unsigned swp_msk = (g + f);
 
             if (complex) {
+                if (newmap->ch_map[f / 2] == 0xff) {
+                    chmap_o[g + f] = g + f;
+                } else {
                 unsigned swap_iq = (newmap->ch_map[f / 2] & CH_SWAP_IQ_FLAG) ? 1 : 0;
+                    unsigned channel = newmap->ch_map[f / 2] & ~CH_SWAP_IQ_FLAG;
                 flag_swap_iq[g + f] = swap_iq;
-                chmap_o[g + f] = (2 * (newmap->ch_map[f / 2] & msk) + ((f % 2) ^ swap_iq));
+                    chmap_o[g + f] = (2 * (channel & msk) + ((f % 2) ^ swap_iq));
+                }
             } else  {
-                chmap_o[g + f] = (newmap->ch_map[f] & msk);
+                if (newmap->ch_map[f] == 0xff) {
+                    chmap_o[g + f] = g + f;
+                } else {
+                    unsigned channel = newmap->ch_map[f] & ~CH_SWAP_IQ_FLAG;
+                    chmap_o[g + f] = (channel & msk);
+                }
             }
             chmap[g + f] = chmap_o[g + f]  ^ (swp_msk);
         }
@@ -608,10 +702,10 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     }
 
     for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
-        USDR_LOG("STRM", USDR_LOG_INFO, "EXFE: CH%d => %d (orig %d MSK %x/%d) %s", g, chmap[g], chmap_o[g], msk, total_chan_num, flag_swap_iq[g] ? "SWAP_IQ" : "");
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "EXFE: CH%d => %d (orig %d MSK %x/%d) %s", g, chmap[g], chmap_o[g], msk, total_chan_num, flag_swap_iq[g] ? "SWAP_IQ" : "");
     }
     for (unsigned f = 0; f < lg_chans; f++) {
-        USDR_LOG("STRM", USDR_LOG_INFO, "EXFE: STAGE_%d: %04x", f, ch_remapped[f]);
+        USDR_LL_LOG(lldev, "STRM", USDR_LOG_INFO, "EXFE: STAGE_%d: %04x", f, ch_remapped[f]);
     }
 
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_SHUFFLE_0, ch_remapped[0]);
@@ -621,11 +715,11 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     return res;
 }
 
-int exfe_tx4_config(const sfe_cfg_t* fe, unsigned bmt, unsigned expand)
+int exfe_tx4_config(const sfe_cfg_t* fe, unsigned bmt, unsigned expand, bool pack_3x16)
 {
     int res = 0;
     res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_EXPAND, expand);
-    res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_TXFMT12, bmt == 12 ? 1 : 0);
+    res = res ? res : _sfe_exrx_reg_set(fe, EXFE_CMD_TXFMT12, pack_3x16 ? 3 : bmt == 12 ? 1 : 0);
     return res;
 }
 

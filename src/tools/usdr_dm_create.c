@@ -68,6 +68,10 @@ struct tx_thread_input_s
     float gain;
     double start_phase;
     double delta_phase;
+
+    //chirp_gen params
+    double chirp_freq0, chirp_freq1;
+    int32_t chirp_steps;
 };
 typedef struct tx_thread_input_s tx_thread_input_t;
 
@@ -239,12 +243,65 @@ void* freq_gen_thread_ci16_lut(void* obj)
 #define USE_WVLT_SINCOS
 #define MAX_TXGEN_CI16_AMPL 32760
 
+static void* chirp_gen_thread_ci16(void* obj)
+{
+#ifndef USE_WVLT_SINCOS
+    USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Not implemented");
+    return NULL;
+#endif
+
+    tx_thread_input_t* inp = (tx_thread_input_t*)obj;
+
+    const unsigned p = inp->chan;
+    const unsigned tx_get_samples = inp->samples_count;
+    const int16_t gain = DBFS_TO_AMPLITUDE(inp->gain, MAX_TXGEN_CI16_AMPL);
+
+    const bool upchirp = inp->chirp_steps > 0;
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "Using TX ci16 CHIRP sinus generator with USE_WVLT_SINCOS opt @ ch#%d F1:%.6f MHz F2:%.6f MHz GAIN:(%.2fdBFS = %d)",
+             p, inp->chirp_freq0 / 1000000.f, inp->chirp_freq1 / 1000000.f, inp->gain, gain);
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CHIRP steps count: %d [%s]", inp->chirp_steps, (upchirp ? "UP_CHIRP":"DOWN_CHIRP"));
+    USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CHIRP period: %.6f s (having sr:%.3f Msps)", (double)inp->chirp_steps / (double)inp->samplerate, inp->samplerate / 1e6);
+
+    int32_t phase = WVLT_CONVPHASE_F32_I32(inp->start_phase);
+
+    const int32_t dp0 = WVLT_CONVPHASE_F32_I32(inp->chirp_freq0 / inp->samplerate);
+    const int32_t dp1 = WVLT_CONVPHASE_F32_I32(inp->chirp_freq1 / inp->samplerate);
+    int32_t delta_phase_arr[] = { dp0, dp1 };
+    int32_t delta_phase = inp->chirp_steps >= 0 ? dp0 : dp1;
+
+    while (!s_stop && !thread_stop)
+    {
+        unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
+        if (idx == IDX_TIMEDOUT)
+            continue;
+
+        char* data = ring_buffer_at(tbuff[p], idx);
+
+        tx_header_t* hdr = (tx_header_t*)data;
+        hdr->len = tx_get_samples * sizeof(uint16_t) * 2;
+        hdr->flags = TXF_NONE;
+
+        int16_t *iqp = (int16_t *)(data + sizeof(tx_header_t));
+
+        wvlt_sincos_i16_interleaved_chirp(&phase, &delta_phase, delta_phase_arr, inp->chirp_steps,
+                                          gain, true/*invert sin*/, false/*invert cos*/, iqp, tx_get_samples);
+        ring_buffer_ppost(tbuff[p]);
+    }
+
+    return NULL;
+}
+
 /*
  *   Thread function - Sine generator to TX stream (ci16)
  */
 void* freq_gen_thread_ci16(void* obj)
 {
     tx_thread_input_t* inp = (tx_thread_input_t*)obj;
+    if(inp->chirp_steps)
+    {
+        return chirp_gen_thread_ci16(obj);
+    }
+
     const unsigned p = inp->chan;
     const unsigned tx_get_samples = inp->samples_count;
     const int16_t gain = DBFS_TO_AMPLITUDE(inp->gain, MAX_TXGEN_CI16_AMPL);
@@ -344,16 +401,17 @@ void* freq_gen_thread_cf32(void* obj)
  */
 bool print_device_temperature(pdm_dev_t dev)
 {
-    uint64_t temp;
+    uint64_t temp = -1;
     int res = usdr_dme_get_uint(dev, "/dm/sensor/temp", &temp);
+    int traw = (temp & 0xffffffff);
 
     if (res) {
-        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get device temperature: errno %d", res);
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get device temperature: errno %d\n", res);
         return false;
-    } else if (temp > 65535) {
-        USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "The temperature sensor doen't seem to be supported by your hardware - or your device has already melted)");
+    } else if (traw > 65535 || traw < -65535) {
+        USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "The temperature sensor reports incorrect value!\n");
     } else {
-        USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Temp = %.1f C", temp / 256.0);
+        USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Temp = %.1f C\n", traw / 256.0);
     }
     return true;
 }
@@ -370,6 +428,8 @@ enum {
     DD_TX_GAIN,
     DD_TX_PATH,
     DD_RX_PATH,
+
+    DD_TX_GAIN_LB, //Must be followed by DD_TX_PATH & DD_RX_PATH
 };
 
 /*
@@ -394,6 +454,8 @@ static void usage(int severity, const char* me)
                                 "\t[-T <flag: TX+RX mode>] \n"
                                 "\t[-N <flag: No TX timestamps>] \n"
                                 "\t[-J <flag: use samp/3 LUT table for sin generator (ultra fast)>]\n"
+                                "\t[-v RX_BB_FREQ] \n"
+                                "\t[-V TX_BB_FREQ] \n"
                                 "\t[-q TDD_FREQ [910e6]] \n"
                                 "\t[-e RX_FREQ [900e6]] \n"
                                 "\t[-E TX_FREQ [920e6]] \n"
@@ -416,9 +478,12 @@ static void usage(int severity, const char* me)
                                 "\t[-g comma-separated list of sin generator gains (FP values, dBFS -100..0)] \n"
                                 "\t[-X <flag: Skip initialization>] \n"
                                 "\t[-z <flag: Continue on error>] \n"
+                                "\t[-b TX packet precharge count before doing RX (valid with -T flag) [16]\n"
                                 "\t[-l loglevel [3(INFO)]] \n"
                                 "\t[-G calibration [algo#]] \n"
                                 "\t[-Z param1=value1,param2=value2,...] \n"
+                                "\t[-m <flag: Enable chirp TX generator mode>] \n"
+                                "\t[-M comma-separated list of CHIRP generator params (each channel specified as <steps_count(int)>:<freq0(float)>:<freq1(float)>)] \n"
                                 "\t[-h <flag: This help>]",
              me);
 }
@@ -637,6 +702,10 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned calibrate = 0;
     param_list_t extra_params[32];
     unsigned extra_param_len = 0;
+    int tx_pkt_precharge = 16;
+    bool use_chirp_gen = false;
+    double freq_bb_rx = 0.0;
+    double freq_bb_tx = 0.0;
 
     memset(rx_thread_inputs, 0, sizeof(rx_thread_inputs));
     memset(tx_thread_inputs, 0, sizeof(tx_thread_inputs));
@@ -646,6 +715,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         inp->start_phase = -10;
         inp->delta_phase = -10;
         inp->gain = INT16_MIN;
+        inp->chirp_freq0 = 0.f;
+        inp->chirp_freq1 = 0.f;
+        inp->chirp_steps = 0;
     }
 
     channel_info_init(&chl_rx);
@@ -654,10 +726,10 @@ int main(UNUSED int argc, UNUSED char** argv)
     //Device parameters
     //                 { endpoint, default_value, ignore flag, stop_on_fail flag }
     struct dme_findsetv_data dev_data[] = {
-        [DD_RX_FREQ] = { "rx/freqency", 900e6, true, true },
-        [DD_TX_FREQ] = { "tx/freqency", 920e6, true, true },
+        [DD_RX_FREQ] = { "rx/frequency", 900e6, true, true },
+        [DD_TX_FREQ] = { "tx/frequency", 920e6, true, true },
 
-        [DD_TDD_FREQ] = { "tdd/freqency", 910e6, true, true },
+        [DD_TDD_FREQ] = { "tdd/frequency", 910e6, true, true },
 
         [DD_RX_BANDWIDTH] = { "rx/bandwidth", 1e6, true, true },
         [DD_TX_BANDWIDTH] = { "tx/bandwidth", 1e6, true, true },
@@ -670,15 +742,21 @@ int main(UNUSED int argc, UNUSED char** argv)
         [DD_RX_PATH] = { "rx/path", (uintptr_t)"rx_auto", false, true },
         [DD_TX_PATH] = { "tx/path", (uintptr_t)"tx_auto", false, true },
 
+        [DD_TX_GAIN_LB] = { "tx/gain/lb", 0, true, true },
     };
 
-    //primary logging for proper usage() call - may be overriden below
+    //primary logging for proper usage() call - may be overridden below
     usdrlog_setlevel(NULL, loglevel);
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:")) != -1) {
+    // Still available: kL
+    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:K:mM:v:V:")) != -1) {
         switch (opt) {
+        //BB frequency RX
+        case 'v': freq_bb_rx = atof(optarg); break;
+        //BB frequency TX
+        case 'V': freq_bb_tx = atof(optarg); break;
         //Time-division duplexing (TDD) frequency
         case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
         //RX frequency
@@ -701,6 +779,8 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
         //RX VGA gain
         case 'U': dev_data[DD_RX_GAIN_VGA].value = atoi(optarg); dev_data[DD_RX_GAIN_VGA].ignore = false; break;
+        //TX loopback gain
+        case 'K': dev_data[DD_TX_GAIN_LB].value = atoi(optarg); dev_data[DD_TX_GAIN_LB].ignore = false; break;
         case 'G':
             calibrate = atoi(optarg);
             break;
@@ -719,6 +799,9 @@ int main(UNUSED int argc, UNUSED char** argv)
         //If omitted, the default internal ref clock will be used (26MHz typically)
         case 'x':
             fref = atof(optarg);
+            break;
+        case 'b':
+            tx_pkt_precharge = atoi(optarg);
             break;
         //Calibration frequency
         case 'B':
@@ -897,6 +980,42 @@ int main(UNUSED int argc, UNUSED char** argv)
         case 'Z':
             extra_param_len = parse_param_list(optarg, SIZEOF_ARRAY(extra_params), extra_params);
             break;
+        case 'm':
+            use_chirp_gen = true;
+            break;
+        case 'M':
+        {
+            char* pt_end;
+            char *pt = strtok_r(optarg, ",", &pt_end);
+            unsigned i = 0;
+
+            while(pt && i < MAX_CHS)
+            {
+                char *chirp_pt_end;
+                char *chirp_pt = strtok_r(pt, ":", &chirp_pt_end);
+                if(!chirp_pt)
+                    exit(EXIT_FAILURE);
+                else
+                    tx_thread_inputs[i].chirp_steps = atoi(chirp_pt);
+
+                chirp_pt = strtok_r(NULL, ":", &chirp_pt_end);
+                if(!chirp_pt)
+                    exit(EXIT_FAILURE);
+                else
+                    tx_thread_inputs[i].chirp_freq0 = atof(chirp_pt);
+
+                chirp_pt = strtok_r(NULL, ":", &chirp_pt_end);
+                if(!chirp_pt)
+                    exit(EXIT_FAILURE);
+                else
+                    tx_thread_inputs[i].chirp_freq1 = atof(chirp_pt);
+
+                ++i;
+                pt = strtok_r(NULL, ",", &pt_end);
+            }
+
+            break;
+        }
         //Show usage
         case 'h':
             usdrlog_disablecolorize(NULL);
@@ -938,10 +1057,11 @@ int main(UNUSED int argc, UNUSED char** argv)
             }
         }
 
-        if (dev_data[DD_TX_BANDWIDTH].ignore) {
-            dev_data[DD_TX_BANDWIDTH].ignore = false;
-            dev_data[DD_TX_BANDWIDTH].value = rate;
-        }
+        // Device should decide which BW to use
+        // if (dev_data[DD_TX_BANDWIDTH].ignore) {
+        //     dev_data[DD_TX_BANDWIDTH].ignore = false;
+        //     dev_data[DD_TX_BANDWIDTH].value = rate;
+        // }
     }
 
     //Prepare parameters to RX
@@ -952,10 +1072,11 @@ int main(UNUSED int argc, UNUSED char** argv)
             return 3;
         }
 
-        if (dev_data[DD_RX_BANDWIDTH].ignore) {
-            dev_data[DD_RX_BANDWIDTH].ignore = false;
-            dev_data[DD_RX_BANDWIDTH].value = rate;
-        }
+        // Device should decide which BW to use
+        // if (dev_data[DD_RX_BANDWIDTH].ignore) {
+        //     dev_data[DD_RX_BANDWIDTH].ignore = false;
+        //     dev_data[DD_RX_BANDWIDTH].value = rate;
+        // }
     }
 
     //Open device & create dev handle
@@ -985,7 +1106,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Devices in the array: %d", devices);
     }
 
-    res = usdr_dme_get_u32(dev, "/ll/sdr/max_sw_rx_chans", &swchmax);
+    res = usdr_dme_get_u32(dev, "/ll/sdr/max_hw_rx_chans", &swchmax);
     if (res == 0) {
         if (!chl_tx.chmsk_alter) {
             chl_tx.chmsk = (1ULL << devices * swchmax) - 1;
@@ -1054,7 +1175,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = res ? res : usdr_dms_info(usds_rx, &snfo_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get RX data stream info: errno %d", res);
-            goto dev_close;
+            if (stop_on_error) goto dev_close;
         } else {
             s_rx_blksampl = snfo_rx.pktsyms;
             s_rx_blksz = snfo_rx.pktbszie;
@@ -1078,7 +1199,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = res ? res : usdr_dms_info(usds_tx, &snfo_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get TX data stream info: errno %d", res);
-            goto dev_close;
+            if (stop_on_error) goto dev_close;
         } else {
             s_tx_blksz = snfo_tx.pktbszie;
             s_tx_blksampl = snfo_tx.pktsyms;
@@ -1105,6 +1226,9 @@ int main(UNUSED int argc, UNUSED char** argv)
     static double start_phase[]  = { 0, 0.5, 0.25, 0.125 };
     static double start_dphase[] = { 0.3333333333333333333333333, 0.02, 0.03, 0.04 };
     static int16_t gains[] = {0.0, 0.0, 0.0, 0.0};
+    static int32_t chirp_steps[] = { -100007, 100007, -1000007, 1000007 };
+    static int32_t chirp_freq0[] = { -333333, -666666, -1E6, -10E6 };
+    static int32_t chirp_freq1[] = {  333333,  666666,  1E6,  10E6 };
 
     for(unsigned i = 0; i < tx_bufcnt; ++i) {
         tx_thread_input_t* inp = &tx_thread_inputs[i];
@@ -1114,11 +1238,37 @@ int main(UNUSED int argc, UNUSED char** argv)
         inp->start_phase = inp->start_phase > -1 ? inp->start_phase : start_phase[i % (sizeof(start_phase) / sizeof(*start_phase))];
         inp->delta_phase = inp->delta_phase > -1 ? inp->delta_phase : start_dphase[i % (sizeof(start_dphase) / sizeof(*start_dphase))];
         inp->gain = inp->gain != INT16_MIN ? inp->gain : gains[i % (sizeof(gains) / sizeof(*gains))];
+
+        if(use_chirp_gen)
+        {
+            inp->chirp_steps = inp->chirp_steps ? inp->chirp_steps : chirp_steps[i % (sizeof(chirp_steps) / sizeof(*chirp_steps))];
+            inp->chirp_freq0 = (inp->chirp_freq0 != 0.f) ? inp->chirp_freq0 : chirp_freq0[i % (sizeof(chirp_freq0) / sizeof(*chirp_freq0))];
+            inp->chirp_freq1 = (inp->chirp_freq1 != 0.f) ? inp->chirp_freq1 : chirp_freq1[i % (sizeof(chirp_freq1) / sizeof(*chirp_freq1))];
+        }
     }
 
     for(unsigned i = 0; i < MAX_CHS; ++i) {
         USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX SINGEN CH#%2d PHASE_START:%.4f PHASE_DELTA:%.4f",
                  i, tx_thread_inputs[i].start_phase, tx_thread_inputs[i].delta_phase);
+    }
+
+    for(unsigned i = 0; i < tx_bufcnt && use_chirp_gen; ++i) {
+        USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX CHIRP_GEN CH#%2d FROM_FREQ:%.4f TO_FREQ:%.4f STEPS:%d",
+                 i, tx_thread_inputs[i].chirp_freq0, tx_thread_inputs[i].chirp_freq1, tx_thread_inputs[i].chirp_steps);
+
+        if(tx_thread_inputs[i].chirp_freq0 >= tx_thread_inputs[i].chirp_freq1)
+        {
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "CH#%2d CHIRP params error: freq0 >= freq1 [%.2f >= %.2f]",
+                     i, tx_thread_inputs[i].chirp_freq0, tx_thread_inputs[i].chirp_freq1);
+            goto dev_close;
+        }
+
+        if(abs(tx_thread_inputs[i].chirp_steps % 8) != 7)
+        {
+            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "CH#%2d CHIRP steps count[%d]: recommended condition - step %% 8 = 7(-1)",
+                     i, tx_thread_inputs[i].chirp_steps);
+            tx_thread_inputs[i].chirp_steps = (tx_thread_inputs[i].chirp_steps / 8 ) * 8 + 7;
+        }
     }
 
     //Create TX buffers and threads
@@ -1237,12 +1387,12 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
-    //Sync TX&RX data streams
-    res = usdr_dms_sync(dev, synctype, 2, strms);
-    if (res) {
-        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
-        if (stop_on_error) goto dev_close;
-    }
+    // //Sync TX&RX data streams
+    // res = usdr_dms_sync(dev, synctype, 2, strms);
+    // if (res) {
+    //     USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
+    //     if (stop_on_error) goto dev_close;
+    // }
 
 
     //Set antenna configuration
@@ -1253,6 +1403,11 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Set device parameters from the dev_data struct (see above)
     if (!noinit) {
+        if (!stop_on_error) {
+            for (unsigned i = 0; i < SIZEOF_ARRAY(dev_data); i++) {
+                dev_data[i].stopOnFail = false;
+            }
+        }
         res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set device parameters: errno %d", res);
@@ -1260,11 +1415,24 @@ int main(UNUSED int argc, UNUSED char** argv)
         }
     }
 
+    //Sync TX&RX data streams
+    res = usdr_dms_sync(dev, synctype, 2, strms);
+    if (res) {
+        USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
+        if (stop_on_error) goto dev_close;
+    }
+
     if (calibrate) {
         res = usdr_dme_set_uint(dev, "/dm/sdr/0/calibrate", calibrate);
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "SDR Calibration done: %d\n", res);
+    }
 
-        res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
+    // Update BB freqs if set
+    if (freq_bb_rx != 0.0) {
+        usdr_dme_set_uint(dev, "/dm/sdr/0/rx/frequency/bb", (int64_t)freq_bb_rx);
+    }
+    if (freq_bb_tx != 0.0) {
+        usdr_dme_set_uint(dev, "/dm/sdr/0/tx/frequency/bb", (int64_t)freq_bb_tx);
     }
 
     uint64_t stm = start_tx_delay;
@@ -1301,8 +1469,19 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     for (unsigned i = 0; !s_stop && (i < count); i++)
     {
-        if(dotx && !do_transmit(usds_tx, &stm, &snfo_tx, nots, i, &tx_samples_cnt, &txstat))
-            goto stop;
+        if (tx_pkt_precharge < 0) {
+            if (tx_pkt_precharge != 0) {
+                ++tx_pkt_precharge;
+            }
+        } else {
+            if (dotx && !do_transmit(usds_tx, &stm, &snfo_tx, nots, i, &tx_samples_cnt, &txstat))
+                goto stop;
+
+            if (tx_pkt_precharge != 0) {
+                --tx_pkt_precharge;
+                continue;
+            }
+        }
 
         if(dorx && !do_receive(usds_rx, i, &rxstat))
             goto stop;

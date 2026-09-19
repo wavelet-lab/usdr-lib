@@ -33,6 +33,13 @@ VWLT_ATTRIBUTE(optimize("-O3"), target("avx2"))
 DECLARE_TR_FUNC_1_1(conv_i16_f32_avx2)
 #endif
 
+#ifdef WVLT_AVX512BW
+#define TEMPLATE_FUNC_NAME conv_i16_f32_avx512bw
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx512bw"))
+#include "templates/conv_i16_f32_avx512bw.t"
+DECLARE_TR_FUNC_1_1(conv_i16_f32_avx512bw)
+#endif
+
 #ifdef WVLT_NEON
 #define TEMPLATE_FUNC_NAME conv_i16_f32_neon
 VWLT_ATTRIBUTE(optimize("-O3"))
@@ -49,6 +56,7 @@ conv_function_t conv_get_i16_f32_c(generic_opts_t cpu_cap, const char** sfunc)
     SELECT_SSE2_FN(fn, fname, tr_conv_i16_f32_sse2, cpu_cap);
     SELECT_AVX_FN(fn, fname, tr_conv_i16_f32_avx, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_conv_i16_f32_avx2, cpu_cap);
+    SELECT_AVX512BW_FN(fn, fname, tr_conv_i16_f32_avx512bw, cpu_cap);
     SELECT_NEON_FN(fn, fname, tr_conv_i16_f32_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;

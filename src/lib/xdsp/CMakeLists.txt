@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024 Wavelet Lab
+# Copyright (c) 2023-2026 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
 # Populate a CMake variable with the sources
@@ -42,6 +42,14 @@ set(xdsplib_conv_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci12_4ci16_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_2ci16_ci12_2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/conv_4ci16_ci12_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_6ci16_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_6cf32_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_8cf32_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_8ci16_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_3ci16_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_ci16_3cf32_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_3cf32_ci16_2.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv_3ci16_ci16_2.c
 )
 
 if(WVLT_ARCH_X86 OR WVLT_ARCH_X86_64)
@@ -78,10 +86,16 @@ else()
         #add_definitions("-mfpu=neon")
     endif()
 
-    add_library(usdr-dsp ${xdsplib_SRCS})
+    add_library(usdr-dsp SHARED ${xdsplib_SRCS})
     target_link_libraries(usdr-dsp m pthread)
     target_compile_options(usdr-dsp PRIVATE "-Wall" "-Werror=implicit-function-declaration")
-    install(TARGETS usdr-dsp LIBRARY)
+    install(TARGETS usdr-dsp EXPORT usdrTargets LIBRARY
+        DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+    # Prevent exporting build-tree include paths for the dsp target
+    set_target_properties(usdr-dsp PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${USDR_INCLUDE_FILES};${USDR_INCLUDE_DIRS}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+    )
 
     set_target_properties(usdr-dsp PROPERTIES SOVERSION ${USDR_ABI_VERSION})
     set_target_properties(usdr-dsp PROPERTIES VERSION ${USDR_LIBVER})

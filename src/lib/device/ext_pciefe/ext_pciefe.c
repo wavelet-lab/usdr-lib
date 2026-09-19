@@ -16,8 +16,8 @@
 #include "def_pciefe_cmd.h"
 
 enum {
-    GPIO_SDA     = GPIO0, // Alternatide mode
-    GPIO_SCL     = GPIO1, // Alternatide mode
+    GPIO_SDA     = GPIO0, // Alternative mode
+    GPIO_SCL     = GPIO1, // Alternative mode
 
     GPIO_FATTN_0 = GPIO0, // Fast Attenuator interface
     GPIO_FATTN_1 = GPIO1, // Fast Attenuator interface
@@ -43,7 +43,7 @@ enum {
     // GPIO14, GPIO15  -- DIRCD
 };
 
-// GPIO Translatos
+// GPIO Translators
 // DIRxx 0: PLD -> USDR  (usdr in)
 // DIRxx 1: USDR -> PLD  (usdr out)
 
@@ -740,4 +740,12 @@ int board_ext_pciefe_best_path_set(board_ext_pciefe_t* ob,
 {
 
     return -EINVAL;
+}
+
+int board_ext_pciefe_set_dac(board_ext_pciefe_t* brd, unsigned value)
+{
+    unsigned i2ca_dac = MAKE_LSOP_I2C_ADDR(LSOP_I2C_INSTANCE(brd->i2c_loc), LSOP_I2C_BUSNO(brd->i2c_loc), I2C_ADDR_DAC);
+
+    brd->dac = value;
+    return dac80501_dac_set(brd->dev, brd->subdev, i2ca_dac, brd->dac);
 }

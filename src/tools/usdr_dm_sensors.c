@@ -47,7 +47,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     enum sensor_type type = 0;
     const char *list_pattern = NULL;
 
-    while ((opt = getopt(argc, argv, "d:i:l:s:S:r:c:t:L:")) != -1) {
+    while ((opt = getopt(argc, argv, "D:d:i:l:s:S:r:c:t:L:")) != -1) {
         switch (opt) {
         case 't':
             if (strcmp(optarg, "temp") == 0)
@@ -61,6 +61,7 @@ int main(UNUSED int argc, UNUSED char** argv)
                 exit(1);
             }
             break;
+        case 'D':
         case 'd':
             device = optarg;
             break;

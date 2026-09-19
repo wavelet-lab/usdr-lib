@@ -33,6 +33,13 @@ static int tps6381x_reg_set(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
                                         0, NULL, 2, &tv);
 }
 
+int tps6381x_check_pg(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr, bool* ppg)
+{
+    uint8_t reg_status = 0xff;
+    int res = tps6381x_reg_get(dev, subdev, ls_op_addr, STATUS, &reg_status);
+    *ppg = (reg_status == 0x00);
+    return res;
+}
 
 int tps6381x_init(lldev_t dev, subdev_t subdev, lsopaddr_t ls_op_addr,
                   bool enable, bool force_pwm, int vout_mv)

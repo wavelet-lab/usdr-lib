@@ -10,6 +10,8 @@
 
 int usdr_channel_info_map_default(const usdr_channel_info_t* channels, const channel_map_info_t* map, unsigned max_chnum, channel_info_t* core_chans)
 {
+    memset(core_chans->ch_map, 0xff, sizeof(core_chans->ch_map));
+
     if (channels->phys_names == NULL && channels->phys_nums == NULL) {
         for (unsigned i = 0; i < channels->count; i++) {
             core_chans->ch_map[i] = i;

@@ -12,8 +12,8 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fftsz, float
         __m256 e2 = _mm256_load_ps(&in[i +  8][0]);
         __m256 e3 = _mm256_load_ps(&in[i + 12][0]);
 
-        __m256 w0 = _mm256_load_ps(&wnd[i + 0]);
-        __m256 w1 = _mm256_load_ps(&wnd[i + 8]);
+        __m256 w0 = _mm256_castsi256_ps(_mm256_stream_load_si256((__m256i*)&wnd[i + 0]));
+        __m256 w1 = _mm256_castsi256_ps(_mm256_stream_load_si256((__m256i*)&wnd[i + 8]));
 
         __m256 dw0 = _mm256_permutevar8x32_ps(w0, sh0);
         __m256 dw1 = _mm256_permutevar8x32_ps(w0, sh1);

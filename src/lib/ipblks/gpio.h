@@ -12,6 +12,7 @@ enum gpio_config_vals {
     GPIO_CFG_IN = 0,
     GPIO_CFG_OUT = 1,
     GPIO_CFG_ALT0 = 2,
+    GPIO_CFG_ALT1 = 3,
 };
 
 // Core supports gpio0 through gpio14

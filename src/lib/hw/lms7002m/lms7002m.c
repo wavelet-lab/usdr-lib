@@ -202,6 +202,25 @@ int lms7002m_cgen_trim_vco(lms7002m_state_t* m, int vco_cap)
                   GET_LMS7002M_CGEN_0X008C_VCO_CMPLO(reg));
 }
 
+int lms7002m_cgen_trim_vco_slow(lms7002m_state_t* m, int vco_cap)
+{
+    uint16_t reg;
+    uint32_t cgen_regs[] = { MAKE_LMS7002M_CGEN_0x008B(15, (unsigned)vco_cap, 0) };
+    int res = lms7002m_spi_post(m, cgen_regs, SIZEOF_ARRAY(cgen_regs));
+    if (res)
+        return res;
+
+    res = lms7002m_spi_rd(m, CGEN_0x008C, &reg);
+    if (res)
+        return res;
+
+    usleep(1000);
+
+    return (int)((GET_LMS7002M_CGEN_0X008C_VCO_CMPHO(reg) << 1) |
+                  GET_LMS7002M_CGEN_0X008C_VCO_CMPLO(reg));
+}
+
+
 int lms7002m_sxx_trim_vco(lms7002m_state_t* m, int vco_cap)
 {
     uint16_t reg;
@@ -218,10 +237,27 @@ int lms7002m_sxx_trim_vco(lms7002m_state_t* m, int vco_cap)
                   GET_LMS7002M_SXX_0X0123_VCO_CMPLO(reg));
 }
 
+int lms7002m_sxx_trim_vco_slow(lms7002m_state_t* m, int vco_cap)
+{
+    uint16_t reg;
+    uint32_t cgen_regs[] = { MAKE_LMS7002M_SXX_0x0121(16, (unsigned)vco_cap, m->temp, 0) };
+    int res = lms7002m_spi_post(m, cgen_regs, SIZEOF_ARRAY(cgen_regs));
+    if (res)
+        return res;
+
+    usleep(1000);
+
+    res = lms7002m_spi_rd(m, SXX_0x0123, &reg);
+    if (res)
+        return res;
+
+    return (int)((GET_LMS7002M_SXX_0X0123_VCO_CMPHO(reg) << 1) |
+                  GET_LMS7002M_SXX_0X0123_VCO_CMPLO(reg));
+}
 
 static int _lms7002m_vco_range(lms7002m_state_t* m, lms7002m_trim_vco_func_t f,
                                unsigned start, uint8_t* phi, uint8_t* plo,
-                               const char *name)
+                               const char *name, unsigned extend_range)
 {
     int i;
     int lo = 0, hi = -1;
@@ -248,28 +284,50 @@ static int _lms7002m_vco_range(lms7002m_state_t* m, lms7002m_trim_vco_func_t f,
 
         // Backup by one just to be sure we don't miss it
         lo = i;
-        i = i > 1 ? i - 1 : 0;
+        if (lo > 255)
+            lo = 255;
+        i = i - 1 - extend_range;
+        if (i < 0)
+            i = 0;
     } else {
         i = (int)start;
     }
 
     unsigned log_s = i;
     unsigned log_b = lo;
+    unsigned hi_cnt = 0;
+    unsigned r = 0;
 
-    for (; i < 256; i++) {
-        switch ((res = f(m, i))) {
+    struct vco_ranges {
+        uint8_t lo;
+        uint8_t hi;
+    } ranges[4] = {{ 255, 0}, { 255, 0}, { 255, 0}, { 255, 0}};
+
+    for (; i < 256 && r < 4; i++) {
+        res = f(m, i);
+        if (res != LMS7002M_VCO_HIGH) {
+            hi_cnt = 0;
+        }
+
+        switch (res) {
         case LMS7002M_VCO_OK:
-            hi = i;
-            if (lo > i)
-                lo = i;
+            if (ranges[r].lo > i)
+                ranges[r].lo = i;
+            ranges[r].hi = i;
             break;
         case LMS7002M_VCO_HIGH:
-            if (hi == -1) {
-                hi = (i == 0) ? 0 : i - 1;
+            if (ranges[r].lo <= ranges[r].hi) {
+                r++;
             }
-            goto find_high;
+            if (hi_cnt > extend_range) {
+                goto find_high;
+            }
+            hi_cnt++;
+            break;
         case LMS7002M_VCO_LOW:
-            lo = i + 1;
+            if (ranges[r].lo <= ranges[r].hi) {
+                r++;
+            }
             break;
         case LMS7002M_VCO_FAIL:
             return -EIO;
@@ -278,16 +336,23 @@ static int _lms7002m_vco_range(lms7002m_state_t* m, lms7002m_trim_vco_func_t f,
         }
     }
 
-find_high:
-    if (hi == -1)
-        hi = 0;
-
-    USDR_LOG("7002", USDR_LOG_INFO, "%s binary result: %d; Probed range [%d .. %d] => Good range [%d; %d]",
-             name, log_b, log_s, i, lo, hi);
-
-    if (lo > 255) {
-        lo = 255;
+find_high:;
+    int ldelta = -1;
+    int idx = -1;
+    for (unsigned p = 0; p < r; p++) {
+        int delta = ranges[p].hi - ranges[p].lo;
+        if (delta > ldelta) {
+            idx = p;
+            ldelta = delta;
+        }
     }
+
+    USDR_LOG("7002", USDR_LOG_INFO, "%s binary result: %d; Probed range [%d .. %d] => Good ranges %d: [%d; %d] / [%d; %d] / [%d; %d] / [%d; %d] took %d\n",
+             name, log_b, log_s, i, r, ranges[0].lo, ranges[0].hi, ranges[1].lo, ranges[1].hi, ranges[2].lo, ranges[2].hi, ranges[3].lo, ranges[3].hi, idx);
+
+
+    hi = (idx == -1) ? 0   : ranges[idx].hi;
+    lo = (idx == -1) ? 255 : ranges[idx].lo;
 
     *phi = (uint8_t)hi;
     *plo = (uint8_t)lo;
@@ -341,6 +406,101 @@ int lms7002m_limelight_reset(lms7002m_state_t* m)
     return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
 }
 
+int lms7002m_limelight_fifo_reset(lms7002m_state_t* m, bool rx, bool tx)
+{
+    uint16_t reg_mac_rst = m->reg_mac;
+    if (rx)
+        SET_LMS7002M_LML_0X0020_SRST_RXFIFO(reg_mac_rst, 1);
+    if (tx)
+        SET_LMS7002M_LML_0X0020_SRST_TXFIFO(reg_mac_rst, 1);
+
+    uint32_t regs[] = {
+        // Reset LML FIFO
+        MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac_rst),
+        MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac),
+    };
+
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms7002m_limelight_l_reset(lms7002m_state_t* m, bool rx, bool tx)
+{
+    uint16_t reg_mac_rst = m->reg_mac;
+    if (rx) {
+        SET_LMS7002M_LML_0X0020_LRST_RX_B(reg_mac_rst, 1);
+        SET_LMS7002M_LML_0X0020_LRST_RX_A(reg_mac_rst, 1);
+    }
+    if (tx) {
+        SET_LMS7002M_LML_0X0020_LRST_TX_B(reg_mac_rst, 1);
+        SET_LMS7002M_LML_0X0020_LRST_TX_A(reg_mac_rst, 1);
+    }
+
+    uint32_t regs[] = {
+        // Reset LML FIFO
+        MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac_rst),
+        //MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac),
+    };
+
+     lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+
+
+     usleep(1000);
+
+    uint32_t regs2[] = {
+        // Reset LML FIFO
+        //MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac_rst),
+        MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac),
+    };
+
+
+    return lms7002m_spi_post(m, regs2, SIZEOF_ARRAY(regs2));
+
+}
+
+int lms7002m_limelight_toggle_ntx(lms7002m_state_t* m)
+{
+    uint32_t regs[] = {
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1),
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1),
+    };
+
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms7002m_limelight_switch_rx_mode(lms7002m_state_t* m, lms7002m_limelight_conf_t params)
+{
+    unsigned rxmux = params.rx_lfsr ? LML_0X002A_RX_MUX_LFSR :
+                         params.rx_tx_dig_loopback ? LML_0X002A_RX_MUX_TXFIFO : LML_0X002A_RX_MUX_RXTSP;
+    unsigned rdclk = (params.rx_ext_rd_fclk /* || params.rx_tx_dig_loopback */ ) ?
+                         ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_FCLK1 : LML_0X002A_RXRDCLK_MUX_FCLK2) :
+                         ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_MCLK1 : LML_0X002A_RXRDCLK_MUX_MCLK2);
+    uint32_t regs[] = {
+        MAKE_LMS7002M_LML_0x002A(rxmux,
+                                 params.rx_port ? LML_0X002A_TX_MUX_PORT2 : LML_0X002A_TX_MUX_PORT1,
+                                 LML_0X002A_TXRDCLK_MUX_TXTSPCLK,
+                                 params.rx_port ? LML_0X002A_TXWRCLK_MUX_FCLK2 : LML_0X002A_TXWRCLK_MUX_FCLK1,
+                                 rdclk,
+                                 LML_0X002A_RXWRCLK_MUX_RXTSPCLK ),
+    };
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms7002m_limelight_toggle_tsp_clk(lms7002m_state_t* m, lms7002m_limelight_conf_t params, uint8_t set)
+{
+    uint32_t regs[] = {
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, set, set, 1, 1, 1, params.txsisoddr && params.txdiv == 1 ? 0 : 1, 1, params.rxsisoddr && params.rxdiv == 1 ? 0 : 1, 1, 1),
+    };
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
+int lms7002m_limelight_upd_delay(lms7002m_state_t* m, lms7002m_limelight_conf_t params)
+{
+    uint32_t regs[] = {
+        MAKE_LMS7002M_CDS_0x00AE(params.txtspdelay, params.txtspdelay, 0, 0, params.txlmldelay, params.txlmldelay, 0, 0),
+    };
+    return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+}
+
 
 int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t params)
 {
@@ -350,7 +510,7 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
     unsigned rxmux = params.rx_lfsr ? LML_0X002A_RX_MUX_LFSR :
                          params.rx_tx_dig_loopback ? LML_0X002A_RX_MUX_TXFIFO : LML_0X002A_RX_MUX_RXTSP;
 
-    unsigned rdclk = (params.rx_ext_rd_fclk || params.rx_tx_dig_loopback) ?
+    unsigned rdclk = (params.rx_ext_rd_fclk /* || params.rx_tx_dig_loopback */ ) ?
                          ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_FCLK1 : LML_0X002A_RXRDCLK_MUX_FCLK2) :
                          ((params.rx_port) ? LML_0X002A_RXRDCLK_MUX_MCLK1 : LML_0X002A_RXRDCLK_MUX_MCLK2);
     uint16_t reg_mac = m->reg_mac;
@@ -395,6 +555,8 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
                                  (params.txdiv > 1) ? 1u : 0,
                                  (params.rxdiv > 1) ? 1u : 0),
         MAKE_LMS7002M_LML_0x002C( params.txdiv / 2u - 1u, params.rxdiv / 2u - 1u ),
+        MAKE_LMS7002M_CDS_0x00AD(0, 0, 0, 1, 1, 1, 1, 1, params.txsisoddr && params.txdiv == 1 ? 0 : 1, 1, params.rxsisoddr && params.rxdiv == 1 ? 0 : 1, 1, 1),
+        MAKE_LMS7002M_CDS_0x00AE(params.txtspdelay, params.txtspdelay, 0, 0, params.txlmldelay, params.txlmldelay, 0, 0),
         MAKE_LMS7002M_REG_WR(LML_0x0020, reg_mac),
         MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac)
     };
@@ -403,31 +565,50 @@ int lms7002m_limelight_configure(lms7002m_state_t* m, lms7002m_limelight_conf_t 
 }
 
 
-int _lms7002m_fill_pos(lms7002m_lml_map_t l, lms7002m_lml_map_t* o)
+
+int _lms7002m_fill_pos(lms7002m_lml_map_t l, bool siso, lms7002m_lml_map_t* o)
 {
     lms7002m_lml_map_t p = {{0, 0, 0, 0}};
-    for (unsigned i = 0; i < 4; i++) {
-        switch (l.m[i]) {
-        case LML_0X0024_LML1_S0S_AI: p.m[LML_AI] = i; break;
-        case LML_0X0024_LML1_S0S_AQ: p.m[LML_AQ] = i; break;
-        case LML_0X0024_LML1_S0S_BI: p.m[LML_BI] = i; break;
-        case LML_0X0024_LML1_S0S_BQ: p.m[LML_BQ] = i; break;
-        default:
-            return -EINVAL;
+    if (siso) {
+        for (unsigned i = 0; i < 2; i++) {
+            switch (l.m[i]) {
+            case LML_0X0024_LML1_S0S_AI:
+            case LML_0X0024_LML1_S0S_BI:
+                p.m[LML_AI] = i;
+                p.m[LML_BI] = i;
+                break;
+            case LML_0X0024_LML1_S0S_AQ:
+            case LML_0X0024_LML1_S0S_BQ:
+                p.m[LML_AQ] = i;
+                p.m[LML_BQ] = i;
+                break;
+            default:
+                return -EINVAL;
+            }
+        }
+    } else {
+        for (unsigned i = 0; i < 4; i++) {
+            switch (l.m[i]) {
+            case LML_0X0024_LML1_S0S_AI: p.m[LML_AI] = i; break;
+            case LML_0X0024_LML1_S0S_AQ: p.m[LML_AQ] = i; break;
+            case LML_0X0024_LML1_S0S_BI: p.m[LML_BI] = i; break;
+            case LML_0X0024_LML1_S0S_BQ: p.m[LML_BQ] = i; break;
+            default:
+                return -EINVAL;
+            }
         }
     }
-
     *o = p;
     return 0;
 }
 
 
-int lms7002m_limelight_map(lms7002m_state_t* m, lms7002m_lml_map_t l1m, lms7002m_lml_map_t l2m)
+int lms7002m_limelight_map(lms7002m_state_t* m, bool sisol1m, bool sisol2m, lms7002m_lml_map_t l1m, lms7002m_lml_map_t l2m)
 {
     lms7002m_lml_map_t l1p, l2p;
     int res = 0;
-    res = res ? res : _lms7002m_fill_pos(l1m, &l1p);
-    res = res ? res : _lms7002m_fill_pos(l2m, &l2p);
+    res = res ? res : _lms7002m_fill_pos(l1m, sisol1m, &l1p);
+    res = res ? res : _lms7002m_fill_pos(l2m, sisol2m, &l2p);
     if (res)
         return res;
 
@@ -483,9 +664,14 @@ int lms7002m_cgen_tune(lms7002m_state_t* m, unsigned fref, unsigned outfreq, uns
     usleep(20);
 
     uint8_t hi = 255, lo = 0;
-    res = _lms7002m_vco_range(m, &lms7002m_cgen_trim_vco, (unsigned)-1, &hi, &lo, "CGEN");
-    if (res < 0)
-        return res;
+    for (unsigned a = 0; a < 2; a++) {
+        res = _lms7002m_vco_range(m, a == 0 ? &lms7002m_cgen_trim_vco : &lms7002m_cgen_trim_vco_slow, (unsigned)-1, &hi, &lo, "CGEN", 0);
+        if (res < 0)
+            return res;
+
+        if (hi >= lo)
+            break;
+    }
 
     if (hi < lo) {
         USDR_LOG("7002", USDR_LOG_WARNING, "CGEN: Can't find sutable VCO cap!");
@@ -548,9 +734,6 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
     const char* sxxn = path == SXX_RX ? "SXR" : "SXT";
     int res;
 
-    SET_LMS7002M_LML_0X0020_MAC(mac, path == SXX_RX ? LMS7_CH_A : LMS7_CH_B);
-    SET_LMS7002M_SXX_0X0124_EN_DIR_SXX(m->reg_en_dir[dir_idx], 1);
-
     if (vco > SXX_VCOH_MAX) {
         USDR_LOG("7002", USDR_LOG_WARNING, "%s: VCO=%u is out of range\n", sxxn, lofreq);
         return -ERANGE;
@@ -565,6 +748,9 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
         vco <<= 1;
     }
 
+    SET_LMS7002M_LML_0X0020_MAC(mac, path == SXX_RX ? LMS7_CH_A : LMS7_CH_B);
+    bool pwr = GET_LMS7002M_SXX_0X0124_EN_DIR_SXX(m->reg_en_dir[dir_idx]);
+    SET_LMS7002M_SXX_0X0124_EN_DIR_SXX(m->reg_en_dir[dir_idx], 1);
     uint32_t sxx_regs[] = {
         MAKE_LMS7002M_REG_WR(LML_0x0020, mac),
         MAKE_LMS7002M_REG_WR(SXX_0x0124, m->reg_en_dir[dir_idx]),
@@ -588,9 +774,16 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
                                  1),
         MAKE_LMS7002M_SXX_0x011F(3, 3, 6, 0, 0, 0, 0),
     };
-    res = lms7002m_spi_post(m, sxx_regs, SIZEOF_ARRAY(sxx_regs));
+
+     //Select only MAC if VCO was powered before
+    res = lms7002m_spi_post(m, sxx_regs, pwr ? 1 : SIZEOF_ARRAY(sxx_regs));
     if (res)
         return res;
+
+    if (!pwr) {
+        // Wait for 1st start to settle LDOs & PLL
+        usleep(10000);
+    }
 
     bool vcoit[4] = {
         (SXX_VCOL_MIN < vco) && (vco < SXX_VCOL_MAX),
@@ -625,7 +818,7 @@ int lms7002m_sxx_tune(lms7002m_state_t* m, lms7002m_sxx_path_t path, unsigned fr
                 return res;
 
             m->temp = vcono[i];
-            res = _lms7002m_vco_range(m, &lms7002m_sxx_trim_vco, (unsigned)-1, &phi, &plo, sxxn);
+            res = _lms7002m_vco_range(m, t > 1 ? &lms7002m_sxx_trim_vco_slow : &lms7002m_sxx_trim_vco, (unsigned)-1, &phi, &plo, sxxn, 2 * t);
             if (res != 0)
                 return res;
 
@@ -747,16 +940,101 @@ int lms7002m_dc_corr(lms7002m_state_t* m, unsigned p, int16_t v)
 }
 
 
-int lms7002m_cds_set(lms7002m_state_t* m, bool rxalml, bool rxblml)
+int lms7002m_xxtsp_bst(lms7002m_state_t* m, lms7002m_xxtsp_t tsp)
 {
+    uint32_t reg_rxmod = MAKE_LMS7002M_RXTSP_0x0400(0,
+                                                    RXTSP_0X0400_CAPSEL_RSSI, //CAPSEL
+                                                    RXTSP_0X0400_CAPSEL_ADC_RXTSP_INPUT, //CAPSEL_ADC
+                                                    RXTSP_0X0400_TSGFC_NEG6DB, //TSGFC,
+                                                    RXTSP_0X0400_TSGFCW_DIV8, //TSGFCW,
+                                                    0, //TSGDCLDQ
+                                                    0, //TSGDCLDI
+                                                    0, //TSGSWAPIQ,
+                                                    RXTSP_0X0400_TSGMODE_DC, //TSGMODE,
+                                                    RXTSP_0X0400_INSEL_LML, //INSEL,
+                                                    0, //BSTART,
+                                                    1);
+    uint32_t reg_rxmod_s = reg_rxmod;
+    SET_LMS7002M_RXTSP_0X0400_BSTART(reg_rxmod_s, 1);
+
+    uint32_t reg_txmod = MAKE_LMS7002M_TXTSP_0x0200(TXTSP_0X0200_TSGFC_NEG6DB, //TSGFC,
+                                                    TXTSP_0X0200_TSGFCW_DIV8, //TSGFCW,
+                                                    0, //TSGDCLDQ
+                                                    0, //TSGDCLDI
+                                                    0, //TSGSWAPIQ,
+                                                    TXTSP_0X0200_TSGMODE_DC, //TSGMODE,
+                                                    TXTSP_0X0200_INSEL_LML, //INSEL,
+                                                    0, //BSTART,
+                                                    1u);
+    uint32_t reg_txmod_s = reg_txmod;
+    SET_LMS7002M_TXTSP_0X0200_BSTART(reg_txmod_s, 1);
+
+    uint32_t xxtsp_regs[] = {
+        (tsp == LMS_RXTSP) ? reg_rxmod : reg_txmod,
+        (tsp == LMS_RXTSP) ? reg_rxmod_s : reg_txmod_s,
+    };
+    return lms7002m_spi_post(m, xxtsp_regs, SIZEOF_ARRAY(xxtsp_regs));
+}
+
+int lms7002m_xxtsp_bst_isdone(lms7002m_state_t* m, lms7002m_xxtsp_t tsp, bool* done)
+{
+    int res = 0;
+    uint16_t data = 0;
+    if (tsp == LMS_RXTSP) {
+        uint32_t reg_rxmod = MAKE_LMS7002M_RXTSP_0x0400(0,
+                                                        RXTSP_0X0400_CAPSEL_BSIGI_BSTATE,    //CAPSEL
+                                                        RXTSP_0X0400_CAPSEL_ADC_RXTSP_INPUT, //CAPSEL_ADC
+                                                        RXTSP_0X0400_TSGFC_NEG6DB, //TSGFC,
+                                                        RXTSP_0X0400_TSGFCW_DIV8, //TSGFCW,
+                                                        0, //TSGDCLDQ
+                                                        0, //TSGDCLDI
+                                                        0, //TSGSWAPIQ,
+                                                        RXTSP_0X0400_TSGMODE_DC, //TSGMODE,
+                                                        RXTSP_0X0400_INSEL_LML, //INSEL,
+                                                        0, //BSTART,
+                                                        1);
+        uint32_t regs[] = {
+            reg_rxmod,
+            reg_rxmod | (1 << RXTSP_0X0400_CAPTURE_OFF),
+        };
+        res = res ? res : lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
+    }
+
+    res = res ? res : lms7002m_spi_rd(m, (tsp == LMS_TXTSP) ? 0x0209 : 0x040E, &data);
+    *done = (data & 1) ? false : true;
+
+    return res;
+}
+
+int lms7002m_xxtsp_reset(lms7002m_state_t* m, lms7002m_xxtsp_t tsp)
+{
+    uint32_t reg_rxmod = MAKE_LMS7002M_RXTSP_0x0400(0,
+                                                    RXTSP_0X0400_CAPSEL_RSSI, //CAPSEL
+                                                    RXTSP_0X0400_CAPSEL_ADC_RXTSP_INPUT, //CAPSEL_ADC
+                                                    RXTSP_0X0400_TSGFC_NEG6DB, //TSGFC,
+                                                    RXTSP_0X0400_TSGFCW_DIV8, //TSGFCW,
+                                                    0, //TSGDCLDQ
+                                                    0, //TSGDCLDI
+                                                    0, //TSGSWAPIQ,
+                                                    RXTSP_0X0400_TSGMODE_DC, //TSGMODE,
+                                                    RXTSP_0X0400_INSEL_LML, //INSEL,
+                                                    0, //BSTART,
+                                                    0);
+    uint32_t reg_txmod = MAKE_LMS7002M_TXTSP_0x0200(TXTSP_0X0200_TSGFC_NEG6DB, //TSGFC,
+                                                    TXTSP_0X0200_TSGFCW_DIV8, //TSGFCW,
+                                                    0, //TSGDCLDQ
+                                                    0, //TSGDCLDI
+                                                    0, //TSGSWAPIQ,
+                                                    TXTSP_0X0200_TSGMODE_DC, //TSGMODE,
+                                                    TXTSP_0X0200_INSEL_LML, //INSEL,
+                                                    0, //BSTART,
+                                                    0);
     uint32_t regs[] = {
-        //   0x80AD03ff ^ ((rxalml ? 1 : 0) << 2) , //^ ((rxblml ? 1 : 0) << 3),
-        0x80AD03ff ^ ((rxalml ? 1 : 0) << 2),
-        0x80AE0C00,
+        (tsp == LMS_RXTSP) ? reg_rxmod : reg_txmod,
+        (tsp == LMS_RXTSP) ? reg_rxmod | 1 : reg_txmod | 1,
     };
     return lms7002m_spi_post(m, regs, SIZEOF_ARRAY(regs));
 }
-
 
 // xxTSP
 int lms7002m_xxtsp_enable(lms7002m_state_t* m, lms7002m_xxtsp_t tsp, bool enable)
@@ -1066,15 +1344,18 @@ int lms7002m_rfe_gain(lms7002m_state_t* m, lms7002m_rfe_gain_t gain, int gainx10
     switch (gain) {
     case RFE_GAIN_LNA:
         idx = _find_idx(-gainx10, lna_attens, SIZEOF_ARRAY(lna_attens) - 1);
-        *goutx10 = -lna_attens[idx];
+        if (goutx10)
+            *goutx10 = -lna_attens[idx];
         goto update_vals;
     case RFE_GAIN_TIA:
         idx = _find_idx(-gainx10, tia_attens, SIZEOF_ARRAY(tia_attens) - 1);
-        *goutx10 = -tia_attens[idx];
+        if (goutx10)
+            *goutx10 = -tia_attens[idx];
         goto update_vals;
     case RFE_GAIN_RFB:
         idx = _find_idx(-gainx10, lb_attens, SIZEOF_ARRAY(lb_attens) - 1);
-        *goutx10 = -lb_attens[idx];
+        if (goutx10)
+            *goutx10 = -lb_attens[idx];
         goto update_vals;
     update_vals:
         for (unsigned i = 0; i < 2; i++) {
@@ -1190,17 +1471,43 @@ int lms7002m_trf_gain(lms7002m_state_t* m, lms7002m_trf_gain_t gt, int gainx10, 
     for (unsigned i = 0; i < 2; i++) {
         uint16_t mac = m->reg_mac;
         unsigned lb_loss = m->trf[i].lb ? m->trf[i].lbloss : LB_LOSS_24;
+        unsigned main_gain = m->trf[i].lb ? m->trf[i].gain : m->trf[i].gain;
+        SET_LMS7002M_LML_0X0020_MAC(mac, i + 1);
+        regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, mac);
+        regs[j++] = MAKE_LMS7002M_TRF_0x0101(
+            3,              // F_TXPAD_TRF,
+            lb_loss,        // L_LOOPB_TXPAD_TRF,
+            main_gain,      // LOSS_LIN_TXPAD_TRF,
+            main_gain,      // LOSS_MAIN_TXPAD_TRF,
+            m->trf[i].lb);  // EN_LOOPB_TXPAD_TRF
+
+        USDR_LOG("7002", USDR_LOG_INFO, "trf_gain[%d] lb_loss=%d loss=%d en_lb=%d\n",
+                 i,  lb_loss, main_gain, m->trf[i].lb);
+    };
+    regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac);
+
+    return lms7002m_spi_post(m, regs, j);
+}
+
+int lms7002m_trf_gain_lb_off(lms7002m_state_t* m)
+{
+    if (_lms7002m_is_none(m))
+        return -EINVAL;
+
+    uint32_t regs[2 * 3 + 2], j = 0;
+    for (unsigned i = 0; i < 2; i++) {
+        uint16_t mac = m->reg_mac;
         SET_LMS7002M_LML_0X0020_MAC(mac, i + 1);
         regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, mac);
         regs[j++] = MAKE_LMS7002M_TRF_0x0101(
             3,     //F_TXPAD_TRF,
-            lb_loss,  //L_LOOPB_TXPAD_TRF,
+            LB_LOSS_24,        //L_LOOPB_TXPAD_TRF,
             m->trf[i].gain,    //LOSS_LIN_TXPAD_TRF,
             m->trf[i].gain,    //LOSS_MAIN_TXPAD_TRF,
             m->trf[i].lb);     //EN_LOOPB_TXPAD_TRF
 
         USDR_LOG("7002", USDR_LOG_INFO, "trf_gain[%d] lb_loss=%d loss=%d en_lb=%d\n",
-                 i,  lb_loss, m->trf[i].gain, m->trf[i].lb);
+                 i,  LB_LOSS_24, m->trf[i].gain, m->trf[i].lb);
     };
     regs[j++] = MAKE_LMS7002M_REG_WR(LML_0x0020, m->reg_mac);
 
@@ -1224,8 +1531,8 @@ int lms7002m_rbb_path(lms7002m_state_t* m, lms7002m_rbb_path_t path, lms7002m_rb
 
         MAKE_LMS7002M_RBB_0x0118(
             (path == RBB_LBF) ? RBB_0X0118_INPUT_CTL_PGA_RBB_LPFL :
-                (path == RBB_HBF) ? RBB_0X0118_INPUT_CTL_PGA_RBB_LPFH :
-                (mode == RBB_MODE_LOOPBACK && path == RBB_BYP) ? RBB_0X0118_INPUT_CTL_PGA_RBB_TBB : RBB_0X0118_INPUT_CTL_PGA_RBB_BYPASS,
+            (path == RBB_HBF) ? RBB_0X0118_INPUT_CTL_PGA_RBB_LPFH :
+            (mode == RBB_MODE_LOOPBACK && path == RBB_BYP) ? RBB_0X0118_INPUT_CTL_PGA_RBB_TBB : RBB_0X0118_INPUT_CTL_PGA_RBB_BYPASS,
             24,
             24),
     };
@@ -1307,11 +1614,14 @@ int lms7002m_tbb_path(lms7002m_state_t* m, lms7002m_tbb_path_t path, lms7002m_tb
     bool en = mode != TBB_MODE_DISABLE;
     _lms7002m_mask_field_set(m, m->reg_en_dir, SXX_0X0124_EN_DIR_TBB_OFF, SXX_0X0124_EN_DIR_TBB_MSK, en);
 
+    if (mode == TBB_MODE_LOOPBACK_DAC)
+        path = TBB_BYP;
+
     uint32_t tbb_regs[] = {
         MAKE_LMS7002M_TBB_0x0105(
             0, //STATPULSE_TBB,
             mode == TBB_MODE_LOOPBACK_SWAPIQ ? 1 : 0,
-            mode == TBB_MODE_NORMAL ? TBB_0X0105_LOOPB_NORMAL : TBB_0X0105_LOOPB_LB_TBB_OUT,
+            mode == TBB_MODE_NORMAL ? TBB_0X0105_LOOPB_NORMAL : mode == TBB_MODE_LOOPBACK_DAC ? TBB_0X0105_LOOPB_LB_DAC : TBB_0X0105_LOOPB_LB_TBB_OUT,
             (path == TBB_HBF) ? 0 : 1u, //PD_LPFH_TBB,
             0, //PD_LPFIAMP_TBB,
             (path == TBB_LAD) ? 0 : 1u, //PD_LPFLAD_TBB,

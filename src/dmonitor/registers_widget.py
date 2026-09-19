@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023-2024 Wavelet Lab
+# Copyright (c) 2023-2026 Wavelet Lab
 # SPDX-License-Identifier: MIT
 
 import os
@@ -18,12 +18,16 @@ import re
 
 from conn_pipe import ConnDebugPipe
 
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QPalette, QColor, QIcon
-from PyQt5.QtCore import Qt, QTimer
+try:
+    from PySide6.QtWidgets import *
+    from PySide6.QtGui import QPalette, QColor, QIcon
+    from PySide6.QtCore import Qt, QTimer
+except ImportError:
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtGui import QPalette, QColor, QIcon
+    from PyQt5.QtCore import Qt, QTimer
 
 import pyqtgraph as pg
-
 
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 SCHEMA_PATH = "/usr/share/usdr/schema/"
@@ -93,8 +97,6 @@ class Sensors(QWidget):
 
     def update(self):
         pass
-
-
 
 
 class GeneralProperties(QScrollArea):
@@ -227,7 +229,7 @@ class ParserCollection:
 
     def find_hw_parser(self, pf):
         for p in self.parsers:
-            pattern = '^\s*' + str(p.path).replace('*', '([a-zA-Z0-9]+)') + '\s*$'
+            pattern = r'^\s*' + str(p.path).replace(r'*', r'([a-zA-Z0-9]+)') + r'\s*$'
             res = re.match(pattern, pf)
             if res is not None:
                 return p

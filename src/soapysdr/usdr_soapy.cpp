@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2024 Wavelet Lab
+// Copyright (c) 2023-2025 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
 #include "usdr_soapy.h"
@@ -10,12 +10,52 @@
 #include <SoapySDR/Formats.hpp>
 #include <cstdlib>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <string.h>
+#include <climits>
+#include <unistd.h>
 
 // #include <usdr_logging.h>
 
 std::map<std::string, std::weak_ptr<usdr_handle>> usdr_handle::s_created;
+
+static const std::set<std::string> USDR_SOAPY_DEVICE_ARGS = {
+    "bus",
+    "device",
+    "fe",
+    "extclk",
+    "extref",
+};
+
+static void usdr_soapy_apply_device_arg(const SoapySDR::Kwargs &args, SoapySDR::Kwargs &dev_args, const char *key)
+{
+    if (args.count(key)) {
+        dev_args[key] = args.at(key);
+    }
+}
+
+SoapySDR::Kwargs usdrSoapyDeviceArgs(const SoapySDR::Kwargs &args)
+{
+    SoapySDR::Kwargs dev_args = SoapySDR::KwargsFromString((args.count("dev")) ? args.at("dev") : "");
+
+    for (const auto &key : USDR_SOAPY_DEVICE_ARGS) {
+        usdr_soapy_apply_device_arg(args, dev_args, key.c_str());
+    }
+
+    return dev_args;
+}
+
+std::string usdrSoapyDeviceString(const SoapySDR::Kwargs &args)
+{
+    return SoapySDR::KwargsToString(usdrSoapyDeviceArgs(args));
+}
+
+bool usdrSoapyIsDeviceArg(const std::string &key)
+{
+    // "dev" is a packed Soapy device string, not a lower-level device parameter.
+    return key == "dev" || USDR_SOAPY_DEVICE_ARGS.count(key) != 0;
+}
 
 std::shared_ptr<usdr_handle> usdr_handle::get(const std::string& name)
 {
@@ -55,7 +95,7 @@ struct rfic_gain_descriptor
     const char* property_name;
 };
 
-const rfic_gain_descriptor lms7_gains[] {
+static const rfic_gain_descriptor lms7_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(0.0, 30.0),   "LNA", nullptr, nullptr, "/dm/sdr/0/rx/gain/lna" },
     { SOAPY_SDR_RX, SoapySDR::Range(0.0, 12.0),   "TIA", "VGA",   "VGA1",  "/dm/sdr/0/rx/gain/vga" },
     { SOAPY_SDR_RX, SoapySDR::Range(-12.0, 19.0), "PGA", "VGA2",  nullptr, "/dm/sdr/0/rx/gain/pga" },
@@ -63,7 +103,7 @@ const rfic_gain_descriptor lms7_gains[] {
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
-const rfic_gain_descriptor lms6_gains[] {
+static const rfic_gain_descriptor lms6_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(0.0, 6.0),    "LNA",  nullptr, nullptr, "/dm/sdr/0/rx/gain/lna" },
     { SOAPY_SDR_RX, SoapySDR::Range(5, 31),       "VGA1", "TIA",   nullptr, "/dm/sdr/0/rx/gain/vga" },
     { SOAPY_SDR_RX, SoapySDR::Range(0, 60.0),     "VGA2", "PGA",   nullptr, "/dm/sdr/0/rx/gain/pga" },
@@ -72,14 +112,14 @@ const rfic_gain_descriptor lms6_gains[] {
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
-const rfic_gain_descriptor ad45lb49_gains[] {
+static const rfic_gain_descriptor ad45lb49_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(0, 4),        "LNA",  "SEL",   nullptr, "/dm/sdr/0/rx/gain/lna" },
     { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "VGA",  "ATTN",  nullptr, "/dm/sdr/0/rx/gain/vga" },
     { SOAPY_SDR_RX, SoapySDR::Range(0, 31),       "PGA",  nullptr, nullptr, "/dm/sdr/0/rx/gain/pga" },
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
 };
 
-const rfic_gain_descriptor unk_gains[] {
+static const rfic_gain_descriptor unk_gains[] {
     { SOAPY_SDR_RX, SoapySDR::Range(-99, 99),   "GRX", nullptr, nullptr, "/dm/sdr/0/rx/gain" },
     { SOAPY_SDR_TX, SoapySDR::Range(-99, 99),   "GTX", nullptr, nullptr, "/dm/sdr/0/tx/gain" },
     { 0, SoapySDR::Range(), nullptr, nullptr, nullptr, nullptr }
@@ -94,7 +134,235 @@ static inline const rfic_gain_descriptor* get_gains(rfic_type_t t) {
     }
 }
 
+static bool get_overall_gain_range(rfic_type_t t, int direction, SoapySDR::Range& range)
+{
+    const rfic_gain_descriptor* gains = get_gains(t);
+    bool found = false;
+    double min_gain = 0.0;
+    double max_gain = 0.0;
+
+    for (unsigned i = 0; gains[i].name != nullptr; i++) {
+        if (gains[i].direction != direction) {
+            continue;
+        }
+
+        min_gain += gains[i].range.minimum();
+        max_gain += gains[i].range.maximum();
+        found = true;
+    }
+
+    if (found) {
+        range = SoapySDR::Range(min_gain, max_gain);
+    }
+    return found;
+}
+
+struct device_ranges
+{
+    SoapySDR::Range frequency_range;
+    SoapySDR::Range samplerate_range;
+    SoapySDR::Range bandwidth_range;
+};
+
+static const char RATE_CONFIG_ENDPOINT[] = "/dm/rate/rxtxadcdac";
+
+enum rate_config_index
+{
+    RATE_CONFIG_RX = 0,
+    RATE_CONFIG_TX,
+    RATE_CONFIG_ADC,
+    RATE_CONFIG_DAC,
+    RATE_CONFIG_WORDS
+};
+
+typedef std::array<unsigned, RATE_CONFIG_WORDS> rate_config;
+
+static const double DEFAULT_SAMPLE_RATE = 5e6;
+
+struct rx_packet_policy
+{
+    double min_sample_rate;
+    unsigned packet_samples;
+};
+
+static const rx_packet_policy RX_PACKET_POLICIES[] {
+    { 7.6e6, 7680 },
+    { 3.8e6, 3840 },
+    { 0.0, 1920 },
+};
+
+static unsigned default_rx_packet_samples(double sample_rate)
+{
+    for (const auto &policy : RX_PACKET_POLICIES) {
+        if (sample_rate >= policy.min_sample_rate) {
+            return policy.packet_samples;
+        }
+    }
+    return RX_PACKET_POLICIES[sizeof(RX_PACKET_POLICIES) / sizeof(RX_PACKET_POLICIES[0]) - 1].packet_samples;
+}
+
+static void append_stepped_range(std::vector<double> &values, const SoapySDR::Range &range, double step)
+{
+    const double minimum = range.minimum();
+    const double maximum = range.maximum();
+    if (maximum < minimum || step <= 0.0) {
+        return;
+    }
+
+    auto push_unique = [&values](double value) {
+        if (values.empty() || values.back() != value) {
+            values.push_back(value);
+        }
+    };
+
+    push_unique(minimum);
+
+    const long long min_step = (long long)std::ceil(minimum / step);
+    const long long max_step = (long long)std::floor(maximum / step);
+    for (long long i = min_step; i <= max_step; i++) {
+        const double value = i * step;
+        if (value >= minimum && value <= maximum) {
+            push_unique(value);
+        }
+    }
+
+    push_unique(maximum);
+}
+
+static bool antenna_to_path(int direction, const std::string &name, const char **path, const char **soapy_name)
+{
+    struct antenna_map {
+        const char *soapy;
+        const char *path;
+    };
+
+    static const antenna_map rx_antennas[] = {
+        { "AUTO", "rx_auto" },
+        { "LNAL", "rxl" },
+        { "LNAW", "rxw" },
+        { "LNAH", "rxh" },
+    };
+    static const antenna_map tx_antennas[] = {
+        { "AUTO", "tx_auto" },
+        { "TXW", "txw" },
+        { "TXH", "txh" },
+    };
+
+    const antenna_map *antennas = (direction == SOAPY_SDR_TX) ? tx_antennas : rx_antennas;
+    const size_t count = (direction == SOAPY_SDR_TX) ?
+                         sizeof(tx_antennas) / sizeof(tx_antennas[0]) :
+                         sizeof(rx_antennas) / sizeof(rx_antennas[0]);
+
+    for (size_t i = 0; i < count; i++) {
+        if (name == antennas[i].soapy || name == antennas[i].path) {
+            *path = antennas[i].path;
+            *soapy_name = antennas[i].soapy;
+            return true;
+        }
+    }
+    return false;
+}
+
+static const device_ranges usdr_ranges {
+    .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(1e6, 85e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
+};
+
+static const device_ranges xsdr_ranges {
+    .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(0.1e6, 125e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
+};
+
+static const device_ranges ssdr_ranges {
+    .frequency_range = SoapySDR::Range(0.1e6, 12500e6),
+    .samplerate_range = SoapySDR::Range(4e6, 125e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
+};
+
+static const device_ranges dsdr_ranges {
+    .frequency_range = SoapySDR::Range(5e6, 12500e6),
+    .samplerate_range = SoapySDR::Range(4e6, 500e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 500e6),
+};
+
+static const device_ranges lsdr_ranges {
+    .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(2e6, 125e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
+};
+
+static const device_ranges limesdr_mini_ranges {
+    .frequency_range = SoapySDR::Range(30e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(0.1e6, 40e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
+};
+
+static const device_ranges unk_ranges {
+    .frequency_range = SoapySDR::Range(30e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(1e6, 40e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
+};
+
+static inline const device_ranges* get_ranges(device_type_t t) {
+    switch (t) {
+    case DEVICE_USDR: return &usdr_ranges;
+    case DEVICE_XSDR: return &xsdr_ranges;
+    case DEVICE_SSDR: return &ssdr_ranges;
+    case DEVICE_DSDR: return &dsdr_ranges;
+    case DEVICE_LSDR: return &lsdr_ranges;
+    case DEVICE_LIMESDR_MINI: return &limesdr_mini_ranges;
+    default: return &unk_ranges;
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+uint64_t SoapyUSDR::max_sw_chans(const int direction) const
+{
+    validateDirection(direction);
+    return (direction == SOAPY_SDR_RX) ? max_sw_rx_chans : max_sw_tx_chans;
+}
+
+uint64_t SoapyUSDR::max_hw_chans(const int direction) const
+{
+    validateDirection(direction);
+    return (direction == SOAPY_SDR_RX) ? max_hw_rx_chans : max_hw_tx_chans;
+}
+
+void SoapyUSDR::validateDirection(const int direction) const
+{
+    if (direction != SOAPY_SDR_RX && direction != SOAPY_SDR_TX) {
+        throw std::invalid_argument("SoapyUSDR: invalid direction " + std::to_string(direction));
+    }
+}
+
+void SoapyUSDR::validateChannel(const int direction, const size_t channel) const
+{
+    const uint64_t chans = max_sw_chans(direction);
+    if (channel >= chans) {
+        throw std::out_of_range("SoapyUSDR: channel " + std::to_string(channel) +
+                                " is outside available software channels [0, " +
+                                std::to_string(chans) + ")");
+    }
+}
+
+void SoapyUSDR::ensureSampleRateConfigured(const int direction, const size_t channel)
+{
+    validateChannel(direction, channel);
+
+    const unsigned actual_rate = (direction == SOAPY_SDR_TX) ? _actual_tx_rate : _actual_rx_rate;
+    if (actual_rate != 0) {
+        return;
+    }
+
+    const device_ranges *dev_ranges = get_ranges(device_type);
+    const double default_rate = dev_ranges ? dev_ranges->samplerate_range.minimum() : DEFAULT_SAMPLE_RATE;
+    SoapySDR::logf(callLogLvl(), "SoapyUSDR::ensureSampleRateConfigured(%s, %d) => %.3f MHz",
+                   direction == SOAPY_SDR_TX ? "TX" : "RX", int(channel), default_rate / 1e6);
+    setSampleRate(direction, channel, default_rate);
+}
 
 const char* SoapyUSDR::get_sdr_param(int sdridx, const char* dir, const char* par, const char* subpar)
 {
@@ -102,6 +370,21 @@ const char* SoapyUSDR::get_sdr_param(int sdridx, const char* dir, const char* pa
         snprintf(_param_name, sizeof(_param_name), "/dm/sdr/%d/%s/%s/%s", sdridx, dir, par, subpar);
     } else {
         snprintf(_param_name, sizeof(_param_name), "/dm/sdr/%d/%s/%s", sdridx, dir, par);
+    }
+    return _param_name;
+}
+
+const char* SoapyUSDR::get_sdr_param_chan(int sdridx, const char* dir, const char* par, const char* subpar, unsigned chan)
+{
+    const bool tx = (strcmp(dir, "tx") == 0);
+    const uint64_t max_sw_chans = tx ? max_sw_tx_chans : max_sw_rx_chans;
+    if (max_sw_chans <= 1)
+        return get_sdr_param(sdridx, dir, par, subpar);
+
+    if (subpar) {
+        snprintf(_param_name, sizeof(_param_name), "/dm/sdr/%d/%s/%s/%s/%d", sdridx, dir, par, subpar, chan);
+    } else {
+        snprintf(_param_name, sizeof(_param_name), "/dm/sdr/%d/%s/%s/%d", sdridx, dir, par, chan);
     }
     return _param_name;
 }
@@ -136,25 +419,12 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
     const SoapySDR::Kwargs &args = (env_str.length() > 0) ? env_args : args_orig;
 
 
-    std::string dev = (args.count("dev")) ? args.at("dev") : "";
-
     if (args.count("loglevel")) {
         loglevel = std::stoi(args.at("loglevel"));
     }
-    if (args.count("fe")) {
-        if (dev.length() != 0) {
-            dev += ",";
-        }
-        dev += "fe=";
-        dev += args.at("fe").c_str();
-    }
-    if (args.count("bus")) {
-        if (dev.length() > 0) {
-            dev += ",";
-        }
-        dev += "bus=";
-        dev += args.at("bus").c_str();
-    }
+
+    const std::string dev = usdrSoapyDeviceString(args);
+
     if (args.count("txcorr")) {
         _txcorr = atoi(args.at("txcorr").c_str());
     }
@@ -164,11 +434,11 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
 
     usdrlog_setlevel(NULL, loglevel);
 
-
-    SoapySDR::logf(callLogLvl(), "Make connection: '%s'", args.count("dev") ? args.at("dev").c_str() : "*");
+    SoapySDR::logf(SOAPY_SDR_DEBUG, "Make connection: '%s'", args.count("dev") ? args.at("dev").c_str() : "*");
     for (auto& i: args) {
-        SoapySDR::logf(callLogLvl(), "Param %s => %s", i.first.c_str(), i.second.c_str());
+        SoapySDR::logf(SOAPY_SDR_DEBUG, "Param %s => %s", i.first.c_str(), i.second.c_str());
     }
+
     _dev = usdr_handle::get(dev);
 
     if (args.count("refclk")) {
@@ -198,7 +468,14 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
     }
 
     uint64_t val;
-    int res = usdr_dme_get_uint(_dev->dev(), "/ll/sdr/0/rfic/0", &val);
+    int res;
+
+    usdr_dme_get_uint(_dev->dev(), "/ll/sdr/max_hw_rx_chans", &max_hw_rx_chans);
+    usdr_dme_get_uint(_dev->dev(), "/ll/sdr/max_hw_tx_chans", &max_hw_tx_chans);
+    usdr_dme_get_uint(_dev->dev(), "/ll/sdr/max_sw_rx_chans", &max_sw_rx_chans);
+    usdr_dme_get_uint(_dev->dev(), "/ll/sdr/max_sw_tx_chans", &max_sw_tx_chans);
+
+    res = usdr_dme_get_uint(_dev->dev(), "/ll/sdr/0/rfic/0", &val);
     if (res == 0) {
         const char* rfic = reinterpret_cast<const char*>(val);
         if (strcmp(rfic, "lms6002d") == 0)
@@ -209,6 +486,24 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
             type = RFIC_AD45LB49;
         else if (strcmp(rfic, "afe79xx") == 0)
             type = RFIC_AFE79XX;
+    }
+
+    res = usdr_dme_get_uint(_dev->dev(), "/ll/device/name", &val);
+    if (res == 0) {
+        const char* device = reinterpret_cast<const char*>(val);
+        SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() Device name is \"%s\"", device);
+        if (strcmp(device, "usdr") == 0)
+            device_type = DEVICE_USDR;
+        else if (strcmp(device, "xsdr") == 0)
+            device_type = DEVICE_XSDR;
+        else if (strcmp(device, "ssdr") == 0)
+            device_type = DEVICE_SSDR;
+        else if (strcmp(device, "dsdr") == 0)
+            device_type = DEVICE_DSDR;
+        else if (strcmp(device, "lsdr") == 0)
+            device_type = DEVICE_LSDR;
+        else if (strcmp(device, "limemini") == 0)
+            device_type = DEVICE_LIMESDR_MINI;
     }
 
     if (args.count("rx_bw")) {
@@ -257,6 +552,8 @@ SoapySDR::Kwargs SoapyUSDR::getHardwareInfo(void) const
  ******************************************************************/
 size_t SoapyUSDR::getNumChannels(const int direction) const
 {
+    validateDirection(direction);
+
     uint64_t chans = 1;
     const char* nch = direction == SOAPY_SDR_RX ? "/ll/sdr/max_sw_rx_chans" :  "/ll/sdr/max_sw_tx_chans";
     int res = usdr_dme_get_uint(_dev->dev(), nch, &chans);
@@ -269,25 +566,41 @@ size_t SoapyUSDR::getNumChannels(const int direction) const
     return chans;
 }
 
-bool SoapyUSDR::getFullDuplex(const int /*direction*/, const size_t /*channel*/) const
+bool SoapyUSDR::getFullDuplex(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
     return true;
+}
+
+SoapySDR::Kwargs SoapyUSDR::getChannelInfo(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+
+    SoapySDR::Kwargs info;
+    info["software_channel"] = std::to_string(channel);
+    info["software_channels"] = std::to_string(max_sw_chans(direction));
+    info["hardware_channels"] = std::to_string(max_hw_chans(direction));
+    return info;
 }
 
 /*******************************************************************
  * Antenna API
  ******************************************************************/
-std::vector<std::string> SoapyUSDR::listAntennas(const int direction, const size_t /*channel*/) const
+std::vector<std::string> SoapyUSDR::listAntennas(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     std::vector<std::string> ants;
     if (direction == SOAPY_SDR_RX)
     {
+        ants.push_back("AUTO");
         ants.push_back("LNAH");
         ants.push_back("LNAL");
         ants.push_back("LNAW");
     }
     if (direction == SOAPY_SDR_TX)
     {
+        ants.push_back("AUTO");
         ants.push_back("TXH");
         ants.push_back("TXW");
     }
@@ -296,16 +609,45 @@ std::vector<std::string> SoapyUSDR::listAntennas(const int direction, const size
 
 void SoapyUSDR::setAntenna(const int direction, const size_t channel, const std::string &name)
 {
+    validateChannel(direction, channel);
+
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setAntenna(%d, %d, %s)", direction, int(channel), name.c_str());
 
+    const char *path = nullptr;
+    const char *soapy_name = nullptr;
+    if (!antenna_to_path(direction, name, &path, &soapy_name)) {
+        throw std::runtime_error("SoapyUSDR::setAntenna(" + name + ") unsupported antenna");
+    }
+
+    ensureSampleRateConfigured(direction, channel);
+
+    const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
+    const char* pname = get_sdr_param_chan(0, dir, "path", NULL, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    const int res = usdr_dme_set_string(_dev->dev(), pname, path);
+    if (res) {
+        throw std::runtime_error("SoapyUSDR::setAntenna(" + std::string(pname) + ") error");
+    }
+    for (size_t ch = 0; ch < max_sw_chans(direction); ch++) {
+        _actual_antenna[direction][ch] = soapy_name;
+    }
 }
 
 std::string SoapyUSDR::getAntenna(const int direction, const size_t channel) const
 {
-    std::string antenna = "";
+    validateChannel(direction, channel);
+
+    std::string antenna = "AUTO";
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    const auto dir_it = _actual_antenna.find(direction);
+    if (dir_it != _actual_antenna.end()) {
+        const auto chan_it = dir_it->second.find(channel);
+        if (chan_it != dir_it->second.end()) {
+            antenna = chan_it->second;
+        }
+    }
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::getAntenna(%d, %d, %s)", direction, int(channel), antenna.c_str());
     return antenna;
@@ -315,20 +657,23 @@ std::string SoapyUSDR::getAntenna(const int direction, const size_t channel) con
  * Frontend corrections API
  ******************************************************************/
 
-bool SoapyUSDR::hasDCOffsetMode(const int direction, const size_t /*channel*/) const
+bool SoapyUSDR::hasDCOffsetMode(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
     return (direction == SOAPY_SDR_RX);
 }
 
-void SoapyUSDR::setDCOffsetMode(const int direction, const size_t /*channel*/, const bool /*automatic*/)
+void SoapyUSDR::setDCOffsetMode(const int direction, const size_t channel, const bool /*automatic*/)
 {
+    validateChannel(direction, channel);
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     if (direction == SOAPY_SDR_RX) {
     }
 }
 
-bool SoapyUSDR::getDCOffsetMode(const int direction, const size_t /*channel*/) const
+bool SoapyUSDR::getDCOffsetMode(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     if (direction == SOAPY_SDR_RX) {
     }
@@ -336,47 +681,96 @@ bool SoapyUSDR::getDCOffsetMode(const int direction, const size_t /*channel*/) c
     return false;
 }
 
-bool SoapyUSDR::hasDCOffset(const int direction, const size_t /*channel*/) const
+bool SoapyUSDR::hasDCOffset(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
     return (direction == SOAPY_SDR_TX);
 }
 
-void SoapyUSDR::setDCOffset(const int direction, const size_t /*channel*/, const std::complex<double> &/*offset*/)
+void SoapyUSDR::setDCOffset(const int direction, const size_t channel, const std::complex<double> &/*offset*/)
 {
+    validateChannel(direction, channel);
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     if (direction == SOAPY_SDR_TX) {
     }
 }
 
-std::complex<double> SoapyUSDR::getDCOffset(const int /*direction*/, const size_t /*channel*/) const
+std::complex<double> SoapyUSDR::getDCOffset(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     double I = 0.0, Q = 0.0;
     return std::complex<double>(I, Q);
 }
 
-bool SoapyUSDR::hasIQBalance(const int /*direction*/, const size_t /*channel*/) const
+bool SoapyUSDR::hasIQBalance(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
     return true;
 }
 
-void SoapyUSDR::setIQBalance(const int /*direction*/, const size_t /*channel*/, const std::complex<double> &/*balance*/)
+void SoapyUSDR::setIQBalance(const int direction, const size_t channel, const std::complex<double> &/*balance*/)
 {
+    validateChannel(direction, channel);
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     //TODO
 }
 
-std::complex<double> SoapyUSDR::getIQBalance(const int /*direction*/, const size_t /*channel*/) const
+std::complex<double> SoapyUSDR::getIQBalance(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     return std::complex<double>(0,0);
+}
+
+bool SoapyUSDR::hasIQBalanceMode(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+    return false;
+}
+
+void SoapyUSDR::setIQBalanceMode(const int direction, const size_t channel, const bool automatic)
+{
+    validateChannel(direction, channel);
+    if (automatic) {
+        throw std::runtime_error("SoapyUSDR::setIQBalanceMode() automatic IQ balance is not supported");
+    }
+}
+
+bool SoapyUSDR::getIQBalanceMode(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+    return false;
+}
+
+bool SoapyUSDR::hasFrequencyCorrection(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+    return false;
+}
+
+void SoapyUSDR::setFrequencyCorrection(const int direction, const size_t channel, const double value)
+{
+    validateChannel(direction, channel);
+    if (value != 0.0) {
+        throw std::runtime_error("SoapyUSDR::setFrequencyCorrection() frequency correction is not supported");
+    }
+}
+
+double SoapyUSDR::getFrequencyCorrection(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+    return 0.0;
 }
 
 /*******************************************************************
  * Gain API
  ******************************************************************/
 
-std::vector<std::string> SoapyUSDR::listGains(const int direction, const size_t /*channel*/) const
+std::vector<std::string> SoapyUSDR::listGains(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     std::vector<std::string> gain_list;
     const rfic_gain_descriptor* gains = get_gains(type);
     for (unsigned i = 0; gains[i].name != nullptr; i++) {
@@ -388,22 +782,47 @@ std::vector<std::string> SoapyUSDR::listGains(const int direction, const size_t 
     return gain_list;
 }
 
+bool SoapyUSDR::hasGainMode(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+    return false;
+}
+
+void SoapyUSDR::setGainMode(const int direction, const size_t channel, const bool automatic)
+{
+    validateChannel(direction, channel);
+    if (automatic) {
+        throw std::runtime_error("SoapyUSDR::setGainMode() automatic gain mode is not supported");
+    }
+}
+
+bool SoapyUSDR::getGainMode(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+    return false;
+}
+
 void SoapyUSDR::setGain(const int direction, const size_t channel, const double value)
 {
+    validateChannel(direction, channel);
+
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setGain(%s, %d, %g dB)", dir, int(channel), value);
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    const char* defparam = get_sdr_param(0, dir, "gain", "auto");
+    const char* defparam = get_sdr_param_chan(0, dir, "gain", "auto", channel);
     int res = usdr_dme_set_uint(_dev->dev(), defparam, value);
     if (res) {
         SoapySDR::logf(callLogLvl(), "SoapyUSDR::setGain(%s, %d, %g dB) => %s failed %d",
                        dir, int(channel), value, defparam, res);
     }
+    _actual_gains[direction][channel][""] = value;
 }
 
 void SoapyUSDR::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
+    validateChannel(direction, channel);
+
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setGain(%s, %d, %s, %g dB)",
                    direction == SOAPY_SDR_RX ? "RX" : "TX",
@@ -411,7 +830,7 @@ void SoapyUSDR::setGain(const int direction, const size_t channel, const std::st
 
     const rfic_gain_descriptor* gains = get_gains(type);
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    const char* defparam = get_sdr_param(0, dir, "gain", nullptr);
+    const char* defparam = get_sdr_param_chan(0, dir, "gain", nullptr, channel);
     unsigned i;
 
     for (i = 0; gains[i].name != nullptr; i++) {
@@ -421,16 +840,33 @@ void SoapyUSDR::setGain(const int direction, const size_t channel, const std::st
             break;
         }
     }
+    if (gains[i].name == nullptr) {
+        throw std::invalid_argument("SoapyUSDR::setGain(" + name + ") unknown gain name");
+    }
+
+    char chan_param[128];
+    if (max_sw_chans(direction) > 1) {
+        snprintf(chan_param, sizeof(chan_param), "%s/%u", defparam, (unsigned)channel);
+        defparam = chan_param;
+    }
 
     int res = usdr_dme_set_uint(_dev->dev(), defparam, value);
     if (res)
         throw std::runtime_error(std::string("SoapyUSDR::setGain(") + defparam + ", " + std::to_string((int)value) + ")");
 
-    _actual_gains[i] = value;
+    _actual_gains[direction][channel][gains[i].name] = value;
+    if (gains[i].altname) {
+        _actual_gains[direction][channel][gains[i].altname] = value;
+    }
+    if (gains[i].altname2) {
+        _actual_gains[direction][channel][gains[i].altname2] = value;
+    }
 }
 
 double SoapyUSDR::getGain(const int direction, const size_t channel, const std::string &name) const
 {
+    validateChannel(direction, channel);
+
     const rfic_gain_descriptor* gains = get_gains(type);
     unsigned i;
     for (i = 0; gains[i].name != nullptr; i++) {
@@ -439,25 +875,79 @@ double SoapyUSDR::getGain(const int direction, const size_t channel, const std::
             break;
         }
     }
+    if (gains[i].name == nullptr) {
+        throw std::invalid_argument("SoapyUSDR::getGain(" + name + ") unknown gain name");
+    }
+
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    double value = 0.0;
+    const auto dir_it = _actual_gains.find(direction);
+    if (dir_it != _actual_gains.end()) {
+        const auto chan_it = dir_it->second.find(channel);
+        if (chan_it != dir_it->second.end()) {
+            const auto gain_it = chan_it->second.find(name);
+            if (gain_it != chan_it->second.end()) {
+                value = gain_it->second;
+            }
+        }
+    }
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::getGain(%s, %d, %s) => %g dB",
                    direction == SOAPY_SDR_RX ? "RX" : "TX",
-                   int(channel), name.c_str(), _actual_gains[i]);
-    return _actual_gains[i];
+                   int(channel), name.c_str(), value);
+    return value;
+}
+
+double SoapyUSDR::getGain(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    const auto dir_it = _actual_gains.find(direction);
+    if (dir_it == _actual_gains.end()) {
+        return 0.0;
+    }
+
+    const auto chan_it = dir_it->second.find(channel);
+    if (chan_it == dir_it->second.end()) {
+        return 0.0;
+    }
+
+    const auto gain_it = chan_it->second.find("");
+    if (gain_it != chan_it->second.end()) {
+        return gain_it->second;
+    }
+
+    double value = 0.0;
+    const rfic_gain_descriptor* gains = get_gains(type);
+    for (unsigned i = 0; gains[i].name != nullptr; i++) {
+        if (gains[i].direction != direction) {
+            continue;
+        }
+        const auto named_it = chan_it->second.find(gains[i].name);
+        if (named_it != chan_it->second.end()) {
+            value += named_it->second;
+        }
+    }
+    return value;
 }
 
 SoapySDR::Range SoapyUSDR::getGainRange(const int direction, const size_t channel) const
 {
-    if (direction == SOAPY_SDR_RX)
-    {
-        //make it so gain of 0.0 sets PGA at its mid-range
-        return SoapySDR::Range(-12.0, 19.0+12.0+30.0);
+    validateChannel(direction, channel);
+
+    SoapySDR::Range range;
+    if (get_overall_gain_range(type, direction, range)) {
+        return range;
     }
+
     return SoapySDR::Device::getGainRange(direction, channel);
 }
 
 SoapySDR::Range SoapyUSDR::getGainRange(const int direction, const size_t channel, const std::string &name) const
 {
+    validateChannel(direction, channel);
+
     const rfic_gain_descriptor* gains = get_gains(type);
     for (unsigned i = 0; gains[i].name != nullptr; i++) {
         if ((gains[i].direction == direction) && (name == gains[i].name)) {
@@ -472,6 +962,8 @@ SoapySDR::Range SoapyUSDR::getGainRange(const int direction, const size_t channe
  ******************************************************************/
 SoapySDR::ArgInfoList SoapyUSDR::getFrequencyArgsInfo(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     auto infos = SoapySDR::Device::getFrequencyArgsInfo(direction, channel);
     /*{
         SoapySDR::ArgInfo info;
@@ -485,8 +977,19 @@ SoapySDR::ArgInfoList SoapyUSDR::getFrequencyArgsInfo(const int direction, const
     return infos;
 }
 
+void SoapyUSDR::setFrequency(const int direction, const size_t channel, const double frequency, const SoapySDR::Kwargs &args)
+{
+    setFrequency(direction, channel, "RF", frequency, args);
+}
+
 void SoapyUSDR::setFrequency(const int direction, const size_t channel, const std::string &name, const double frequency, const SoapySDR::Kwargs &/*args*/)
 {
+    validateChannel(direction, channel);
+    if (!(name.empty() || name == "RF" || name == "BB")) {
+        throw std::invalid_argument("SoapyUSDR::setFrequency(" + name + ") unknown frequency name");
+    }
+    ensureSampleRateConfigured(direction, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setFrequency(%s, %d, %s, %g MHz)",
                    direction == SOAPY_SDR_RX ? "RX" : "TX",
@@ -494,66 +997,88 @@ void SoapyUSDR::setFrequency(const int direction, const size_t channel, const st
     int res;
 
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
-    const char* pname = get_sdr_param(0, dir, "freqency", (name == "BB") ? "bb" : NULL);
+    const char* subpar = (name == "BB") ? "bb" : NULL;
+    std::string pname = get_sdr_param_chan(0, dir, "frequency", subpar, channel);
 
-    uint64_t val = (((uint64_t)channel) << 32) | (uint32_t)frequency;
-
-    res = usdr_dme_set_uint(_dev->dev(), pname,
-                            type == RFIC_AFE79XX ? (uint64_t)frequency : val);
+    res = usdr_dme_set_uint(_dev->dev(), pname.c_str(), (uint64_t)(int64_t)frequency);
     if (res)
-        throw std::runtime_error(std::string("SoapyUSDR::setFrequency(") + pname + ", " + ")");
+        throw std::runtime_error(std::string("SoapyUSDR::setFrequency(") + pname + ", " + std::to_string(frequency) + ")");
 
-    _actual_frequency[direction] = val;
+    const std::string actual_name = name.empty() ? "RF" : name;
+    _actual_frequency[direction][channel][actual_name] = frequency;
+}
+
+double SoapyUSDR::getFrequency(const int direction, const size_t channel) const
+{
+    return getFrequency(direction, channel, "RF");
 }
 
 double SoapyUSDR::getFrequency(const int direction, const size_t channel, const std::string &name) const
 {
+    validateChannel(direction, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::getFrequency(%d, %s)", int(channel), name.c_str());
 
-    return _actual_frequency[direction];
+    const auto dir_it = _actual_frequency.find(direction);
+    if (dir_it == _actual_frequency.end()) {
+        return 0.0;
+    }
+
+    const auto chan_it = dir_it->second.find(channel);
+    if (chan_it == dir_it->second.end()) {
+        return 0.0;
+    }
+
+    const std::string actual_name = name.empty() ? "RF" : name;
+    const auto freq_it = chan_it->second.find(actual_name);
+    if (freq_it == chan_it->second.end()) {
+        return 0.0;
+    }
+
+    return freq_it->second;
 }
 
-std::vector<std::string> SoapyUSDR::listFrequencies(const int /*direction*/, const size_t /*channel*/) const
+std::vector<std::string> SoapyUSDR::listFrequencies(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     std::vector<std::string> opts;
     opts.push_back("RF");
     //opts.push_back("BB");
     return opts;
 }
 
-SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const size_t /*channel*/, const std::string &name) const
+SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int direction, const size_t channel, const std::string &name) const
 {
+    validateChannel(direction, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     SoapySDR::RangeList ranges;
-    if (name == "RF")
+    if (name == "RF" || name.empty())
     {
-        if (type == RFIC_AFE79XX) {
-            ranges.push_back(SoapySDR::Range(5e6, 12.5e9));
-        } else {
-            ranges.push_back(SoapySDR::Range(1e5, 3.8e9));
-        }
+        const device_ranges *dev_ranges = get_ranges(device_type);
+        if (!dev_ranges)
+            return ranges;
+        ranges.push_back(dev_ranges->frequency_range);
     }
     else if (name == "BB")
     {
-        uint64_t out = 80e6;
-        // if (res)
-        //    ranges.push_back(SoapySDR::Range(-0.0, 0.0));
-        //else
-            ranges.push_back(SoapySDR::Range(-(double)out / 2, (double)out / 2));
+        double sample_rate = (direction == SOAPY_SDR_TX) ? _actual_tx_rate : _actual_rx_rate;
+        if (sample_rate == 0.0) {
+            const device_ranges *dev_ranges = get_ranges(device_type);
+            if (dev_ranges) {
+                sample_rate = dev_ranges->samplerate_range.minimum();
+            }
+        }
+        ranges.push_back(SoapySDR::Range(-sample_rate / 2, sample_rate / 2));
     }
     return ranges;
 }
 
-SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const size_t /*channel*/) const
+SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int direction, const size_t channel) const
 {
-    SoapySDR::RangeList ranges;
-    if (type == RFIC_AFE79XX) {
-        ranges.push_back(SoapySDR::Range(5e6, 12.5e9));
-    } else {
-        ranges.push_back(SoapySDR::Range(0e6, 3.8e9));
-    }
-    return ranges;
+    return getFrequencyRange(direction, channel, "RF");
 }
 
 /*******************************************************************
@@ -562,6 +1087,8 @@ SoapySDR::RangeList SoapyUSDR::getFrequencyRange(const int /*direction*/, const 
 
 void SoapyUSDR::setSampleRate(const int direction, const size_t channel, const double rate)
 {
+    validateChannel(direction, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setSampleRate(%d, %s, %g MHz)", int(channel), (direction == SOAPY_SDR_TX) ? "TX" : "RX", rate/1e6);
 
@@ -581,9 +1108,11 @@ void SoapyUSDR::setSampleRate(const int direction, const size_t channel, const d
         return;
     }
 
-    unsigned rates[4] = { _actual_rx_rate, _actual_tx_rate, 0, 0 };
-    int res = usdr_dme_set_uint(_dev->dev(), "/dm/rate/rxtxadcdac",
-                            (uintptr_t)&rates[0]);
+    rate_config rates = {};
+    rates[RATE_CONFIG_RX] = _actual_rx_rate;
+    rates[RATE_CONFIG_TX] = _actual_tx_rate;
+    int res = usdr_dme_set_uint(_dev->dev(), RATE_CONFIG_ENDPOINT,
+                            (uintptr_t)rates.data());
 
 
     if (res) {
@@ -594,8 +1123,10 @@ void SoapyUSDR::setSampleRate(const int direction, const size_t channel, const d
     }
 }
 
-double SoapyUSDR::getSampleRate(const int direction, const size_t /*channel*/) const
+double SoapyUSDR::getSampleRate(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
 
     if (direction == SOAPY_SDR_RX)
@@ -610,21 +1141,28 @@ double SoapyUSDR::getSampleRate(const int direction, const size_t /*channel*/) c
     return 0;
 }
 
-SoapySDR::RangeList SoapyUSDR::getSampleRateRange(const int /*direction*/, const size_t /*channel*/) const
+SoapySDR::RangeList SoapyUSDR::getSampleRateRange(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     SoapySDR::RangeList ranges;
-    ranges.push_back(SoapySDR::Range((type == RFIC_AFE79XX) ? 1.92e6 : 0.1e6,
-                                     (type == RFIC_AFE79XX) ? 500e6 : (type == RFIC_AD45LB49) ? 130e6 : 80e6));
+    const device_ranges *dev_ranges = get_ranges(device_type);
+    if (!dev_ranges)
+        return ranges;
+    ranges.push_back(dev_ranges->samplerate_range);
     return ranges;
 }
 
-std::vector<double> SoapyUSDR::listSampleRates(const int /*direction*/, const size_t /*channel*/) const
+std::vector<double> SoapyUSDR::listSampleRates(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     std::vector<double> rates;
-    for (int i = 2; i < 57; i++)
-    {
-        rates.push_back(i*1e6);
-    }
+    const device_ranges *dev_ranges = get_ranges(device_type);
+    if (!dev_ranges)
+        return rates;
+
+    append_stepped_range(rates, dev_ranges->samplerate_range, 1e6);
     return rates;
 }
 /*******************************************************************
@@ -642,12 +1180,12 @@ void SoapyUSDR::setUParam(const int direction, const char* param, const char* su
 
 void SoapyUSDR::setBandwidth(const int direction, const size_t channel, const double bw)
 {
-    (void)channel;
+    validateChannel(direction, channel);
 
     if (bw == 0.0) return; //special ignore value
 
     const char* dir = (direction == SOAPY_SDR_TX) ? "tx" : "rx";
-    const char* pname = get_sdr_param(0, dir, "bandwidth",  NULL);
+    const char* pname = get_sdr_param_chan(0, dir, "bandwidth",  NULL, channel);
     int res;
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setBandwidth(%s, %g MHz)",dir, bw/1e6);
 
@@ -657,19 +1195,48 @@ void SoapyUSDR::setBandwidth(const int direction, const size_t channel, const do
         throw std::runtime_error("SoapyUSDR::setBandwidth(" + std::string(pname) + ") error");
 
     // TODO readback
-    _actual_bandwidth[direction] = bw;
+    _actual_bandwidth[direction][channel] = bw;
 }
 
-double SoapyUSDR::getBandwidth(const int direction, const size_t /*channel*/) const
+double SoapyUSDR::getBandwidth(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
-    return _actual_bandwidth[direction];
+    const auto dir_it = _actual_bandwidth.find(direction);
+    if (dir_it == _actual_bandwidth.end()) {
+        return 0.0;
+    }
+
+    const auto chan_it = dir_it->second.find(channel);
+    if (chan_it == dir_it->second.end()) {
+        return 0.0;
+    }
+
+    return chan_it->second;
 }
 
-SoapySDR::RangeList SoapyUSDR::getBandwidthRange(const int /*direction*/, const size_t /*channel*/) const
+std::vector<double> SoapyUSDR::listBandwidths(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
+    std::vector<double> bandwidths;
+    SoapySDR::RangeList ranges = getBandwidthRange(direction, channel);
+    for (const auto &range : ranges) {
+        append_stepped_range(bandwidths, range, 1e6);
+    }
+    return bandwidths;
+}
+
+SoapySDR::RangeList SoapyUSDR::getBandwidthRange(const int direction, const size_t channel) const
+{
+    validateChannel(direction, channel);
+
     SoapySDR::RangeList bws;
-    bws.push_back(SoapySDR::Range(0.5e6, 80e6));
+    const device_ranges *dev_ranges = get_ranges(device_type);
+    if (!dev_ranges)
+        return bws;
+    bws.push_back(dev_ranges->bandwidth_range);
     return bws;
 }
 
@@ -699,6 +1266,37 @@ SoapySDR::RangeList SoapyUSDR::getMasterClockRates(void) const
     clks.push_back(SoapySDR::Range(0, 0)); // means autodetect
     clks.push_back(SoapySDR::Range(10e6, 52e6));
     return clks;
+}
+
+void SoapyUSDR::setReferenceClockRate(const double rate)
+{
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+
+    SoapySDR::logf(callLogLvl(), "SoapyUSDR::setReferenceClockRate(%.3f MHz)", rate/1e6);
+    int res = usdr_dme_set_uint(_dev->dev(), "/dm/sdr/refclk/frequency", (uint64_t)rate);
+    if (res) {
+        throw std::invalid_argument("SoapyUSDR::setReferenceClockRate("+std::to_string(rate)+") failed");
+    }
+
+    _ref_clock_rate = rate;
+}
+
+double SoapyUSDR::getReferenceClockRate(void) const
+{
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+
+    uint64_t rate = 0;
+    int res = usdr_dme_get_uint(_dev->dev(), "/dm/sdr/refclk/frequency", &rate);
+    if (res == 0) {
+        return (double)rate;
+    }
+
+    return _ref_clock_rate;
+}
+
+SoapySDR::RangeList SoapyUSDR::getReferenceClockRates(void) const
+{
+    return getMasterClockRates();
 }
 
 std::vector<std::string> SoapyUSDR::listClockSources(void) const
@@ -757,6 +1355,11 @@ void SoapyUSDR::setHardwareTime(const long long timeNs, const std::string &what)
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setHardwareTime(%lld)", timeNs);
 }
 
+std::vector<std::string> SoapyUSDR::listTimeSources(void) const
+{
+    return { "internal", "external" };
+}
+
 /*******************************************************************
  * Sensor API
  ******************************************************************/
@@ -765,6 +1368,7 @@ std::vector<std::string> SoapyUSDR::listSensors(void) const
 {
     std::vector<std::string> sensors;
     sensors.push_back("clock_locked");
+    sensors.push_back("ref_locked");
     sensors.push_back("board_temp");
     return sensors;
 }
@@ -779,6 +1383,14 @@ SoapySDR::ArgInfo SoapyUSDR::getSensorInfo(const std::string &name) const
         info.type = SoapySDR::ArgInfo::BOOL;
         info.value = "false";
         info.description = "CGEN clock is locked, good VCO selection.";
+    }
+    else if (name == "ref_locked")
+    {
+        info.key = "ref_locked";
+        info.name = "Reference Locked";
+        info.type = SoapySDR::ArgInfo::BOOL;
+        info.value = "false";
+        info.description = "Reference clock is locked.";
     }
     else if (name == "board_temp")
     {
@@ -799,6 +1411,10 @@ std::string SoapyUSDR::readSensor(const std::string &name) const
     {
         return "true";
     }
+    else if (name == "ref_locked")
+    {
+        return "true";
+    }
     else if (name == "board_temp")
     {
         uint64_t val;
@@ -814,15 +1430,19 @@ std::string SoapyUSDR::readSensor(const std::string &name) const
     throw std::runtime_error("SoapyUSDR::readSensor("+name+") - unknown sensor name");
 }
 
-std::vector<std::string> SoapyUSDR::listSensors(const int /*direction*/, const size_t /*channel*/) const
+std::vector<std::string> SoapyUSDR::listSensors(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     std::vector<std::string> sensors;
     sensors.push_back("lo_locked");
     return sensors;
 }
 
-SoapySDR::ArgInfo SoapyUSDR::getSensorInfo(const int /*direction*/, const size_t /*channel*/, const std::string &name) const
+SoapySDR::ArgInfo SoapyUSDR::getSensorInfo(const int direction, const size_t channel, const std::string &name) const
 {
+    validateChannel(direction, channel);
+
     SoapySDR::ArgInfo info;
     if (name == "lo_locked")
     {
@@ -832,11 +1452,14 @@ SoapySDR::ArgInfo SoapyUSDR::getSensorInfo(const int /*direction*/, const size_t
         info.value = "false";
         info.description = "LO synthesizer is locked, good VCO selection.";
     }
+
     return info;
 }
 
-std::string SoapyUSDR::readSensor(const int /*direction*/, const size_t /*channel*/, const std::string &name) const
+std::string SoapyUSDR::readSensor(const int direction, const size_t channel, const std::string &name) const
 {
+    validateChannel(direction, channel);
+
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
 
     if (name == "lo_locked")
@@ -873,36 +1496,75 @@ SoapySDR::ArgInfoList SoapyUSDR::getSettingInfo(void) const
     return infos;
 }
 
+#ifdef SOAPY_SDR_API_HAS_GET_SPECIFIC_SETTING_INFO
+SoapySDR::ArgInfo SoapyUSDR::getSettingInfo(const std::string &key) const
+{
+    const SoapySDR::ArgInfoList infos = getSettingInfo();
+    for (const auto &info : infos) {
+        if (info.key == key) {
+            return info;
+        }
+    }
+    throw std::runtime_error("unknown setting key: " + key);
+}
+#endif
+
 void SoapyUSDR::writeSetting(const std::string &key, const std::string &value)
 {
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::writeSetting(%s, %s)", key.c_str(), value.c_str());
 
+    std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
+    if (key == "calibrate") {
+        int res = usdr_dme_set_uint(_dev->dev(), "/dm/sdr/0/calibrate", (uintptr_t)value.c_str());
+        if (res) {
+            throw std::invalid_argument("SoapyUSDR::writeSetting("+key+") failed");
+        }
+    } else {
+        throw std::runtime_error("unknown setting key: " + key);
+    }
+}
+
+std::string SoapyUSDR::readSetting(const std::string &key) const
+{
     throw std::runtime_error("unknown setting key: " + key);
 }
 
 SoapySDR::ArgInfoList SoapyUSDR::getSettingInfo(const int direction, const size_t channel) const
 {
-    // TODO
-    (void)direction;
-    (void)channel;
+    validateChannel(direction, channel);
 
     SoapySDR::ArgInfoList infos;
     return infos;
 }
 
+#ifdef SOAPY_SDR_API_HAS_GET_SPECIFIC_SETTING_INFO
+SoapySDR::ArgInfo SoapyUSDR::getSettingInfo(const int direction, const size_t channel, const std::string &key) const
+{
+    const SoapySDR::ArgInfoList infos = getSettingInfo(direction, channel);
+    for (const auto &info : infos) {
+        if (info.key == key) {
+            return info;
+        }
+    }
+    throw std::runtime_error("unknown setting key: " + key);
+}
+#endif
+
 void SoapyUSDR::writeSetting(const int direction, const size_t channel,
                              const std::string &key, const std::string &value)
 {
-    // TODO
-    (void)direction;
-    (void)channel;
-    (void)key;
-    (void)value;
+    validateChannel(direction, channel);
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::writeSetting(%d, %d, %s, %s)", direction, (int)channel, key.c_str(), value.c_str());
 
     std::unique_lock<std::recursive_mutex> lock(_dev->accessMutex);
     throw std::runtime_error("unknown setting key: "+key);
+}
+
+std::string SoapyUSDR::readSetting(const int direction, const size_t channel, const std::string &key) const
+{
+    validateChannel(direction, channel);
+    throw std::runtime_error("unknown setting key: " + key);
 }
 
 /*******************************************************************
@@ -929,8 +1591,14 @@ unsigned SoapyUSDR::transactSPI(const int addr, const unsigned /*data*/, const s
                 "SoapyUSDR::transactSPI("+std::to_string(addr)+") FAIL");
 }
 
+/*******************************************************************
+ * Native device API
+ ******************************************************************/
 
-
+void* SoapyUSDR::getNativeDeviceHandle(void) const
+{
+    return (void*)_dev->dev();
+}
 
 /*******************************************************************
  * Stream data structure
@@ -942,22 +1610,28 @@ struct USDRConnectionStream
 /*******************************************************************
  * Stream information
  ******************************************************************/
-std::vector<std::string> SoapyUSDR::getStreamFormats(const int /*direction*/, const size_t /*channel*/) const
+std::vector<std::string> SoapyUSDR::getStreamFormats(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     std::vector<std::string> formats;
     formats.push_back(SOAPY_SDR_CF32);
     formats.push_back(SOAPY_SDR_CS16);
     return formats;
 }
 
-std::string SoapyUSDR::getNativeStreamFormat(const int /*direction*/, const size_t /*channel*/, double &fullScale) const
+std::string SoapyUSDR::getNativeStreamFormat(const int direction, const size_t channel, double &fullScale) const
 {
-    fullScale = 32768;
+    validateChannel(direction, channel);
+
+    fullScale = 32767;
     return SOAPY_SDR_CS16;
 }
 
-SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int /*direction*/, const size_t /*channel*/) const
+SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int direction, const size_t channel) const
 {
+    validateChannel(direction, channel);
+
     SoapySDR::ArgInfoList argInfos;
 
     //float scale
@@ -993,7 +1667,7 @@ SoapySDR::ArgInfoList SoapyUSDR::getStreamArgsInfo(const int /*direction*/, cons
         info.name = "Buffer Length";
         info.description = "Hardware packet size over the link.";
         info.type = SoapySDR::ArgInfo::INT;
-        info.value = _desired_rx_pkt;
+        info.value = std::to_string(_desired_rx_pkt);
         argInfos.push_back(info);
     }
 
@@ -1010,19 +1684,27 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
         const std::vector<size_t> &channels,
         const SoapySDR::Kwargs &args)
 {
+    validateDirection(direction);
+
     size_t num_channels = channels.size();
-    size_t chmsk = 0;
+    unsigned chmsk = 0;
     bool wire12bit = false;
 
     if (num_channels < 1) {
+        validateChannel(direction, 0);
         num_channels = 1;
         chmsk = 1;
     } else {
         for (size_t ch: channels) {
-            if (chmsk & (1 << ch)) {
+            validateChannel(direction, ch);
+            if (ch >= sizeof(chmsk) * CHAR_BIT) {
+                throw std::runtime_error(std::string("SoapyUSDR::setupStream channel ") +
+                                         std::to_string(ch) + " exceeds stream channel mask width");
+            }
+            if (chmsk & (1u << ch)) {
                 throw std::runtime_error(std::string("SoapyUSDR::setupStream channel ") + std::to_string(ch) + " is already in channels mask!");
             }
-            chmsk |= 1 << ch;
+            chmsk |= 1u << ch;
         }
     }
 
@@ -1063,6 +1745,9 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     }
     const char* uformat = (format == SOAPY_SDR_CF32) ? (wire12bit ? "cf32@ci12" : "cf32" ):
                           (format == SOAPY_SDR_CS16) ? "ci16" : NULL;
+    if (uformat == NULL) {
+        throw std::runtime_error("SoapyUSDR::setupStream(" + format + ") unsupported format");
+    }
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setupStream(%s, %s, Chans %d [0x%02x] format `%s`)\n",
                    direction == SOAPY_SDR_RX ? "RX" : "TX", format.c_str(), (unsigned)channels.size(), chmsk, uformat);
@@ -1080,10 +1765,16 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     _streams[direction].chmsk = chmsk;
     _streams[direction].stream = direction == SOAPY_SDR_RX ? "/ll/srx/0" : "/ll/stx/0";
 
+    if (_actual_rx_rate == 0) {
+        const device_ranges *dev_ranges = get_ranges(device_type);
+        if (dev_ranges)
+            setSampleRate(SOAPY_SDR_RX, 0, dev_ranges->samplerate_range.minimum());
+        else
+            setSampleRate(SOAPY_SDR_RX, 0, DEFAULT_SAMPLE_RATE);
+    }
+
     if (direction == SOAPY_SDR_RX) {
-        // We need a better way to calculate packet size
-        unsigned defbufsz =
-            (_actual_rx_rate >= 7.6e6) ? 7680 : (_actual_rx_rate >= 3.8e6) ? 3840 : 1920;
+        const unsigned defbufsz = default_rx_packet_samples(_actual_rx_rate);
 
         _streams[direction].nfo.pktsyms =
             (pktSamples != 0) ? pktSamples :
@@ -1111,10 +1802,6 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::setupStream(%s) %d Samples per packet, burst size %d * %d chs; res = %d",
                    ustr->stream, numElems, ustr->nfo.pktsyms, ustr->nfo.channels, res);
-
-    if (_actual_rx_rate == 0) {
-        setSampleRate(SOAPY_SDR_RX, 0, 1.92e6);
-    }
 
     res = usdr_dms_sync(_dev->dev(), "off", 1, &ustr->strm);
     if (res) {
@@ -1211,8 +1898,12 @@ int SoapyUSDR::readStream(
         const long timeoutUs)
 {
     USDRStream* ustr = (USDRStream*)(stream);
-    while (!ustr->active )
-        usleep(1000);
+    if (!ustr->active) {
+        if (timeoutUs > 0) {
+            usleep(timeoutUs);
+        }
+        return SOAPY_SDR_TIMEOUT;
+    }
 
     int res;
     struct usdr_dms_recv_nfo nfo;
@@ -1223,7 +1914,6 @@ int SoapyUSDR::readStream(
     }
 
     if (ustr->rxcbuf.size() > 0) {
-        // Single channel mode only atm
         size_t req_bytes = numElems * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
         do {
             // fprintf(stderr, "rxcb wpos=%lld rpos=%lld req_bytes=%lld\n",
@@ -1231,8 +1921,17 @@ int SoapyUSDR::readStream(
             //         (long long)ustr->rxcbuf->rpos,
             //         (long long)req_bytes);
 
-            if (ring_circbuf_rspace(ustr->rxcbuf[0]) >= req_bytes) {
+            bool have_all_channels = true;
+            for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
+                if (ring_circbuf_rspace(ustr->rxcbuf[i]) < req_bytes) {
+                    have_all_channels = false;
+                    break;
+                }
+            }
+
+            if (have_all_channels) {
                 for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
+                    // TODO: decide how to handle alignment requirements for user-provided stream buffers.
                     ring_circbuf_read(ustr->rxcbuf[i], buffs[i], req_bytes);
                 }
 
@@ -1242,12 +1941,12 @@ int SoapyUSDR::readStream(
             }
 
             // We don't have enough data here
-            void* chans[64];
+            std::vector<void*> chans(ustr->rxcbuf.size());
             for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
                 chans[i] = ring_circbuf_wptr(ustr->rxcbuf[i]);
             }
 
-            res = usdr_dms_recv(ustr->strm, chans, timeoutUs / 1000, &nfo);
+            res = usdr_dms_recv(ustr->strm, chans.data(), timeoutUs / 1000, &nfo);
             if (res == 0) {
                 for (unsigned i = 0; i < ustr->rxcbuf.size(); i++) {
                     ustr->rxcbuf[i]->wpos += ustr->nfo.pktbszie;
@@ -1278,14 +1977,17 @@ int SoapyUSDR::readStream(
             return readStream(stream, buffs, numElems, flags, timeNs, timeoutUs);
         }
 
+        // TODO: decide how to handle alignment requirements for user-provided stream buffers.
         res = usdr_dms_recv(ustr->strm, (void**)buffs, timeoutUs / 1000, &nfo);
 
-        if (rd) {
-            fwrite(buffs[0], nfo.totsyms * 8, 1, rd);
+        if (rd && res == 0) {
+            const size_t bytes_per_channel = nfo.totsyms * ustr->nfo.pktbszie / ustr->nfo.pktsyms;
+            for (unsigned i = 0; i < _rx_log_chans; i++) {
+                fwrite(buffs[i], bytes_per_channel, 1, rd);
+            }
 
-            // Marks
-            float d[2] = { -2, 2 };
-            fwrite((void*)d, 8, 1, rd);
+            const float marker[2] = { -2.0f, 2.0f };
+            fwrite(marker, sizeof(marker), 1, rd);
         }
 
         flags |= SOAPY_SDR_HAS_TIME;
@@ -1296,17 +1998,21 @@ int SoapyUSDR::readStream(
     }
 }
 
-int SoapyUSDR::writeStream(
-        SoapySDR::Stream *stream,
-        const void * const *buffs,
-        const size_t numElems,
-        int &flags,
-        const long long timeNs,
-        const long timeoutUs)
+int SoapyUSDR::writeStream(SoapySDR::Stream *stream,
+    const void *const *buffs,
+    const size_t numElems,
+    int &flags,
+    const long long timeNs,
+    const long timeoutUs)
 {
-    USDRStream* ustr = (USDRStream*)(stream);
-    long long ts = (flags & SOAPY_SDR_HAS_TIME) ?
-                    SoapySDR::timeNsToTicks(timeNs, _actual_tx_rate) + _txcorr : -1;
+    USDRStream *ustr = (USDRStream *) (stream);
+    long long ts;
+    if (flags & SOAPY_SDR_HAS_TIME) {
+        ts = SoapySDR::timeNsToTicks(timeNs, _actual_tx_rate) + _txcorr;
+        this->calc_ts = ts;
+    } else {
+        ts = this->calc_ts;
+    }
 
     int64_t lag = ts - last_recv_pkt_time;
     if (tx_pkts == 0) {
@@ -1319,7 +2025,10 @@ int SoapyUSDR::writeStream(
     SoapySDR::logf(SOAPY_SDR_DEBUG, "writeStream::writeStream(%s) @ %lld num %d should be %d\n", ustr->stream, ts, numElems, ustr->nfo.pktsyms);
 
     unsigned toSend = numElems;
-    int res = usdr_dms_send(ustr->strm, (const void **)buffs, numElems, ts, timeoutUs / 1000);
+    // TODO: decide how to handle alignment requirements for user-provided stream buffers.
+    int res = usdr_dms_send(ustr->strm, (const void **) buffs, numElems, ts, timeoutUs / 1000);
+    if (this->calc_ts >= 0)
+        this->calc_ts += numElems;
 
     if (tx_pkts % 1000 == 0) {
         SoapySDR::logf(_dump_calls ? SOAPY_SDR_ERROR : SOAPY_SDR_TRACE,
@@ -1343,5 +2052,5 @@ int SoapyUSDR::readStreamStatus(
     (void)timeNs;
     (void)timeoutUs;
 
-    return SOAPY_SDR_TIMEOUT; //SOAPY_SDR_NOT_SUPPORTED;
+    return SOAPY_SDR_NOT_SUPPORTED;
 }

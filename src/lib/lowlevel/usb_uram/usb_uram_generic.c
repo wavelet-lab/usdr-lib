@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "../../device/generic_usdr/generic_regs.h"
+#include <assert.h>
 
 usb_uram_generic_t* get_uram_generic(lldev_t dev);
 
@@ -261,18 +262,19 @@ int usb_uram_read_wait(lldev_t dev, unsigned lsop, lsopaddr_t ls_op_addr, size_t
     usb_uram_generic_t* gen = get_uram_generic(dev);
 
     unsigned int_number, reg;
-    char busname[4];
+    const char* busname;
+
     switch(lsop)
     {
     case USDR_LSOP_SPI:
         int_number = gen->spi_int_number[ls_op_addr];
         reg = gen->db.spi_core[ls_op_addr];
-        strcpy(busname, "SPI");
+        busname = "SPI";
         break;
     case USDR_LSOP_I2C_DEV:
         int_number = gen->i2c_int_number[ls_op_addr];
         reg = gen->db.i2c_base[ls_op_addr];
-        strcpy(busname, "I2C");
+        busname = "I2C";
         break;
     default:
         return -EOPNOTSUPP;
@@ -299,8 +301,8 @@ int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** 
     res = usdr_device_create(dev, *pdevid);
     if (res) {
         USDR_LOG(USBG_LOG_TAG, USDR_LOG_ERROR,
-                 "Unable to find device spcec for %s, uuid %s! Update software!\n",
-                 devname, usdr_device_id_to_str(*pdevid));
+             "Unable to find device spec for %s, uuid %s! Update software!\n",
+             devname, usdr_device_id_to_str(*pdevid));
 
         return res;
     }
@@ -374,7 +376,8 @@ int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** 
         interrupt_base = tmp;
 
         //Do these in case of pure USB only
-
+        const unsigned REG_WR_MBUS2_ADDR= 6;
+        const unsigned REG_WR_MBUS2_DATA= 7;
         const unsigned REG_WR_PNTFY_CFG = 8;
         const unsigned REG_WR_PNTFY_ACK = 9;
 
@@ -400,6 +403,9 @@ int usb_uram_generic_create_and_init(lldev_t dev, unsigned pcount, const char** 
             return res;
         }
 
+        // Set no limit for RX USB transfers
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_MBUS2_ADDR, 0x000000e0);
+        res = res ? res : usb_uram_reg_out(dev, REG_WR_MBUS2_DATA, 0xffffffff);
     } else {
         USDR_LOG(USBG_LOG_TAG, USDR_LOG_WARNING, "Omit interrupt initialization on USB+PCIE mode\n");
     }

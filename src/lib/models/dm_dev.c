@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <poll.h>
 
 #include "dm_stream.h"
 #include "../ipblks/streams/streams_api.h"
@@ -101,8 +100,12 @@ int _usdr_dmd_create(const struct dev_params *par, pdm_dev_t* odev,
     if (bus_cnt <= 1) {
         res = lowlevel_create(par->num, (const char**)par->params, (const char**)par->value, &lldev, vidpid, webops, param);
     } else {
+#ifdef WIN32
+        res = -ENOTSUP;
+#else
         res = mdev_create(par->num, (const char**)par->params, (const char**)par->value, &lldev,
                           idx, bus_names, bus_cnt);
+#endif
     }
     if (res)
         return res;
@@ -164,7 +167,7 @@ int usdr_dmd_create_string(const char* connection_string, pdm_dev_t* odev)
             break;
         } else if (strcmp(par.params[k], "bus") == 0) {
             bus_idx = k;
-            strncpy(bus_buffer, par.value[k], sizeof(bus_buffer));
+            snprintf(bus_buffer, sizeof(bus_buffer), "%s", par.value[k]);
 
             unsigned j;
             char *str, *token, *saveptr;

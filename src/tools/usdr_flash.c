@@ -36,6 +36,7 @@ enum flash_action {
     ACTION_READBACK,
     ACTION_WRITE,
     ACTION_INFO,
+    ACTION_ERASE_MASTER,
 };
 
 int main(int argc, char** argv)
@@ -48,10 +49,13 @@ int main(int argc, char** argv)
     bool force = false;
     bool golden = false;
     bool corrupt = false;
+    bool verbose = false;
     uint32_t curfwid;
     bool no_device = false;
+    bool crc_check = true;
     uint64_t master_offset = MASTER_IMAGE_OFF;
     uint64_t qspi_base = 10;
+    unsigned readback_size = 0;
 
     memset(outa, 0xff, SIZEOF_ARRAY(outa));
     memset(outb, 0xff, SIZEOF_ARRAY(outb));
@@ -59,8 +63,11 @@ int main(int argc, char** argv)
     usdrlog_setlevel(NULL, USDR_LOG_WARNING);
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGC")) != -1) {
+    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCvkES:")) != -1) {
         switch (opt) {
+        case 'S':
+            readback_size = atoi(optarg);
+            break;
         case 'U':
             busname = optarg;
             break;
@@ -87,6 +94,15 @@ int main(int argc, char** argv)
             break;
         case 'C':
             corrupt = true;
+            break;
+        case 'v':
+            verbose = true;
+            break;
+        case 'k':
+            crc_check = false;
+            break;
+        case 'E':
+            rdwr = ACTION_ERASE_MASTER;
             break;
         default:
             fprintf(stderr, "Usage: %s [-U device_bus] [-l loglevel] [-r filename | -w filename | -i filename] [-G]\n",
@@ -130,8 +146,12 @@ int main(int argc, char** argv)
     }
 
     if (!(no_device)) {
-        usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/master_off", &master_offset);
-        usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/base", &qspi_base);
+        res = res ? res : usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/master_off", &master_offset);
+        res = res ? res : usdr_device_vfs_obj_val_get_u64(dev->pdev, "/ll/qspi_flash/base", &qspi_base);
+
+        if (res) {
+            fprintf(stderr, "Unable to get board memory configuration, assuming MASTER_OFF=%x!\n", (unsigned)master_offset);
+        }
     }
 
     usleep(1000);
@@ -160,12 +180,12 @@ int main(int argc, char** argv)
         return 4;
     }
 
-    res = (no_device) ? 0 : xlnx_btstrm_parse_header((const uint32_t* )outb, 256/4, &image);
+    res = (no_device) ? 0 : xlnx_btstrm_parse_header_ex((const uint32_t* )outb, 256/4, &image, XLNX_BSTRM_ALLOW_CROP);
     if (res) {
         fprintf(stderr, "It looks like the FPGA G image is corrupted! res=%d\n", res);
         return 4;
     }
-    res = (no_device) ? 0 : xlnx_btstrm_parse_header((const uint32_t* )(outb + 256), 256/4, &image_master);
+    res = (no_device) ? 0 : xlnx_btstrm_parse_header_ex((const uint32_t* )(outb + 256), 256/4, &image_master, XLNX_BSTRM_ALLOW_CROP);
     if (res) {
         fprintf(stderr, "It looks like the FPGA M image is corrupted! res=%d\n", res);
     } else {
@@ -183,35 +203,49 @@ int main(int argc, char** argv)
 
     uint32_t off = (golden) ? 0 : master_offset;
     unsigned total_length = SIZEOF_ARRAY(outa);
+    if (rdwr == ACTION_READBACK && readback_size) {
+        total_length = readback_size;
+    }
     if (rdwr == ACTION_WRITE || rdwr == ACTION_INFO) {
         FILE* w = fopen(filename, "rb");
         if (w == NULL) {
-            fprintf(stderr, "Unabe to read file '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Unable to read file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
         res = fseek(w, 0, SEEK_END);
         if (res) {
-            fprintf(stderr, "Unabe to seek file '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Unable to seek file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
         total_length = ftell(w);
         res = fseek(w, 0, SEEK_SET);
         if (res) {
-            fprintf(stderr, "Unabe to seek file '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Unable to seek file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
         res = fread(outa, 1, total_length, w);
         if ((unsigned)res != total_length) {
-            fprintf(stderr, "Unabe to read file '%s': %d read\n", filename, res);
+            fprintf(stderr, "Unable to read file '%s': %d read\n", filename, res);
             return 3;
         }
         fclose(w);
 
-        res = xlnx_btstrm_parse_header((const uint32_t* )outa, 256/4, &file);
+        // res = xlnx_btstrm_parse_header((const uint32_t* )outa, 256/4, &file);
+        res = xlnx_btstrm_parse_header_ex((const uint32_t* )outa,
+                                          crc_check ? (total_length / 4) : (256 / 4),
+                                          &file,
+                                          crc_check ? XLNX_BSTRM_PARSE_F_CRC_CHECK : XLNX_BSTRM_ALLOW_CROP);
         if (res) {
             fprintf(stderr, "It looks like the file is corrupted! res=%d\n", res);
             return 4;
         }
+        if (verbose) {
+            fprintf(stderr, "- GOLDEN: WBSTART=%08x IPROG=%d\n", image.wbstar, image.iprog);
+            fprintf(stderr, "- MASTER: WBSTART=%08x IPROG=%d\n", image_master.wbstar, image_master.iprog);
+            fprintf(stderr, "- FILE:   WBSTART=%08x IPROG=%d\n", file.wbstar, file.iprog);
+            fprintf(stderr, "- DEVICE: OFFSET= %08x\n", (unsigned)master_offset);
+        }
+
         res = (no_device) ? 0 : xlnx_btstrm_iprgcheck(&image, &file, master_offset, golden);
         if (res) {
             fprintf(stderr, "Image check failed! res=%d, file revision=%12ld\n", res, get_xilinx_rev_h(file.usr_access2));
@@ -239,6 +273,15 @@ int main(int argc, char** argv)
             fprintf(stderr, "Looks like you're using latest firmware already\n");
             return 9;
         }
+        if (image.usr_access2 == file.usr_access2 && golden && !force) {
+            fprintf(stderr, "Looks like GOLD image %08x is already flashed!\n", file.usr_access2);
+            return 9;
+        }
+        if (image_master.usr_access2 == file.usr_access2 && !golden && !force) {
+            fprintf(stderr, "Looks like MASTER image %08x is already flashed!\n", file.usr_access2);
+            return 9;
+        }
+
         if (corrupt) {
             memset(outa + 512*1024, -1, 512*1024);
             fprintf(stderr, "CORRUPTING IMAGE!!!\n\n");
@@ -277,6 +320,49 @@ int main(int argc, char** argv)
         }
     }
 
+    if (rdwr == ACTION_ERASE_MASTER) {
+        char reply[100];
+        char* term;
+
+        if (!mp) {
+            fprintf(stderr, "Master image is not detected!\n\n");
+        }
+
+        fprintf(stderr, " ===========================================\n");
+        fprintf(stderr, " == YOU'RE GOING TO BLANK MASTER FIRMWARE ==\n");
+        fprintf(stderr, " ===========================================\n");
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Type YES if you know what're doing: ");
+
+        if (fgets(reply, sizeof(reply), stdin) == NULL)
+            return 0;
+
+        term = strstr(reply, "\n");
+        if (term) {
+            *term = 0;
+        }
+
+        if (strcmp(reply, "YES") != 0)
+            return 0;
+
+        if (image.wbstar == 0) {
+            fprintf(stderr, "No Master support detected: WBSTAR is 0!\n");
+            return 7;
+        }
+        if (image.wbstar != master_offset) {
+            fprintf(stderr, "Master trampoline mismatches: WBSTAR is %08x != %08x in the software!\n",
+                    image.wbstar, (unsigned)master_offset);
+            return 8;
+        }
+
+        fprintf(stderr, "Blanking flash starting from %08x...\n", image.wbstar);
+        res = espi_flash_erase(dev, 0, qspi_base, 65536, master_offset);
+        if (res) {
+            fprintf(stderr, "Failed to blank flash header! res=%d", res);
+            return 4;
+        }
+    }
+
     if (rdwr == ACTION_WRITE || rdwr == ACTION_READBACK) {
         fprintf(stderr, "Reading %d bytes!\n", total_length);
         res = espi_flash_read(dev, 0, qspi_base, 512, off, total_length, outb);
@@ -306,7 +392,7 @@ int main(int argc, char** argv)
     } else if (rdwr == ACTION_READBACK) {
         FILE* w = fopen(filename, "wb");
         if (w == NULL) {
-            fprintf(stderr, "Unabe to create file '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Unable to create file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
         fwrite(outb, 1, total_length, w);

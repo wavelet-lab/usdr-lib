@@ -150,5 +150,21 @@ static inline int usdr_vfs_obj_param_init_array(pdevice_t dev,
     return usdr_vfs_obj_param_init_array_param(dev, NULL, params, count);
 }
 
+struct usdr_dev_link {
+    const char* fullpath;
+    const char* linkpath;
+};
+typedef struct usdr_dev_link usdr_dev_link_t;
+
+int usdr_vfs_obj_link_init_array_param(pdevice_t dev,
+                                       void *param,
+                                       const usdr_dev_link_t* links,
+                                       unsigned count);
+
+static inline int usdr_vfs_obj_link_init_array(pdevice_t dev,
+                                               const usdr_dev_link_t* links,
+                                               unsigned count) {
+    return usdr_vfs_obj_link_init_array_param(dev, NULL, links, count);
+}
 
 #endif

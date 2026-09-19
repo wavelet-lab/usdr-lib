@@ -41,7 +41,17 @@ x-band-opts: &x-band-opts
     0b01: BAND_2200_7200
     0b10: BAND_AUTO_L
     0b11: BAND_AUTO_H
-    
+
+x-rxband-opts: &x-rxband-opts
+    0b000: BAND_400_3500
+    0b001: BAND_2200_7200
+    0b010: BAND_1580_2760_BP
+    0b011: DISABLE
+    0b100: BAND_AUTO_L
+    0b101: BAND_AUTO_H
+    0b110: BAND_AUTO_BP
+    0b111: BAND_AUTO_DIS
+
 pages:
   - name: FEUSR
     regs:
@@ -65,22 +75,22 @@ pages:
       - addr: 0x41
         name: RX_H_BAND
         fields:
-          - bits: "1:0"
+          - bits: "2:0"
             name: A
-            desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts: *x-band-opts
-          - bits: "5:4"
+            desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector or Bypass_Rev2
+            opts: *x-rxband-opts
+          - bits: "6:4"
             name: B
-            desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts: *x-band-opts
-          - bits: "9:8"
+            desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector or Bypass_Rev2
+            opts: *x-rxband-opts
+          - bits: "10:8"
             name: C
-            desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts: *x-band-opts
-          - bits: "13:12"
+            desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector or Bypass_Rev2
+            opts: *x-rxband-opts
+          - bits: "14:12"
             name: D
-            desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector
-            opts: *x-band-opts
+            desc: Band 2.2G to 7.2G or 0.4G to 3.5G selector or Bypass_Rev2
+            opts: *x-rxband-opts
 #
       - addr: 0x42
         name: RX_FILTER_BANK
@@ -254,5 +264,20 @@ pages:
             name: D
             desc: FE LMS8001A TX high band 0-15 PA Gain
 #
+      - addr: 0x4C
+        name: PA_2ND_BP
+        fields:
+          - bits: "0"
+            name: A
+            desc: Bypass 2nd stage PA
+          - bits: "1"
+            name: B
+            desc: Bypass 2nd stage PA
+          - bits: "2"
+            name: C
+            desc: Bypass 2nd stage PA
+          - bits: "3"
+            name: D
+            desc: Bypass 2nd stage PA
 
 

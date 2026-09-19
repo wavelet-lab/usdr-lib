@@ -40,6 +40,9 @@ enum mmcm_vco_ranges {
     MMCM_VCO_MIN     =  600000000,
     MMCM_VCO_MAX     = 1440000000,
     MMCM_VCO_MAX_SP2 = 1900000000,
+
+    MMCM_VCO_MIN_USP =  800000000,
+    MMCM_VCO_MAX_USP = 1600000000,
 };
 
 struct mmcm_config_raw {

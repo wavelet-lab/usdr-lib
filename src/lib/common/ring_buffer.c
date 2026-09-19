@@ -15,7 +15,7 @@ struct ring_buffer* ring_buffer_create(unsigned items, unsigned isize)
     if (items == 0 || isize == 0)
         return NULL;
 
-    int res = posix_memalign((void**)&obj, CACHE_SIZE, sz);
+    int res = usdr_alignalloc((void**)&obj, CACHE_SIZE, sz);
     if (res)
         return NULL;
 
@@ -24,27 +24,27 @@ struct ring_buffer* ring_buffer_create(unsigned items, unsigned isize)
     obj->pidx = 0;
     obj->cidx = 0;
 
-    res = sem_init(&obj->producer, 0, items);
+    res = usdr_sem_init(&obj->producer, 0, items);
     if (res)
         goto failed_s0;
-    res = sem_init(&obj->consumer, 0, 0);
+    res = usdr_sem_init(&obj->consumer, 0, 0);
     if (res)
         goto failed_s1;
 
     return obj;
 
 failed_s1:
-    sem_destroy(&obj->producer);
+    usdr_sem_destroy(&obj->producer);
 failed_s0:
-    free(obj);
+    usdr_alignfree(obj);
     return NULL;
 }
 
 void ring_buffer_destroy(struct ring_buffer* rb)
 {
-    sem_destroy(&rb->producer);
-    sem_destroy(&rb->consumer);
-    free(rb);
+    usdr_sem_destroy(&rb->producer);
+    usdr_sem_destroy(&rb->consumer);
+    usdr_alignfree(rb);
 }
 
 char* ring_buffer_at(struct ring_buffer* rb, unsigned idx)
@@ -53,13 +53,13 @@ char* ring_buffer_at(struct ring_buffer* rb, unsigned idx)
     return &rb->data[rb->isize * int_idx];
 }
 
-static int ring_buffer_stdwait(sem_t* sem, int usecs)
+static int ring_buffer_stdwait(usdr_sem_t* sem, int usecs)
 {
     int res;
     if (usecs == -1) {
-        res = sem_wait(sem);
+        res = usdr_sem_wait(sem);
     } else if (usecs == 0) {
-        res = sem_trywait(sem);
+        res = usdr_sem_trywait(sem);
     } else {
         struct timespec t;
         res = clock_gettime(CLOCK_REALTIME, &t);
@@ -73,7 +73,7 @@ static int ring_buffer_stdwait(sem_t* sem, int usecs)
             t.tv_sec++;
         }
 
-        res = sem_timedwait(sem, &t);
+        res = usdr_sem_timedwait(sem, &t);
     }
     return res;
 }
@@ -92,7 +92,7 @@ unsigned ring_buffer_pwait(struct ring_buffer* rb, int usecs)
 
 void ring_buffer_ppost(struct ring_buffer* rb)
 {
-    int res = sem_post(&rb->consumer);
+    __attribute__((unused)) int res = usdr_sem_post(&rb->consumer);
     assert(res == 0);
 }
 
@@ -110,7 +110,7 @@ unsigned ring_buffer_cwait(struct ring_buffer* rb, int usecs)
 
 void ring_buffer_cpost(struct ring_buffer* rb)
 {
-    int res = sem_post(&rb->producer);
+    __attribute__((unused)) int res = usdr_sem_post(&rb->producer);
     assert(res == 0);
 }
 

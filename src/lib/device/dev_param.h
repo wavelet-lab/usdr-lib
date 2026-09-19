@@ -46,7 +46,7 @@ static inline void opt_u64_set_val(opt_u64_t* p, unsigned val)
 
 struct freq_auto_band_map
 {
-    unsigned stop_freq;
+    uint64_t stop_freq;
     uint8_t band;
     uint8_t sw   : 4;
     uint8_t swlb : 4;

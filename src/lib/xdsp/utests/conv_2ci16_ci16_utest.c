@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "xdsp_utest_common.h"
-#include "../conv_2ci16_ci16_2.h"
+#include "conv_2ci16_ci16_2.h"
 
 #undef DEBUG_PRINT
 
@@ -31,10 +31,12 @@ static generic_opts_t max_opt = OPT_GENERIC;
 
 static void setup()
 {
-    posix_memalign((void**)&in_0,       ALIGN_BYTES, OUT_BZ / 2);
-    posix_memalign((void**)&in_1,       ALIGN_BYTES, OUT_BZ / 2);
-    posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
-    posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in_0,       ALIGN_BYTES, OUT_BZ / 2);
+    res = res ? res : posix_memalign((void**)&in_1,       ALIGN_BYTES, OUT_BZ / 2);
+    res = res ? res : posix_memalign((void**)&out,        ALIGN_BYTES, OUT_BZ);
+    res = res ? res : posix_memalign((void**)&out_etalon, ALIGN_BYTES, OUT_BZ);
+    ck_assert_int_eq(res, 0);
 
     in[0] = in_0;
     in[1] = in_1;
@@ -63,18 +65,7 @@ static void teardown()
 
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
-    const char* fn_name = NULL;
-    conv_function_t fn = conv_get_2ci16_ci16_c(o, &fn_name);
-
-    //ignore dups
-    if(last_fn_name && !strcmp(last_fn_name, fn_name))
-        return NULL;
-
-    if(log)
-        fprintf(stderr, "%-20s\t", fn_name);
-
-    last_fn_name = fn_name;
-    return fn;
+    return generic_get_fn(o, log, conv_get_2ci16_ci16_c, &last_fn_name);
 }
 
 
@@ -160,18 +151,12 @@ END_TEST
 
 Suite * conv_2ci16_ci16_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("conv_2ci16_ci16");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, conv_2ci16_ci16_check_simd);
-    tcase_add_loop_test(tc_core, conv_2ci16_ci16_speed, 0, 3);
+    Suite* s = suite_create("conv_2ci16_ci16");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, conv_2ci16_ci16_check_simd);
+    ADD_PERF_LOOP_TEST(s, conv_2ci16_ci16_speed, 60, 0, 3);
+
     return s;
 }

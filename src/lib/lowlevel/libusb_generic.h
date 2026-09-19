@@ -4,11 +4,11 @@
 #ifndef _LIBUSB_GENERIC_H
 #define _LIBUSB_GENERIC_H
 
+#include <usdr_port.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 #include <string.h>
-#include <semaphore.h>
 #include <time.h>
 
 #include <usdr_logging.h>
@@ -146,7 +146,7 @@ int libusb_generic_stop_thread(libusb_generic_dev_t *dev);
 
 
 // Return -errno if fails
-int sem_wait_ex(sem_t *s, int64_t timeout_ns);
+int usdr_sem_wait_ex(usdr_sem_t *s, int64_t timeout_ns);
 
 
 // Buffers
@@ -163,7 +163,7 @@ struct buffer_discriptor
 
 struct buffers
 {
-    sem_t buf_ready;
+    usdr_sem_t buf_ready;
 
     uint8_t* rqueuebuf_ptr; // cache aligned pointer to rx_queuebuf
 

@@ -19,16 +19,28 @@ generic_opts_t cpu_vcap_obtain(unsigned flags)
     cap = OPT_SSE41;
 
 #else
-    unsigned max_cpu = OPT_AVX512BW;
+#ifdef WVLT_AVX512VBMI
+    unsigned max_cpu = OPT_AVX512VBMI;
+#else
+    unsigned max_cpu = OPT_AVX2;
+#endif
 
     if (flags & CVF_LIMIT_VCPU) {
         max_cpu = (flags & 0xffff);
     }
 
     __builtin_cpu_init();
+#ifdef WVLT_AVX512VBMI
+    if (__builtin_cpu_supports("avx512vbmi") && max_cpu >= OPT_AVX512VBMI)
+        cap = OPT_AVX512VBMI;
+    else
+#endif
+#ifdef WVLT_AVX512BW
     if (__builtin_cpu_supports("avx512bw") && max_cpu >= OPT_AVX512BW)
         cap = OPT_AVX512BW;
-    else if (__builtin_cpu_supports("avx2") && max_cpu >= OPT_AVX2)
+    else
+#endif
+    if (__builtin_cpu_supports("avx2") && max_cpu >= OPT_AVX2)
         cap = OPT_AVX2;
     else if (__builtin_cpu_supports("avx") && max_cpu >= OPT_AVX)
         cap = OPT_AVX;
@@ -67,6 +79,8 @@ void cpu_vcap_str(char* buffer, unsigned buflen, generic_opts_t caps)
     case OPT_AVX: type = "AVX"; break;
     case OPT_AVX2: type = "AVX2"; break;
     case OPT_AVX512BW: type = "AVX512BW"; break;
+    case OPT_AVX512VBMI: type = "AVX512VBMI"; break;
+
     case OPT_NEON: type = "ARM_NEON"; break;
     }
 
@@ -84,6 +98,7 @@ unsigned cpu_vcap_align(generic_opts_t caps)
     case OPT_SSE42:     return 16;
     case OPT_AVX:
     case OPT_AVX2:      return 32;
+    case OPT_AVX512VBMI:
     case OPT_AVX512BW:  return 64;
     case OPT_NEON:      return 16;
     default:

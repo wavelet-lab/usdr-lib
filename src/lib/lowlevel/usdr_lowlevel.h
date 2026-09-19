@@ -4,9 +4,9 @@
 #ifndef USDR_LOWLEVEL_H
 #define USDR_LOWLEVEL_H
 
-#include <stdint.h>
-#include <stddef.h>
 #include <usdr_port.h>
+#include <usdr_logging.h>
+
 
 #define USBG_LOG_TAG "USBG"
 
@@ -226,7 +226,6 @@ int lowlevel_discovery(unsigned pcount, const char** devparam, const char **devv
                        unsigned maxbuf, char* buf);
 int lowlevel_create(unsigned pcount, const char** devparam, const char **devval, lldev_t* odev, unsigned vidpid, void* webops, uintptr_t param);
 
-
 device_t* lowlevel_get_device(lldev_t obj);
 
 // Basic object
@@ -236,5 +235,32 @@ struct lowlevel_dev {
 };
 typedef struct lowlevel_dev lowlevel_dev_t;
 
+// Set new low-level device filter to specifically process some exceptions
+void lowlevel_ops_set_custom(lldev_t obj, lowlevel_ops_t* newops);
+
+
+void usdrlog_ll_devname_en(bool show_devname);
+
+void usdrlog_ll_out(lldev_t dev,
+                    unsigned loglevel,
+                    const char* subsystem,
+                    const char* function,
+                    const char* file,
+                    int line,
+                    const char* fmt, ...)  __attribute__ ((format (printf, 7, 8)));
+
+void usdrlog_ll_vout(lldev_t dev,
+                     unsigned loglevel,
+                     const char* subsystem,
+                     const char* function,
+                     const char* file,
+                     int line,
+                     const char* fmt,
+                     va_list list)  __attribute__ ((format (printf, 7, 0)));
+
+#define USDR_LL_LOG(dev, system, level, ...) \
+do { \
+        usdrlog_ll_out(dev, (level), (system), __FUNCTION__, __FILE__, __LINE__, __VA_ARGS__); \
+} while (0)
 
 #endif

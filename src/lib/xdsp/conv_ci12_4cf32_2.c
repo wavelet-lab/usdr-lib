@@ -5,11 +5,19 @@
 #include "attribute_switch.h"
 
 #define CONV_SCALE (1.0f/32767)
+#define SCALE2    (CONV_SCALE / 65536)
 
 #define TEMPLATE_FUNC_NAME conv_ci12_4cf32_generic
 VWLT_ATTRIBUTE(optimize("-O3"))
 #include "templates/conv_ci12_4cf32_generic.t"
 DECLARE_TR_FUNC_1_4(conv_ci12_4cf32_generic)
+
+#ifdef WVLT_AVX512BW
+#define TEMPLATE_FUNC_NAME conv_ci12_4cf32_avx512bw
+VWLT_ATTRIBUTE(optimize("-O3"), target("avx512bw"))
+#include "templates/conv_ci12_4cf32_avx512bw.t"
+DECLARE_TR_FUNC_1_4(conv_ci12_4cf32_avx512bw)
+#endif
 
 #ifdef WVLT_AVX2
 #define TEMPLATE_FUNC_NAME conv_ci12_4cf32_avx2
@@ -32,6 +40,7 @@ conv_function_t conv_get_ci12_4cf32_c(generic_opts_t cpu_cap, const char** sfunc
 
     SELECT_GENERIC_FN(fn, fname, tr_conv_ci12_4cf32_generic, cpu_cap);
     SELECT_AVX2_FN(fn, fname, tr_conv_ci12_4cf32_avx2, cpu_cap);
+    SELECT_AVX512BW_FN(fn, fname, tr_conv_ci12_4cf32_avx512bw, cpu_cap);
     SELECT_NEON_FN(fn, fname, tr_conv_ci12_4cf32_neon, cpu_cap);
 
     if (sfunc) *sfunc = fname;

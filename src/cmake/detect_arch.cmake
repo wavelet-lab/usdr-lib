@@ -9,7 +9,7 @@ if(${WVLT_ARCH} STREQUAL "x86")
     message(STATUS "Will compile for ${WVLT_ARCH} architecture")
     message(STATUS "Intel SIMD intrinsics will be used")
 
-elseif(${WVLT_ARCH} STREQUAL "x86_64")
+elseif(${WVLT_ARCH} STREQUAL "x86_64" OR ${WVLT_ARCH} STREQUAL "AMD64")
     add_definitions(-DWVLT_ARCH_X86_64)
     set(WVLT_ARCH_X86_64 1 CACHE BOOL "Arch x86_64")
     message(STATUS "Will compile for ${WVLT_ARCH} architecture")

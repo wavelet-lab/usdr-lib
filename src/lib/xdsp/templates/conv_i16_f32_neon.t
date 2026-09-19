@@ -45,7 +45,7 @@ void TEMPLATE_FUNC_NAME(const void *__restrict indata,
         i -= 8;
     }
 
-    while(i)
+    while(i >= 2)
     {
         *(out++) = *(in++) * CONV_SCALE;
         i -= 2;

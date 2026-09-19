@@ -1,0 +1,29 @@
+# Ubuntu Resolute Raccoon (26.04)
+FROM ubuntu:26.04
+
+ENV TZ=UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update
+RUN apt-get upgrade -y
+
+RUN apt-get install build-essential curl -y
+
+RUN apt-get install cmake python3 python3-venv python3-yaml -y
+RUN apt-get install dwarves libusb-1.0-0-dev libsoapysdr-dev check -y
+
+RUN apt-get install dkms dh-make devscripts debhelper dh-dkms -y
+
+ARG TARGETARCH
+ARG TASK_VERSION=3.53.1
+RUN curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${TARGETARCH}.tar.gz" \
+    | tar -xz -C /usr/local/bin task
+
+RUN mkdir -p /work/build
+RUN mkdir -p /work/source
+RUN mkdir -p /work/output
+ENV PACKAGE_DIR_NAME=ubuntu-resolute
+ENV PACKAGE_ARCH_NAME=unknown
+WORKDIR /work/
+
+CMD ["tail", "-f", "/dev/null"]

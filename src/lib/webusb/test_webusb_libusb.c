@@ -296,7 +296,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    // Recieve test packet
+    // Receive test packet
     res = libusb_bulk_transfer(wsdr->dh,
                                0x03 | LIBUSB_ENDPOINT_IN,
                                (unsigned char*)dummy_buffer,

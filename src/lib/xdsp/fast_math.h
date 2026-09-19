@@ -103,6 +103,52 @@ static inline
 
 #endif
 
+
+
+#ifdef WVLT_AVX512BW
+
+#define WVLT_AVX512_LOG2_POLY0(x, c0) _mm512_set1_ps(c0)
+#define WVLT_AVX512_LOG2_POLY1(x, c0, c1) _mm512_add_ps(_mm512_mul_ps(WVLT_AVX512_LOG2_POLY0(x, c1), x), _mm512_set1_ps(c0))
+#define WVLT_AVX512_LOG2_POLY2(x, c0, c1, c2) _mm512_add_ps(_mm512_mul_ps(WVLT_AVX512_LOG2_POLY1(x, c1, c2), x), _mm512_set1_ps(c0))
+#define WVLT_AVX512_LOG2_POLY3(x, c0, c1, c2, c3) _mm512_add_ps(_mm512_mul_ps(WVLT_AVX512_LOG2_POLY2(x, c1, c2, c3), x), _mm512_set1_ps(c0))
+#define WVLT_AVX512_LOG2_POLY4(x, c0, c1, c2, c3, c4) _mm512_add_ps(_mm512_mul_ps(WVLT_AVX512_LOG2_POLY3(x, c1, c2, c3, c4), x), _mm512_set1_ps(c0))
+#define WVLT_AVX512_LOG2_POLY5(x, c0, c1, c2, c3, c4, c5) _mm512_add_ps(_mm512_mul_ps(WVLT_AVX512_LOG2_POLY4(x, c1, c2, c3, c4, c5), x), _mm512_set1_ps(c0))
+
+#define WVLT_AVX512_POLYLOG2_DECL_CONSTS \
+const __m512i wvlt_AVX512_log2_exp  = _mm512_set1_epi32(0x7F800000); \
+    const __m512i wvlt_AVX512_log2_mant = _mm512_set1_epi32(0x007FFFFF); \
+    const __m512  wvlt_AVX512_log2_one  = _mm512_set1_ps(1.0f); \
+    const __m512i wvlt_AVX512_log2_v127 = _mm512_set1_epi32(127);
+
+#if   LOG_POLY_DEGREE == 3
+#define WVLT_AVX512_LOG2_POLY_APPROX(x) WVLT_AVX512_LOG2_POLY2(x, 2.28330284476918490682f, -1.04913055217340124191f, 0.204446009836232697516f)
+#elif LOG_POLY_DEGREE == 4
+#define WVLT_AVX512_LOG2_POLY_APPROX(x) WVLT_AVX512_LOG2_POLY3(x, 2.61761038894603480148f, -1.75647175389045657003f, 0.688243882994381274313f, -0.107254423828329604454f)
+#elif LOG_POLY_DEGREE == 5
+#define WVLT_AVX512_LOG2_POLY_APPROX(x) WVLT_AVX512_LOG2_POLY4(x, 2.8882704548164776201f, -2.52074962577807006663f, 1.48116647521213171641f, -0.465725644288844778798f, 0.0596515482674574969533f)
+#elif LOG_POLY_DEGREE == 6
+#define WVLT_AVX512_LOG2_POLY_APPROX(x) WVLT_AVX512_LOG2_POLY5(x, 3.1157899f, -3.3241990f, 2.5988452f, -1.2315303f,  3.1821337e-1f, -3.4436006e-2f)
+#else
+#error
+#endif
+
+#define WVLT_POLYLOG2F16(in, out) \
+{ \
+        __m512i i = _mm512_castps_si512(in); \
+        __m512  e = _mm512_cvtepi32_ps(_mm512_sub_epi32(_mm512_srli_epi32(_mm512_and_si512(i, wvlt_AVX512_log2_exp), 23), wvlt_AVX512_log2_v127)); \
+        __m512  m = _mm512_or_ps(_mm512_castsi512_ps(_mm512_and_si512(i, wvlt_AVX512_log2_mant)), wvlt_AVX512_log2_one); \
+  \
+        /* Minimax polynomial fit of log2(x)/(x - 1), for x in range [1, 2[ */ \
+        __m512 p = WVLT_AVX512_LOG2_POLY_APPROX(m); \
+  \
+        /* This effectively increases the polynomial degree by one, but ensures that log2(1) == 0*/ \
+        p = _mm512_mul_ps(p, _mm512_sub_ps(m, wvlt_AVX512_log2_one)); \
+  \
+        out = _mm512_add_ps(p, e); \
+}
+
+#endif
+
 #ifdef WVLT_NEON
 
 #define WVLT_LOG2_POLY0(x, c0) vdupq_n_f32(c0)

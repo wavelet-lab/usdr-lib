@@ -4,6 +4,7 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#include "usdr_port.h"
 #include <stdint.h>
 #include <math.h>
 #include "fmquad.h"

@@ -11,7 +11,7 @@
 #include "sincos_functions.h"
 #include <math.h>
 
-//#define DEBUG_PRINT
+#undef DEBUG_PRINT
 
 #define WORD_COUNT (65536)
 #define STREAM_SIZE_BZ (WORD_COUNT * sizeof(int16_t))
@@ -41,17 +41,28 @@ static int16_t gain[SPEED_CYCLES];
 static const char* last_fn_name = NULL;
 static generic_opts_t max_opt = OPT_GENERIC;
 
+struct chirp_t
+{
+    int32_t phase_diap[2];
+    int32_t start_dphase;
+    int32_t steps_count;
+};
+
+static struct chirp_t chirp = { {-1000000, 1000000}, -1000000, (100000 / 8) * 8 + 7};
+
 static void setup()
 {
-    posix_memalign((void**)&in_check,       ALIGN_BYTES, STREAM_SIZE_BZ);
-    posix_memalign((void**)&in,             ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&sindata,        ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&sindata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
-    posix_memalign((void**)&cosdata,        ALIGN_BYTES, SPEED_SIZE_BZ);
-    posix_memalign((void**)&cosdata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
+    int res = 0;
+    res = res ? res : posix_memalign((void**)&in_check,       ALIGN_BYTES, STREAM_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&in,             ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&sindata,        ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&sindata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&cosdata,        ALIGN_BYTES, SPEED_SIZE_BZ);
+    res = res ? res : posix_memalign((void**)&cosdata_etalon, ALIGN_BYTES, STREAM_SIZE_BZ);
 
-    posix_memalign((void**)&sincosdata,        ALIGN_BYTES, SPEED_WORD_COUNT * 2 * sizeof(int16_t));
-    posix_memalign((void**)&sincosdata_etalon, ALIGN_BYTES, WORD_COUNT * 2 * sizeof(int16_t));
+    res = res ? res : posix_memalign((void**)&sincosdata,        ALIGN_BYTES, SPEED_WORD_COUNT * 2 * sizeof(int16_t));
+    res = res ? res : posix_memalign((void**)&sincosdata_etalon, ALIGN_BYTES, WORD_COUNT * 2 * sizeof(int16_t));
+    ck_assert_int_eq(res, 0);
 
     srand( time(0) );
 
@@ -99,18 +110,7 @@ static void teardown()
 
 static conv_function_t get_fn(generic_opts_t o, int log)
 {
-    const char* fn_name = NULL;
-    conv_function_t fn = get_wvlt_sincos_i16_c(o, &fn_name);
-
-    //ignore dups
-    if(last_fn_name && !strcmp(last_fn_name, fn_name))
-        return NULL;
-
-    if(log)
-        fprintf(stderr, "%-20s\t", fn_name);
-
-    last_fn_name = fn_name;
-    return fn;
+    return generic_get_fn(o, log, get_wvlt_sincos_i16_c, &last_fn_name);
 }
 
 static sincos_i16_interleaved_ctrl_function_t get_fn_interleaved(generic_opts_t o, int log)
@@ -128,6 +128,23 @@ static sincos_i16_interleaved_ctrl_function_t get_fn_interleaved(generic_opts_t 
     last_fn_name = fn_name;
     return fn;
 }
+
+static sincos_i16_interleaved_chirp_function_t get_fn_interleaved_chirp(generic_opts_t o, int log)
+{
+    const char* fn_name = NULL;
+    sincos_i16_interleaved_chirp_function_t fn = get_wvlt_sincos_i16_interleaved_chirp_c(o, &fn_name);
+
+    //ignore dups
+    if(last_fn_name && !strcmp(last_fn_name, fn_name))
+        return NULL;
+
+    if(log)
+        fprintf(stderr, "%-20s\t", fn_name);
+
+    last_fn_name = fn_name;
+    return fn;
+}
+
 
 static int32_t is_equal()
 {
@@ -338,23 +355,133 @@ START_TEST(wvlt_sincos_i16_speed)
 END_TEST
 
 
+// CHIRP
+START_TEST(wvlt_sincos_i16_interleaved_chirp_check_simd)
+{
+    generic_opts_t opt = max_opt;
+    sincos_i16_interleaved_chirp_function_t fn = NULL;
+    last_fn_name = NULL;
+
+    fprintf(stderr,"\n**** Check SIMD implementations ***\n");
+
+    int32_t ph_etalon = start_phase[0];
+    int32_t phdelta_etalon = chirp.start_dphase;
+
+    const int32_t delta_ph = delta_phase[0];
+    const bool inv_sin = invert_sin[0];
+    const bool inv_cos = invert_cos[0];
+    const int16_t gain_c = gain[0];
+
+    //get etalon output data (generic foo)
+    (*get_fn_interleaved_chirp(OPT_GENERIC, 0))
+        (&ph_etalon, &phdelta_etalon, chirp.phase_diap, chirp.steps_count, gain_c, inv_sin, inv_cos, sincosdata_etalon, WORD_COUNT);
+
+    fprintf(stderr, "-- start_phase:%d delta_phase:%d final_phase:%d\n", start_phase[0], delta_ph, ph_etalon);
+
+
+    while(opt != OPT_GENERIC)
+    {
+        sincos_i16_interleaved_chirp_function_t fn = get_fn_interleaved_chirp(opt--, 1);
+        if(fn)
+        {
+            memset(sincosdata, 0, WORD_COUNT * 2 * sizeof(int16_t));
+            int32_t ph = start_phase[0];
+            int32_t phdelta = chirp.start_dphase;
+
+            (*fn)(&ph, &phdelta, chirp.phase_diap, chirp.steps_count, gain_c, inv_sin, inv_cos, sincosdata, WORD_COUNT);
+
+            int32_t tmp_ph = start_phase[0];
+            int32_t max_eps = 0;
+            for(unsigned i = 0; i < WORD_COUNT; ++i, tmp_ph += delta_ph)
+            {
+                int16_t ss = sincosdata[i*2];
+                int16_t cc = sincosdata[i*2 + 1];
+                int16_t sse = sincosdata_etalon[i*2];
+                int16_t cce = sincosdata_etalon[i*2 + 1];
+#ifdef DEBUG_PRINT
+                fprintf(stderr, "i#%d : phase:%12d, out{sin:%6d cos:%6d}, etalon{sin:%6d cos:%6d}, delta = {%4d %4d}\n",
+                        i, tmp_ph, ss, cc, sse, cce, abs(ss-sse), abs(cc-cce));
+#endif
+                if(abs(ss-sse) > max_eps)
+                    max_eps = abs(ss-sse);
+                if(abs(cc-cce) > max_eps)
+                    max_eps = abs(cc-cce);
+            }
+            fprintf(stderr, "-- final_phase:%d (est:%d) max_eps:%d\n", ph, tmp_ph, max_eps);
+
+            int res = is_equal_interleaved();
+            res >= 0 ? fprintf(stderr,"\tFAILED!\n") : fprintf(stderr,"\tOK!\n");
+
+            for(int i = res - 20; res >= 0 && i <= res + 20; ++i)
+            {
+                if(i >= 0 && i < WORD_COUNT)
+                    fprintf(stderr, "%si#%d : in = %d, out = {sin:%d cos:%d}, etalon = {sin:%d cos:%d}, delta = {%d %d}\n",
+                            i == res ? ">>>" : "   ",
+                            i, in_check[i], sincosdata[i*2], sincosdata[i*2 + 1], sincosdata_etalon[i*2], sincosdata_etalon[i*2 + 1],
+                            abs(sincosdata_etalon[i*2] - sincosdata[i*2]), abs(sincosdata_etalon[i*2 + 1] - sincosdata[i*2 + 1]));
+            }
+
+            ck_assert_int_eq( res, -1 );
+            ck_assert_int_eq( ph, ph_etalon );
+        }
+    }
+}
+END_TEST
+
+
+START_TEST(wvlt_sincos_i16_interleaved_chirp_speed)
+{
+    generic_opts_t opt = max_opt;
+    sincos_i16_interleaved_chirp_function_t fn = NULL;
+    last_fn_name = NULL;
+
+    const unsigned iters  = packet_lens[_i];
+
+
+    fprintf(stderr, "\n**** Compare SIMD implementations speed ***\n");
+    fprintf(stderr,   "**** packet: %d IQs, cycles: %u ***\n", iters, SPEED_CYCLES);
+
+    while(opt != OPT_GENERIC)
+    {
+        sincos_i16_interleaved_chirp_function_t fn = get_fn_interleaved_chirp(opt--, 1);
+        if(fn)
+        {
+            int32_t ph = start_phase[0];
+            int32_t phdelta = chirp.start_dphase;
+            //warming
+            for(int i = 0; i < 10; ++i)
+                (*fn)(&ph, &phdelta, chirp.phase_diap, chirp.steps_count, gain[0], invert_sin[0], invert_cos[0], sincosdata, SPEED_WORD_COUNT);
+
+            //measuring
+            phdelta = chirp.start_dphase;
+            uint64_t tk = clock_get_time();
+            for(unsigned i = 0; i < SPEED_CYCLES; ++i)
+            {
+                (*fn)
+                    (&start_phase[i], &phdelta, chirp.phase_diap, chirp.steps_count, gain[i], invert_sin[i], invert_cos[i], sincosdata, iters);
+            }
+            uint64_t tk1 = clock_get_time() - tk;
+            fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 IQ, ave speed = %.2f mln IQs/s \n",
+                    tk1, (uint64_t)(tk1*1000LL/SPEED_CYCLES/iters), (uint64_t)(1000000LL*SPEED_CYCLES*iters/tk1)/(float)1000000);
+        }
+    }
+}
+END_TEST
+//
+
 
 Suite * wvlt_sincos_i16_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
-
     max_opt = cpu_vcap_get();
 
-    s = suite_create("wvlt_sincos_i16");
-    tc_core = tcase_create("XDSP");
-    tcase_set_timeout(tc_core, 60);
-    tcase_add_unchecked_fixture(tc_core, setup, teardown);
-    tcase_add_test(tc_core, wvlt_sincos_i16_check_simd);
-    tcase_add_loop_test(tc_core, wvlt_sincos_i16_speed, 0, 3);
-    tcase_add_test(tc_core, wvlt_sincos_i16_interleaved_ctrl_check_simd);
-    tcase_add_loop_test(tc_core, wvlt_sincos_i16_interleaved_ctrl_speed, 0, 3);
+    Suite* s = suite_create("wvlt_sincos_i16");
 
-    suite_add_tcase(s, tc_core);
+    ADD_REGRESS_TEST(s, wvlt_sincos_i16_check_simd);
+    ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_speed, 60, 0, 3);
+    ADD_REGRESS_TEST(s, wvlt_sincos_i16_interleaved_ctrl_check_simd);
+    ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_interleaved_ctrl_speed, 60, 0, 3);
+    ADD_REGRESS_TEST(s, wvlt_sincos_i16_interleaved_chirp_check_simd);
+    ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_interleaved_chirp_speed, 60, 0, 3);
+
     return s;
 }

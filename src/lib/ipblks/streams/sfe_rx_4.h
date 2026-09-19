@@ -10,7 +10,7 @@ int sfe_rx4_check_format(const struct stream_config* psc);
 
 int sfe_rx4_configure(const sfe_cfg_t *fe,
                       const struct stream_config* psc,
-                      struct fifo_config* pfc);
+                      struct fifo_config* pfc, uint64_t *pwr_ch_mask);
 
 int sfe_rx4_throttle(const sfe_cfg_t* fe, bool enable, uint8_t send, uint8_t skip);
 
@@ -23,16 +23,17 @@ int sfe_rf4_nco_freq(const sfe_cfg_t* fe, int32_t freq);
 
 int exfe_rx4_configure(const sfe_cfg_t* fe,
                        const struct stream_config* psc,
-                       struct fifo_config* pfc);
+                       struct fifo_config* pfc, bool *out_pack_3x16);
 
 int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
                            bool mask,
                            bool complex,
+                           bool pack_3x16,
                            unsigned total_chan_num,
                            const channel_info_t *newmap);
 
 int exfe_tx4_mute(const sfe_cfg_t* fe, uint64_t mutemask);
 
-int exfe_tx4_config(const sfe_cfg_t* fe, unsigned bmt, unsigned expand);
+int exfe_tx4_config(const sfe_cfg_t* fe, unsigned bmt, unsigned expand, bool pack_3x16);
 
 #endif

@@ -7,6 +7,10 @@ obj-*/
 
 cmake-build-debug/
 
+# Python
+__pycache__/
+*.py[cod]
+
 # OS specific
 .DS_Store
 
