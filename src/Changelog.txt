@@ -1,4 +1,4 @@
-Release 1.0.0 (2026-09-15)
+Release 1.0.0 (2026-09-21)
 ==========================
 
 - Added PE Sync support with configurable DPLL, SYSREF, reference-clock distribution, and synchronization workflows.

@@ -33,6 +33,10 @@ tasks:
     cmds:
       - mkdir -p output
       - docker build --platform {{.PLATFORM}} -t {{.DOCKER_IMAGE}} -f {{.DOCKER_FILE}} --label {{.LABEL}}=true .
+      - |
+          if [ "{{.OS}}-{{.DISTRO_NAME}}-{{.ARCH}}" = "ubuntu-resolute-aarch64" ]; then
+            docker/ensure-resolute-arm64-binfmt.sh "{{.DOCKER_IMAGE}}"
+          fi
       - docker run --platform {{.PLATFORM}} --init --rm -it -v $(pwd):/work/source:ro -v $(pwd)/output:/work/output -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml:ro -v ~/.gnupg:/mnt/gnupg:ro -e PACKAGE_ARCH_NAME={{.ARCH}} --name {{.CONTAINER_NAME}} {{.DOCKER_IMAGE}} {{.COMMAND}}
 
   '*-*-*-deb':
