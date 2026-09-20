@@ -6,13 +6,17 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
 
 #include "../lib/ipblks/espi_flash.h"
 #include "../lib/ipblks/xlnx_bitstream.h"
 
 #include "../lib/device/device.h"
+#include "cli_parse.h"
 
 enum {
     M2PCI_REG_STAT_CTRL = 0,
@@ -20,7 +24,32 @@ enum {
 
 static char outa[16*1024*1024];
 static char outb[16*1024*1024];
+static lldev_t device_to_destroy;
 
+static void destroy_device(void)
+{
+    if (device_to_destroy != NULL) {
+        lowlevel_destroy(device_to_destroy);
+        device_to_destroy = NULL;
+    }
+}
+
+#define FLASH_CLI_OPTIONS(X) \
+    X(OPT_DEVICE, "device", 'U', required_argument, "DEVICE", "Device bus or connection string") \
+    X(OPT_LOG_LEVEL, "log-level", 'l', required_argument, "LEVEL", "Logging level") \
+    X(OPT_INFO, "info", 'i', required_argument, "FILE", "Inspect and validate an image file") \
+    X(OPT_WRITE, "write", 'w', required_argument, "FILE", "Write an image to flash") \
+    X(OPT_READ, "read", 'r', required_argument, "FILE", "Read flash contents into a file") \
+    X(OPT_FORCE, "force", 'F', no_argument, NULL, "Write even if the same firmware is already present") \
+    X(OPT_GOLDEN, "golden", 'G', no_argument, NULL, "Operate on the golden image partition") \
+    X(OPT_CORRUPT, "corrupt", 'C', no_argument, NULL, "Intentionally corrupt the image before writing") \
+    X(OPT_VERBOSE, "verbose", 'v', no_argument, NULL, "Print detailed image information") \
+    X(OPT_SKIP_CRC, "skip-crc", 'k', no_argument, NULL, "Skip full image CRC validation") \
+    X(OPT_ERASE_MASTER, "erase-master", 'E', no_argument, NULL, "Erase the master image header") \
+    X(OPT_READBACK_SIZE, "readback-size", 'S', required_argument, "BYTES", "Number of bytes to read back") \
+    X(OPT_HELP, "help", 'h', no_argument, NULL, "Show this help and exit")
+
+CLI_DEFINE_OPTIONS(flash, FLASH_CLI_OPTIONS)
 
 enum {
     MASTER_IMAGE_OFF = 0x001c0000,
@@ -45,7 +74,7 @@ int main(int argc, char** argv)
     enum flash_action rdwr = ACTION_NONE;
     const char* filename = NULL;
     const char* busname = NULL;
-    lldev_t dev;
+    lldev_t dev = NULL;
     bool force = false;
     bool golden = false;
     bool corrupt = false;
@@ -57,56 +86,77 @@ int main(int argc, char** argv)
     uint64_t qspi_base = 10;
     unsigned readback_size = 0;
 
+    if (atexit(destroy_device) != 0) {
+        fprintf(stderr, "Unable to register device cleanup\n");
+        return 1;
+    }
+
     memset(outa, 0xff, SIZEOF_ARRAY(outa));
     memset(outb, 0xff, SIZEOF_ARRAY(outb));
 
     usdrlog_setlevel(NULL, USDR_LOG_WARNING);
     usdrlog_enablecolorize(NULL);
 
-    while ((opt = getopt(argc, argv, "U:l:i:w:r:FGCvkES:")) != -1) {
+    char short_options[3 * SIZEOF_ARRAY(flash_long_options)];
+    res = cli_build_short_options(flash_long_options, short_options, sizeof(short_options));
+    if (res) {
+        fprintf(stderr, "Unable to build short option list: %s\n", strerror(-res));
+        return 1;
+    }
+
+    while ((opt = getopt_long(argc, argv, short_options, flash_long_options, NULL)) != -1) {
         switch (opt) {
-        case 'S':
-            readback_size = atoi(optarg);
+        case OPT_READBACK_SIZE:
+            readback_size = cli_parse_unsigned_or_exit("readback-size", optarg);
+            if (readback_size > SIZEOF_ARRAY(outb)) {
+                fprintf(stderr, "Invalid readback size '%s' (maximum is %zu bytes)\n",
+                        optarg, sizeof(outb));
+                return 1;
+            }
             break;
-        case 'U':
+        case OPT_DEVICE:
             busname = optarg;
             break;
-        case 'l':
+        case OPT_LOG_LEVEL:
             usdrlog_setlevel(NULL, atoi(optarg));
             break;
-        case 'r':
+        case OPT_READ:
             filename = optarg;
             rdwr = ACTION_READBACK;
             break;
-        case 'w':
+        case OPT_WRITE:
             filename = optarg;
             rdwr = ACTION_WRITE;
             break;
-        case 'i':
+        case OPT_INFO:
             filename = optarg;
             rdwr = ACTION_INFO;
             break;
-        case 'F':
+        case OPT_FORCE:
             force = true;
             break;
-        case 'G':
+        case OPT_GOLDEN:
             golden = true;
             break;
-        case 'C':
+        case OPT_CORRUPT:
             corrupt = true;
             break;
-        case 'v':
+        case OPT_VERBOSE:
             verbose = true;
             break;
-        case 'k':
+        case OPT_SKIP_CRC:
             crc_check = false;
             break;
-        case 'E':
+        case OPT_ERASE_MASTER:
             rdwr = ACTION_ERASE_MASTER;
             break;
+        case OPT_HELP:
+            cli_print_usage(stdout, argv[0], "[OPTIONS]",
+                            flash_long_options, flash_options_help);
+            return 0;
         default:
-            fprintf(stderr, "Usage: %s [-U device_bus] [-l loglevel] [-r filename | -w filename | -i filename] [-G]\n",
-                    argv[0]);
+            cli_print_usage(stderr, argv[0], "[OPTIONS]",
+                            flash_long_options, flash_options_help);
             return 1;
         }
     }
@@ -132,6 +182,8 @@ int main(int argc, char** argv)
         if (rdwr != ACTION_INFO)
             return 1;
         no_device = true;
+    } else {
+        device_to_destroy = dev;
     }
 
     const char* name = (no_device) ? "<no_device>" : lowlevel_get_devname(dev);
@@ -158,6 +210,7 @@ int main(int argc, char** argv)
 
     uint32_t fid = 0xdeadbeef;
     char fid_str[64] = {0};
+    uint64_t flash_capacity = 0;
 
     res = (no_device) ? 0 : espi_flash_get_id(dev, 0, qspi_base, &fid, fid_str, sizeof(fid_str));
     if (res) {
@@ -166,6 +219,17 @@ int main(int argc, char** argv)
     }
     if (!no_device) {
         fprintf(stderr, "Flash ID id %08x (%s)!\n", fid, fid_str);
+        res = espi_flash_get_capacity(fid, &flash_capacity);
+        if (res || flash_capacity > (uint64_t)UINT32_MAX + 1) {
+            fprintf(stderr, "Unsupported flash capacity code 0x%02x!\n",
+                    (fid >> 16) & 0xff);
+            return 2;
+        }
+        if (master_offset > UINT32_MAX || master_offset >= flash_capacity) {
+            fprintf(stderr, "Invalid master image offset 0x%llx for %llu-byte flash!\n",
+                    (unsigned long long)master_offset, (unsigned long long)flash_capacity);
+            return 2;
+        }
     }
 
     //Check image
@@ -206,6 +270,16 @@ int main(int argc, char** argv)
     if (rdwr == ACTION_READBACK && readback_size) {
         total_length = readback_size;
     }
+    if (rdwr == ACTION_READBACK && !no_device) {
+        uint64_t partition_end = golden ? master_offset : flash_capacity;
+        uint64_t available = partition_end - off;
+        if (!readback_size && available < total_length)
+            total_length = (unsigned)available;
+        if ((uint64_t)total_length > available) {
+            fprintf(stderr, "Readback range exceeds flash capacity!\n");
+            return 3;
+        }
+    }
     if (rdwr == ACTION_WRITE || rdwr == ACTION_INFO) {
         FILE* w = fopen(filename, "rb");
         if (w == NULL) {
@@ -215,17 +289,27 @@ int main(int argc, char** argv)
         res = fseek(w, 0, SEEK_END);
         if (res) {
             fprintf(stderr, "Unable to seek file '%s': %s\n", filename, strerror(errno));
+            fclose(w);
             return 3;
         }
-        total_length = ftell(w);
+        long file_length = ftell(w);
+        if (file_length < 0 || (unsigned long)file_length > sizeof(outa)) {
+            fprintf(stderr, "File '%s' is too large (maximum is %zu bytes)\n",
+                    filename, sizeof(outa));
+            fclose(w);
+            return 3;
+        }
+        total_length = (unsigned)file_length;
         res = fseek(w, 0, SEEK_SET);
         if (res) {
             fprintf(stderr, "Unable to seek file '%s': %s\n", filename, strerror(errno));
+            fclose(w);
             return 3;
         }
         res = fread(outa, 1, total_length, w);
         if ((unsigned)res != total_length) {
             fprintf(stderr, "Unable to read file '%s': %d read\n", filename, res);
+            fclose(w);
             return 3;
         }
         fclose(w);
@@ -256,6 +340,15 @@ int main(int argc, char** argv)
         if (total_length & 0xffff) {
             total_length += 65536;
             total_length &= 0xffff0000;
+        }
+
+        if (!no_device) {
+            uint64_t partition_end = golden ? master_offset : flash_capacity;
+            if ((uint64_t)off + total_length > partition_end) {
+                fprintf(stderr, "Image (%u bytes) does not fit in the %s partition!\n",
+                        total_length, golden ? "golden" : "master");
+                return 4;
+            }
         }
 
         fprintf(stderr, "File image:   DEVID %08x FirmwareID %08x (%lld)\n",
@@ -388,6 +481,7 @@ int main(int argc, char** argv)
             fprintf(stderr, "Write successful!\n");
         } else {
             fprintf(stderr, "Write FAILED; errors: %d!\n", errors);
+            return 4;
         }
     } else if (rdwr == ACTION_READBACK) {
         FILE* w = fopen(filename, "wb");
@@ -395,11 +489,16 @@ int main(int argc, char** argv)
             fprintf(stderr, "Unable to create file '%s': %s\n", filename, strerror(errno));
             return 3;
         }
-        fwrite(outb, 1, total_length, w);
-        fclose(w);
+        size_t written = fwrite(outb, 1, total_length, w);
+        int write_error = ferror(w);
+        int close_error = fclose(w);
+        if (written != total_length || write_error || close_error != 0) {
+            fprintf(stderr, "Unable to write file '%s': %s\n", filename, strerror(errno));
+            return 3;
+        }
     }
 
 
-    lowlevel_destroy(dev);
+    destroy_device();
     return 0;
 }

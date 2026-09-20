@@ -13,10 +13,13 @@
 #include <time.h>
 #include <math.h>
 #include <unistd.h>
+#include <string.h>
+#include <getopt.h>
 #ifdef __linux__
 #include <sys/timerfd.h>
 #include <poll.h>
 #endif
+#include "cli_parse.h"
 
 // PID parameters
 #define KP 0.75    // Proportional gain
@@ -27,6 +30,14 @@
 #define INTEGRAL_MAX 1e6
 #define OUTPUT_MAX 1e-3
 #define DEVIATION_MAX 7e-6
+
+#define GPSDO_CLI_OPTIONS(X) \
+    X(OPT_DEVICE, "device", 'd', required_argument, "DEVICE", "Device parameters") \
+    X(OPT_OSCILLATOR_FREQUENCY, "oscillator-frequency", 'o', required_argument, "HZ|MHZ", "External oscillator frequency [25e6 Hz]") \
+    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS|MSPS", "Target sample rate [4e6 samples/s]") \
+    X(OPT_HELP, "help", 'h', no_argument, NULL, "Show this help and exit")
+
+CLI_DEFINE_OPTIONS(gpsdo, GPSDO_CLI_OPTIONS)
 
 typedef struct {
     uint32_t bits;
@@ -129,17 +140,6 @@ uint32_t get_measured_freq(uint64_t ppsparm)
     return ppsparm & 0xfffffff;
 }
 
-void show_usage(const char *procname)
-{
-    fprintf(stderr, "Usage %s:\n", procname);
-    fprintf(stderr, "  Options:\n");
-    fprintf(stderr, "    -d <device>           - device\n");
-    // fprintf(stderr, "    -f <target_frequency> - target frequency of oscillator [26e6] Hz\n");
-    fprintf(stderr, "    -o <frequency>        - external oscilator frequency [25e6] Hz\n");
-    fprintf(stderr, "    -r <target_rate>      - target samplerate [4e6] Samples\n");
-    fprintf(stderr, "    -h                    - this help\n");
-}
-
 int main(int argc, char **argv)
 {
     const char *pps_path = "/dm/sensor/freqpps";//"/dm/sdr/0/clkmeas";
@@ -159,9 +159,16 @@ int main(int argc, char **argv)
     double target_freq = 4e6; // Target samplerate, 4 Msps
     bool new_holdover_msg = true;
 
-    while ((opt = getopt(argc, argv, "d:f:o:r:h")) != -1) {
+    char short_options[3 * SIZEOF_ARRAY(gpsdo_long_options)];
+    res = cli_build_short_options(gpsdo_long_options, short_options, sizeof(short_options));
+    if (res) {
+        fprintf(stderr, "Unable to build short option list: %s\n", strerror(-res));
+        return 1;
+    }
+
+    while ((opt = getopt_long(argc, argv, short_options, gpsdo_long_options, NULL)) != -1) {
         switch (opt) {
-        case 'd':
+        case OPT_DEVICE:
             device = optarg;
             break;
         // case 'f':
@@ -169,19 +176,23 @@ int main(int argc, char **argv)
         //     if (target_freq < 100.0)
         //         target_freq *= 1e6;
         //     break;
-        case 'o':
-            osc_freq = atof(optarg);
+        case OPT_OSCILLATOR_FREQUENCY:
+            osc_freq = cli_parse_double_or_exit("oscillator-frequency", optarg);
             if (osc_freq < 100.0)
                 osc_freq *= 1e6;
             break;
-        case 'r':
-            target_freq = atof(optarg);
+        case OPT_SAMPLE_RATE:
+            target_freq = cli_parse_double_or_exit("sample-rate", optarg);
             if (target_freq < 100.0)
                 target_freq *= 1e6;
             break;
-        case 'h':
+        case OPT_HELP:
+            cli_print_usage(stdout, argv[0], "[OPTIONS]",
+                            gpsdo_long_options, gpsdo_options_help);
+            return 0;
         default:
-            show_usage(argv[0]);
+            cli_print_usage(stderr, argv[0], "[OPTIONS]",
+                            gpsdo_long_options, gpsdo_options_help);
             return 1;
         }
     }

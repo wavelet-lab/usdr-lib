@@ -94,27 +94,47 @@ static int _espi_flash_cmd_rdsr(lldev_t dev, subdev_t subdev, unsigned cfg_base,
 
 #define ADESTO_SPI_QPI        0x42
 
+int espi_flash_get_capacity(uint32_t flash_id, uint64_t *capacity)
+{
+    uint8_t capacity_code = (flash_id >> 16) & 0xff;
+
+    if (capacity == NULL)
+        return -EINVAL;
+    if (capacity_code >= 64)
+        return -ERANGE;
+
+    *capacity = UINT64_C(1) << capacity_code;
+    return 0;
+}
+
 static int _espi_flash_id_to_str(uint32_t flash_id,
                                  char* outid, size_t maxstr)
 {
     uint8_t manufacture_id = flash_id & 0xff;
     uint8_t flash_type = ((flash_id >> 8) & 0xff);
-    uint8_t flash_size = ((flash_id >> 16) & 0xff);
-    uint32_t cap = 1U << flash_size;
+    uint64_t capacity;
+    int res = espi_flash_get_capacity(flash_id, &capacity);
+    if (res) {
+        snprintf(outid, maxstr, "Mfg 0x%02x Type 0x%02x invalid capacity code 0x%02x",
+                 manufacture_id, flash_type, (flash_id >> 16) & 0xff);
+        return res;
+    }
+
+    unsigned long long capacity_mbit =
+        (unsigned long long)(capacity / 1024 / 1024 * 8);
 
     if ((manufacture_id == JEDEC_MICRON) && (flash_type == MICRON_SERIAL_NOR || flash_type == MICRON_SERIAL_NOR_18)) {
-            snprintf(outid, maxstr, "Micron Serial NOR MT25Q %d Mb (%s)",
-                     8 * cap / 1024 / 1024,
+            snprintf(outid, maxstr, "Micron Serial NOR MT25Q %llu Mb (%s)",
+                     capacity_mbit,
                      (flash_type == MICRON_SERIAL_NOR) ? "3.3V" : "1.8V");
     } else if (manufacture_id == JEDEC_MACRONIX) {
-        snprintf(outid, maxstr, "Macronix MX%02x series %d Mb",
-                 flash_type, 8 * cap / 1024 / 1024);
+        snprintf(outid, maxstr, "Macronix MX%02x series %llu Mb",
+                 flash_type, capacity_mbit);
     } else if (manufacture_id == JEDEC_ADESTO && flash_type == ADESTO_SPI_QPI) {
-        snprintf(outid, maxstr, "Adesto SPI/QPI series %d Mb",
-                 /*flash_type,*/ 8 * cap / 1024 / 1024);
+        snprintf(outid, maxstr, "Adesto SPI/QPI series %llu Mb", capacity_mbit);
     } else {
-        snprintf(outid, maxstr, "Mfg 0x%02x Type 0x%02x %d Mb",
-                 manufacture_id, flash_type, 8 * cap / 1024 / 1024);
+        snprintf(outid, maxstr, "Mfg 0x%02x Type 0x%02x %llu Mb",
+                 manufacture_id, flash_type, capacity_mbit);
         return -ENODATA;
     }
     return 0;
@@ -123,10 +143,13 @@ static int _espi_flash_id_to_str(uint32_t flash_id,
 
 int espi_flash_get_id(lldev_t dev, subdev_t subdev, unsigned cfg_base, uint32_t *flash_id, char* outid, size_t maxstr)
 {
+    if (flash_id == NULL || outid == NULL || maxstr == 0)
+        return -EINVAL;
+
     outid[0] = 0;
 
     int res = _espi_flash_read_reg(dev, subdev, cfg_base, ESPI_CMD_RDID_1, 4, flash_id);
-    if (res || !outid)
+    if (res)
         return res;
 
     return _espi_flash_id_to_str(*flash_id, outid, maxstr);
@@ -376,5 +399,3 @@ int espi_flash_write(lldev_t dev, subdev_t subdev, unsigned cfg_base, unsigned c
 
 	return res;
 }
-
-

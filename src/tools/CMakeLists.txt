@@ -8,25 +8,27 @@ include_directories(../lib/port)
 include_directories(../lib/lowlevel)
 include_directories(../lib/xdsp)
 
+add_library(usdr_cli_parse STATIC cli_parse.c)
+
 add_executable(usdr_flash usdr_flash.c)
-target_link_libraries(usdr_flash usdr)
+target_link_libraries(usdr_flash usdr usdr_cli_parse)
 install(TARGETS usdr_flash RUNTIME)
 
 include_directories(../lib/models)
 
 add_executable(usdr_dm_create usdr_dm_create.c)
-target_link_libraries(usdr_dm_create usdr)
+target_link_libraries(usdr_dm_create usdr usdr_cli_parse)
 install(TARGETS usdr_dm_create RUNTIME)
 
 add_executable(usdr_dm_sensors usdr_dm_sensors.c)
-target_link_libraries(usdr_dm_sensors usdr)
+target_link_libraries(usdr_dm_sensors usdr usdr_cli_parse)
 install(TARGETS usdr_dm_sensors RUNTIME)
 
 add_executable(usdr_lml7_test lms7002_dm_limelight.c)
-target_link_libraries(usdr_lml7_test usdr)
+target_link_libraries(usdr_lml7_test usdr usdr_cli_parse)
 
 add_executable(usdr_dm_gpsdo usdr_dm_gpsdo.c)
-target_link_libraries(usdr_dm_gpsdo usdr)
+target_link_libraries(usdr_dm_gpsdo usdr usdr_cli_parse)
 install(TARGETS usdr_dm_gpsdo RUNTIME)
 
 list(APPEND WVLT_SCRIPTS

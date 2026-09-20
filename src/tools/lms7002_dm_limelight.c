@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <signal.h>
 #include <unistd.h>
 #include <math.h>
@@ -23,8 +24,27 @@
 #include "../common/ring_buffer.h"
 #include "sincos_functions.h"
 #include "fast_math.h"
+#include "cli_parse.h"
 
 #define LOG_TAG "LML7"
+
+#define LML7_CLI_OPTIONS(X) \
+    X(OPT_MEMCACHED, "memcached", 'M', no_argument, NULL, "Store captured data in memory before processing") \
+    X(OPT_ITERATIONS, "iterations", 'i', required_argument, "COUNT", "Maximum test iterations [10]") \
+    X(OPT_RATE, "rate", 'r', required_argument, "HZ", "Test sample rate [10e6]") \
+    X(OPT_STATISTICS, "statistics", 'j', required_argument, "LEVEL", "Statistics verbosity") \
+    X(OPT_DEVICE, "device", 'D', required_argument, "DEVICE", "Device parameters") \
+    X(OPT_TEST, "test", 't', required_argument, "NUMBER", "Run a specific test pattern") \
+    X(OPT_LOG_LEVEL, "log-level", 'l', required_argument, "LEVEL", "Logging level") \
+    X(OPT_DRY_RUN, "dry-run", 'd', no_argument, NULL, "Run without opening a device") \
+    X(OPT_DUMP_RX, "dump-rx", 'o', no_argument, NULL, "Write received samples to output files") \
+    X(OPT_HW_TX_RX, "hardware-tx-rx", 'z', no_argument, NULL, "Run hardware TX/RX LFSR tests") \
+    X(OPT_HW_TX, "hardware-tx", 'W', no_argument, NULL, "Run hardware TX tests") \
+    X(OPT_HW, "hardware", 'w', no_argument, NULL, "Run hardware tests") \
+    X(OPT_SOFTWARE_HW_TX, "software-hardware-tx", 'Z', no_argument, NULL, "Run software-to-hardware TX test") \
+    X(OPT_HELP, "help", 'h', no_argument, NULL, "Show this help and exit")
+
+CLI_DEFINE_OPTIONS(lml7, LML7_CLI_OPTIONS)
 
 #define MAX_CHS       2
 #define MAX_PATTERN   16384
@@ -936,50 +956,63 @@ int main(int argc, char** argv)
     bool dump_rx = false;
     int opt, res;
 
-    while ((opt = getopt(argc, argv, "Mi:r:j:D:t:l:dowWZz")) != -1) {
+    char short_options[3 * SIZEOF_ARRAY(lml7_long_options)];
+    res = cli_build_short_options(lml7_long_options, short_options, sizeof(short_options));
+    if (res) {
+        fprintf(stderr, "Unable to build short option list: %s\n", strerror(-res));
+        return 1;
+    }
+
+    while ((opt = getopt_long(argc, argv, short_options, lml7_long_options, NULL)) != -1) {
         switch (opt) {
-        case 'M':
+        case OPT_MEMCACHED:
             memcached = true;
             break;
-        case 'i':
-            maximum_iterations = atoi(optarg);
+        case OPT_ITERATIONS:
+            maximum_iterations = cli_parse_unsigned_or_exit("iterations", optarg);
             break;
-        case 'r':
-            specific_rate = atof(optarg);
+        case OPT_RATE:
+            specific_rate = cli_parse_double_or_exit("rate", optarg);
             break;
-        case 'j':
-            statistics = atoi(optarg);
+        case OPT_STATISTICS:
+            statistics = cli_parse_unsigned_or_exit("statistics", optarg);
             break;
-        case 'D':
+        case OPT_DEVICE:
             device_name = optarg;
             break;
-        case 't':
-            specific_test = atoi(optarg);
+        case OPT_TEST:
+            specific_test = cli_parse_unsigned_or_exit("test", optarg);
             break;
-        case 'l':
-            loglevel = atof(optarg);
+        case OPT_LOG_LEVEL:
+            loglevel = cli_parse_unsigned_or_exit("log-level", optarg);
             usdrlog_setlevel(NULL, loglevel);
             break;
-        case 'd':
+        case OPT_DRY_RUN:
             dry_run = true;
             break;
-        case 'o':
+        case OPT_DUMP_RX:
             dump_rx = true;
             break;
-        case 'z':
+        case OPT_HW_TX_RX:
             hwtxrx_tests = true;
             break;
-        case 'W':
+        case OPT_HW_TX:
             hwtx_tests = true;
             break;
-        case 'w':
+        case OPT_HW:
             hw_tests = true;
             break;
-        case 'Z':
+        case OPT_SOFTWARE_HW_TX:
             shwtx_tests = true;
             break;
+        case OPT_HELP:
+            cli_print_usage(stdout, argv[0], "[OPTIONS]",
+                            lml7_long_options, lml7_options_help);
+            return 0;
         default:
-            exit(EXIT_FAILURE);
+            cli_print_usage(stderr, argv[0], "[OPTIONS]",
+                            lml7_long_options, lml7_options_help);
+            return 1;
         }
     }
 
@@ -1019,7 +1052,6 @@ int main(int argc, char** argv)
     res = dry_run ? 0 : usdr_dmd_close(dev);
     return res;
 }
-
 
 
 
