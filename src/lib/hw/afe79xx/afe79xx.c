@@ -91,9 +91,9 @@ int afe79xx_create(lldev_t dev, unsigned subdev, unsigned lsaddr, unsigned chipT
     int res;
     const char* afe79xxlib =
 #ifdef _WIN32
-        "liblibcapi79xx.dll";
+        "libcapi79xx.dll";
 #else
-        "liblibcapi79xx.so";
+        USDR_DEFAULT_AFECAPI;
 #endif
     memset(out, 0, sizeof(*out));
     out->dev = dev;

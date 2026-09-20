@@ -29,6 +29,16 @@ message("DEP - ${USDR_DEPEND_TARGETS}")
 
 add_library(usdr SHARED ${USDR_LIBRARY_FILES})
 
+target_compile_definitions(usdr PRIVATE
+    USDR_DEFAULT_AFECFG_PATH="${CMAKE_INSTALL_FULL_DATADIR}/libcapi79xx/refs"
+)
+
+if(NOT WIN32)
+    target_compile_definitions(usdr PRIVATE
+        USDR_DEFAULT_AFECAPI="${CMAKE_INSTALL_FULL_LIBDIR}/usdr-plugins/libcapi79xx.so"
+    )
+endif()
+
 if (APPLE)
     set(USDR_PLATFORM_LIBS dl)
 elseif(NOT WIN32)
