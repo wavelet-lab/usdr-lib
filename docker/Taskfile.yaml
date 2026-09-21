@@ -52,6 +52,7 @@ tasks:
           /work/source/packaging/{{.PACKAGE_DIR_NAME}} \
           packaging/
       - ln -s packaging/{{.PACKAGE_DIR_NAME}} debian
+      - cp LICENSE debian/copyright
       - packaging/generate-debian-control.sh {{.PACKAGE_DIR_NAME}} debian/control
       - packaging/generate-debian-changelog.sh src/Changelog.txt {{.PACKAGE_CODENAME}} {{.PACKAGE_DISTRIBUTION}} debian/changelog
 
