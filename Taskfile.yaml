@@ -8,6 +8,12 @@ includes:
 
 tasks:
 
+  packages:
+    desc: Interactively build distribution packages
+    interactive: true
+    cmds:
+      - ./build-packages.sh
+
   clean:
     desc: Clean the build environment
     cmds:

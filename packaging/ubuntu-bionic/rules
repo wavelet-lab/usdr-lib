@@ -7,7 +7,7 @@ include /usr/share/dpkg/default.mk
 
 
 override_dh_auto_configure:
-	dh_auto_configure
+	dh_auto_configure -- -DENABLE_AVX512=OFF
 
 	# Generate the DKMS install files
 	sed 's/#MODULE_VERSION#/$(DEB_VERSION_UPSTREAM)/g' debian/usdr-dkms.install.template > debian/usdr-dkms.install
@@ -19,7 +19,7 @@ override_dh_auto_configure:
 
 
 override_dh_auto_build:
-	cd "obj-$(DEB_TARGET_GNU_TYPE)" && make
+	dh_auto_build
 
 
 override_dh_auto_install:
@@ -27,4 +27,3 @@ override_dh_auto_install:
 
 
 override_dh_missing:
-

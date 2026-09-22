@@ -1685,9 +1685,10 @@ static int usdr_probe(struct pci_dev *pdev,
 	//	pci_write_config_byte(tbridge, 0x928, 0x00);
 	}
 
-	/* Reconfigure MaxReadReq to 4KB */
-	//pcie_capability_clear_and_set_word(pdev, PCI_EXP_DEVCTL,
-	//				   PCI_EXP_DEVCTL_READRQ, PCI_EXP_DEVCTL_READRQ_4096B);
+	/* Reconfigure MaxReadReq to 1KB */
+	/* TODO: Required only for older firmware; remove when it is no longer supported */
+	pcie_capability_clear_and_set_word(pdev, PCI_EXP_DEVCTL,
+					   PCI_EXP_DEVCTL_READRQ, PCI_EXP_DEVCTL_READRQ_1024B);
 
 	//dma_set_mask_and_coherent
 	if (dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32))) {

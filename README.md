@@ -4,7 +4,7 @@ uSDR software libraries, driver and utilities
 
 ## Installation from packages
 
-### Ubuntu 20.04, 22.04, 24.04
+### Ubuntu 20.04, 22.04, 24.04, 26.04
 
 #### Add the repository
 
@@ -60,6 +60,18 @@ sudo dpkg -i *.deb
 
 ## Build from source
 
+### Interactive package build
+
+Install the terminal UI dependency and run the package selector:
+
+```shell
+sudo apt install whiptail
+task packages
+```
+
+The resulting packages are saved under `output/<distribution>-<architecture>/`.
+Build logs are saved under `output/logs/`.
+
 #### Clone the repository
 
 ```shell
@@ -88,11 +100,11 @@ update-alternatives --install /usr/bin/cmake cmake /usr/local/bin/cmake 10
 # Install Python3.8
 apt-get install python3.8 python3.8-distutils -y
 update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 10
-curl https://bootstrap.pypa.io/get-pip.py | python3.8
+curl -fsSL https://bootstrap.pypa.io/pip/3.8/get-pip.py | python3.8
 python3.8 -m pip install pyyaml
 ```
 
-##### Ubuntu 20.04, 22.04, 24.04, Debian 12
+##### Ubuntu 20.04, 22.04, 24.04, 26.04, Debian 12
 
 ```shell
 sudo apt install build-essential cmake python3 python3-venv python3-yaml dwarves -y
@@ -155,4 +167,3 @@ cmake --build .
 ```
 
 If `find_package` fails, ensure the file `usdrConfig.cmake` is installed under `<install-prefix>/lib/cmake/usdr/` (or the corresponding `libdir/cmake/usdr` for your system) and pass that prefix via `CMAKE_PREFIX_PATH`.
-

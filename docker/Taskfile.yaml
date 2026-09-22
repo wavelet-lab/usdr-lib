@@ -7,6 +7,10 @@ vars:
     sh: "echo $PACKAGE_ARCH_NAME"
   OUTPUT_DIR_NAME:
     sh: "echo $PACKAGE_DIR_NAME-$PACKAGE_ARCH_NAME"
+  PACKAGE_CODENAME:
+    sh: "printf '%s\n' \"$PACKAGE_DIR_NAME\" | cut -d- -f2-"
+  PACKAGE_DISTRIBUTION:
+    sh: "if [ \"$PACKAGE_DIR_NAME\" = debian-bookworm ]; then echo stable; else printf '%s\n' \"$PACKAGE_DIR_NAME\" | cut -d- -f2-; fi"
 
 tasks:
 
@@ -22,7 +26,7 @@ tasks:
     cmds:
       - rm -rf /work/build
       - rm -rf /work/output/{{.OUTPUT_DIR_NAME}}
-      - mkdir -p /work/build
+      - mkdir -p /work/build/source
       - mkdir -p /work/output/{{.OUTPUT_DIR_NAME}}
 
   prepare:
@@ -33,8 +37,24 @@ tasks:
       - test -d /work/source
     dir: /work/build/source
     cmds:
-      - cp -ra /work/source /work/build/
+      - |
+        cp -a \
+          /work/source/src \
+          /work/source/LICENSE \
+          /work/source/README.md \
+          .
+        mkdir -p packaging
+        cp -a \
+          /work/source/packaging/control-packages \
+          /work/source/packaging/generate-debian-changelog.sh \
+          /work/source/packaging/generate-debian-control.sh \
+          /work/source/packaging/package-metadata \
+          /work/source/packaging/{{.PACKAGE_DIR_NAME}} \
+          packaging/
       - ln -s packaging/{{.PACKAGE_DIR_NAME}} debian
+      - cp LICENSE debian/copyright
+      - packaging/generate-debian-control.sh {{.PACKAGE_DIR_NAME}} debian/control
+      - packaging/generate-debian-changelog.sh src/Changelog.txt {{.PACKAGE_CODENAME}} {{.PACKAGE_DISTRIBUTION}} debian/changelog
 
   deb:
     desc: Build the debian packages
@@ -44,7 +64,7 @@ tasks:
     cmds:
       - echo "#!/usr/bin/env sh" > /usr/bin/lintian # dirty hack to disable lintian
       - echo "exit 0" >> /usr/bin/lintian
-      - debuild -us -uc -eDH_VERBOSE=1
+      - DH_VERBOSE=1 debuild -us -uc
       - cp -ra /work/build/*.deb /work/output/{{.OUTPUT_DIR_NAME}}/
 
   ppa:

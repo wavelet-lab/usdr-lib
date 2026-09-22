@@ -1,7 +1,21 @@
-Release 0.9.10b (2025-06-26)
+Release 1.0.0 (2026-09-21)
 ==========================
 
-- Fixes and improvements
+- Added PE Sync support with configurable DPLL, SYSREF, reference-clock distribution, and synchronization workflows.
+- Added support for USDR Pro, Hiper v2, XMASS, PCIe FE, multi-channel external front ends, and updated DSDR/SSDR hardware revisions.
+- Added drivers and configuration support for LMX1204, LMX1205, LMX1214, LMX2820, LMK1D1208I, TMP114, TCA9555, AT24, and other board components.
+- Expanded DSDR and streaming support with 3-, 6-, and 8-channel DSP layouts, channel mapping, and improved RX/TX DMA handling.
+- Added generic, AVX2, and AVX-512 DSP conversions for 12-bit and multi-channel sample formats, FFT window processing, and chirp generation.
+- Improved SIMD conversion safety for unaligned buffers and added an option to disable AVX-512 for compatibility with older build environments.
+- Expanded the SoapySDR API with antenna selection, rate enumeration, calibration controls, hardware discovery improvements, and HIL tests.
+- Improved LMS7002M/LMS8001 tuning, LML and MMCM setup, RX/TX IQ imbalance calibration, TX LO calibration, and extended-frequency operation.
+- Added Python bindings and FFT RX/TX examples, plus GPSDO, firmware update, flash-management, and device-control utility improvements.
+- Added CMake package exports and pkg-config metadata to simplify integration with downstream applications.
+- Improved portability across Linux, macOS, Windows, and WebAssembly, including portable threading, allocation, dynamic-library, and filename-matching APIs.
+- Improved PCIe driver compatibility with newer and enterprise kernels, DMA boundary handling, delayed-event metadata, probing, and diagnostic output.
+- Added firmware image validation and safer flash operations, including CRC checks, duplicate-image detection, readback limits, and optional master-image blanking.
+- Added reproducible Debian package builds for Debian 12 and Ubuntu 18.04 through 26.04 on AMD64 and AArch64, with centralized package metadata and changelog generation.
+- Fixed numerous device initialization, calibration, streaming, logging, build-system, and cross-platform compatibility issues.
 
 Release 0.9.9 (2025-01-30)
 ==========================

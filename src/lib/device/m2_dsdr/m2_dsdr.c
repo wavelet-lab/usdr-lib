@@ -2432,7 +2432,10 @@ int usdr_device_m2_dsdr_initialize(pdevice_t udev, unsigned pcount, const char**
         res = res ? res : usleep(100000);
 
         char afeconfig_path[1024];
-        char *afecfgpath = getenv("AFECFG_PATH");
+        const char *afecfgpath = getenv("AFECFG_PATH");
+        if (!afecfgpath) {
+            afecfgpath = USDR_DEFAULT_AFECFG_PATH;
+        }
         snprintf(afeconfig_path, sizeof(afeconfig_path) - 1, "%s/%s", (afecfgpath) ? afecfgpath : "", d->afecongiguration);
 
         USDR_LOG("DSDR", USDR_LOG_ERROR, "Initializing config `%s` for AFE...\n", afeconfig_path);

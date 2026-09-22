@@ -20,7 +20,7 @@ tasks:
         - name: OS
           enum: [ 'ubuntu', 'debian' ]
         - name: DISTRO_NAME
-          enum: [ 'bookworm', 'bionic', 'focal', 'jammy', 'noble' ]
+          enum: [ 'bookworm', 'bionic', 'focal', 'jammy', 'noble', 'resolute' ]
         - name: ARCH
           enum: [ 'amd64', 'aarch64' ]
         - COMMAND
@@ -31,11 +31,13 @@ tasks:
       COMMAND: '{{.COMMAND}}'
       CONTAINER_NAME: '{{.DOCKER_IMAGE}}-{{.NOW}}'
     cmds:
+      - mkdir -p output
       - docker build --platform {{.PLATFORM}} -t {{.DOCKER_IMAGE}} -f {{.DOCKER_FILE}} --label {{.LABEL}}=true .
-      - docker run --platform {{.PLATFORM}} -d --rm -v $(pwd):/work/source:ro -v $(pwd)/output:/work/output -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml:ro -v ~/.gnupg:/mnt/gnupg:ro -e PACKAGE_ARCH_NAME={{.ARCH}} --name {{.CONTAINER_NAME}} {{.DOCKER_IMAGE}}
-      - silent: true
-        cmd: |
-          docker exec -ti {{.CONTAINER_NAME}} {{.COMMAND}}
+      - |
+          if [ "{{.OS}}-{{.DISTRO_NAME}}-{{.ARCH}}" = "ubuntu-resolute-aarch64" ]; then
+            docker/ensure-resolute-arm64-binfmt.sh "{{.DOCKER_IMAGE}}"
+          fi
+      - docker run --platform {{.PLATFORM}} --init --rm -it -v $(pwd):/work/source:ro -v $(pwd)/output:/work/output -v $(pwd)/docker/Taskfile.yaml:/Taskfile.yaml:ro -v ~/.gnupg:/mnt/gnupg:ro -e PACKAGE_ARCH_NAME={{.ARCH}} --name {{.CONTAINER_NAME}} {{.DOCKER_IMAGE}} {{.COMMAND}}
 
   '*-*-*-deb':
     desc: Build the debian packages
