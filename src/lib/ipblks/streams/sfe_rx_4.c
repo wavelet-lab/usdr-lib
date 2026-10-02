@@ -633,8 +633,12 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     }
     const channel_info_t* newmap = (pack_3x16) ? &pack_3x16_mmap : newmap_orig;
 
+    const bool is_tx = fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0 ||
+                       fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_2 ||
+                       fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_8;
+
     // For TX we need invert in and out
-    if (fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0 || fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_2 || fe->cfg_fecore_id == CORE_EXFETX_DMA32_R0_8) {
+    if (is_tx) {
         memset(reverse_map.ch_map, ~CH_SWAP_IQ_FLAG, sizeof(reverse_map.ch_map));
 
         for (unsigned g = 0; g < fe->cfg_raw_chans; g++) {
@@ -670,21 +674,25 @@ int exfe_trx4_update_chmap(const sfe_cfg_t* fe,
     for (unsigned g = 0; g < fe->cfg_raw_chans; g = g + total_chan_num) {
         for (unsigned f = 0; f < total_chan_num; f++) {
             unsigned swp_msk = (g + f);
+            // TX reverse_map is indexed by physical output, including outputs
+            // beyond the active stream width (e.g. C/D in a two-channel stream).
+            // RX repeats the selected inputs for each group of stream samples.
+            unsigned map_idx = is_tx ? g + f : f;
 
             if (complex) {
-                if (newmap->ch_map[f / 2] == 0xff) {
+                if (newmap->ch_map[map_idx / 2] == 0xff) {
                     chmap_o[g + f] = g + f;
                 } else {
-                unsigned swap_iq = (newmap->ch_map[f / 2] & CH_SWAP_IQ_FLAG) ? 1 : 0;
-                    unsigned channel = newmap->ch_map[f / 2] & ~CH_SWAP_IQ_FLAG;
+                unsigned swap_iq = (newmap->ch_map[map_idx / 2] & CH_SWAP_IQ_FLAG) ? 1 : 0;
+                    unsigned channel = newmap->ch_map[map_idx / 2] & ~CH_SWAP_IQ_FLAG;
                 flag_swap_iq[g + f] = swap_iq;
                     chmap_o[g + f] = (2 * (channel & msk) + ((f % 2) ^ swap_iq));
                 }
             } else  {
-                if (newmap->ch_map[f] == 0xff) {
+                if (newmap->ch_map[map_idx] == 0xff) {
                     chmap_o[g + f] = g + f;
                 } else {
-                    unsigned channel = newmap->ch_map[f] & ~CH_SWAP_IQ_FLAG;
+                    unsigned channel = newmap->ch_map[map_idx] & ~CH_SWAP_IQ_FLAG;
                     chmap_o[g + f] = (channel & msk);
                 }
             }
