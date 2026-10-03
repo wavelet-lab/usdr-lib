@@ -315,8 +315,8 @@ Suite * rtsa_suite(void)
     Suite* s = suite_create("xfft_rtsa_functions");
 
     ADD_REGRESS_TEST(s, rtsa_check);
-    //ADD_PERF_LOOP_TEST(s, rtsa_speed, 300, 0, 4);
-    ADD_PERF_LOOP_TEST(s, rtsa_speed_u16, 300, 0, 4);
+    ADD_PERF_LOOP_TEST(s, rtsa_speed, 300, 0, 4);
+    //ADD_PERF_LOOP_TEST(s, rtsa_speed_u16, 300, 0, 4);
 
     return s;
 }

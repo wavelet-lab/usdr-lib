@@ -29,7 +29,7 @@ void TEMPLATE_FUNC_NAME(uint16_t* __restrict in, unsigned fft_size,
         float p = scale * (float)in[i - diap.from] + corr;
 
         p -= st->upper_pwr_bound;
-        p = fabs(p);
+        p = (p > 0.f) ? 0.f : -p;
         p *= st->divs_for_dB;
         if(p > (float)(rtsa_depth - 1) - 0.5f) p = (float)(rtsa_depth - 1) - 0.5f;
 

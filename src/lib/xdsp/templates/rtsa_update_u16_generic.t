@@ -30,7 +30,7 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         float p = fcale_mpy * wvlt_log2f_fn(in[k][0]*in[k][0] + in[k][1]*in[k][1] + mine) + corr;
 
         p -= st->upper_pwr_bound;
-        p = fabs(p);
+        p = (p > 0.f) ? 0.f : -p;
         p *= st->divs_for_dB;
         if(p > (float)(rtsa_depth - 1) - 0.5f) p = (float)(rtsa_depth - 1) - 0.5f;
 

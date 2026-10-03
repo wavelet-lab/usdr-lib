@@ -102,13 +102,15 @@ void TEMPLATE_FUNC_NAME(wvlt_fftwf_complex* __restrict in, unsigned fft_size,
         __m256 pwr0 = _mm256_fmadd_ps(l2_res0, v_scale_mpy, v_corr);
         __m256 pwr1 = _mm256_fmadd_ps(l2_res1, v_scale_mpy, v_corr);
 
-        // drop sign
-        //
-        __m256 p0 = _mm256_andnot_ps(sign_bit, pwr0);
-        __m256 p1 = _mm256_andnot_ps(sign_bit, pwr1);
+        // zero-mask positives (all in-bound points are negative)
+        __m256 negmask0 = _mm256_castsi256_ps(_mm256_srai_epi32(_mm256_castps_si256(pwr0), 31));
+        __m256 negmask1 = _mm256_castsi256_ps(_mm256_srai_epi32(_mm256_castps_si256(pwr1), 31));
+
+        // zero OOB points (positives) & inverse sign
+        __m256 p0 = _mm256_xor_ps(_mm256_and_ps(pwr0, negmask0), sign_bit);
+        __m256 p1 = _mm256_xor_ps(_mm256_and_ps(pwr1, negmask1), sign_bit);
 
         // normalize
-        //
         __m256 pn0 = _mm256_min_ps(p0, max_ind);
         __m256 pn1 = _mm256_min_ps(p1, max_ind);
 
