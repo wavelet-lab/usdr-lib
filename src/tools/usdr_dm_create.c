@@ -38,7 +38,7 @@
     X(OPT_TX_FILES, "tx-files", 'I', required_argument, "FILES", "TX input file or colon-separated file list") \
     X(OPT_TX_FILE_CYCLE, "tx-file-cycle", 'o', no_argument, NULL, "Cycle TX input files") \
     X(OPT_COUNT, "count", 'c', required_argument, "COUNT", "Number of blocks [128]") \
-    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "HZ", "Sample rate [50e6]") \
+    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS", "Sample rate [50e6 samples/s]") \
     X(OPT_RX_FORMAT, "rx-format", 'F', required_argument, "FORMAT", "RX format: ci16, cf32, ci16@ci12 or cf32@ci12 [ci16]") \
     X(OPT_TX_FORMAT, "tx-format", 'i', required_argument, "FORMAT", "TX format: ci16, cf32, ci16@ci12 or cf32@ci12 [ci16]") \
     X(OPT_RX_CHANNELS, "rx-channels", 'C', required_argument, "MASK|:NAMES", "RX numeric mask or comma-separated names, e.g. ':A,B' [autodetect]") \
@@ -48,14 +48,14 @@
     X(OPT_TX_ONLY, "tx-only", 't', no_argument, NULL, "Enable TX-only mode") \
     X(OPT_TX_RX, "tx-rx", 'T', no_argument, NULL, "Enable simultaneous TX and RX") \
     X(OPT_NO_TIMESTAMPS, "no-timestamps", 'N', no_argument, NULL, "Disable TX timestamps") \
-    X(OPT_LUT, "lut", 'J', no_argument, NULL, "Use the fast samp/3 sine LUT") \
+    X(OPT_LUT, "lut", 'J', no_argument, NULL, "Use the fast sample sine LUT") \
     X(OPT_RX_BB_FREQUENCY, "rx-bb-frequency", 'v', required_argument, "HZ", "RX baseband frequency") \
     X(OPT_TX_BB_FREQUENCY, "tx-bb-frequency", 'V', required_argument, "HZ", "TX baseband frequency") \
-    X(OPT_TDD_FREQUENCY, "tdd-frequency", 'q', required_argument, "HZ", "TDD frequency [910e6]") \
-    X(OPT_RX_FREQUENCY, "rx-frequency", 'e', required_argument, "HZ", "RX frequency [900e6]") \
-    X(OPT_TX_FREQUENCY, "tx-frequency", 'E', required_argument, "HZ", "TX frequency [920e6]") \
-    X(OPT_RX_BANDWIDTH, "rx-bandwidth", 'w', required_argument, "HZ", "RX bandwidth [1e6]") \
-    X(OPT_TX_BANDWIDTH, "tx-bandwidth", 'W', required_argument, "HZ", "TX bandwidth [1e6]") \
+    X(OPT_TDD_FREQUENCY, "tdd-frequency", 'q', required_argument, "HZ", "TDD frequency [910e6 Hz]") \
+    X(OPT_RX_FREQUENCY, "rx-frequency", 'e', required_argument, "HZ", "RX frequency [900e6 Hz]") \
+    X(OPT_TX_FREQUENCY, "tx-frequency", 'E', required_argument, "HZ", "TX frequency [920e6 Hz]") \
+    X(OPT_RX_BANDWIDTH, "rx-bandwidth", 'w', required_argument, "HZ", "RX bandwidth [1e6 Hz]") \
+    X(OPT_TX_BANDWIDTH, "tx-bandwidth", 'W', required_argument, "HZ", "TX bandwidth [1e6 Hz]") \
     X(OPT_RX_GAIN_LNA, "rx-gain-lna", 'y', required_argument, "GAIN", "RX LNA gain [15]") \
     X(OPT_RX_GAIN_PGA, "rx-gain-pga", 'u', required_argument, "GAIN", "RX PGA gain [15]") \
     X(OPT_RX_GAIN_VGA, "rx-gain-vga", 'U', required_argument, "GAIN", "RX VGA gain [15]") \
@@ -774,35 +774,35 @@ int main(UNUSED int argc, UNUSED char** argv)
         switch (opt) {
         //BB frequency RX
         case OPT_RX_BB_FREQUENCY:
-            freq_bb_rx = cli_parse_double_or_exit("rx-bb-frequency", optarg);
+            freq_bb_rx = cli_parse_si_double_or_exit("rx-bb-frequency", optarg);
             break;
         //BB frequency TX
         case OPT_TX_BB_FREQUENCY:
-            freq_bb_tx = cli_parse_double_or_exit("tx-bb-frequency", optarg);
+            freq_bb_tx = cli_parse_si_double_or_exit("tx-bb-frequency", optarg);
             break;
         //Time-division duplexing (TDD) frequency
         case OPT_TDD_FREQUENCY:
-            dev_data[DD_TDD_FREQ].value = cli_parse_double_or_exit("tdd-frequency", optarg);
+            dev_data[DD_TDD_FREQ].value = cli_parse_si_double_or_exit("tdd-frequency", optarg);
             dev_data[DD_TDD_FREQ].ignore = false;
             break;
         //RX frequency
         case OPT_RX_FREQUENCY:
-            dev_data[DD_RX_FREQ].value = cli_parse_double_or_exit("rx-frequency", optarg);
+            dev_data[DD_RX_FREQ].value = cli_parse_si_double_or_exit("rx-frequency", optarg);
             dev_data[DD_RX_FREQ].ignore = false;
             break;
         //TX frequency
         case OPT_TX_FREQUENCY:
-            dev_data[DD_TX_FREQ].value = cli_parse_double_or_exit("tx-frequency", optarg);
+            dev_data[DD_TX_FREQ].value = cli_parse_si_double_or_exit("tx-frequency", optarg);
             dev_data[DD_TX_FREQ].ignore = false;
             break;
         //RX bandwidth
         case OPT_RX_BANDWIDTH:
-            dev_data[DD_RX_BANDWIDTH].value = cli_parse_double_or_exit("rx-bandwidth", optarg);
+            dev_data[DD_RX_BANDWIDTH].value = cli_parse_si_double_or_exit("rx-bandwidth", optarg);
             dev_data[DD_RX_BANDWIDTH].ignore = false;
             break;
         //TX bandwidth
         case OPT_TX_BANDWIDTH:
-            dev_data[DD_TX_BANDWIDTH].value = cli_parse_double_or_exit("tx-bandwidth", optarg);
+            dev_data[DD_TX_BANDWIDTH].value = cli_parse_si_double_or_exit("tx-bandwidth", optarg);
             dev_data[DD_TX_BANDWIDTH].ignore = false;
             break;
         //RX LNA gain
@@ -857,14 +857,14 @@ int main(UNUSED int argc, UNUSED char** argv)
         //Reference clock (in Hz). Ignored when internal clocking is selected.
         //If omitted, the default internal ref clock will be used (26MHz typically)
         case OPT_REFCLK_FREQUENCY:
-            fref = cli_parse_u64_or_exit("refclk-frequency", optarg);
+            fref = cli_parse_si_u64_or_exit("refclk-frequency", optarg);
             break;
         case OPT_TX_PRECHARGE:
             tx_pkt_precharge = atoi(optarg);
             break;
         //Calibration frequency
         case OPT_CALIBRATION_FREQUENCY:
-            cal_freq = cli_parse_unsigned_or_exit("calibration-frequency", optarg);
+            cal_freq = cli_parse_si_unsigned_or_exit("calibration-frequency", optarg);
             break;
         //Sync type ([all]|1pps|rx|tx|any|none|off)
         case OPT_SYNC:
@@ -932,7 +932,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             break;
         //Sample rate
         case OPT_SAMPLE_RATE:
-            rate = cli_parse_unsigned_or_exit("sample-rate", optarg);
+            rate = cli_parse_si_unsigned_or_exit("sample-rate", optarg);
             if (rate == 0) {
                 fprintf(stderr, "Sample rate must be greater than zero\n");
                 return 1;
@@ -1092,10 +1092,12 @@ int main(UNUSED int argc, UNUSED char** argv)
             usdrlog_disablecolorize(NULL);
             cli_print_usage(stdout, argv[0], "[OPTIONS]",
                             dm_create_long_options, dm_create_options_help);
+            cli_print_si_help(stdout);
             exit(EXIT_SUCCESS);
         default:
             cli_print_usage(stderr, argv[0], "[OPTIONS]",
                             dm_create_long_options, dm_create_options_help);
+            cli_print_si_help(stderr);
             exit(EXIT_FAILURE);
         }
     }

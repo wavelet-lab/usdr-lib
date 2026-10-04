@@ -34,6 +34,18 @@ static void destroy_device(void)
     }
 }
 
+static bool flash_region_is_erased(const void* data, size_t size)
+{
+    const unsigned char* bytes = data;
+
+    for (size_t i = 0; i < size; i++) {
+        if (bytes[i] != 0xff)
+            return false;
+    }
+
+    return true;
+}
+
 #define FLASH_CLI_OPTIONS(X) \
     X(OPT_DEVICE, "device", 'U', required_argument, "DEVICE", "Device bus or connection string") \
     X(OPT_LOG_LEVEL, "log-level", 'l', required_argument, "LEVEL", "Logging level") \
@@ -249,8 +261,13 @@ int main(int argc, char** argv)
         fprintf(stderr, "It looks like the FPGA G image is corrupted! res=%d\n", res);
         return 4;
     }
-    res = (no_device) ? 0 : xlnx_btstrm_parse_header_ex((const uint32_t* )(outb + 256), 256/4, &image_master, XLNX_BSTRM_ALLOW_CROP);
-    if (res) {
+    bool master_is_erased = !no_device && flash_region_is_erased(outb + 256, 256);
+    res = (no_device || master_is_erased) ? 0 :
+            xlnx_btstrm_parse_header_ex((const uint32_t* )(outb + 256), 256/4,
+                                        &image_master, XLNX_BSTRM_ALLOW_CROP);
+    if (master_is_erased) {
+        fprintf(stderr, "Master image is not programmed.\n");
+    } else if (res) {
         fprintf(stderr, "It looks like the FPGA M image is corrupted! res=%d\n", res);
     } else {
         mp = true;
@@ -462,6 +479,24 @@ int main(int argc, char** argv)
         if (res) {
             fprintf(stderr, "Failed to readback! res=%d", res);
             return 4;
+        }
+        if (rdwr == ACTION_READBACK && !readback_size) {
+            unsigned image_words;
+            xlnx_image_params_t readback_image;
+
+            res = xlnx_btstrm_parse_image_ex((const uint32_t*)outb, total_length / 4,
+                                              &readback_image,
+                                              XLNX_BSTRM_PARSE_F_CRC_CHECK |
+                                              XLNX_BSTRM_ALLOW_ERASED_TAIL,
+                                              &image_words);
+            if (res == 0) {
+                total_length = image_words * 4;
+                fprintf(stderr, "Detected image size: %u bytes.\n", total_length);
+            } else {
+                fprintf(stderr,
+                        "Unable to determine image size (res=%d); saving the full partition.\n",
+                        res);
+            }
         }
     }
 

@@ -14,7 +14,7 @@
  *
  * #define APP_CLI_OPTIONS(X) \
  *     X(OPT_HELP, "help", 'h', no_argument, NULL, "Show this help") \
- *     X(OPT_RATE, "sample-rate", 'r', required_argument, "HZ", \
+ *     X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS", \
  *       "Set the sample rate") \
  *     X(OPT_FOO, "foo", 256, optional_argument, "VALUE", \
  *       "A long-only option")
@@ -56,11 +56,21 @@ unsigned cli_parse_unsigned_or_exit(const char* option, const char* value);
 uint64_t cli_parse_u64_or_exit(const char* option, const char* value);
 double cli_parse_double_or_exit(const char* option, const char* value);
 
+/*
+ * Parse decimal/scientific values with optional case-insensitive k, m or g
+ * multipliers. A trailing "Hz" is also accepted, e.g. 4e6, 4M and 4MHz.
+ * Lowercase 'm' intentionally means mega for convenient frequency input.
+ */
+double cli_parse_si_double_or_exit(const char* option, const char* value);
+unsigned cli_parse_si_unsigned_or_exit(const char* option, const char* value);
+uint64_t cli_parse_si_u64_or_exit(const char* option, const char* value);
+
 int cli_build_short_options(const struct option* long_options,
                             char* short_options, size_t short_options_size);
 
 void cli_print_usage(FILE* stream, const char* program, const char* synopsis,
                      const struct option* long_options,
                      const struct cli_option_help* options_help);
+void cli_print_si_help(FILE* stream);
 
 #endif

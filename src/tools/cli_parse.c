@@ -56,6 +56,72 @@ double cli_parse_double_or_exit(const char* option, const char* value)
     return parsed;
 }
 
+static double cli_parse_si_value_or_exit(const char* option, const char* value)
+{
+    char* end;
+    double parsed;
+    double multiplier = 1.0;
+
+    errno = 0;
+    parsed = strtod(value, &end);
+    if (errno || end == value || !isfinite(parsed))
+        cli_invalid_value(option, value);
+
+    if (*end != '\0') {
+        switch (tolower((unsigned char)*end)) {
+        case 'k':
+            multiplier = 1e3;
+            end++;
+            break;
+        case 'm':
+            multiplier = 1e6;
+            end++;
+            break;
+        case 'g':
+            multiplier = 1e9;
+            end++;
+            break;
+        default:
+            break;
+        }
+
+        if (tolower((unsigned char)end[0]) == 'h' &&
+            tolower((unsigned char)end[1]) == 'z')
+            end += 2;
+    }
+
+    parsed *= multiplier;
+    if (*end != '\0' || !isfinite(parsed))
+        cli_invalid_value(option, value);
+
+    return parsed;
+}
+
+double cli_parse_si_double_or_exit(const char* option, const char* value)
+{
+    return cli_parse_si_value_or_exit(option, value);
+}
+
+unsigned cli_parse_si_unsigned_or_exit(const char* option, const char* value)
+{
+    double parsed = cli_parse_si_value_or_exit(option, value);
+
+    if (parsed < 0 || parsed > UINT_MAX || floor(parsed) != parsed)
+        cli_invalid_value(option, value);
+
+    return (unsigned)parsed;
+}
+
+uint64_t cli_parse_si_u64_or_exit(const char* option, const char* value)
+{
+    double parsed = cli_parse_si_value_or_exit(option, value);
+
+    if (parsed < 0 || parsed >= 18446744073709551616.0 || floor(parsed) != parsed)
+        cli_invalid_value(option, value);
+
+    return (uint64_t)parsed;
+}
+
 int cli_build_short_options(const struct option* long_options,
                             char* short_options, size_t short_options_size)
 {
@@ -141,4 +207,15 @@ void cli_print_usage(FILE* stream, const char* program, const char* synopsis,
         fprintf(stream, "  %-36s %s\n", option_text,
                 help->description ? help->description : "");
     }
+}
+
+void cli_print_si_help(FILE* stream)
+{
+    if (stream == NULL)
+        return;
+
+    fprintf(stream,
+            "\nNumeric frequency, bandwidth and rate values:\n"
+            "  Scientific notation and case-insensitive k/m/g multipliers are supported.\n"
+            "  Examples: 4e6, 4M, 4MHz, 100k, 2.4G, 2.4GHz.\n");
 }

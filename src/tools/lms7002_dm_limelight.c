@@ -31,7 +31,7 @@
 #define LML7_CLI_OPTIONS(X) \
     X(OPT_MEMCACHED, "memcached", 'M', no_argument, NULL, "Store captured data in memory before processing") \
     X(OPT_ITERATIONS, "iterations", 'i', required_argument, "COUNT", "Maximum test iterations [10]") \
-    X(OPT_RATE, "rate", 'r', required_argument, "HZ", "Test sample rate [10e6]") \
+    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS", "Test sample rate [10e6 samples/s]") \
     X(OPT_STATISTICS, "statistics", 'j', required_argument, "LEVEL", "Statistics verbosity") \
     X(OPT_DEVICE, "device", 'D', required_argument, "DEVICE", "Device parameters") \
     X(OPT_TEST, "test", 't', required_argument, "NUMBER", "Run a specific test pattern") \
@@ -971,8 +971,8 @@ int main(int argc, char** argv)
         case OPT_ITERATIONS:
             maximum_iterations = cli_parse_unsigned_or_exit("iterations", optarg);
             break;
-        case OPT_RATE:
-            specific_rate = cli_parse_double_or_exit("rate", optarg);
+        case OPT_SAMPLE_RATE:
+            specific_rate = cli_parse_si_double_or_exit("sample-rate", optarg);
             break;
         case OPT_STATISTICS:
             statistics = cli_parse_unsigned_or_exit("statistics", optarg);
@@ -1008,10 +1008,12 @@ int main(int argc, char** argv)
         case OPT_HELP:
             cli_print_usage(stdout, argv[0], "[OPTIONS]",
                             lml7_long_options, lml7_options_help);
+            cli_print_si_help(stdout);
             return 0;
         default:
             cli_print_usage(stderr, argv[0], "[OPTIONS]",
                             lml7_long_options, lml7_options_help);
+            cli_print_si_help(stderr);
             return 1;
         }
     }
@@ -1052,8 +1054,6 @@ int main(int argc, char** argv)
     res = dry_run ? 0 : usdr_dmd_close(dev);
     return res;
 }
-
-
 
 
 

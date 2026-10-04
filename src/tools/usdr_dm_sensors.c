@@ -25,7 +25,7 @@
     X(OPT_LOG_LEVEL, "log-level", 'l', required_argument, "LEVEL", "Logging level") \
     X(OPT_SENSORS, "sensors", 's', required_argument, "PATHS", "Semicolon-separated sensor paths") \
     X(OPT_SET, "set", 'S', required_argument, "VALUE", "Set the first sensor to an unsigned value") \
-    X(OPT_RATE, "rate", 'r', required_argument, "RATE", "Set the device sample rate") \
+    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS", "Set the device sample rate") \
     X(OPT_COUNT, "count", 'c', required_argument, "COUNT", "Maximum number of samples [1]") \
     X(OPT_TYPE, "type", 't', required_argument, "TYPE", "Output type: raw, temp or clock [raw]") \
     X(OPT_LIST, "list", 'L', required_argument, "PATTERN", "List device parameters matching a pattern") \
@@ -100,9 +100,9 @@ int main(UNUSED int argc, UNUSED char** argv)
             set = true;
             set_val = atoi(optarg);
             break;
-        case OPT_RATE:
+        case OPT_SAMPLE_RATE:
             rate = true;
-            rate_val = atof(optarg);
+            rate_val = cli_parse_si_unsigned_or_exit("sample-rate", optarg);
             break;
         case OPT_COUNT:
             count = atoi(optarg);
@@ -113,10 +113,12 @@ int main(UNUSED int argc, UNUSED char** argv)
         case OPT_HELP:
             cli_print_usage(stdout, argv[0], "[OPTIONS]",
                             sensors_long_options, sensors_options_help);
+            cli_print_si_help(stdout);
             return 0;
         default:
             cli_print_usage(stderr, argv[0], "[OPTIONS]",
                             sensors_long_options, sensors_options_help);
+            cli_print_si_help(stderr);
             return 1;
         }
     }

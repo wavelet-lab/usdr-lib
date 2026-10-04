@@ -34,7 +34,7 @@
 #define GPSDO_CLI_OPTIONS(X) \
     X(OPT_DEVICE, "device", 'd', required_argument, "DEVICE", "Device parameters") \
     X(OPT_OSCILLATOR_FREQUENCY, "oscillator-frequency", 'o', required_argument, "HZ|MHZ", "External oscillator frequency [25e6 Hz]") \
-    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS|MSPS", "Target sample rate [4e6 samples/s]") \
+    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS", "Target sample rate [4e6 samples/s]") \
     X(OPT_HELP, "help", 'h', no_argument, NULL, "Show this help and exit")
 
 CLI_DEFINE_OPTIONS(gpsdo, GPSDO_CLI_OPTIONS)
@@ -177,22 +177,22 @@ int main(int argc, char **argv)
         //         target_freq *= 1e6;
         //     break;
         case OPT_OSCILLATOR_FREQUENCY:
-            osc_freq = cli_parse_double_or_exit("oscillator-frequency", optarg);
+            osc_freq = cli_parse_si_double_or_exit("oscillator-frequency", optarg);
             if (osc_freq < 100.0)
                 osc_freq *= 1e6;
             break;
         case OPT_SAMPLE_RATE:
-            target_freq = cli_parse_double_or_exit("sample-rate", optarg);
-            if (target_freq < 100.0)
-                target_freq *= 1e6;
+            target_freq = cli_parse_si_double_or_exit("sample-rate", optarg);
             break;
         case OPT_HELP:
             cli_print_usage(stdout, argv[0], "[OPTIONS]",
                             gpsdo_long_options, gpsdo_options_help);
+            cli_print_si_help(stdout);
             return 0;
         default:
             cli_print_usage(stderr, argv[0], "[OPTIONS]",
                             gpsdo_long_options, gpsdo_options_help);
+            cli_print_si_help(stderr);
             return 1;
         }
     }
