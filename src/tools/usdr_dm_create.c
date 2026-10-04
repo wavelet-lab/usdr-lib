@@ -37,7 +37,7 @@
     X(OPT_RX_FILE, "rx-file", 'f', required_argument, "FILE", "RX output file [out.data]") \
     X(OPT_TX_FILES, "tx-files", 'I', required_argument, "FILES", "TX input file or colon-separated file list") \
     X(OPT_TX_FILE_CYCLE, "tx-file-cycle", 'o', no_argument, NULL, "Cycle TX input files") \
-    X(OPT_COUNT, "count", 'c', required_argument, "COUNT", "Number of blocks [128]") \
+    X(OPT_COUNT, "count", 'c', required_argument, "COUNT", "Number of blocks; -1 runs until interrupted [128]") \
     X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS", "Sample rate [50e6 samples/s]") \
     X(OPT_RX_FORMAT, "rx-format", 'F', required_argument, "FORMAT", "RX format: ci16, cf32, ci16@ci12 or cf32@ci12 [ci16]") \
     X(OPT_TX_FORMAT, "tx-format", 'i', required_argument, "FORMAT", "TX format: ci16, cf32, ci16@ci12 or cf32@ci12 [ci16]") \
@@ -927,7 +927,8 @@ int main(UNUSED int argc, UNUSED char** argv)
             break;
         //Block count - TX/RX samples count in one data block
         case OPT_COUNT:
-            count = cli_parse_unsigned_or_exit("count", optarg);
+            count = strcmp(optarg, "-1") == 0 ? UINT_MAX :
+                    cli_parse_unsigned_or_exit("count", optarg);
             explicit_count = true;
             break;
         //Sample rate
