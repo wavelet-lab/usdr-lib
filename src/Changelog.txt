@@ -1,3 +1,8 @@
+Release 1.0.1 (2026-10-03)
+==========================
+
+- Fixed TX channel mapping for inactive outputs in multi-channel streams.
+
 Release 1.0.0 (2026-09-21)
 ==========================
 
