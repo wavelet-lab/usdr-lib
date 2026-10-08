@@ -511,9 +511,7 @@ static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nf
         unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
         if (idx == IDX_TIMEDOUT) {
             USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX Cbuffer[%d] timed out!", b);
-            while (b > 0)
-                ring_buffer_cpost(tbuff[--b]);
-            return false;
+            continue;
         }
 
         char* buf = ring_buffer_at(tbuff[b], idx);
@@ -546,8 +544,6 @@ static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nf
         res = usdr_dms_send_stat(strm, (const void**)buffers, sample_cnt, nots ? UINT64_MAX : *ts, 32250, st);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX error, unable to send data: errno %d, i = %d", res, iteration);
-            for (unsigned b = 0; b < tx_bufcnt; b++)
-                ring_buffer_cpost(tbuff[b]);
             return false;
         }
     }
@@ -581,9 +577,7 @@ static bool do_receive(pusdr_dms_t strm, unsigned iteration, usdr_dms_recv_nfo_t
         unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
         if (idx == IDX_TIMEDOUT) {
             USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "RX Pbuffer[%d] timed out!", b);
-            while (b > 0)
-                ring_buffer_cpost(rbuff[--b]);
-            return false;
+            continue;
         }
         buffers[b] = ring_buffer_at(rbuff[b], idx);
     }
@@ -592,8 +586,6 @@ static bool do_receive(pusdr_dms_t strm, unsigned iteration, usdr_dms_recv_nfo_t
     res = usdr_dms_recv(strm, buffers, 2250, rxstat);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX error, unable to recv data: errno %d, i = %d", res, iteration);
-        for (unsigned b = 0; b < rx_bufcnt; b++)
-            ring_buffer_cpost(rbuff[b]);
         return false;
     }
 
