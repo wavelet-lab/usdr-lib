@@ -15,6 +15,8 @@ enum espi_write_flags {
 int espi_flash_get_id(lldev_t dev, subdev_t subdev, unsigned cfg_base,
                       uint32_t *flash_id, char *outid, size_t maxstr);
 
+int espi_flash_get_capacity(uint32_t flash_id, uint64_t *capacity);
+
 int espi_flash_read(lldev_t dev, subdev_t subdev, unsigned cfg_base, unsigned cfg_mmap_base,
                     uint32_t flash_off, uint32_t size, uint8_t* out);
 

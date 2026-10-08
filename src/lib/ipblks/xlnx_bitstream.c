@@ -90,10 +90,11 @@ static uint32_t xlnx_btstrm_crc32_regw(uint32_t crc, uint16_t reg, uint32_t data
     return crc;
 }
 
-int xlnx_btstrm_parse_header_ex(const uint32_t* mem,
-                                unsigned len,
-                                xlnx_image_params_t* stat,
-                                unsigned flags)
+int xlnx_btstrm_parse_image_ex(const uint32_t* mem,
+                               unsigned len,
+                               xlnx_image_params_t* stat,
+                               unsigned flags,
+                               unsigned* image_len)
 {
     uint32_t w;
     unsigned ptr = 0;
@@ -103,6 +104,8 @@ int xlnx_btstrm_parse_header_ex(const uint32_t* mem,
     uint32_t crc_word_cnt = 0;
 
     memset(stat, 0, sizeof(*stat));
+    if (image_len != NULL)
+        *image_len = 0;
 
     // Sync FSM
     bool bo_seen = false;
@@ -134,6 +137,14 @@ next:
     uint16_t last_reg = XLNX_REG_CRC;
     for (; ptr < len; ptr++) {
         w = be32toh(mem[ptr]);
+        if ((flags & XLNX_BSTRM_ALLOW_ERASED_TAIL) && w == W_DUMMY) {
+            unsigned tail = ptr + 1;
+
+            while (tail < len && be32toh(mem[tail]) == W_DUMMY)
+                tail++;
+            if (tail == len)
+                break;
+        }
         uint8_t ptype = (w >> 29) & 0x7;
         uint8_t op;
         uint16_t reg;
@@ -211,7 +222,17 @@ next:
         }
         USDR_LOG("BSTR", USDR_LOG_INFO, "Bitstream CRC %d block(s) validated\n", crc_word_cnt);
     }
+    if (image_len != NULL)
+        *image_len = ptr;
     return devid_found && wbstar_found ? 0 : -ENOENT;
+}
+
+int xlnx_btstrm_parse_header_ex(const uint32_t* mem,
+                                unsigned len,
+                                xlnx_image_params_t* stat,
+                                unsigned flags)
+{
+    return xlnx_btstrm_parse_image_ex(mem, len, stat, flags, NULL);
 }
 
 int xlnx_btstrm_parse_header(const uint32_t* mem, unsigned len, xlnx_image_params_t* stat)
