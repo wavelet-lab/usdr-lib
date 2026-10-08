@@ -53,6 +53,7 @@ struct cli_option_help {
     };
 
 unsigned cli_parse_unsigned_or_exit(const char* option, const char* value);
+int cli_parse_int_or_exit(const char* option, const char* value);
 uint64_t cli_parse_u64_or_exit(const char* option, const char* value);
 double cli_parse_double_or_exit(const char* option, const char* value);
 

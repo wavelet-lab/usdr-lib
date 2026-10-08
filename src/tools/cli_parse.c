@@ -30,6 +30,20 @@ unsigned cli_parse_unsigned_or_exit(const char* option, const char* value)
     return (unsigned)parsed;
 }
 
+int cli_parse_int_or_exit(const char* option, const char* value)
+{
+    char* end;
+    long parsed;
+
+    errno = 0;
+    parsed = strtol(value, &end, 0);
+    if (errno || end == value || *end != '\0' ||
+        parsed < INT_MIN || parsed > INT_MAX)
+        cli_invalid_value(option, value);
+
+    return (int)parsed;
+}
+
 uint64_t cli_parse_u64_or_exit(const char* option, const char* value)
 {
     char* end;

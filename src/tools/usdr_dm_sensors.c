@@ -91,21 +91,21 @@ int main(UNUSED int argc, UNUSED char** argv)
             interval = atof(optarg) * 1000.0;
             break;
         case OPT_LOG_LEVEL:
-            usdrlog_setlevel(NULL, atoi(optarg));
+            usdrlog_setlevel(NULL, cli_parse_int_or_exit("log-level", optarg));
             break;
         case OPT_SENSORS:
             strncpy(sensors, optarg, MAX_BUFFER);  sensors[MAX_BUFFER - 1] = 0;
             break;
         case OPT_SET:
             set = true;
-            set_val = atoi(optarg);
+            set_val = cli_parse_unsigned_or_exit("set", optarg);
             break;
         case OPT_SAMPLE_RATE:
             rate = true;
             rate_val = cli_parse_si_unsigned_or_exit("sample-rate", optarg);
             break;
         case OPT_COUNT:
-            count = atoi(optarg);
+            count = cli_parse_unsigned_or_exit("count", optarg);
             break;
         case OPT_LIST:
             list_pattern = optarg;

@@ -130,7 +130,7 @@ int main(int argc, char** argv)
             busname = optarg;
             break;
         case OPT_LOG_LEVEL:
-            usdrlog_setlevel(NULL, atoi(optarg));
+            usdrlog_setlevel(NULL, cli_parse_int_or_exit("log-level", optarg));
             break;
         case OPT_READ:
             filename = optarg;

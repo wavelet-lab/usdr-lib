@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2024 Wavelet Lab
+// Copyright (c) 2023-2026 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
 #define _GNU_SOURCE
@@ -89,7 +89,7 @@ static atomic_bool s_stop = false;
 
 void on_stop(UNUSED int signo)
 {
-    s_stop = true;
+    atomic_store_explicit(&s_stop, true, memory_order_relaxed);
 }
 
 static unsigned s_rx_blksampl = 0;
@@ -159,7 +159,8 @@ void* disk_write_thread(void* obj)
     rx_thread_input_t* inp = (rx_thread_input_t*)obj;
     const unsigned i = inp->chan;
 
-    while (!s_stop && !thread_stop) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed)) {
         unsigned idx = ring_buffer_cwait(rbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -168,7 +169,7 @@ void* disk_write_thread(void* obj)
         size_t res = fwrite(data, s_rx_blksz, 1, s_out_file[i]);
         if (res != 1) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Can't write %d bytes! error=%zd", s_rx_blksz, res);
-            s_stop = true;
+            atomic_store_explicit(&s_stop, true, memory_order_relaxed);
             break;
         }
 
@@ -187,7 +188,8 @@ void* disk_read_thread(void* obj)
     const unsigned i = inp->chan;
     bool interrupt = false;
 
-    while (!s_stop && !thread_stop && !interrupt) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed) && !interrupt) {
 
         unsigned idx = ring_buffer_pwait(tbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
@@ -262,7 +264,8 @@ void* freq_gen_thread_ci16_lut(void* obj)
     int lut_sz = 6;
     int k = 0;
 
-    while (!s_stop && !thread_stop) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed)) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -325,7 +328,8 @@ static void* chirp_gen_thread_ci16(void* obj)
     int32_t delta_phase_arr[] = { dp0, dp1 };
     int32_t delta_phase = inp->chirp_steps >= 0 ? dp0 : dp1;
 
-    while (!s_stop && !thread_stop)
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed))
     {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
         if (idx == IDX_TIMEDOUT)
@@ -372,7 +376,8 @@ void* freq_gen_thread_ci16(void* obj)
     const double phase_delta = inp->delta_phase;
 #endif
 
-    while (!s_stop && !thread_stop) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed)) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -419,7 +424,8 @@ void* freq_gen_thread_cf32(void* obj)
     const unsigned tx_get_samples = inp->samples_count;
     float gain = inp->gain;
 
-    while (!s_stop && !thread_stop) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed)) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -807,12 +813,12 @@ int main(UNUSED int argc, UNUSED char** argv)
             break;
         //RX LNA gain
         case OPT_RX_GAIN_LNA:
-            dev_data[DD_RX_GAIN_LNA].value = atoi(optarg);
+            dev_data[DD_RX_GAIN_LNA].value = cli_parse_int_or_exit("rx-gain-lna", optarg);
             dev_data[DD_RX_GAIN_LNA].ignore = false;
             break;
         //TX gain
         case OPT_TX_GAIN:
-            dev_data[DD_TX_GAIN].value = atoi(optarg);
+            dev_data[DD_TX_GAIN].value = cli_parse_int_or_exit("tx-gain", optarg);
             dev_data[DD_TX_GAIN].ignore = false;
             break;
         //RX LNA path ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)
@@ -827,21 +833,21 @@ int main(UNUSED int argc, UNUSED char** argv)
             break;
         //RX PGA gain
         case OPT_RX_GAIN_PGA:
-            dev_data[DD_RX_GAIN_PGA].value = atoi(optarg);
+            dev_data[DD_RX_GAIN_PGA].value = cli_parse_int_or_exit("rx-gain-pga", optarg);
             dev_data[DD_RX_GAIN_PGA].ignore = false;
             break;
         //RX VGA gain
         case OPT_RX_GAIN_VGA:
-            dev_data[DD_RX_GAIN_VGA].value = atoi(optarg);
+            dev_data[DD_RX_GAIN_VGA].value = cli_parse_int_or_exit("rx-gain-vga", optarg);
             dev_data[DD_RX_GAIN_VGA].ignore = false;
             break;
         //TX loopback gain
         case OPT_TX_LOOPBACK_GAIN:
-            dev_data[DD_TX_GAIN_LB].value = atoi(optarg);
+            dev_data[DD_TX_GAIN_LB].value = cli_parse_int_or_exit("tx-loopback-gain", optarg);
             dev_data[DD_TX_GAIN_LB].ignore = false;
             break;
         case OPT_CALIBRATION:
-            calibrate = atoi(optarg);
+            calibrate = cli_parse_unsigned_or_exit("calibration", optarg);
             break;
         case OPT_LUT:
             use_lut = true;
@@ -860,7 +866,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             fref = cli_parse_si_u64_or_exit("refclk-frequency", optarg);
             break;
         case OPT_TX_PRECHARGE:
-            tx_pkt_precharge = atoi(optarg);
+            tx_pkt_precharge = cli_parse_int_or_exit("tx-precharge", optarg);
             break;
         //Calibration frequency
         case OPT_CALIBRATION_FREQUENCY:
@@ -1068,7 +1074,8 @@ int main(UNUSED int argc, UNUSED char** argv)
                 if(!chirp_pt)
                     exit(EXIT_FAILURE);
                 else
-                    tx_thread_inputs[i].chirp_steps = atoi(chirp_pt);
+                    tx_thread_inputs[i].chirp_steps =
+                            cli_parse_int_or_exit("chirp-parameters", chirp_pt);
 
                 chirp_pt = strtok_r(NULL, ":", &chirp_pt_end);
                 if(!chirp_pt)
@@ -1130,7 +1137,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             if (!s_in_file[0]) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open TX source data file #%u '%s'", 0, filename_tx[0]);
                 res = 3;
-                goto dev_close;
+                goto finalize;
             }
         }
 
@@ -1147,7 +1154,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         if (!s_out_file[0]) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create RX storage data file #%u '%s'", 0, filename_rx);
             res = 3;
-            goto dev_close;
+            goto finalize;
         }
 
         // Device should decide which BW to use
@@ -1162,7 +1169,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create device: errno %d", res);
         res = 1;
-        goto dev_close;
+        goto finalize;
     }
 
     // Apply extra parameters
@@ -1175,7 +1182,7 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         if (stop_on_error && res) {
             res = 1;
-            goto dev_close;
+            goto finalize;
         }
     }
 
@@ -1236,7 +1243,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dmr_rate_set(dev, NULL, rate);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set device rate: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
 
         usleep(5000);
@@ -1251,13 +1258,13 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dms_create_ex2(dev, "/ll/srx/0", fmt_rx, &chans, samples_rx, rxflags, NULL, &usds_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to initialize RX data stream: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
 
         res = res ? res : usdr_dms_info(usds_rx, &snfo_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get RX data stream info: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         } else {
             s_rx_blksampl = snfo_rx.pktsyms;
             s_rx_blksz = snfo_rx.pktbszie;
@@ -1275,13 +1282,13 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dms_create_ex2(dev, "/ll/stx/0", fmt_tx, &chans, samples_tx, 0, NULL, &usds_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to initialize TX data stream: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
 
         res = res ? res : usdr_dms_info(usds_tx, &snfo_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get TX data stream info: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         } else {
             s_tx_blksz = snfo_tx.pktbszie;
             s_tx_blksampl = snfo_tx.pktsyms;
@@ -1297,7 +1304,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (rx_bufcnt > MAX_CHS || tx_bufcnt > MAX_CHS) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Too many requested channels %d/%d (MAX: %d)", rx_bufcnt, tx_bufcnt, MAX_CHS);
         res = -E2BIG;
-        goto dev_close;
+        goto finalize;
     }
 
     // initialize thread input params
@@ -1344,7 +1351,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "CH#%2d CHIRP params error: freq0 >= freq1 [%.2f >= %.2f]",
                      i, tx_thread_inputs[i].chirp_freq0, tx_thread_inputs[i].chirp_freq1);
             res = -EINVAL;
-            goto dev_close;
+            goto finalize;
         }
 
         if(abs(tx_thread_inputs[i].chirp_steps % 8) != 7)
@@ -1369,7 +1376,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             if (!s_in_file[f]) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open TX source data file #%u '%s'", f, fname);
                 res = 3;
-                goto dev_close;
+                goto finalize;
             }
             else
                 USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX source data file #%u '%s' opened OK", f, fname);
@@ -1380,7 +1387,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             if (!tbuff[i]) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to allocate TX ring buffer %d", i);
                 res = -ENOMEM;
-                goto dev_close;
+                goto finalize;
             }
 
             fn_rxtx_thread_t thread_func;
@@ -1396,14 +1403,14 @@ int main(UNUSED int argc, UNUSED char** argv)
                                                   "use -I option to read from file or specify %s/%s data format (-i option) for sine generator",
                          i, fmt_tx, SFMT_CI16, SFMT_CF32);
                 res = -EINVAL;
-                goto dev_close;
+                goto finalize;
             }
 
             res = pthread_create(&rthread[i], NULL, thread_func, &tx_thread_inputs[i]);
 
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: errno %d", i, res);
-                goto dev_close;
+                goto finalize;
             }
             tx_threads_started++;
         }
@@ -1423,7 +1430,7 @@ int main(UNUSED int argc, UNUSED char** argv)
             if (!s_out_file[f]) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create RX storage data file #%u '%s'", f, fmod);
                 res = 3;
-                goto dev_close;
+                goto finalize;
             }
             else
                 USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "RX storage data file #%u '%s' created OK", f, fmod);
@@ -1434,12 +1441,12 @@ int main(UNUSED int argc, UNUSED char** argv)
             if (!rbuff[i]) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to allocate RX ring buffer %d", i);
                 res = -ENOMEM;
-                goto dev_close;
+                goto finalize;
             }
             res = pthread_create(&wthread[i], NULL, disk_write_thread, &rx_thread_inputs[i]);
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start RX thread %d: errno %d", i, res);
-                goto dev_close;
+                goto finalize;
             }
             rx_threads_started++;
         }
@@ -1465,7 +1472,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     res = usdr_dms_sync(dev, "off", 2, strms);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
-        if (stop_on_error) goto dev_close;
+        if (stop_on_error) goto finalize;
     }
 
     //Start RX streaming
@@ -1473,7 +1480,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usds_rx ? usdr_dms_op(usds_rx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start RX data stream: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
     }
 
@@ -1482,7 +1489,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usds_tx ? usdr_dms_op(usds_tx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX data stream: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
     }
 
@@ -1490,7 +1497,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     // res = usdr_dms_sync(dev, synctype, 2, strms);
     // if (res) {
     //     USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
-    //     if (stop_on_error) goto dev_close;
+    //     if (stop_on_error) goto finalize;
     // }
 
 
@@ -1510,7 +1517,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set device parameters: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
     }
 
@@ -1518,7 +1525,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     res = usdr_dms_sync(dev, synctype, 2, strms);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
-        if (stop_on_error) goto dev_close;
+        if (stop_on_error) goto finalize;
     }
 
     if (calibrate) {
@@ -1539,11 +1546,11 @@ int main(UNUSED int argc, UNUSED char** argv)
     //Check stream handles and exit if NULL
     if (dotx && !usds_tx) {
         res = -ENODEV;
-        goto dev_close;
+        goto finalize;
     }
     if (dorx && !usds_rx) {
         res = -ENODEV;
-        goto dev_close;
+        goto finalize;
     }
 
     //TX & RX
@@ -1568,7 +1575,9 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned fifo_min = ~0;
     unsigned tx_samples_cnt;
 
-    for (unsigned i = 0; !s_stop && (i < count); i++)
+    for (unsigned i = 0;
+         !atomic_load_explicit(&s_stop, memory_order_relaxed) && (i < count);
+         i++)
     {
         if (tx_pkt_precharge < 0) {
             if (tx_pkt_precharge != 0) {
@@ -1649,29 +1658,29 @@ stop:
         res = usdr_dms_op(usds_rx, USDR_DMS_STOP, 0);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to stop RX data stream: errno %d", res);
-            goto dev_close;
+            goto finalize;
         }
     }
     if (dotx) {
         res = usdr_dms_op(usds_tx, USDR_DMS_STOP, 0);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to stop TX data stream: errno %d", res);
-            goto dev_close;
+            goto finalize;
         }
     }
 
-    thread_stop = true;
+    atomic_store_explicit(&thread_stop, true, memory_order_relaxed);
 
     res = usdr_dme_get_uint(dev, "/dm/debug/all", temp);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get device debug data: errno %d", res);
-        goto dev_close;
+        goto finalize;
     }
 
     print_device_temperature(dev);
 
-dev_close:
-    thread_stop = true;
+finalize:
+    atomic_store_explicit(&thread_stop, true, memory_order_relaxed);
 
     for (unsigned i = 0; i < rx_threads_started; i++)
         pthread_join(wthread[i], NULL);
