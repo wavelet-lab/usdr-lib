@@ -1661,8 +1661,6 @@ stop:
         }
     }
 
-    atomic_store_explicit(&thread_stop, true, memory_order_relaxed);
-
     res = usdr_dme_get_uint(dev, "/dm/debug/all", temp);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get device debug data: errno %d", res);
