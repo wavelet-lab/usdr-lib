@@ -510,7 +510,7 @@ static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nf
     {
         unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
         if (idx == IDX_TIMEDOUT) {
-            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX Cbuffer[%d] timed out!", b);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX Cbuffer[%d] timed out!", b);
             return false;
         }
 
@@ -576,7 +576,7 @@ static bool do_receive(pusdr_dms_t strm, unsigned iteration, usdr_dms_recv_nfo_t
     {
         unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
         if (idx == IDX_TIMEDOUT) {
-            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "RX Pbuffer[%d] timed out!", b);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX Pbuffer[%d] timed out!", b);
             return false;
         }
         buffers[b] = ring_buffer_at(rbuff[b], idx);
