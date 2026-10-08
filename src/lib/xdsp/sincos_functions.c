@@ -87,13 +87,15 @@ sincos_i16_interleaved_ctrl_function_t get_wvlt_sincos_i16_interleaved_ctrl()
 
 #define TEMPLATE_FUNC_NAME wvlt_sincos_i16_interleaved_chirp_generic
 VWLT_ATTRIBUTE(optimize("-O3", "inline"))
-#include "templates/wvlt_sincos_i16_interleaved_chirp_generic.t"
+#include "templates/wvlt_sincos_i16_interleaved_chirp_common.t"
 DECLARE_TR_FUNC_SINCOS_I16_INTERLEAVED_CHIRP(wvlt_sincos_i16_interleaved_chirp_generic)
 
 #ifdef WVLT_SSSE3
 #define TEMPLATE_FUNC_NAME wvlt_sincos_i16_interleaved_chirp_ssse3
 VWLT_ATTRIBUTE(optimize("-O3", "inline"), target("ssse3"))
-#include "templates/wvlt_sincos_i16_interleaved_chirp_ssse3.t"
+#define USE_SSSE3_CHIRP
+#include "templates/wvlt_sincos_i16_interleaved_chirp_common.t"
+#undef USE_SSSE3_CHIRP
 DECLARE_TR_FUNC_SINCOS_I16_INTERLEAVED_CHIRP(wvlt_sincos_i16_interleaved_chirp_ssse3)
 #endif
 
