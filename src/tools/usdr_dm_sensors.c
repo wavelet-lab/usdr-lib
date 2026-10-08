@@ -10,12 +10,28 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <signal.h>
 #include <string.h>
 #include <math.h>
+#include "cli_parse.h"
 
 #define MAX_BUFFER 512
 #define MAX_SENSORS 16
+
+#define SENSORS_CLI_OPTIONS(X) \
+    X(OPT_DEVICE, "device", 'd', required_argument, "DEVICE", "Device parameters") \
+    X(OPT_INTERVAL, "interval", 'i', required_argument, "SECONDS", "Polling interval in seconds") \
+    X(OPT_LOG_LEVEL, "log-level", 'l', required_argument, "LEVEL", "Logging level") \
+    X(OPT_SENSORS, "sensors", 's', required_argument, "PATHS", "Semicolon-separated sensor paths") \
+    X(OPT_SET, "set", 'S', required_argument, "VALUE", "Set the first sensor to an unsigned value") \
+    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS", "Set the device sample rate") \
+    X(OPT_COUNT, "count", 'c', required_argument, "COUNT", "Maximum number of samples [1]") \
+    X(OPT_TYPE, "type", 't', required_argument, "TYPE", "Output type: raw, temp or clock [raw]") \
+    X(OPT_LIST, "list", 'L', required_argument, "PATTERN", "List device parameters matching a pattern") \
+    X(OPT_HELP, "help", 'h', no_argument, NULL, "Show this help and exit")
+
+CLI_DEFINE_OPTIONS(sensors, SENSORS_CLI_OPTIONS)
 
 int main(UNUSED int argc, UNUSED char** argv)
 {
@@ -47,9 +63,16 @@ int main(UNUSED int argc, UNUSED char** argv)
     enum sensor_type type = 0;
     const char *list_pattern = NULL;
 
-    while ((opt = getopt(argc, argv, "D:d:i:l:s:S:r:c:t:L:")) != -1) {
+    char short_options[3 * SIZEOF_ARRAY(sensors_long_options)];
+    res = cli_build_short_options(sensors_long_options, short_options, sizeof(short_options));
+    if (res) {
+        fprintf(stderr, "Unable to build short option list: %s\n", strerror(-res));
+        return 1;
+    }
+
+    while ((opt = getopt_long(argc, argv, short_options, sensors_long_options, NULL)) != -1) {
         switch (opt) {
-        case 't':
+        case OPT_TYPE:
             if (strcmp(optarg, "temp") == 0)
                 type = ST_TEMP;
             else if (strcmp(optarg, "clock") == 0)
@@ -61,33 +84,42 @@ int main(UNUSED int argc, UNUSED char** argv)
                 exit(1);
             }
             break;
-        case 'D':
-        case 'd':
+        case OPT_DEVICE:
             device = optarg;
             break;
-        case 'i':
+        case OPT_INTERVAL:
             interval = atof(optarg) * 1000.0;
             break;
-        case 'l':
-            usdrlog_setlevel(NULL, atoi(optarg));
+        case OPT_LOG_LEVEL:
+            usdrlog_setlevel(NULL, cli_parse_int_or_exit("log-level", optarg));
             break;
-        case 's':
+        case OPT_SENSORS:
             strncpy(sensors, optarg, MAX_BUFFER);  sensors[MAX_BUFFER - 1] = 0;
             break;
-        case 'S':
+        case OPT_SET:
             set = true;
-            set_val = atoi(optarg);
+            set_val = cli_parse_unsigned_or_exit("set", optarg);
             break;
-        case 'r':
+        case OPT_SAMPLE_RATE:
             rate = true;
-            rate_val = atof(optarg);
+            rate_val = cli_parse_si_unsigned_or_exit("sample-rate", optarg);
             break;
-        case 'c':
-            count = atoi(optarg);
+        case OPT_COUNT:
+            count = cli_parse_unsigned_or_exit("count", optarg);
             break;
-        case 'L':
+        case OPT_LIST:
             list_pattern = optarg;
             break;
+        case OPT_HELP:
+            cli_print_usage(stdout, argv[0], "[OPTIONS]",
+                            sensors_long_options, sensors_options_help);
+            cli_print_si_help(stdout);
+            return 0;
+        default:
+            cli_print_usage(stderr, argv[0], "[OPTIONS]",
+                            sensors_long_options, sensors_options_help);
+            cli_print_si_help(stderr);
+            return 1;
         }
     }
 

@@ -44,6 +44,7 @@ typedef struct xlnx_image_params xlnx_image_params_t;
 enum xlnx_btstrm_parse_flags {
     XLNX_BSTRM_PARSE_F_CRC_CHECK = 1 << 0,
     XLNX_BSTRM_ALLOW_CROP = 1 << 1,
+    XLNX_BSTRM_ALLOW_ERASED_TAIL = 1 << 2,
 };
 
 int xlnx_btstrm_parse_header(const uint32_t* mem, unsigned len, xlnx_image_params_t* stat);
@@ -51,6 +52,11 @@ int xlnx_btstrm_parse_header_ex(const uint32_t* mem,
                                 unsigned len,
                                 xlnx_image_params_t* stat,
                                 unsigned flags);
+int xlnx_btstrm_parse_image_ex(const uint32_t* mem,
+                               unsigned len,
+                               xlnx_image_params_t* stat,
+                               unsigned flags,
+                               unsigned* image_len);
 int xlnx_btstrm_iprgcheck(
         const xlnx_image_params_t* internal_golden,
         const xlnx_image_params_t* newimg,

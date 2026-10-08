@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2024 Wavelet Lab
+// Copyright (c) 2023-2026 Wavelet Lab
 // SPDX-License-Identifier: MIT
 
 #define _GNU_SOURCE
@@ -15,26 +15,81 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <signal.h>
 #include <unistd.h>
 #include <math.h>
 #include <string.h>
+#include <limits.h>
+#include <errno.h>
+#include <stdatomic.h>
 
 #include "../common/ring_buffer.h"
 #include "sincos_functions.h"
 #include "fast_math.h"
+#include "cli_parse.h"
 
 #define LOG_TAG "DMCR"
 
+#define DM_CREATE_CLI_OPTIONS(X) \
+    X(OPT_DEVICE, "device", 'D', required_argument, "PARAMS", "Device parameters") \
+    X(OPT_DISCOVER, "discover", 'Q', no_argument, NULL, "List available devices and exit") \
+    X(OPT_RX_FILE, "rx-file", 'f', required_argument, "FILE", "RX output file [out.data]") \
+    X(OPT_TX_FILES, "tx-files", 'I', required_argument, "FILES", "TX input file or colon-separated file list") \
+    X(OPT_TX_FILE_CYCLE, "tx-file-cycle", 'o', no_argument, NULL, "Cycle TX input files") \
+    X(OPT_COUNT, "count", 'c', required_argument, "COUNT", "Number of blocks; -1 runs until interrupted [128]") \
+    X(OPT_SAMPLE_RATE, "sample-rate", 'r', required_argument, "SPS", "Sample rate [50e6 samples/s]") \
+    X(OPT_RX_FORMAT, "rx-format", 'F', required_argument, "FORMAT", "RX format: ci16, cf32, ci16@ci12 or cf32@ci12 [ci16]") \
+    X(OPT_TX_FORMAT, "tx-format", 'i', required_argument, "FORMAT", "TX format: ci16, cf32, ci16@ci12 or cf32@ci12 [ci16]") \
+    X(OPT_RX_CHANNELS, "rx-channels", 'C', required_argument, "MASK|:NAMES", "RX numeric mask or comma-separated names, e.g. ':A,B' [autodetect]") \
+    X(OPT_TX_CHANNELS, "tx-channels", 'R', required_argument, "MASK|:NAMES", "TX numeric mask or comma-separated names, e.g. ':A,B' [autodetect]") \
+    X(OPT_RX_BUFFER_SIZE, "rx-buffer-size", 'S', required_argument, "SAMPLES", "RX buffer size [4096]") \
+    X(OPT_TX_BUFFER_SIZE, "tx-buffer-size", 'O', required_argument, "SAMPLES", "TX buffer size [4096]") \
+    X(OPT_TX_ONLY, "tx-only", 't', no_argument, NULL, "Enable TX-only mode") \
+    X(OPT_TX_RX, "tx-rx", 'T', no_argument, NULL, "Enable simultaneous TX and RX") \
+    X(OPT_NO_TIMESTAMPS, "no-timestamps", 'N', no_argument, NULL, "Disable TX timestamps") \
+    X(OPT_LUT, "lut", 'J', no_argument, NULL, "Use the fast sample sine LUT") \
+    X(OPT_RX_BB_FREQUENCY, "rx-bb-frequency", 'v', required_argument, "HZ", "RX baseband frequency") \
+    X(OPT_TX_BB_FREQUENCY, "tx-bb-frequency", 'V', required_argument, "HZ", "TX baseband frequency") \
+    X(OPT_TDD_FREQUENCY, "tdd-frequency", 'q', required_argument, "HZ", "TDD frequency [910e6 Hz]") \
+    X(OPT_RX_FREQUENCY, "rx-frequency", 'e', required_argument, "HZ", "RX frequency [900e6 Hz]") \
+    X(OPT_TX_FREQUENCY, "tx-frequency", 'E', required_argument, "HZ", "TX frequency [920e6 Hz]") \
+    X(OPT_RX_BANDWIDTH, "rx-bandwidth", 'w', required_argument, "HZ", "RX bandwidth [1e6 Hz]") \
+    X(OPT_TX_BANDWIDTH, "tx-bandwidth", 'W', required_argument, "HZ", "TX bandwidth [1e6 Hz]") \
+    X(OPT_RX_GAIN_LNA, "rx-gain-lna", 'y', required_argument, "GAIN", "RX LNA gain [15]") \
+    X(OPT_RX_GAIN_PGA, "rx-gain-pga", 'u', required_argument, "GAIN", "RX PGA gain [15]") \
+    X(OPT_RX_GAIN_VGA, "rx-gain-vga", 'U', required_argument, "GAIN", "RX VGA gain [15]") \
+    X(OPT_TX_GAIN, "tx-gain", 'Y', required_argument, "GAIN", "TX gain [0]") \
+    X(OPT_TX_LOOPBACK_GAIN, "tx-loopback-gain", 'K', required_argument, "GAIN", "TX loopback gain") \
+    X(OPT_RX_PATH, "rx-path", 'p', required_argument, "PATH", "RX path: rx_auto, rxl, rxw, rxh, adc, rxl_lb, rxw_lb or rxh_lb [rx_auto]") \
+    X(OPT_TX_PATH, "tx-path", 'P', required_argument, "PATH", "TX path: tx_auto, txb1, txb2, txw or txh [tx_auto]") \
+    X(OPT_REFCLK_PATH, "refclk-path", 'a', required_argument, "PATH", "Reference clock path: internal or external [internal]") \
+    X(OPT_REFCLK_FREQUENCY, "refclk-frequency", 'x', required_argument, "HZ", "External reference clock frequency") \
+    X(OPT_CALIBRATION_FREQUENCY, "calibration-frequency", 'B', required_argument, "HZ", "Calibration frequency") \
+    X(OPT_SYNC, "sync", 's', required_argument, "TYPE", "Synchronization type: all, 1pps, rx, tx, any, none or off [all]") \
+    X(OPT_ANTENNA, "antenna", 'A', required_argument, "CONFIG", "Antenna configuration [0]") \
+    X(OPT_TX_START_PHASES, "tx-start-phases", 'H', required_argument, "PHASES", "Comma-separated floating-point TX start phases, ordered by channel") \
+    X(OPT_TX_PHASE_DELTAS, "tx-phase-deltas", 'd', required_argument, "DELTAS", "Comma-separated phase deltas; output frequency is sample-rate * delta") \
+    X(OPT_TX_GAINS, "tx-gains", 'g', required_argument, "GAINS", "Comma-separated TX gains in dBFS, range -100..0") \
+    X(OPT_SKIP_INITIALIZATION, "skip-initialization", 'X', no_argument, NULL, "Skip device initialization") \
+    X(OPT_CONTINUE_ON_ERROR, "continue-on-error", 'z', no_argument, NULL, "Continue after recoverable errors") \
+    X(OPT_TX_PRECHARGE, "tx-precharge", 'b', required_argument, "COUNT", "TX packets to precharge before RX [16]") \
+    X(OPT_LOG_LEVEL, "log-level", 'l', required_argument, "LEVEL", "Logging level [3]") \
+    X(OPT_STATISTICS, "statistics", 'j', required_argument, "LEVEL", "Statistics verbosity") \
+    X(OPT_CALIBRATION, "calibration", 'G', required_argument, "ALGORITHM", "Run calibration algorithm") \
+    X(OPT_PARAMETERS, "parameters", 'Z', required_argument, "NAME=VALUE,...", "Additional comma-separated device parameter assignments") \
+    X(OPT_CHIRP, "chirp", 'm', no_argument, NULL, "Enable chirp TX generator") \
+    X(OPT_CHIRP_PARAMETERS, "chirp-parameters", 'M', required_argument, "PARAMS", "Per-channel chirp_sample_len:freq0:freq1 tuples, comma-separated") \
+    X(OPT_HELP, "help", 'h', no_argument, NULL, "Show this help and exit")
+
+CLI_DEFINE_OPTIONS(dm_create, DM_CREATE_CLI_OPTIONS)
+
 char buffer[65536*2];
-static volatile bool s_stop = false;
+static atomic_bool s_stop = false;
 
 void on_stop(UNUSED int signo)
 {
-    if (s_stop)
-        exit(1);
-
-    s_stop = true;
+    atomic_store_explicit(&s_stop, true, memory_order_relaxed);
 }
 
 static unsigned s_rx_blksampl = 0;
@@ -42,7 +97,7 @@ static unsigned s_tx_blksampl = 0;
 
 static unsigned s_rx_blksz = 0;
 static unsigned s_tx_blksz = 0;
-static bool thread_stop = false;
+static atomic_bool thread_stop = false;
 
 static unsigned rx_bufcnt = 0;
 static unsigned tx_bufcnt = 0;
@@ -104,7 +159,8 @@ void* disk_write_thread(void* obj)
     rx_thread_input_t* inp = (rx_thread_input_t*)obj;
     const unsigned i = inp->chan;
 
-    while (!s_stop && !thread_stop) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed)) {
         unsigned idx = ring_buffer_cwait(rbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -113,6 +169,7 @@ void* disk_write_thread(void* obj)
         size_t res = fwrite(data, s_rx_blksz, 1, s_out_file[i]);
         if (res != 1) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Can't write %d bytes! error=%zd", s_rx_blksz, res);
+            atomic_store_explicit(&s_stop, true, memory_order_relaxed);
             break;
         }
 
@@ -131,7 +188,8 @@ void* disk_read_thread(void* obj)
     const unsigned i = inp->chan;
     bool interrupt = false;
 
-    while (!s_stop && !thread_stop && !interrupt) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed) && !interrupt) {
 
         unsigned idx = ring_buffer_pwait(tbuff[i], 100000);
         if (idx == IDX_TIMEDOUT)
@@ -206,7 +264,8 @@ void* freq_gen_thread_ci16_lut(void* obj)
     int lut_sz = 6;
     int k = 0;
 
-    while (!s_stop && !thread_stop) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed)) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -222,7 +281,7 @@ void* freq_gen_thread_ci16_lut(void* obj)
         const int16_t *lut = lut_sincos60_25000 + phase * 2;
 
         unsigned i = 0;
-        for (; i < tx_get_samples - lut_sz; i += lut_sz) {
+        for (; i + lut_sz <= tx_get_samples; i += lut_sz) {
             memcpy(iqp + 2 * i, lut, lut_sz * sizeof(uint16_t) * 2);
         }
 
@@ -269,7 +328,8 @@ static void* chirp_gen_thread_ci16(void* obj)
     int32_t delta_phase_arr[] = { dp0, dp1 };
     int32_t delta_phase = upchirp ? dp0 : dp1;
 
-    while (!s_stop && !thread_stop)
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed))
     {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
         if (idx == IDX_TIMEDOUT)
@@ -316,7 +376,8 @@ void* freq_gen_thread_ci16(void* obj)
     const double phase_delta = inp->delta_phase;
 #endif
 
-    while (!s_stop && !thread_stop) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed)) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -363,7 +424,8 @@ void* freq_gen_thread_cf32(void* obj)
     const unsigned tx_get_samples = inp->samples_count;
     float gain = inp->gain;
 
-    while (!s_stop && !thread_stop) {
+    while (!atomic_load_explicit(&s_stop, memory_order_relaxed) &&
+           !atomic_load_explicit(&thread_stop, memory_order_relaxed)) {
         unsigned idx = ring_buffer_pwait(tbuff[p], 100000);
         if (idx == IDX_TIMEDOUT)
             continue;
@@ -433,62 +495,6 @@ enum {
 };
 
 /*
- * Utility Usage info
- */
-static void usage(int severity, const char* me)
-{
-    USDR_LOG(LOG_TAG, severity, "Usage: %s \n"
-                                "\t[-D device_parameters] \n"
-                                "\t[-f RX_filename [./out.data]] \n"
-                                "\t[-I TX_filename(s) (optionally colon-separated list)] \n"
-                                "\t[-o <flag: cycle TX from file>] \n"
-                                "\t[-c count [128]] \n"
-                                "\t[-r samplerate [50e6]] \n"
-                                "\t[-F format_rx [ci16] | cf32 | ci16@ci12 | cf32@ci12] \n"
-                                "\t[-i format_tx [ci16] | cf32 | ci16@ci12 | cf32@ci12] \n"
-                                "\t[-C chmsk_rx [autodetect] or \":<comma separated channel names>\", e.g. \":A,B\"] \n"
-                                "\t[-R chmsk_tx [autodetect] or \":<comma separated channel names>\", e.g. \":A,B\"] \n"
-                                "\t[-S RX buffer size (in samples) [4096]] \n"
-                                "\t[-O TX buffer size (in samples) [4096]] \n"
-                                "\t[-t <flag: TX only mode>] \n"
-                                "\t[-T <flag: TX+RX mode>] \n"
-                                "\t[-N <flag: No TX timestamps>] \n"
-                                "\t[-J <flag: use samp/3 LUT table for sin generator (ultra fast)>]\n"
-                                "\t[-v RX_BB_FREQ] \n"
-                                "\t[-V TX_BB_FREQ] \n"
-                                "\t[-q TDD_FREQ [910e6]] \n"
-                                "\t[-e RX_FREQ [900e6]] \n"
-                                "\t[-E TX_FREQ [920e6]] \n"
-                                "\t[-w RX_BANDWIDTH [1e6]] \n"
-                                "\t[-W TX_BANDWIDTH [1e6]] \n"
-                                "\t[-y RX_GAIN_LNA [15]] \n"
-                                "\t[-Y TX_GAIN [0]] \n"
-                                "\t[-p RX_PATH ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)] \n"
-                                "\t[-P TX_PATH ([tx_auto]|txb1|txb2|txw|txh)] \n"
-                                "\t[-u RX_GAIN_PGA [15]] \n"
-                                "\t[-U RX_GAIN_VGA [15]] \n"
-                                "\t[-a Reference clock path [internal]] \n"
-                                "\t[-x Reference clock frequency [internal clock freq]] \n"
-                                "\t[-B Calibration freq [0]] \n"
-                                "\t[-s Sync type [all]] \n"
-                                "\t[-Q <flag: Discover and exit>] \n"
-                                "\t[-A Antenna configuration [0]] \n"
-                                "\t[-H comma-separated list of sin generator start phases (FP values)] \n"
-                                "\t[-d comma-separated list of sin generator phase deltas (FP values)] \n"
-                                "\t[-g comma-separated list of sin generator gains (FP values, dBFS -100..0)] \n"
-                                "\t[-X <flag: Skip initialization>] \n"
-                                "\t[-z <flag: Continue on error>] \n"
-                                "\t[-b TX packet precharge count before doing RX (valid with -T flag) [16]\n"
-                                "\t[-l loglevel [3(INFO)]] \n"
-                                "\t[-G calibration [algo#]] \n"
-                                "\t[-Z param1=value1,param2=value2,...] \n"
-                                "\t[-m <flag: Enable chirp TX generator mode>] \n"
-                                "\t[-M comma-separated list of CHIRP generator params (each channel specified as <chirp length is samples(int)>:<freq0(float)>:<freq1(float)>)] \n"
-                                "\t[-h <flag: This help>]",
-             me);
-}
-
-/*
  * Get packet from the circular buffer & TX
  * Returns true on success, false on error or EOF
  */
@@ -504,7 +510,8 @@ static bool do_transmit(pusdr_dms_t strm, uint64_t* ts, const usdr_dms_nfo_t* nf
     {
         unsigned idx = ring_buffer_cwait(tbuff[b], 1000000);
         if (idx == IDX_TIMEDOUT) {
-            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "TX Cbuffer[%d] timed out!", b);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "TX Cbuffer[%d] timed out!", b);
+            return false;
         }
 
         char* buf = ring_buffer_at(tbuff[b], idx);
@@ -569,7 +576,8 @@ static bool do_receive(pusdr_dms_t strm, unsigned iteration, usdr_dms_recv_nfo_t
     {
         unsigned idx = ring_buffer_pwait(rbuff[b], 1000000);
         if (idx == IDX_TIMEDOUT) {
-            USDR_LOG(LOG_TAG, USDR_LOG_WARNING, "RX Pbuffer[%d] timed out!", b);
+            USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "RX Pbuffer[%d] timed out!", b);
+            return false;
         }
         buffers[b] = ring_buffer_at(rbuff[b], idx);
     }
@@ -590,7 +598,7 @@ static bool do_receive(pusdr_dms_t strm, unsigned iteration, usdr_dms_recv_nfo_t
 
 struct mychannel_info {
     const char* chlst[64];
-    unsigned chmsk;
+    uint64_t chmsk;
     unsigned chlst_cnt;
     bool chmsk_alter;
 };
@@ -600,7 +608,7 @@ static void channel_info_init(mychannel_info_t* c) {
     c->chmsk = 1;
     c->chmsk_alter = false;
     c->chlst_cnt = 0;
-    memset(c->chlst, 0, SIZEOF_ARRAY(c->chlst));
+    memset(c->chlst, 0, sizeof(c->chlst));
 }
 
 static void fill_usdr_channels(usdr_channel_info_t* chans, unsigned chan_map[64], mychannel_info_t* ch) {
@@ -653,7 +661,7 @@ unsigned parse_param_list(char* list, unsigned max_len, param_list_t* out)
 int main(UNUSED int argc, UNUSED char** argv)
 {
     int res;
-    pdm_dev_t dev;
+    pdm_dev_t dev = NULL;
     const char* device_name = NULL;
     unsigned rate = 50 * 1000 * 1000;
     usdr_dms_nfo_t snfo_rx;
@@ -663,6 +671,8 @@ int main(UNUSED int argc, UNUSED char** argv)
     pusdr_dms_t strms[2] = { NULL, NULL };
     pthread_t wthread[MAX_CHS];
     pthread_t rthread[MAX_CHS];
+    unsigned rx_threads_started = 0;
+    unsigned tx_threads_started = 0;
     unsigned count = 128;
     bool explicit_count = false;
 
@@ -750,69 +760,116 @@ int main(UNUSED int argc, UNUSED char** argv)
     //set colored log output
     usdrlog_enablecolorize(NULL);
 
+    char short_options[3 * SIZEOF_ARRAY(dm_create_long_options)];
+    res = cli_build_short_options(dm_create_long_options, short_options, sizeof(short_options));
+    if (res) {
+        fprintf(stderr, "Unable to build short option list: %s\n", strerror(-res));
+        return 1;
+    }
+
     // Still available: kL
-    while ((opt = getopt(argc, argv, "b:B:U:u:R:Qq:e:E:w:W:y:Y:l:S:O:C:F:f:c:r:i:XtTNAoha:D:s:p:P:z:I:x:j:H:d:g:JG:Z:K:mM:v:V:")) != -1) {
+    while ((opt = getopt_long(argc, argv, short_options, dm_create_long_options, NULL)) != -1) {
         switch (opt) {
         //BB frequency RX
-        case 'v': freq_bb_rx = atof(optarg); break;
-        //BB frequency TX
-        case 'V': freq_bb_tx = atof(optarg); break;
-        //Time-division duplexing (TDD) frequency
-        case 'q': dev_data[DD_TDD_FREQ].value = atof(optarg); dev_data[DD_TDD_FREQ].ignore = false; break;
-        //RX frequency
-        case 'e': dev_data[DD_RX_FREQ].value = atof(optarg); dev_data[DD_RX_FREQ].ignore = false; break;
-        //TX frequency
-        case 'E': dev_data[DD_TX_FREQ].value = atof(optarg); dev_data[DD_TX_FREQ].ignore = false; break;
-        //RX bandwidth
-        case 'w': dev_data[DD_RX_BANDWIDTH].value = atof(optarg); dev_data[DD_RX_BANDWIDTH].ignore = false; break;
-        //TX bandwidth
-        case 'W': dev_data[DD_TX_BANDWIDTH].value = atof(optarg); dev_data[DD_TX_BANDWIDTH].ignore = false; break;
-        //RX LNA gain
-        case 'y': dev_data[DD_RX_GAIN_LNA].value = atoi(optarg); dev_data[DD_RX_GAIN_LNA].ignore = false; break;
-        //TX gain
-        case 'Y': dev_data[DD_TX_GAIN].value = atoi(optarg); dev_data[DD_TX_GAIN].ignore = false; break;
-        //RX LNA path ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)
-        case 'p': dev_data[DD_RX_PATH].value = (uintptr_t)optarg; dev_data[DD_RX_PATH].ignore = false; break;
-        //TX LNA path ([tx_auto]|txb1|txb2|txw|txh)
-        case 'P': dev_data[DD_TX_PATH].value = (uintptr_t)optarg; dev_data[DD_TX_PATH].ignore = false; break;
-        //RX PGA gain
-        case 'u': dev_data[DD_RX_GAIN_PGA].value = atoi(optarg); dev_data[DD_RX_GAIN_PGA].ignore = false; break;
-        //RX VGA gain
-        case 'U': dev_data[DD_RX_GAIN_VGA].value = atoi(optarg); dev_data[DD_RX_GAIN_VGA].ignore = false; break;
-        //TX loopback gain
-        case 'K': dev_data[DD_TX_GAIN_LB].value = atoi(optarg); dev_data[DD_TX_GAIN_LB].ignore = false; break;
-        case 'G':
-            calibrate = atoi(optarg);
+        case OPT_RX_BB_FREQUENCY:
+            freq_bb_rx = cli_parse_si_double_or_exit("rx-bb-frequency", optarg);
             break;
-        case 'J':
+        //BB frequency TX
+        case OPT_TX_BB_FREQUENCY:
+            freq_bb_tx = cli_parse_si_double_or_exit("tx-bb-frequency", optarg);
+            break;
+        //Time-division duplexing (TDD) frequency
+        case OPT_TDD_FREQUENCY:
+            dev_data[DD_TDD_FREQ].value = cli_parse_si_double_or_exit("tdd-frequency", optarg);
+            dev_data[DD_TDD_FREQ].ignore = false;
+            break;
+        //RX frequency
+        case OPT_RX_FREQUENCY:
+            dev_data[DD_RX_FREQ].value = cli_parse_si_double_or_exit("rx-frequency", optarg);
+            dev_data[DD_RX_FREQ].ignore = false;
+            break;
+        //TX frequency
+        case OPT_TX_FREQUENCY:
+            dev_data[DD_TX_FREQ].value = cli_parse_si_double_or_exit("tx-frequency", optarg);
+            dev_data[DD_TX_FREQ].ignore = false;
+            break;
+        //RX bandwidth
+        case OPT_RX_BANDWIDTH:
+            dev_data[DD_RX_BANDWIDTH].value = cli_parse_si_double_or_exit("rx-bandwidth", optarg);
+            dev_data[DD_RX_BANDWIDTH].ignore = false;
+            break;
+        //TX bandwidth
+        case OPT_TX_BANDWIDTH:
+            dev_data[DD_TX_BANDWIDTH].value = cli_parse_si_double_or_exit("tx-bandwidth", optarg);
+            dev_data[DD_TX_BANDWIDTH].ignore = false;
+            break;
+        //RX LNA gain
+        case OPT_RX_GAIN_LNA:
+            dev_data[DD_RX_GAIN_LNA].value = cli_parse_int_or_exit("rx-gain-lna", optarg);
+            dev_data[DD_RX_GAIN_LNA].ignore = false;
+            break;
+        //TX gain
+        case OPT_TX_GAIN:
+            dev_data[DD_TX_GAIN].value = cli_parse_int_or_exit("tx-gain", optarg);
+            dev_data[DD_TX_GAIN].ignore = false;
+            break;
+        //RX LNA path ([rx_auto]|rxl|rxw|rxh|adc|rxl_lb|rxw_lb|rxh_lb)
+        case OPT_RX_PATH:
+            dev_data[DD_RX_PATH].value = (uintptr_t)optarg;
+            dev_data[DD_RX_PATH].ignore = false;
+            break;
+        //TX LNA path ([tx_auto]|txb1|txb2|txw|txh)
+        case OPT_TX_PATH:
+            dev_data[DD_TX_PATH].value = (uintptr_t)optarg;
+            dev_data[DD_TX_PATH].ignore = false;
+            break;
+        //RX PGA gain
+        case OPT_RX_GAIN_PGA:
+            dev_data[DD_RX_GAIN_PGA].value = cli_parse_int_or_exit("rx-gain-pga", optarg);
+            dev_data[DD_RX_GAIN_PGA].ignore = false;
+            break;
+        //RX VGA gain
+        case OPT_RX_GAIN_VGA:
+            dev_data[DD_RX_GAIN_VGA].value = cli_parse_int_or_exit("rx-gain-vga", optarg);
+            dev_data[DD_RX_GAIN_VGA].ignore = false;
+            break;
+        //TX loopback gain
+        case OPT_TX_LOOPBACK_GAIN:
+            dev_data[DD_TX_GAIN_LB].value = cli_parse_int_or_exit("tx-loopback-gain", optarg);
+            dev_data[DD_TX_GAIN_LB].ignore = false;
+            break;
+        case OPT_CALIBRATION:
+            calibrate = cli_parse_unsigned_or_exit("calibration", optarg);
+            break;
+        case OPT_LUT:
             use_lut = true;
             break;
         //Statistics option
-        case 'j':
-            statistics = atoi(optarg);
+        case OPT_STATISTICS:
+            statistics = cli_parse_unsigned_or_exit("statistics", optarg);
             break;
         //Reference clock source path, [internal]|external
-        case 'a':
+        case OPT_REFCLK_PATH:
             refclkpath = optarg;
             break;
         //Reference clock (in Hz). Ignored when internal clocking is selected.
         //If omitted, the default internal ref clock will be used (26MHz typically)
-        case 'x':
-            fref = atof(optarg);
+        case OPT_REFCLK_FREQUENCY:
+            fref = cli_parse_si_u64_or_exit("refclk-frequency", optarg);
             break;
-        case 'b':
-            tx_pkt_precharge = atoi(optarg);
+        case OPT_TX_PRECHARGE:
+            tx_pkt_precharge = cli_parse_int_or_exit("tx-precharge", optarg);
             break;
         //Calibration frequency
-        case 'B':
-            cal_freq = atof(optarg);
+        case OPT_CALIBRATION_FREQUENCY:
+            cal_freq = cli_parse_si_unsigned_or_exit("calibration-frequency", optarg);
             break;
         //Sync type ([all]|1pps|rx|tx|any|none|off)
-        case 's':
+        case OPT_SYNC:
             synctype = optarg;
             break;
         //Print available devices
-        case 'Q':
+        case OPT_DISCOVER:
             listdevs = true;
             break;
         //Device additional options & parameters
@@ -824,23 +881,23 @@ int main(UNUSED int argc, UNUSED char** argv)
         //            - this enables the devboard clock, that can be used as 'external' clock for your on-board sdr device.
         //              (see -a & -x options above)
         //  See the full devboard parameters list in the documentation.
-        case 'D':
+        case OPT_DEVICE:
             device_name = optarg;
             break;
         //Set log level (0 - errors only -> 6+ - trace msgs)
-        case 'l':
-            loglevel = atof(optarg);
+        case OPT_LOG_LEVEL:
+            loglevel = cli_parse_unsigned_or_exit("log-level", optarg);
             usdrlog_setlevel(NULL, loglevel);
             break;
         //Set file name to store RX data (default: ./out.data)
         //A suffix will be automatically added to the file name when using several RX RF channels
-        case 'f':
+        case OPT_RX_FILE:
             filename_rx = optarg;
             break;
         //Set file name(s) to read TX data (produce sine if omitted)
         //Use colon-separated list for several TX RF channels
         //If the number of channels exceeds the number of files, round-robin file rotation will be applied.
-        case 'I':
+        case OPT_TX_FILES:
         {
             const char* sep = ":";
             char* pch = strtok(optarg, sep);
@@ -863,30 +920,35 @@ int main(UNUSED int argc, UNUSED char** argv)
             break;
         }
         //TX cycling - if filesize/tx_block_sz < count
-        case 'o':
+        case OPT_TX_FILE_CYCLE:
             tx_file_cycle = true;
             break;
         //Block count - TX/RX samples count in one data block
-        case 'c':
-            count = atoi(optarg);
+        case OPT_COUNT:
+            count = strcmp(optarg, "-1") == 0 ? UINT_MAX :
+                    cli_parse_unsigned_or_exit("count", optarg);
             explicit_count = true;
             break;
         //Sample rate
-        case 'r':
-            rate = atof(optarg);
+        case OPT_SAMPLE_RATE:
+            rate = cli_parse_si_unsigned_or_exit("sample-rate", optarg);
+            if (rate == 0) {
+                fprintf(stderr, "Sample rate must be greater than zero\n");
+                return 1;
+            }
             break;
         //Set data format (default: ci16)
-        case 'F':
+        case OPT_RX_FORMAT:
             fmt_rx = optarg;
             break;
-        case 'i':
+        case OPT_TX_FORMAT:
             fmt_tx = optarg;
             break;
         //Channels mask - autodetect if not specified
-        case 'C':
-        case 'R':
+        case OPT_RX_CHANNELS:
+        case OPT_TX_CHANNELS:
         {
-            mychannel_info_t* ci = (opt == 'R') ? &chl_tx : &chl_rx;
+            mychannel_info_t* ci = (opt == OPT_TX_CHANNELS) ? &chl_tx : &chl_rx;
             if (*optarg == ':') {
                 char *pt = strtok(optarg + 1, ",");
                 ci->chlst_cnt = 0;
@@ -895,46 +957,54 @@ int main(UNUSED int argc, UNUSED char** argv)
                     pt = strtok(NULL, ",");
                 }
             } else {
-                ci->chmsk = atoi(optarg);
+                ci->chmsk = cli_parse_u64_or_exit(opt == OPT_TX_CHANNELS ? "tx-channels" : "rx-channels", optarg);
             }
 
             ci->chmsk_alter = true;
             break;
         }
         //RX buffer size, in samples
-        case 'S':
-            samples_rx = atoi(optarg);
+        case OPT_RX_BUFFER_SIZE:
+            samples_rx = cli_parse_unsigned_or_exit("rx-buffer-size", optarg);
+            if (samples_rx == 0) {
+                fprintf(stderr, "RX buffer size must be greater than zero\n");
+                return 1;
+            }
             break;
         //TX buffer size, in samples
-        case 'O':
-            samples_tx = atoi(optarg);
+        case OPT_TX_BUFFER_SIZE:
+            samples_tx = cli_parse_unsigned_or_exit("tx-buffer-size", optarg);
+            if (samples_tx == 0) {
+                fprintf(stderr, "TX buffer size must be greater than zero\n");
+                return 1;
+            }
             break;
         //Skip device initialization
-        case 'X':
+        case OPT_SKIP_INITIALIZATION:
             noinit = 1;
             break;
         //TX only mode
-        case 't':
+        case OPT_TX_ONLY:
             dotx = 1;
             dorx = 0;
             break;
         //TX and RX mode
-        case 'T':
+        case OPT_TX_RX:
             dotx = 1;
             dorx = 1;
             break;
         //No time stamp for TX
-        case 'N':
+        case OPT_NO_TIMESTAMPS:
             nots = true;
             break;
         //Antenna configuration [0]
-        case 'A':
-            antennacfg = atoi(optarg);
+        case OPT_ANTENNA:
+            antennacfg = cli_parse_unsigned_or_exit("antenna", optarg);
             break;
         //Comma-separated list of sin generator start phases (FP values)
         //Ordered by channel#
         //If start phase is not specified or ==-1, default sequence is applied (see start_phase[] below)
-        case 'H':
+        case OPT_TX_START_PHASES:
         {
             char *pt = strtok(optarg, ",");
             unsigned i = 0;
@@ -947,7 +1017,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         //Comma-separated list of sin generator phase deltas (FP values). The resulting frequency == sample_rate * phase_delta
         //Ordered by channel#
         //If not specified or ==-1, default sequence is applied (see start_dphase[] below)
-        case 'd':
+        case OPT_TX_PHASE_DELTAS:
         {
             char *pt = strtok(optarg, ",");
             unsigned i = 0;
@@ -960,7 +1030,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         //Comma-separated list of sin generator gains (dBFS -100..0 range).
         //Ordered by channel#
         //If not specified, default 0dBFS is applied (see gains[] below)
-        case 'g':
+        case OPT_TX_GAINS:
         {
             char *pt = strtok(optarg, ",");
             unsigned i = 0;
@@ -974,16 +1044,16 @@ int main(UNUSED int argc, UNUSED char** argv)
             break;
         }
         //Don't stop on error
-        case 'z':
+        case OPT_CONTINUE_ON_ERROR:
             stop_on_error = false;
             break;
-        case 'Z':
+        case OPT_PARAMETERS:
             extra_param_len = parse_param_list(optarg, SIZEOF_ARRAY(extra_params), extra_params);
             break;
-        case 'm':
+        case OPT_CHIRP:
             use_chirp_gen = true;
             break;
-        case 'M':
+        case OPT_CHIRP_PARAMETERS:
         {
             char* pt_end;
             char *pt = strtok_r(optarg, ",", &pt_end);
@@ -996,7 +1066,8 @@ int main(UNUSED int argc, UNUSED char** argv)
                 if(!chirp_pt)
                     exit(EXIT_FAILURE);
                 else
-                    tx_thread_inputs[i].chirp_sample_count = atoi(chirp_pt);
+                    tx_thread_inputs[i].chirp_sample_count =
+                            cli_parse_int_or_exit("chirp-parameters", chirp_pt);
 
                 chirp_pt = strtok_r(NULL, ":", &chirp_pt_end);
                 if(!chirp_pt)
@@ -1017,12 +1088,16 @@ int main(UNUSED int argc, UNUSED char** argv)
             break;
         }
         //Show usage
-        case 'h':
+        case OPT_HELP:
             usdrlog_disablecolorize(NULL);
-            usage(USDR_LOG_INFO, argv[0]);
+            cli_print_usage(stdout, argv[0], "[OPTIONS]",
+                            dm_create_long_options, dm_create_options_help);
+            cli_print_si_help(stdout);
             exit(EXIT_SUCCESS);
         default:
-            usage(USDR_LOG_ERROR, argv[0]);
+            cli_print_usage(stderr, argv[0], "[OPTIONS]",
+                            dm_create_long_options, dm_create_options_help);
+            cli_print_si_help(stderr);
             exit(EXIT_FAILURE);
         }
     }
@@ -1050,10 +1125,11 @@ int main(UNUSED int argc, UNUSED char** argv)
     if (dotx) {
         if(tx_from_file)
         {
-            s_in_file[0] = fopen(filename_tx[0], "rb+");
+            s_in_file[0] = fopen(filename_tx[0], "rb");
             if (!s_in_file[0]) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open TX source data file #%u '%s'", 0, filename_tx[0]);
-                return 3;
+                res = 3;
+                goto finalize;
             }
         }
 
@@ -1069,7 +1145,8 @@ int main(UNUSED int argc, UNUSED char** argv)
         s_out_file[0] = fopen(filename_rx, "wb+c");
         if (!s_out_file[0]) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create RX storage data file #%u '%s'", 0, filename_rx);
-            return 3;
+            res = 3;
+            goto finalize;
         }
 
         // Device should decide which BW to use
@@ -1083,7 +1160,8 @@ int main(UNUSED int argc, UNUSED char** argv)
     res = usdr_dmd_create_string(device_name, &dev);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create device: errno %d", res);
-        return 1;
+        res = 1;
+        goto finalize;
     }
 
     // Apply extra parameters
@@ -1095,7 +1173,8 @@ int main(UNUSED int argc, UNUSED char** argv)
                  res, res ? strerror(res) : "");
 
         if (stop_on_error && res) {
-            return 1;
+            res = 1;
+            goto finalize;
         }
     }
 
@@ -1108,11 +1187,13 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     res = usdr_dme_get_u32(dev, "/ll/sdr/max_hw_rx_chans", &swchmax);
     if (res == 0) {
+        uint64_t channel_count = (uint64_t)devices * swchmax;
+        uint64_t channel_mask = channel_count >= 64 ? UINT64_MAX : (UINT64_C(1) << channel_count) - 1;
         if (!chl_tx.chmsk_alter) {
-            chl_tx.chmsk = (1ULL << devices * swchmax) - 1;
+            chl_tx.chmsk = channel_mask;
         }
         if (!chl_rx.chmsk_alter) {
-            chl_rx.chmsk = (1ULL << devices * swchmax) - 1;
+            chl_rx.chmsk = channel_mask;
         }
     }
 
@@ -1154,7 +1235,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dmr_rate_set(dev, NULL, rate);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set device rate: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
 
         usleep(5000);
@@ -1169,13 +1250,13 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dms_create_ex2(dev, "/ll/srx/0", fmt_rx, &chans, samples_rx, rxflags, NULL, &usds_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to initialize RX data stream: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
 
         res = res ? res : usdr_dms_info(usds_rx, &snfo_rx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get RX data stream info: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         } else {
             s_rx_blksampl = snfo_rx.pktsyms;
             s_rx_blksz = snfo_rx.pktbszie;
@@ -1193,13 +1274,13 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dms_create_ex2(dev, "/ll/stx/0", fmt_tx, &chans, samples_tx, 0, NULL, &usds_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to initialize TX data stream: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
 
         res = res ? res : usdr_dms_info(usds_tx, &snfo_tx);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get TX data stream info: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         } else {
             s_tx_blksz = snfo_tx.pktbszie;
             s_tx_blksampl = snfo_tx.pktsyms;
@@ -1209,12 +1290,13 @@ int main(UNUSED int argc, UNUSED char** argv)
         memset(&snfo_tx, 0, sizeof(snfo_tx));
     }
 
-    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Configured RX %d (%d bytes) x %d buffs  TX %d x %d buffs  ===  RX_MASK %x/%d FMT %s",
+    USDR_LOG(LOG_TAG, USDR_LOG_INFO, "Configured RX %d (%d bytes) x %d buffs  TX %d x %d buffs  ===  RX_MASK %" PRIx64 "/%d FMT %s",
              s_rx_blksampl, s_rx_blksz, rx_bufcnt, s_tx_blksz, tx_bufcnt, chl_rx.chmsk, chl_rx.chlst_cnt, fmt_rx);
 
     if (rx_bufcnt > MAX_CHS || tx_bufcnt > MAX_CHS) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Too many requested channels %d/%d (MAX: %d)", rx_bufcnt, tx_bufcnt, MAX_CHS);
-        if (stop_on_error) goto dev_close;
+        res = -E2BIG;
+        goto finalize;
     }
 
     // initialize thread input params
@@ -1234,7 +1316,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         tx_thread_input_t* inp = &tx_thread_inputs[i];
         inp->chan = i;
         inp->samplerate = rate;
-        inp->samples_count = samples_tx;
+        inp->samples_count = s_tx_blksampl;
         inp->start_phase = inp->start_phase > -1 ? inp->start_phase : start_phase[i % (sizeof(start_phase) / sizeof(*start_phase))];
         inp->delta_phase = inp->delta_phase > -1 ? inp->delta_phase : start_dphase[i % (sizeof(start_dphase) / sizeof(*start_dphase))];
         inp->gain = inp->gain != INT16_MIN ? inp->gain : gains[i % (sizeof(gains) / sizeof(*gains))];
@@ -1266,7 +1348,8 @@ int main(UNUSED int argc, UNUSED char** argv)
         {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "CH#%2d CHIRP params error: freq0 >= freq1 [%.2f >= %.2f]",
                      i, tx_thread_inputs[i].chirp_freq0, tx_thread_inputs[i].chirp_freq1);
-            goto dev_close;
+            res = -EINVAL;
+            goto finalize;
         }
 
         const int sc = abs(tx_thread_inputs[i].chirp_sample_count);
@@ -1286,10 +1369,11 @@ int main(UNUSED int argc, UNUSED char** argv)
 
             const char* fname = filename_tx[fidx++];
 
-            s_in_file[f] = fopen(fname, "rb+");
+            s_in_file[f] = fopen(fname, "rb");
             if (!s_in_file[f]) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to open TX source data file #%u '%s'", f, fname);
-                return 3;
+                res = 3;
+                goto finalize;
             }
             else
                 USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "TX source data file #%u '%s' opened OK", f, fname);
@@ -1297,28 +1381,35 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         for (unsigned i = 0; i < tx_bufcnt; i++) {
             tbuff[i] = ring_buffer_create(256, sizeof(tx_header_t) + snfo_tx.pktbszie);
+            if (!tbuff[i]) {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to allocate TX ring buffer %d", i);
+                res = -ENOMEM;
+                goto finalize;
+            }
 
             fn_rxtx_thread_t thread_func;
             if(tx_from_file)
                 thread_func = disk_read_thread;
-            else if(strcmp(fmt_rx, SFMT_CI16) == 0 || strcmp(fmt_rx, SFMT_CI16_CI12) == 0)
+            else if(strcmp(fmt_tx, SFMT_CI16) == 0 || strcmp(fmt_tx, SFMT_CI16_CI12) == 0)
                 thread_func = (use_lut) ? freq_gen_thread_ci16_lut : freq_gen_thread_ci16;
-            else if(strcmp(fmt_rx, SFMT_CF32) == 0 || strcmp(fmt_rx, SFMT_CF32_CI12) == 0)
+            else if(strcmp(fmt_tx, SFMT_CF32) == 0 || strcmp(fmt_tx, SFMT_CF32_CI12) == 0)
                 thread_func = freq_gen_thread_cf32;
             else
             {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: invalid format '%s', "
-                                                  "use -I option to read from file or specify %s/%s data format (-F option) for sine generator",
-                         i, fmt_rx, SFMT_CI16, SFMT_CF32);
-                goto dev_close;
+                                                  "use -I option to read from file or specify %s/%s data format (-i option) for sine generator",
+                         i, fmt_tx, SFMT_CI16, SFMT_CF32);
+                res = -EINVAL;
+                goto finalize;
             }
 
             res = pthread_create(&rthread[i], NULL, thread_func, &tx_thread_inputs[i]);
 
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX thread %d: errno %d", i, res);
-                goto dev_close;
+                goto finalize;
             }
+            tx_threads_started++;
         }
     }
 
@@ -1335,7 +1426,8 @@ int main(UNUSED int argc, UNUSED char** argv)
             s_out_file[f] = fopen(fmod, "wb+c");
             if (!s_out_file[f]) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to create RX storage data file #%u '%s'", f, fmod);
-                return 3;
+                res = 3;
+                goto finalize;
             }
             else
                 USDR_LOG(LOG_TAG, USDR_LOG_DEBUG, "RX storage data file #%u '%s' created OK", f, fmod);
@@ -1343,11 +1435,17 @@ int main(UNUSED int argc, UNUSED char** argv)
 
         for (unsigned i = 0; i < rx_bufcnt; i++) {
             rbuff[i] = ring_buffer_create(256, snfo_rx.pktbszie);
+            if (!rbuff[i]) {
+                USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to allocate RX ring buffer %d", i);
+                res = -ENOMEM;
+                goto finalize;
+            }
             res = pthread_create(&wthread[i], NULL, disk_write_thread, &rx_thread_inputs[i]);
             if (res) {
                 USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start RX thread %d: errno %d", i, res);
-                goto dev_close;
+                goto finalize;
             }
+            rx_threads_started++;
         }
     }
 
@@ -1371,7 +1469,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     res = usdr_dms_sync(dev, "off", 2, strms);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
-        if (stop_on_error) goto dev_close;
+        if (stop_on_error) goto finalize;
     }
 
     //Start RX streaming
@@ -1379,7 +1477,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usds_rx ? usdr_dms_op(usds_rx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start RX data stream: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
     }
 
@@ -1388,7 +1486,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usds_tx ? usdr_dms_op(usds_tx, USDR_DMS_START, 0) : -EPROTONOSUPPORT;
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to start TX data stream: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
     }
 
@@ -1396,7 +1494,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     // res = usdr_dms_sync(dev, synctype, 2, strms);
     // if (res) {
     //     USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
-    //     if (stop_on_error) goto dev_close;
+    //     if (stop_on_error) goto finalize;
     // }
 
 
@@ -1416,7 +1514,7 @@ int main(UNUSED int argc, UNUSED char** argv)
         res = usdr_dme_findsetv_uint(dev, "/dm/sdr/0/", SIZEOF_ARRAY(dev_data), dev_data);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to set device parameters: errno %d", res);
-            if (stop_on_error) goto dev_close;
+            if (stop_on_error) goto finalize;
         }
     }
 
@@ -1424,7 +1522,7 @@ int main(UNUSED int argc, UNUSED char** argv)
     res = usdr_dms_sync(dev, synctype, 2, strms);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to sync data streams: errno %d", res);
-        if (stop_on_error) goto dev_close;
+        if (stop_on_error) goto finalize;
     }
 
     if (calibrate) {
@@ -1444,10 +1542,12 @@ int main(UNUSED int argc, UNUSED char** argv)
 
     //Check stream handles and exit if NULL
     if (dotx && !usds_tx) {
-        goto dev_close;
+        res = -ENODEV;
+        goto finalize;
     }
     if (dorx && !usds_rx) {
-        goto dev_close;
+        res = -ENODEV;
+        goto finalize;
     }
 
     //TX & RX
@@ -1472,7 +1572,9 @@ int main(UNUSED int argc, UNUSED char** argv)
     unsigned fifo_min = ~0;
     unsigned tx_samples_cnt;
 
-    for (unsigned i = 0; !s_stop && (i < count); i++)
+    for (unsigned i = 0;
+         !atomic_load_explicit(&s_stop, memory_order_relaxed) && (i < count);
+         i++)
     {
         if (tx_pkt_precharge < 0) {
             if (tx_pkt_precharge != 0) {
@@ -1553,44 +1655,56 @@ stop:
         res = usdr_dms_op(usds_rx, USDR_DMS_STOP, 0);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to stop RX data stream: errno %d", res);
-            goto dev_close;
+            goto finalize;
         }
     }
     if (dotx) {
         res = usdr_dms_op(usds_tx, USDR_DMS_STOP, 0);
         if (res) {
             USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to stop TX data stream: errno %d", res);
-            goto dev_close;
+            goto finalize;
         }
     }
-
-    thread_stop = true;
 
     res = usdr_dme_get_uint(dev, "/dm/debug/all", temp);
     if (res) {
         USDR_LOG(LOG_TAG, USDR_LOG_ERROR, "Unable to get device debug data: errno %d", res);
-        goto dev_close;
+        goto finalize;
     }
 
     print_device_temperature(dev);
 
-    //Finalize all the threads started above
-    if (dorx) {
-        for (unsigned i = 0; i < rx_bufcnt; i++) {
-            pthread_join(wthread[i], NULL);
+finalize:
+    atomic_store_explicit(&thread_stop, true, memory_order_relaxed);
+
+    for (unsigned i = 0; i < rx_threads_started; i++)
+        pthread_join(wthread[i], NULL);
+    for (unsigned i = 0; i < tx_threads_started; i++)
+        pthread_join(rthread[i], NULL);
+
+    for (unsigned i = 0; i < MAX_CHS; i++) {
+        if (rbuff[i]) {
+            ring_buffer_destroy(rbuff[i]);
+            rbuff[i] = NULL;
         }
-    }
-    if (dotx) {
-        for (unsigned i = 0; i < tx_bufcnt; i++) {
-            pthread_join(rthread[i], NULL);
+        if (tbuff[i]) {
+            ring_buffer_destroy(tbuff[i]);
+            tbuff[i] = NULL;
+        }
+        if (s_out_file[i]) {
+            fclose(s_out_file[i]);
+            s_out_file[i] = NULL;
+        }
+        if (s_in_file[i]) {
+            fclose(s_in_file[i]);
+            s_in_file[i] = NULL;
         }
     }
 
-dev_close:
     //Dispose stream handles
-    if (strms[1]) usdr_dms_destroy(strms[1]);
-    if (strms[0]) usdr_dms_destroy(strms[0]);
+    if (usds_tx) usdr_dms_destroy(usds_tx);
+    if (usds_rx) usdr_dms_destroy(usds_rx);
     //Close & Dispose dev connection handle
-    usdr_dmd_close(dev);
+    if (dev) usdr_dmd_close(dev);
     return res;
 }
