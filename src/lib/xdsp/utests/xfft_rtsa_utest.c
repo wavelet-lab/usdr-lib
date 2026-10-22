@@ -12,8 +12,8 @@
 
 #undef DEBUG_PRINT
 
-#define LOWER_PWR_BOUND -120
-#define UPPER_PWR_BOUND -0
+#define LOWER_PWR_BOUND -100
+#define UPPER_PWR_BOUND -40
 #define DIVS_FOR_DB 1
 
 #define AVGS 128
@@ -63,8 +63,8 @@ static void setup(void)
         wvlt_fftwf_complex* ptr = in + j * STREAM_SIZE;
         for(unsigned i = 0; i < STREAM_SIZE; ++i)
         {
-            ptr[i][0] =  100.0f * (float)(rand()) / (float)RAND_MAX;
-            ptr[i][1] = -100.0f * (float)(rand()) / (float)RAND_MAX;
+            ptr[i][0] =  1.0f * (float)(rand()) / (float)RAND_MAX;
+            ptr[i][1] = -1.0f * (float)(rand()) / (float)RAND_MAX;
         }
 
         uint16_t* ptr16 = in16 + j * STREAM_SIZE;
