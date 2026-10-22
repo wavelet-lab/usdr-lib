@@ -16,6 +16,15 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase, int32_t *__restrict sta
 {
     unsigned i = total_samples_count;
 
+    int32_t delta_phase0 = delta_phase[0];
+    int32_t delta_phase1 = delta_phase[1];
+
+    if(delta_phase0 > delta_phase1) { // if f0 > f1 - totally inverse chirp
+        delta_phase0 = delta_phase[1];
+        delta_phase1 = delta_phase[0];
+        chirp_samples_count = -chirp_samples_count;
+    }
+
     int32_t chirp_steps_cnt;
     if(chirp_samples_count > 0) {
         chirp_steps_cnt = chirp_samples_count - 1;
@@ -23,8 +32,10 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase, int32_t *__restrict sta
         chirp_steps_cnt = chirp_samples_count + 1;
     }
 
-    int32_t delta_phase0 = delta_phase[0];
-    int32_t delta_phase1 = delta_phase[1];
+    if(!chirp_steps_cnt) {
+        memset(outdata, 0, total_samples_count * sizeof(int16_t) * 2); //nothing to do, fill zeros and return
+        return;
+    }
 
     const int16_t sign_sin = inv_sin ? -1 : 1;
     const int16_t sign_cos = inv_cos ? -1 : 1;
@@ -32,18 +43,6 @@ void TEMPLATE_FUNC_NAME(int32_t *__restrict start_phase, int32_t *__restrict sta
 #ifdef CHIRP_DEBUG_PRINT
     printf("ORIGINAL F0:%d F1:%d PHASE:%d F:%d\n", delta_phase0, delta_phase1, *start_phase, *start_delta_phase);
 #endif
-
-    if((int64_t)delta_phase1 * (int64_t)delta_phase0 > 0) {
-        return;
-    }
-    if(delta_phase0 > delta_phase1) {
-        return;
-    }
-    if(delta_phase0 < -delta_phase1) {
-        delta_phase0 = -delta_phase1;
-    } else if(delta_phase0 > -delta_phase1) {
-        delta_phase1 = -delta_phase0;
-    }
 
     const int64_t pdiff = (int64_t)delta_phase1 - (int64_t)delta_phase0;
     const int64_t rem = pdiff % abs(chirp_steps_cnt);
