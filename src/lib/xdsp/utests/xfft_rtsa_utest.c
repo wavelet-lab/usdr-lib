@@ -12,8 +12,8 @@
 
 #undef DEBUG_PRINT
 
-#define LOWER_PWR_BOUND -120
-#define UPPER_PWR_BOUND -0
+#define LOWER_PWR_BOUND -60
+#define UPPER_PWR_BOUND -20
 #define DIVS_FOR_DB 1
 
 #define AVGS 128
@@ -41,9 +41,10 @@ static rtsa_pwr_t* out_etalon = NULL;
 static struct fft_rtsa_data rtsa_data;
 static struct fft_rtsa_data rtsa_data_etalon;
 
-static float scale_mpy = 3.010f;
-static float mine = 1E-7f;
-static float corr = -50.f;
+static float scale_mpy = 3.010f; // 10.0 / log2(10)
+static float mine      = 1E-7f;  // min value to avoid log(0) issues
+static float MAX_IQ    = 100.f;  // input data range (abs)
+static float corr      = -40.f;  // -20 * log10(MAX_IQ)
 
 static fft_rtsa_settings_t rtsa_settings;
 static rtsa_hwi16_consts_t hwi16_consts;
@@ -63,8 +64,8 @@ static void setup(void)
         wvlt_fftwf_complex* ptr = in + j * STREAM_SIZE;
         for(unsigned i = 0; i < STREAM_SIZE; ++i)
         {
-            ptr[i][0] =  100.0f * (float)(rand()) / (float)RAND_MAX;
-            ptr[i][1] = -100.0f * (float)(rand()) / (float)RAND_MAX;
+            ptr[i][0] = 2.f * MAX_IQ * (float)(rand()) / (float)RAND_MAX - MAX_IQ;
+            ptr[i][1] = 2.f * MAX_IQ * (float)(rand()) / (float)RAND_MAX - MAX_IQ;
         }
 
         uint16_t* ptr16 = in16 + j * STREAM_SIZE;
@@ -315,8 +316,8 @@ Suite * rtsa_suite(void)
     Suite* s = suite_create("xfft_rtsa_functions");
 
     ADD_REGRESS_TEST(s, rtsa_check);
-    //ADD_PERF_LOOP_TEST(s, rtsa_speed, 300, 0, 4);
-    ADD_PERF_LOOP_TEST(s, rtsa_speed_u16, 300, 0, 4);
+    ADD_PERF_LOOP_TEST(s, rtsa_speed, 300, 0, 4);
+    //ADD_PERF_LOOP_TEST(s, rtsa_speed_u16, 300, 0, 4);
 
     return s;
 }

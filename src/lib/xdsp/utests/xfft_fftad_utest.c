@@ -32,6 +32,11 @@ static float* out = NULL;
 static float* out_etalon = NULL;
 static struct fft_accumulate_data acc;
 
+static float scale_mpy = 3.010f; // 10.0 / log2(10)
+static float mine      = 1E-7f;  // min value to avoid log(0) issues
+static float MAX_IQ    = 100.f;  // input data range (abs)
+static float corr      = -40.f;  // -20 * log10(MAX_IQ)
+
 static void setup(void)
 {
     srand( time(0) );
@@ -48,14 +53,14 @@ static void setup(void)
     //init input data
     for(unsigned i = 0; i < STREAM_SIZE; ++i)
     {
-        in[i][0] =  100.0f * (float)(rand()) / (float)RAND_MAX;
-        in[i][1] = -100.0f * (float)(rand()) / (float)RAND_MAX;
+        in[i][0] = 2.f * MAX_IQ * (float)(rand()) / (float)RAND_MAX - MAX_IQ;
+        in[i][1] = 2.f * MAX_IQ * (float)(rand()) / (float)RAND_MAX - MAX_IQ;
     }
 
     //init acc
     acc.f_mant = f_mant;
     acc.f_pwr  = f_pwr;
-    acc.mine   = 0.001;
+    acc.mine   = mine;
 }
 
 static void teardown(void)
@@ -83,7 +88,7 @@ START_TEST(fftad_check)
 
     fftad_init_c(OPT_GENERIC, NULL)(&acc, STREAM_SIZE);
     fftad_add_c(OPT_GENERIC, NULL)(&acc, in, STREAM_SIZE);
-    fftad_norm_c(OPT_GENERIC, NULL)(&acc, STREAM_SIZE, 1.0, 0.0, out_etalon);
+    fftad_norm_c(OPT_GENERIC, NULL)(&acc, STREAM_SIZE, scale_mpy, corr, out_etalon);
 
 #ifdef DEBUG_PRINT
     for(unsigned i = 0; i < STREAM_SIZE; ++i)
@@ -119,7 +124,7 @@ START_TEST(fftad_check)
 
         fn_init(&acc, STREAM_SIZE);
         fn_add(&acc, in, STREAM_SIZE);
-        fn_norm(&acc, STREAM_SIZE, 1.0, 0.0, out);
+        fn_norm(&acc, STREAM_SIZE, scale_mpy, corr, out);
 
 #ifdef DEBUG_PRINT
         for(unsigned i = 0; i < STREAM_SIZE; ++i)
@@ -183,7 +188,7 @@ START_TEST(fftad_speed)
         //warming
         (*fn_init)(&acc, size);
         for(unsigned i = 0; i < 100; ++i) (*fn_add)(&acc, in, size);
-        (*fn_norm)(&acc, size, 1.0, 0.0, out);
+        (*fn_norm)(&acc, size, scale_mpy, corr, out);
 
         //measuring
         uint64_t tk = clock_get_time();
@@ -191,7 +196,7 @@ START_TEST(fftad_speed)
         for(unsigned i = 0; i < SPEED_MEASURE_ITERS; ++i)
         {
             for(unsigned j = 0; j < AVGS; ++j) (*fn_add)(&acc, in, size);
-            (*fn_norm)(&acc, size, 1.0, 0.0, out);
+            (*fn_norm)(&acc, size, scale_mpy, corr, out);
         }
         uint64_t tk1 = clock_get_time() - tk;
 
