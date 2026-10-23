@@ -1,6 +1,4 @@
-    while(i > 0)
-    {
-        phase += dphase;
+    while(i > 0) {
         const float ph = WVLT_SINCOS_I32_PHSCALE * phase;
         float ssin, scos;
 
@@ -8,15 +6,12 @@
         *outdata++ = ssin * gain * sign_sin;
         *outdata++ = scos * gain * sign_cos;
 
-        dphase += chirp_step;
-        if(dphase > delta_phase1)
-        {
-            dphase = delta_phase0;
+#ifdef CHIRP_DEBUG_PRINT
+        if(total_samples_count - i <= chirp_samples_count) {
+            printf("---- GENERIC ---- step_idx:%u PHASE:%d F:%d\n", step_idx, phase, dphase);
         }
-        else if(dphase < delta_phase0)
-        {
-            dphase = delta_phase1;
-        }
+#endif
 
+        CHIRP_PHASE_CONDITION;
         --i;
     }

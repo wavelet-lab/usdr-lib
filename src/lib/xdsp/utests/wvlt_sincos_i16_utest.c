@@ -44,11 +44,12 @@ static generic_opts_t max_opt = OPT_GENERIC;
 struct chirp_t
 {
     int32_t phase_diap[2];
+    int32_t start_phase;
     int32_t start_dphase;
-    int32_t steps_count;
+    int32_t chirp_sample_count;
 };
 
-static struct chirp_t chirp = { {-1000000, 1000000}, -1000000, (100000 / 8) * 8 + 7};
+static struct chirp_t chirp = { {-1000000, 1000000}, 0, -1000000, 256};
 
 static void setup()
 {
@@ -374,10 +375,7 @@ START_TEST(wvlt_sincos_i16_interleaved_chirp_check_simd)
 
     //get etalon output data (generic foo)
     (*get_fn_interleaved_chirp(OPT_GENERIC, 0))
-        (&ph_etalon, &phdelta_etalon, chirp.phase_diap, chirp.steps_count, gain_c, inv_sin, inv_cos, sincosdata_etalon, WORD_COUNT);
-
-    fprintf(stderr, "-- start_phase:%d delta_phase:%d final_phase:%d\n", start_phase[0], delta_ph, ph_etalon);
-
+        (&ph_etalon, &phdelta_etalon, chirp.phase_diap, chirp.chirp_sample_count, gain_c, inv_sin, inv_cos, sincosdata_etalon, WORD_COUNT);
 
     while(opt != OPT_GENERIC)
     {
@@ -385,14 +383,14 @@ START_TEST(wvlt_sincos_i16_interleaved_chirp_check_simd)
         if(fn)
         {
             memset(sincosdata, 0, WORD_COUNT * 2 * sizeof(int16_t));
-            int32_t ph = start_phase[0];
+            int32_t ph = chirp.start_phase;
             int32_t phdelta = chirp.start_dphase;
 
-            (*fn)(&ph, &phdelta, chirp.phase_diap, chirp.steps_count, gain_c, inv_sin, inv_cos, sincosdata, WORD_COUNT);
+            (*fn)(&ph, &phdelta, chirp.phase_diap, chirp.chirp_sample_count, gain_c, inv_sin, inv_cos, sincosdata, WORD_COUNT);
 
-            int32_t tmp_ph = start_phase[0];
+            int32_t tmp_ph = chirp.start_phase;
             int32_t max_eps = 0;
-            for(unsigned i = 0; i < WORD_COUNT; ++i, tmp_ph += delta_ph)
+            for(unsigned i = 0; i < WORD_COUNT; ++i)
             {
                 int16_t ss = sincosdata[i*2];
                 int16_t cc = sincosdata[i*2 + 1];
@@ -450,7 +448,7 @@ START_TEST(wvlt_sincos_i16_interleaved_chirp_speed)
             int32_t phdelta = chirp.start_dphase;
             //warming
             for(int i = 0; i < 10; ++i)
-                (*fn)(&ph, &phdelta, chirp.phase_diap, chirp.steps_count, gain[0], invert_sin[0], invert_cos[0], sincosdata, SPEED_WORD_COUNT);
+                (*fn)(&ph, &phdelta, chirp.phase_diap, chirp.chirp_sample_count, gain[0], invert_sin[0], invert_cos[0], sincosdata, SPEED_WORD_COUNT);
 
             //measuring
             phdelta = chirp.start_dphase;
@@ -458,13 +456,57 @@ START_TEST(wvlt_sincos_i16_interleaved_chirp_speed)
             for(unsigned i = 0; i < SPEED_CYCLES; ++i)
             {
                 (*fn)
-                    (&start_phase[i], &phdelta, chirp.phase_diap, chirp.steps_count, gain[i], invert_sin[i], invert_cos[i], sincosdata, iters);
+                    (&start_phase[i], &phdelta, chirp.phase_diap, chirp.chirp_sample_count, gain[i], invert_sin[i], invert_cos[i], sincosdata, iters);
             }
             uint64_t tk1 = clock_get_time() - tk;
             fprintf(stderr, "\t%" PRIu64 " us elapsed, %" PRIu64 " ns per 1 IQ, ave speed = %.2f mln IQs/s \n",
                     tk1, (uint64_t)(tk1*1000LL/SPEED_CYCLES/iters), (uint64_t)(1000000LL*SPEED_CYCLES*iters/tk1)/(float)1000000);
         }
     }
+}
+END_TEST
+
+START_TEST(chirp_to_file)
+{
+    const unsigned series = 1;
+
+    const unsigned sample_sz = 65536;
+    const unsigned byte_sz = sample_sz * sizeof(int16_t) * 2;
+    const unsigned total_byte_sz = byte_sz * series;
+
+    const int32_t chirp_samples = 256;
+    const int32_t f0 =  INT32_MIN;
+    const int32_t f1 =  INT32_MAX;
+    int32_t farr[2] = {f0, f1};
+    int32_t gain = 32760;
+
+    char* buf;
+    posix_memalign((void**)&buf, 64, total_byte_sz);
+    memset(buf, 0, total_byte_sz);
+
+    int32_t start_phase = 0;
+    int start_freq = f0;
+
+    sincos_i16_interleaved_chirp_function_t fn = get_fn_interleaved_chirp(OPT_SSSE3/*OPT_GENERIC*/, 0);
+
+    for(unsigned i = 0; i < series; ++i) {
+        (*fn)
+           (&start_phase,
+            &start_freq,
+            farr,
+            chirp_samples,
+            gain,
+            true,
+            false,
+            (int16_t*)(buf + byte_sz * i),
+            sample_sz);
+    }
+
+    FILE *file = fopen("chirp.ci16", "wb");
+    fwrite(buf, 1, total_byte_sz, file);
+    fclose(file);
+
+    free(buf);
 }
 END_TEST
 //
@@ -482,6 +524,9 @@ Suite * wvlt_sincos_i16_suite(void)
     ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_interleaved_ctrl_speed, 60, 0, 3);
     ADD_REGRESS_TEST(s, wvlt_sincos_i16_interleaved_chirp_check_simd);
     ADD_PERF_LOOP_TEST(s, wvlt_sincos_i16_interleaved_chirp_speed, 60, 0, 3);
+
+    // use this for additional IQ analysis
+    //ADD_REGRESS_TEST(s, chirp_to_file);
 
     return s;
 }
