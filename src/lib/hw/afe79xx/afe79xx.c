@@ -3,6 +3,10 @@
 #include <usdr_port.h>
 #include <usdr_logging.h>
 
+#ifndef USDR_DEFAULT_AFECAPI
+#define USDR_DEFAULT_AFECAPI "libcapi79xx.so"
+#endif
+
 enum afe79xx_regs {
     CHIP_TYPE = 3,
     CHIP_ID_LO = 4,

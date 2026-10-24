@@ -31,6 +31,10 @@
 #define NO_ECFG_DEFS
 #include "../device/ext_fe_ch4_400_7200/ext_fe_ch4_400_7200.h"
 
+#ifndef USDR_DEFAULT_AFECFG_PATH
+#define USDR_DEFAULT_AFECFG_PATH "."
+#endif
+
 // Board revisions:
 //  1 - DSDR
 //  2 - Hiper
