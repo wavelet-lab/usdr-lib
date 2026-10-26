@@ -70,6 +70,7 @@ struct stream_sfetrx_dma32 {
     uint32_t cached_samples;
     uint64_t rcnt;
     uint64_t r_ts;
+    bool rx_ready_issued;
 
     uint32_t burst_mask;
 
@@ -108,13 +109,13 @@ int _sfetrx4_destroy(stream_handle_t* str)
     int res;
 
     if (stream->type == USDR_ZCPY_RX) {
-        //Gracefull stop
-        res = lowlevel_reg_wr32(dev, 0,
-                                stream->cnf_base + 1, 0);
+        // Stop the producer before disabling DMA to avoid leaving an in-flight block.
+        res = sfe_rx4_startstop(&stream->storage.srx4, false);
         if (res)
             return res;
 
-        res = sfe_rx4_startstop(&stream->storage.srx4, false);
+        res = lowlevel_reg_wr32(dev, 0,
+                                stream->cnf_base + 1, 0);
         if (res)
             return res;
     } else {
@@ -150,12 +151,12 @@ int _sfetrx4_stream_recv(stream_handle_t* str,
     unsigned oob_size = sizeof(oob_data);
     char* dma_buf;
 
-    if (stream->rcnt == 0) {
-        // TODO: Issue rx ready, should be put inside
+    if (!stream->rx_ready_issued) {
         res = lowlevel_reg_wr32(dev, 0,
                                 stream->cnf_base + 1, 4);
         if (res)
             return res;
+        stream->rx_ready_issued = true;
     }
 
     ops = lowlevel_get_ops(dev);
@@ -499,6 +500,39 @@ int _sfetrx4_stream_send(stream_handle_t* str,
 }
 
 
+static int _sfetrx4_drain_rx(stream_sfetrx_dma32_t* stream)
+{
+    lowlevel_ops_t* ops = lowlevel_get_ops(stream->base.dev->dev);
+    unsigned drained = 0;
+
+    for (;;) {
+        uint64_t oob_data[2];
+        unsigned oob_size = sizeof(oob_data);
+        char* dma_buf;
+        int res = ops->recv_dma_wait(stream->base.dev->dev, 0,
+                                     stream->ll_streamo, (void**)&dma_buf,
+                                     &oob_data, &oob_size, 0);
+        if (res == -ETIMEDOUT || res == -EAGAIN)
+            break;
+        if (res < 0)
+            return res;
+
+        res = ops->recv_dma_release(stream->base.dev->dev, 0,
+                                    stream->ll_streamo, dma_buf);
+        if (res)
+            return res;
+        drained++;
+    }
+
+    if (drained) {
+        USDR_LL_LOG(stream->base.dev->dev, "UDMS", USDR_LOG_INFO,
+                    "Stream[%d] drained %u pending RX DMA buffers\n",
+                    stream->ll_streamo, drained);
+    }
+    return 0;
+}
+
+
 static int _sfetrx4_op(stream_handle_t* str,
                        unsigned command,
                        dm_time_t tm)
@@ -519,15 +553,33 @@ static int _sfetrx4_op(stream_handle_t* str,
     }
 
     if (stream->type == USDR_ZCPY_RX) {
-        // Enable DMA first
-        res = lowlevel_reg_wr32(dev, 0,
-                                stream->cnf_base + 1, start ? 1 : 0);
-        if (res)
-            return res;
+        if (start) {
+            stream->rx_ready_issued = false;
 
-        res = sfe_rx4_startstop(&stream->storage.srx4, start);
-        if (res)
-            return res;
+            // Enable DMA before starting the frontend producer.
+            res = lowlevel_reg_wr32(dev, 0,
+                                    stream->cnf_base + 1, 1);
+            if (res)
+                return res;
+
+            res = sfe_rx4_startstop(&stream->storage.srx4, true);
+            if (res)
+                return res;
+        } else {
+            // Stop the producer before disabling DMA so the pipeline drains cleanly.
+            res = sfe_rx4_startstop(&stream->storage.srx4, false);
+            if (res)
+                return res;
+
+            res = lowlevel_reg_wr32(dev, 0,
+                                    stream->cnf_base + 1, 0);
+            if (res)
+                return res;
+
+            res = _sfetrx4_drain_rx(stream);
+            if (res)
+                return res;
+        }
     } else {
         // Assuming Complex IQ
         unsigned lgchcnt = (stream->fe_chans == 1) ? 0 :
@@ -861,6 +913,7 @@ static int initialize_stream_rx_32(device_t* device,
     strdev->cached_samples = ~0u;
     strdev->rcnt = 0;
     strdev->r_ts = 0; // Start timestamp
+    strdev->rx_ready_issued = false;
 
     strdev->stats.wirebytes = 0;
     strdev->stats.symbols = 0;
