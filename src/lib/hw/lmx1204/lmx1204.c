@@ -654,12 +654,11 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
         MAKE_LMX1204_R86(0),                                            //MUXOUT_EN_OVRD=0
         MAKE_LMX1204_R79(0, st->logiclk_div_bypass ? 0x104 : 0x5),
         MAKE_LMX1204_REG_WR(0x4c, 0),                                   //R76==0
-        MAKE_LMX1204_R72(0, 0, 0, 0, SYSREF_DELAY_BYPASS_ENGAGE_IN_GENERATOR_MODE__BYPASS_IN_REPEATER_MODE),
 
         // need for MULT VCO calibration
         MAKE_LMX1204_R67(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x51cb : 0x50c8),
         MAKE_LMX1204_R34(0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x04c5 : 0),
-        MAKE_LMX1204_R33(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x6666 : 0x7777),
+        MAKE_LMX1204_R33(st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 0x5666 : 0x7777),
         //
 
         MAKE_LMX1204_R25(0x4, 0, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? st->clk_mult_div : st->clk_mult_div - 1, st->clk_mux),
@@ -684,6 +683,10 @@ int lmx1204_solver(lmx1204_state_t* st, bool prec_mode, bool dry_run)
                         st->clkout_en[LMX1204_CH3], st->clkout_en[LMX1204_CH2], st->clkout_en[LMX1204_CH1], st->clkout_en[LMX1204_CH0]),
         MAKE_LMX1204_R3(st->ch_en[LMX1204_CH3], st->ch_en[LMX1204_CH2], st->ch_en[LMX1204_CH1], st->ch_en[LMX1204_CH0], 1, 1, 1, 1, 1, 0, st->smclk_div),
         MAKE_LMX1204_R2(0,0,st->smclk_div_pre, st->clk_mux == CLK_MUX_MULTIPLIER_MODE ? 1 : 0, 0x3),
+
+        // R72 must be the last one
+        // We must set sysrefreq_spi bit to 1 (ignore SYSREFREQ pin state) in the CONTINUOUS (generator) mode
+        MAKE_LMX1204_R72(0, 0, 0, st->sysref_mode == LMX1204_CONTINUOUS ? 1 : 0, SYSREF_DELAY_BYPASS_ENGAGE_IN_GENERATOR_MODE__BYPASS_IN_REPEATER_MODE),
         //
         MAKE_LMX1204_R0(0, 0, 0, 0),    //reset RESET bit last -> calibration started
     };
@@ -707,7 +710,7 @@ int lmx1204_calibrate(lmx1204_state_t* st)
     {
         MAKE_LMX1204_R67(0x51cb),
         MAKE_LMX1204_R34(0, 0x04c5),
-        MAKE_LMX1204_R33(0x6666),
+        MAKE_LMX1204_R33(0x5666),
         MAKE_LMX1204_R0(0, 0, 0, 0),
     };
 
