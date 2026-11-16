@@ -144,9 +144,9 @@ static int _espi_flash_id_to_str(uint32_t flash_id,
         snprintf(outid, maxstr, "Renesas AT25%cL%03llu1C %llu Mb",
                  ((flash_id >> 16) & 0x80) ? 'Q' : 'S', capacity_mbit, capacity_mbit);
     } else if ((manufacture_id == JEDEC_MICRON) && (flash_type == MICRON_SERIAL_NOR || flash_type == MICRON_SERIAL_NOR_18)) {
-            snprintf(outid, maxstr, "Micron Serial NOR MT25Q %llu Mb (%s)",
-                     capacity_mbit,
-                     (flash_type == MICRON_SERIAL_NOR) ? "3.3V" : "1.8V");
+        snprintf(outid, maxstr, "Micron Serial NOR MT25Q %llu Mb (%s)",
+                 capacity_mbit,
+                 (flash_type == MICRON_SERIAL_NOR) ? "3.3V" : "1.8V");
     } else if (manufacture_id == JEDEC_MACRONIX) {
         snprintf(outid, maxstr, "Macronix MX%02x series %llu Mb",
                  flash_type, capacity_mbit);
