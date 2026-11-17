@@ -10,11 +10,14 @@
 #include <set>
 #include <memory>
 #include <atomic>
+#include <complex>
+#include <vector>
 
 #include "../lib/models/dm_all.h"
 extern "C" {
 #include "../common/ring_circbuf.h"
 }
+#include "usdr_soapy_decim.h"
 
 SoapySDR::Kwargs usdrSoapyDeviceArgs(const SoapySDR::Kwargs &args);
 std::string usdrSoapyDeviceString(const SoapySDR::Kwargs &args);
@@ -442,6 +445,18 @@ private:
         std::atomic<bool> active;
 
         std::vector<ring_circbuf_t*> rxcbuf;
+
+        // RX host-side decimation (see hostDecimationFactor)
+        struct {
+            unsigned factor = 1;
+            std::vector<UsdrHalfbandDecimator> chans;
+            std::vector<std::vector<std::complex<float>>> link;   // one link packet per channel
+            std::vector<std::vector<int16_t>> link16;             // same, when the link format is ci16
+            std::vector<std::vector<std::complex<float>>> out;    // decimated packet per channel
+            size_t out_len = 0;
+            size_t out_pos = 0;
+            long long out_tick = 0;
+        } dec;
     };
 
     uint64_t max_sw_chans(const int direction) const;
@@ -449,6 +464,9 @@ private:
     void validateDirection(const int direction) const;
     void validateChannel(const int direction, const size_t channel) const;
     void ensureSampleRateConfigured(const int direction, const size_t channel);
+    unsigned hostDecimationFactor(double rate) const;
+    int readStreamDecimated(USDRStream* ustr, void * const *buffs, size_t numElems,
+                            int &flags, long long &timeNs, const long timeoutUs);
 
     const char* get_sdr_param(int sdridx, const char* dir, const char* par, const char* subpar);
     const char* get_sdr_param_chan(int sdridx, const char* dir, const char* par, const char* subpar, unsigned chan);
@@ -463,6 +481,11 @@ private:
     unsigned _actual_rx_rate;
 
     unsigned _desired_rx_pkt;
+
+    // RX host-side decimation for xSDR gateware without the FPGA DDC
+    bool _host_decim_capable = false;
+    bool _tx_rate_requested = false;
+    std::atomic<unsigned> _rx_host_decim{1};
 
     bool _force_rx_wire12bit = false;
     bool _dump_calls = false;
