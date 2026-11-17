@@ -48,7 +48,17 @@ SoapySDR::Kwargs usdrSoapyDeviceArgs(const SoapySDR::Kwargs &args)
 
 std::string usdrSoapyDeviceString(const SoapySDR::Kwargs &args)
 {
-    return SoapySDR::KwargsToString(usdrSoapyDeviceArgs(args));
+    // libusdr's connection-string parser doesn't skip spaces, so join without the ", "
+    // SoapySDR::KwargsToString uses. Otherwise " device=usdr1" is ignored and the first
+    // device opens instead of the selected one.
+    std::string result;
+    for (const auto &kv : usdrSoapyDeviceArgs(args)) {
+        if (!result.empty()) {
+            result += ",";
+        }
+        result += kv.first + "=" + kv.second;
+    }
+    return result;
 }
 
 bool usdrSoapyIsDeviceArg(const std::string &key)
