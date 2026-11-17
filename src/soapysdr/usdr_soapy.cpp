@@ -1116,10 +1116,12 @@ void SoapyUSDR::setSampleRate(const int direction, const size_t channel, const d
 
 
     if (res) {
-        SoapySDR::logf(callLogLvl(), "SoapyUSDR::setSampleRate(%d, %s, %g MHz) - error %d",
+        SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setSampleRate(%d, %s, %g MHz) - error %d",
                        int(channel), (direction == SOAPY_SDR_TX) ? "TX" : "RX", rate/1e6, res);
 
-        throw std::runtime_error("SoapyUSDR::setSampleRate() unable to set samplerate!");
+        throw std::runtime_error("SoapyUSDR::setSampleRate() unable to set samplerate " +
+                                 std::to_string(rate / 1e6) + " MSps (error " + std::to_string(res) +
+                                 "); see the uSDR log for the reason");
     }
 }
 
