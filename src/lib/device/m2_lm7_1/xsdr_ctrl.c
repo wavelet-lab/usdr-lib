@@ -424,8 +424,9 @@ static int _xsdr_mmcm_pd(xsdr_dev_t *d)
 static int g_clk_reduce = 0;
 int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, unsigned txphase, unsigned txphase_off)
 {
-    const unsigned VCO_MIN = d->ssdr_pro ? MMCM_VCO_MIN : MMCM_VCO_MIN_USP;
-    const unsigned VCO_MAX = d->ssdr_pro ? MMCM_VCO_MAX : MMCM_VCO_MAX_USP;
+    // UltraScale+ parts (SSDR Pro) have a narrower MMCM VCO range than 7-series parts
+    const unsigned VCO_MIN = d->xilinx_usp ? MMCM_VCO_MIN_USP : MMCM_VCO_MIN;
+    const unsigned VCO_MAX = d->xilinx_usp ? MMCM_VCO_MAX_USP : MMCM_VCO_MAX;
 
     bool nomul = d->dpump ? false :
         (rx_master) ? d->base.lml_mode.rxsisoddr || (d->base.rxtsp_div > 1) :
