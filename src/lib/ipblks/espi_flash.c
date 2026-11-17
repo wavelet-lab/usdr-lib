@@ -94,16 +94,19 @@ static int _espi_flash_cmd_rdsr(lldev_t dev, subdev_t subdev, unsigned cfg_base,
 
 #define ADESTO_SPI_QPI          0x42
 #define RENESAS_AT25_0321C_TYPE 0x67
+#define RENESAS_AT25_0641C_TYPE 0x68
 #define RENESAS_AT25_1281C_TYPE 0x69
+#define RENESAS_AT25_SL         0x01
+#define RENESAS_AT25_QL         0x81
 
 static int _espi_flash_is_renesas_at25(uint32_t flash_id)
 {
     uint8_t type = (flash_id >> 8) & 0xff;
-    uint8_t variant = (flash_id >> 16) & 0xff;
+    uint8_t spi_type = (flash_id >> 16) & 0xff;
 
     return (flash_id & 0xff) == JEDEC_RENESAS &&
            type >= RENESAS_AT25_0321C_TYPE && type <= RENESAS_AT25_1281C_TYPE &&
-           (variant == 0x01 || variant == 0x81);
+           (spi_type == RENESAS_AT25_SL || spi_type == RENESAS_AT25_QL);
 }
 
 int espi_flash_get_capacity(uint32_t flash_id, uint64_t *capacity)
@@ -142,7 +145,8 @@ static int _espi_flash_id_to_str(uint32_t flash_id,
 
     if (_espi_flash_is_renesas_at25(flash_id)) {
         snprintf(outid, maxstr, "Renesas AT25%cL%03llu1C %llu Mb",
-                 ((flash_id >> 16) & 0x80) ? 'Q' : 'S', capacity_mbit, capacity_mbit);
+                 ((flash_id >> 16) & 0xff) == RENESAS_AT25_QL ? 'Q' : 'S',
+                 capacity_mbit, capacity_mbit);
     } else if ((manufacture_id == JEDEC_MICRON) && (flash_type == MICRON_SERIAL_NOR || flash_type == MICRON_SERIAL_NOR_18)) {
         snprintf(outid, maxstr, "Micron Serial NOR MT25Q %llu Mb (%s)",
                  capacity_mbit,
