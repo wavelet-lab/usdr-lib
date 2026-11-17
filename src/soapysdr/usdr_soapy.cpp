@@ -189,6 +189,9 @@ typedef std::array<unsigned, RATE_CONFIG_WORDS> rate_config;
 
 static const double DEFAULT_SAMPLE_RATE = 5e6;
 
+// /dm/revision carries the HWID in its upper 32 bits: device id in [23:16], PHY config in [7:0]
+static const unsigned HWID_DEVID_XTRX = 0x2e;
+
 struct rx_packet_policy
 {
     double min_sample_rate;
@@ -279,7 +282,15 @@ static const device_ranges usdr_ranges {
     .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
 };
 
+// Documented xSDR specifications: https://docs.wsdr.io/hardware/xsdr.html
 static const device_ranges xsdr_ranges {
+    .frequency_range = SoapySDR::Range(30e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(0.1e6, 100e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 90e6),
+};
+
+// XTRX shares the xsdr device name, so it keeps the ranges xSDR used before
+static const device_ranges xtrx_ranges {
     .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
     .samplerate_range = SoapySDR::Range(0.1e6, 125e6),
     .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
@@ -319,6 +330,7 @@ static inline const device_ranges* get_ranges(device_type_t t) {
     switch (t) {
     case DEVICE_USDR: return &usdr_ranges;
     case DEVICE_XSDR: return &xsdr_ranges;
+    case DEVICE_XTRX: return &xtrx_ranges;
     case DEVICE_SSDR: return &ssdr_ranges;
     case DEVICE_DSDR: return &dsdr_ranges;
     case DEVICE_LSDR: return &lsdr_ranges;
@@ -514,6 +526,17 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
             device_type = DEVICE_LSDR;
         else if (strcmp(device, "limemini") == 0)
             device_type = DEVICE_LIMESDR_MINI;
+    }
+
+    if (device_type == DEVICE_XSDR) {
+        // XTRX also reports the xsdr name; the HWID tells them apart
+        uint64_t revision = 0;
+        if (usdr_dme_get_uint(_dev->dev(), "/dm/revision", &revision) == 0) {
+            const unsigned hwid = (unsigned)(revision >> 32);
+            if (((hwid >> 16) & 0xff) == HWID_DEVID_XTRX) {
+                device_type = DEVICE_XTRX;
+            }
+        }
     }
 
     if (args.count("rx_bw")) {

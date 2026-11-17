@@ -33,6 +33,7 @@ enum rfic_type_t {
 enum device_type_t {
     DEVICE_USDR,
     DEVICE_XSDR,
+    DEVICE_XTRX,
     DEVICE_SSDR,
     DEVICE_DSDR,
     DEVICE_LSDR,
