@@ -85,14 +85,29 @@ static int _espi_flash_cmd_rdsr(lldev_t dev, subdev_t subdev, unsigned cfg_base,
     return 0;
 }
 
-#define JEDEC_MACRONIX        0xC2
-#define JEDEC_ADESTO          0x1F
-#define JEDEC_MICRON          0x20
+#define JEDEC_MACRONIX          0xC2
+#define JEDEC_RENESAS           0x1F
+#define JEDEC_MICRON            0x20
 
-#define MICRON_SERIAL_NOR     0xBA
-#define MICRON_SERIAL_NOR_18  0xBB
+#define MICRON_SERIAL_NOR       0xBA
+#define MICRON_SERIAL_NOR_18    0xBB
 
-#define ADESTO_SPI_QPI        0x42
+#define ADESTO_SPI_QPI          0x42
+#define RENESAS_AT25_0321C_TYPE 0x67
+#define RENESAS_AT25_0641C_TYPE 0x68
+#define RENESAS_AT25_1281C_TYPE 0x69
+#define RENESAS_AT25_SL         0x01
+#define RENESAS_AT25_QL         0x81
+
+static int _espi_flash_is_renesas_at25(uint32_t flash_id)
+{
+    uint8_t type = (flash_id >> 8) & 0xff;
+    uint8_t spi_type = (flash_id >> 16) & 0xff;
+
+    return (flash_id & 0xff) == JEDEC_RENESAS &&
+           type >= RENESAS_AT25_0321C_TYPE && type <= RENESAS_AT25_1281C_TYPE &&
+           (spi_type == RENESAS_AT25_SL || spi_type == RENESAS_AT25_QL);
+}
 
 int espi_flash_get_capacity(uint32_t flash_id, uint64_t *capacity)
 {
@@ -100,6 +115,11 @@ int espi_flash_get_capacity(uint32_t flash_id, uint64_t *capacity)
 
     if (capacity == NULL)
         return -EINVAL;
+    if (_espi_flash_is_renesas_at25(flash_id)) {
+        uint8_t type = (flash_id >> 8) & 0xff;
+        *capacity = (UINT64_C(4) * 1024 * 1024) << (type - RENESAS_AT25_0321C_TYPE);
+        return 0;
+    }
     if (capacity_code >= 64)
         return -ERANGE;
 
@@ -123,14 +143,18 @@ static int _espi_flash_id_to_str(uint32_t flash_id,
     unsigned long long capacity_mbit =
         (unsigned long long)(capacity / 1024 / 1024 * 8);
 
-    if ((manufacture_id == JEDEC_MICRON) && (flash_type == MICRON_SERIAL_NOR || flash_type == MICRON_SERIAL_NOR_18)) {
-            snprintf(outid, maxstr, "Micron Serial NOR MT25Q %llu Mb (%s)",
-                     capacity_mbit,
-                     (flash_type == MICRON_SERIAL_NOR) ? "3.3V" : "1.8V");
+    if (_espi_flash_is_renesas_at25(flash_id)) {
+        snprintf(outid, maxstr, "Renesas AT25%cL%03llu1C %llu Mb",
+                 ((flash_id >> 16) & 0xff) == RENESAS_AT25_QL ? 'Q' : 'S',
+                 capacity_mbit, capacity_mbit);
+    } else if ((manufacture_id == JEDEC_MICRON) && (flash_type == MICRON_SERIAL_NOR || flash_type == MICRON_SERIAL_NOR_18)) {
+        snprintf(outid, maxstr, "Micron Serial NOR MT25Q %llu Mb (%s)",
+                 capacity_mbit,
+                 (flash_type == MICRON_SERIAL_NOR) ? "3.3V" : "1.8V");
     } else if (manufacture_id == JEDEC_MACRONIX) {
         snprintf(outid, maxstr, "Macronix MX%02x series %llu Mb",
                  flash_type, capacity_mbit);
-    } else if (manufacture_id == JEDEC_ADESTO && flash_type == ADESTO_SPI_QPI) {
+    } else if (manufacture_id == JEDEC_RENESAS && flash_type == ADESTO_SPI_QPI) {
         snprintf(outid, maxstr, "Adesto SPI/QPI series %llu Mb", capacity_mbit);
     } else {
         snprintf(outid, maxstr, "Mfg 0x%02x Type 0x%02x %llu Mb",
