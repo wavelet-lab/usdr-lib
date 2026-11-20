@@ -48,7 +48,17 @@ SoapySDR::Kwargs usdrSoapyDeviceArgs(const SoapySDR::Kwargs &args)
 
 std::string usdrSoapyDeviceString(const SoapySDR::Kwargs &args)
 {
-    return SoapySDR::KwargsToString(usdrSoapyDeviceArgs(args));
+    // libusdr's connection-string parser doesn't skip spaces, so join without the ", "
+    // SoapySDR::KwargsToString uses. Otherwise " device=usdr1" is ignored and the first
+    // device opens instead of the selected one.
+    std::string result;
+    for (const auto &kv : usdrSoapyDeviceArgs(args)) {
+        if (!result.empty()) {
+            result += ",";
+        }
+        result += kv.first + "=" + kv.second;
+    }
+    return result;
 }
 
 bool usdrSoapyIsDeviceArg(const std::string &key)
@@ -179,6 +189,16 @@ typedef std::array<unsigned, RATE_CONFIG_WORDS> rate_config;
 
 static const double DEFAULT_SAMPLE_RATE = 5e6;
 
+// xSDR gateware without the FPGA DDC reaches low rates only by slowing the LML clock.
+// The interface MMCM's VCO is 63 * 2 * rate there, so below ~4.76 MSps it falls under
+// its 600 MHz minimum. Below this link rate, RX is decimated on the host instead.
+static const double XSDR_MIN_LINK_RATE = 5e6;
+static const unsigned HOST_DECIM_MAX = 64;
+
+// /dm/revision carries the HWID in its upper 32 bits: device id in [23:16], PHY config in [7:0]
+static const unsigned HWID_DEVID_XTRX = 0x2e;
+static const unsigned HWID_PHY_HAS_DUC_DDC = 0x04;
+
 struct rx_packet_policy
 {
     double min_sample_rate;
@@ -269,7 +289,15 @@ static const device_ranges usdr_ranges {
     .bandwidth_range = SoapySDR::Range(0.5e6, 40e6),
 };
 
+// Documented xSDR specifications: https://docs.wsdr.io/hardware/xsdr.html
 static const device_ranges xsdr_ranges {
+    .frequency_range = SoapySDR::Range(30e6, 3800e6),
+    .samplerate_range = SoapySDR::Range(0.1e6, 100e6),
+    .bandwidth_range = SoapySDR::Range(0.5e6, 90e6),
+};
+
+// XTRX shares the xsdr device name, so it keeps the ranges xSDR used before
+static const device_ranges xtrx_ranges {
     .frequency_range = SoapySDR::Range(0.1e6, 3800e6),
     .samplerate_range = SoapySDR::Range(0.1e6, 125e6),
     .bandwidth_range = SoapySDR::Range(0.5e6, 125e6),
@@ -309,6 +337,7 @@ static inline const device_ranges* get_ranges(device_type_t t) {
     switch (t) {
     case DEVICE_USDR: return &usdr_ranges;
     case DEVICE_XSDR: return &xsdr_ranges;
+    case DEVICE_XTRX: return &xtrx_ranges;
     case DEVICE_SSDR: return &ssdr_ranges;
     case DEVICE_DSDR: return &dsdr_ranges;
     case DEVICE_LSDR: return &lsdr_ranges;
@@ -504,6 +533,23 @@ SoapyUSDR::SoapyUSDR(const SoapySDR::Kwargs &args_orig)
             device_type = DEVICE_LSDR;
         else if (strcmp(device, "limemini") == 0)
             device_type = DEVICE_LIMESDR_MINI;
+    }
+
+    if (device_type == DEVICE_XSDR) {
+        // XTRX also reports the xsdr name; the HWID tells them apart and says whether
+        // the gateware has the FPGA DDC/DUC
+        uint64_t revision = 0;
+        if (usdr_dme_get_uint(_dev->dev(), "/dm/revision", &revision) == 0) {
+            const unsigned hwid = (unsigned)(revision >> 32);
+            if (((hwid >> 16) & 0xff) == HWID_DEVID_XTRX) {
+                device_type = DEVICE_XTRX;
+            } else {
+                const bool disabled = args.count("host_decim") && atoi(args.at("host_decim").c_str()) == 0;
+                _host_decim_capable = !(hwid & HWID_PHY_HAS_DUC_DDC) && !disabled;
+                SoapySDR::logf(callLogLvl(), "SoapyUSDR::SoapyUSDR() RX host decimation below %.3f MSps: %s",
+                               XSDR_MIN_LINK_RATE / 1e6, _host_decim_capable ? "on" : "off");
+            }
+        }
     }
 
     if (args.count("rx_bw")) {
@@ -1102,25 +1148,50 @@ void SoapyUSDR::setSampleRate(const int direction, const size_t channel, const d
     {
         _actual_tx_rate = rate;
         _actual_rx_rate = rate; // FIXUP
+        // TX and RX share one hardware rate, so once TX is in use RX stays on the direct path
+        _tx_rate_requested = true;
     }
     else
     {
         return;
     }
 
+    const unsigned decim = (_tx_rate_requested || _streams[SOAPY_SDR_TX].setup) ? 1 : hostDecimationFactor(rate);
+
     rate_config rates = {};
-    rates[RATE_CONFIG_RX] = _actual_rx_rate;
-    rates[RATE_CONFIG_TX] = _actual_tx_rate;
+    rates[RATE_CONFIG_RX] = _actual_rx_rate * decim;
+    rates[RATE_CONFIG_TX] = _actual_tx_rate * decim;
     int res = usdr_dme_set_uint(_dev->dev(), RATE_CONFIG_ENDPOINT,
                             (uintptr_t)rates.data());
 
 
     if (res) {
-        SoapySDR::logf(callLogLvl(), "SoapyUSDR::setSampleRate(%d, %s, %g MHz) - error %d",
+        SoapySDR::logf(SOAPY_SDR_ERROR, "SoapyUSDR::setSampleRate(%d, %s, %g MHz) - error %d",
                        int(channel), (direction == SOAPY_SDR_TX) ? "TX" : "RX", rate/1e6, res);
 
-        throw std::runtime_error("SoapyUSDR::setSampleRate() unable to set samplerate!");
+        throw std::runtime_error("SoapyUSDR::setSampleRate() unable to set samplerate " +
+                                 std::to_string(rate / 1e6) + " MSps (error " + std::to_string(res) +
+                                 "); see the uSDR log for the reason");
     }
+
+    if (decim > 1) {
+        SoapySDR::logf(SOAPY_SDR_INFO, "SoapyUSDR::setSampleRate(%g MHz) running the link at %g MSps and decimating RX by %u on the host",
+                       rate / 1e6, rate * decim / 1e6, decim);
+    }
+    _rx_host_decim = decim;
+}
+
+unsigned SoapyUSDR::hostDecimationFactor(double rate) const
+{
+    if (!_host_decim_capable || rate <= 0.0 || rate >= XSDR_MIN_LINK_RATE) {
+        return 1;
+    }
+
+    unsigned decim = 2;
+    while (decim < HOST_DECIM_MAX && rate * decim < XSDR_MIN_LINK_RATE) {
+        decim *= 2;
+    }
+    return decim;
 }
 
 double SoapyUSDR::getSampleRate(const int direction, const size_t channel) const
@@ -1761,9 +1832,16 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
         closeStream((SoapySDR::Stream *)&_streams[direction]);
     }
 
+    if (direction == SOAPY_SDR_TX && _rx_host_decim > 1) {
+        SoapySDR::logf(SOAPY_SDR_WARNING, "SoapyUSDR::setupStream(TX) TX needs the direct %g MSps rate; turning off RX host decimation",
+                       _actual_tx_rate / 1e6);
+        setSampleRate(SOAPY_SDR_TX, 0, _actual_tx_rate);
+    }
+
     _streams[direction].fmt = uformat;
     _streams[direction].chmsk = chmsk;
     _streams[direction].stream = direction == SOAPY_SDR_RX ? "/ll/srx/0" : "/ll/stx/0";
+    _streams[direction].dec.factor = 0;
 
     if (_actual_rx_rate == 0) {
         const device_ranges *dev_ranges = get_ranges(device_type);
@@ -1774,11 +1852,16 @@ SoapySDR::Stream *SoapyUSDR::setupStream(
     }
 
     if (direction == SOAPY_SDR_RX) {
-        const unsigned defbufsz = default_rx_packet_samples(_actual_rx_rate);
+        const unsigned defbufsz = default_rx_packet_samples((double)_actual_rx_rate * _rx_host_decim);
 
-        _streams[direction].nfo.pktsyms =
+        unsigned pkt =
             (pktSamples != 0) ? pktSamples :
             (_desired_rx_pkt != 0) ? _desired_rx_pkt : defbufsz;
+        if (_host_decim_capable) {
+            // Link packets must split evenly for any decimation factor a later rate may use
+            pkt = (pkt + HOST_DECIM_MAX - 1) / HOST_DECIM_MAX * HOST_DECIM_MAX;
+        }
+        _streams[direction].nfo.pktsyms = pkt;
     } else {
         _streams[direction].nfo.pktsyms = 0;
     }
@@ -1846,11 +1929,12 @@ void SoapyUSDR::closeStream(SoapySDR::Stream *stream)
 size_t SoapyUSDR::getStreamMTU(SoapySDR::Stream *stream) const
 {
     USDRStream* ustr = (USDRStream*)(stream);
+    const unsigned decim = (ustr == &_streams[SOAPY_SDR_RX]) ? _rx_host_decim.load() : 1;
 
     SoapySDR::logf(callLogLvl(), "SoapyUSDR::getStreamMTU(%s) => %d",
-                   ustr->stream, ustr->nfo.pktsyms);
+                   ustr->stream, ustr->nfo.pktsyms / decim);
 
-    return ustr->nfo.pktsyms;
+    return ustr->nfo.pktsyms / decim;
 }
 
 int SoapyUSDR::activateStream(
@@ -1903,6 +1987,10 @@ int SoapyUSDR::readStream(
             usleep(timeoutUs);
         }
         return SOAPY_SDR_TIMEOUT;
+    }
+
+    if (ustr == &_streams[SOAPY_SDR_RX] && _rx_host_decim > 1) {
+        return readStreamDecimated(ustr, buffs, numElems, flags, timeNs, timeoutUs);
     }
 
     int res;
@@ -1996,6 +2084,86 @@ int SoapyUSDR::readStream(
         last_recv_pkt_time = nfo.fsymtime;
         return (res) ? SOAPY_SDR_TIMEOUT : nfo.totsyms;
     }
+}
+
+// RX read while the link runs at rate * factor and the host decimates it. Returns at most the
+// rest of one decimated link packet per call; SoapySDR callers loop on short reads.
+int SoapyUSDR::readStreamDecimated(
+        USDRStream* ustr,
+        void * const *buffs,
+        size_t numElems,
+        int &flags,
+        long long &timeNs,
+        const long timeoutUs)
+{
+    auto &dec = ustr->dec;
+    const unsigned factor = _rx_host_decim;
+    const unsigned chans = _rx_log_chans;
+    const size_t link_pkt = ustr->nfo.pktsyms;
+    const bool link16 = strcmp(ustr->fmt, "ci16") == 0;
+
+    if (dec.factor != factor || dec.chans.size() != chans) {
+        dec.factor = factor;
+        dec.chans.assign(chans, UsdrHalfbandDecimator(factor));
+        dec.link.assign(chans, std::vector<std::complex<float>>(link_pkt));
+        dec.link16.assign(link16 ? chans : 0, std::vector<int16_t>(2 * link_pkt));
+        dec.out.assign(chans, std::vector<std::complex<float>>(link_pkt / factor));
+        dec.out_len = 0;
+        dec.out_pos = 0;
+    }
+
+    if (dec.out_pos == dec.out_len) {
+        std::vector<void*> ptrs(chans);
+        for (unsigned i = 0; i < chans; i++) {
+            ptrs[i] = link16 ? (void*)dec.link16[i].data() : (void*)dec.link[i].data();
+        }
+
+        struct usdr_dms_recv_nfo nfo;
+        int res = usdr_dms_recv(ustr->strm, ptrs.data(), timeoutUs / 1000, &nfo);
+        if (res) {
+            return SOAPY_SDR_TIMEOUT;
+        }
+
+        const size_t count = std::min<size_t>(nfo.totsyms, link_pkt) / factor * factor;
+        for (unsigned i = 0; i < chans; i++) {
+            if (link16) {
+                const int16_t *raw = dec.link16[i].data();
+                for (size_t k = 0; k < count; k++) {
+                    dec.link[i][k] = std::complex<float>(raw[2 * k] / 32768.0f, raw[2 * k + 1] / 32768.0f);
+                }
+            }
+            dec.chans[i].process(dec.link[i].data(), count, dec.out[i].data());
+        }
+
+        dec.out_len = count / factor;
+        dec.out_pos = 0;
+        dec.out_tick = nfo.fsymtime / factor;
+        last_recv_pkt_time = nfo.fsymtime;
+    }
+
+    if ((flags & SOAPY_SDR_ONE_PACKET) != 0) {
+        numElems = std::min(numElems, (size_t)(link_pkt / factor));
+    }
+    const size_t n = std::min(numElems, dec.out_len - dec.out_pos);
+    for (unsigned i = 0; i < chans; i++) {
+        const std::complex<float> *src = dec.out[i].data() + dec.out_pos;
+        if (link16) {
+            int16_t *dst = static_cast<int16_t*>(buffs[i]);
+            for (size_t k = 0; k < n; k++) {
+                const float re = std::max(-32768.0f, std::min(32767.0f, std::round(src[k].real() * 32768.0f)));
+                const float im = std::max(-32768.0f, std::min(32767.0f, std::round(src[k].imag() * 32768.0f)));
+                dst[2 * k] = static_cast<int16_t>(re);
+                dst[2 * k + 1] = static_cast<int16_t>(im);
+            }
+        } else {
+            std::copy(src, src + n, static_cast<std::complex<float>*>(buffs[i]));
+        }
+    }
+
+    flags |= SOAPY_SDR_HAS_TIME;
+    timeNs = SoapySDR::ticksToTimeNs(dec.out_tick + (long long)dec.out_pos, _actual_rx_rate);
+    dec.out_pos += n;
+    return (int)n;
 }
 
 int SoapyUSDR::writeStream(SoapySDR::Stream *stream,

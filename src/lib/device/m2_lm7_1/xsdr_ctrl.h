@@ -74,6 +74,10 @@ struct xsdr_dev
     int lmlcal_tx_phase;
     int lmlcal_rx_phase;
 
+    // Last LML MMCM configuration, kept for rate diagnostics
+    uint64_t mmcm_vco;
+    uint64_t mmcm_vco_min;
+
     bool afe_active;
     bool cfg_srate_siso_rx;
     bool cfg_srate_siso_tx;

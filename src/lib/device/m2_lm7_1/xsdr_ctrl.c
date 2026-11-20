@@ -422,10 +422,26 @@ static int _xsdr_mmcm_pd(xsdr_dev_t *d)
 
 // sep_clkdiv -- experimental mode with dual MMCM path to CLK/CLKDIV
 static int g_clk_reduce = 0;
+
+// Lowest sample rate that keeps the last MMCM configuration's VCO in spec, or 0 if unknown
+static unsigned _xsdr_mmcm_min_rate(const xsdr_dev_t *d, bool rx_master)
+{
+    const uint64_t rate = rx_master ? d->s_rxrate : d->s_txrate;
+    if (rate == 0 || d->mmcm_vco == 0)
+        return 0;
+
+    return (unsigned)((rate * d->mmcm_vco_min + d->mmcm_vco - 1) / d->mmcm_vco);
+}
+
 int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, unsigned txphase, unsigned txphase_off)
 {
-    const unsigned VCO_MIN = d->ssdr_pro ? MMCM_VCO_MIN : MMCM_VCO_MIN_USP;
-    const unsigned VCO_MAX = d->ssdr_pro ? MMCM_VCO_MAX : MMCM_VCO_MAX_USP;
+    // UltraScale+ parts (SSDR Pro) have a narrower MMCM VCO range than 7-series parts
+    const unsigned VCO_MIN = d->xilinx_usp ? MMCM_VCO_MIN_USP : MMCM_VCO_MIN;
+    const unsigned VCO_MAX = d->xilinx_usp ? MMCM_VCO_MAX_USP : MMCM_VCO_MAX;
+
+    // Cleared first so an early return below doesn't leave a stale configuration
+    d->mmcm_vco = 0;
+    d->mmcm_vco_min = 0;
 
     bool nomul = d->dpump ? false :
         (rx_master) ? d->base.lml_mode.rxsisoddr || (d->base.rxtsp_div > 1) :
@@ -474,6 +490,10 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
             }
         }
     }
+
+    // VCO = MCLK * feedback period, which equals io_clk * vco_div_io with or without nomul
+    d->mmcm_vco = (uint64_t)io_clk * vco_div_io;
+    d->mmcm_vco_min = VCO_MIN;
 
     // res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_MMCM_CTRL, mmcm_ctrl_sel | 0);
     // res = res ? res : xsdr_phy_tx_reg(d, PHY_REG_PORT_IQSEL, d->base.lml_mode.txsisoddr ? 0b1010 : 0b1100);
@@ -599,6 +619,15 @@ int xsdr_configure_lml_mmcm_tx(xsdr_dev_t *d, bool rx_master, unsigned rxphase, 
         }
 
         usleep(10);
+    }
+
+    if (d->mmcm_vco < d->mmcm_vco_min) {
+        USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR,
+                    "MMCM Ready flag timed out: VCO %.3f MHz is below the %.0f MHz minimum (LML clock %.3f MHz). "
+                    "Use a sample rate of at least %.3f MSps, or gateware with the FPGA DDC/DUC.\n",
+                    d->mmcm_vco / 1.0e6, d->mmcm_vco_min / 1.0e6, io_clk / 1.0e6,
+                    _xsdr_mmcm_min_rate(d, rx_master) / 1.0e6);
+        return -ERANGE;
     }
 
     USDR_LL_LOG(d->base.lmsstate.dev, "XDEV", USDR_LOG_ERROR, "MMCM Ready flag timed out!\n");
@@ -756,6 +785,13 @@ static int _xsdr_calibrate_lml(xsdr_dev_t *d)
         }
 
         res = res ? res : xsdr_configure_lml_mmcm_tx(d, mmcm_rx_only_path, 0, 0, 0);
+        if (res == 0 && d->mmcm_vco < d->mmcm_vco_min) {
+            USDR_LL_LOG(dev, "XDEV", USDR_LOG_WARNING,
+                        "MMCM VCO %.3f MHz is below the %.0f MHz minimum; the LML clock lock is not guaranteed. "
+                        "Use a sample rate of at least %.3f MSps, or gateware with the FPGA DDC/DUC.\n",
+                        d->mmcm_vco / 1.0e6, d->mmcm_vco_min / 1.0e6,
+                        _xsdr_mmcm_min_rate(d, mmcm_rx_only_path) / 1.0e6);
+        }
         res = res ? res : lms7002m_limelight_reset(&d->base.lmsstate);
         res = res ? res : _xsdr_rxserdes_reset(d);
 
