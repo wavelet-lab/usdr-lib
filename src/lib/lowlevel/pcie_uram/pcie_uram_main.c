@@ -540,6 +540,7 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
                                 void* oob_ptr, unsigned *oob_size, unsigned timeout)
 {
     int res;
+    int ioctl_errno = 0;
     unsigned long ctl_param = ((timeout) << 8) | channel;
     struct stream_cache_data* sc = &d->scache[channel];
     void* addr;
@@ -552,6 +553,7 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
     if (sc->bufavail == 0) {
         if (oob_ptr == NULL) {
             res = ioctl(d->fd, rx ? PCIE_DRIVER_DMA_WAIT : PCIE_DRIVER_DMA_ALLOC, ctl_param);
+            ioctl_errno = res < 0 ? errno : 0;
             sc->oob_size = 0;
             sc->oob_idx = 0;
         } else {
@@ -560,15 +562,19 @@ int pcie_uram_dma_wait_or_alloc(struct pcie_uram_dev* d, bool rx, stream_t chann
             data.oobdata = sc->oob_cache;
             data.ooblength = sizeof(sc->oob_cache);
             res = ioctl(d->fd, rx ? PCIE_DRIVER_DMA_WAIT_OOB : PCIE_DRIVER_DMA_ALLOC_OOB, &data);
-            sc->oob_size = data.ooblength;
+            ioctl_errno = res < 0 ? errno : 0;
+            sc->oob_size = res < 0 ? 0 : data.ooblength;
             sc->oob_idx = 0;
 
-            if (res * 16 != data.ooblength) {
+            if (res >= 0 && res * 16 != data.ooblength) {
                 USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_CRITICAL_WARNING, " RES %d != %d OOBLEN\n", res, sc->oob_size);
             }
         }
         if (res < 0) {
-            res = -errno;
+            res = -ioctl_errno;
+            USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_ERROR,
+                        "STR[%d]: %s DMA ioctl failed: errno=%d (%s), timeout=%u\n",
+                        channel, rx ? "RX" : "TX", ioctl_errno, strerror(ioctl_errno), timeout);
             if (res != -ETIMEDOUT) {
                 USDR_LL_LOG(&d->ll, "PCIE", USDR_LOG_CRITICAL_WARNING, "STR[%d]: PCIe %s dma buffer alloc error: %d!\n",
                          channel, rx ? "recv" : "send", res);
