@@ -52,6 +52,20 @@ tasks:
           ARCH: '{{index .MATCH 2}}'
           COMMAND: 'task deb'
 
+  '*-*-ppa':
+    desc: Build and upload an Ubuntu source package to the Launchpad PPA
+    summary: |
+      Builds one signed source package for the specified Ubuntu series and
+      uploads it to ppa:wavelet-lab/usdr-lib. Launchpad builds all enabled
+      architectures; the local amd64 container is used only to prepare/upload.
+    cmds:
+      - task: _box
+        vars:
+          OS: '{{index .MATCH 0}}'
+          DISTRO_NAME: '{{index .MATCH 1}}'
+          ARCH: 'amd64'
+          COMMAND: 'task ppa'
+
   '*-*-*-int':
     desc: The build environment in interactive mode
     summary: |
